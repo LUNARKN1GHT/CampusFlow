@@ -1,13 +1,34 @@
 # 本地开发
 
-当前可运行内容为 Vue 前端环境页、Python API 健康检查和 OpenAPI 文档，不需要数据库、Docker、Redis 或模型密钥。技术方案和目标架构见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+当前可运行内容为 Vue 前端环境页、Python API 健康检查和 OpenAPI 文档；本地 PostgreSQL + pgvector 与 Redis 可通过 Docker Compose 启动（见下文"本地基础设施"）。业务功能尚未接入数据库，健康检查仍不需要数据库、Redis 或模型密钥。技术方案和目标架构见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
 ## 环境
 
 - Python 3.12，由 `backend/.python-version` 指定；uv 可在同步时寻找或安装相应解释器。
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)。
 - Node.js 建议 24，最低 22.12，使用 npm；版本提示见 `frontend/.nvmrc`。
+- Docker Desktop（Windows 需开启 WSL2 后端）：用于本地 PostgreSQL + pgvector 与 Redis，见下一节。
 - 首次安装依赖需要访问 Python 和 npm 包仓库。
+
+## 本地基础设施（PostgreSQL 与 Redis）
+
+数据库与 Redis 由 [infra/docker-compose.yml](../infra/docker-compose.yml) 定义，在 `infra/` 目录执行：
+
+```bash
+docker compose up -d        # 启动（首次自动拉取镜像）
+docker compose ps           # 状态，两个服务应显示 healthy
+docker compose down         # 停止（数据保留在命名卷中）
+docker compose down -v      # 停止并清空数据（慎用）
+```
+
+连接信息（仅限本机开发）：`127.0.0.1:5432`（用户/密码/业务库均为 `campusflow`，测试库 `campusflow_test`，已启用 vector 扩展）与 `127.0.0.1:6379`（Redis）。连接字符串样例见 `backend/.env.example`。
+
+故障排查：
+
+- **国内网络拉取镜像失败/超时**：在 Docker Desktop 的引擎配置（Windows 上为 `%USERPROFILE%\.docker\daemon.json`）中配置 `registry-mirrors` 国内镜像加速地址后重启 Docker Desktop。修改前先退出 Docker Desktop，避免配置被覆盖。
+- **WSL2 未启用**：管理员 PowerShell 执行 `wsl --install` 并按提示重启。
+- **端口 5432/6379 被占用**：修改 compose 中对应端口映射后重新 `docker compose up -d`。
+- **初始化脚本只执行一次**：修改 `infra/postgres/init/` 后需 `docker compose down -v` 再启动才会重新执行。
 
 以下命令从仓库根目录打开终端执行，前后端分别占用一个终端。不需要手动激活 Python 虚拟环境。
 
@@ -41,6 +62,18 @@ npm run dev
 
 前端请求统一使用相对 `/api` 地址。如调整后端端口，同步修改 `frontend/vite.config.ts` 的代理目标；不要把模型密钥写入前端环境变量。
 
+## 数据库迁移
+
+表结构由 Alembic 迁移管理，在 `backend/` 目录执行：
+
+```bash
+uv run --locked alembic upgrade head                       # 升级到最新结构
+uv run --locked alembic revision --autogenerate -m "说明"   # 按模型变更生成新迁移（需人工检查）
+uv run --locked alembic downgrade -1                       # 回退一步
+```
+
+测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
+
 ## 验证
 
 后端，在 `backend/` 下执行：
@@ -64,7 +97,7 @@ npm run build
 
 ## 当前限制
 
-- 暂无数据库迁移、Worker 命令、Docker Compose、认证、上传、RAG 和排期实现；各预留目录的 README 只说明职责。
+- 暂无数据库迁移、Worker 命令、认证、上传、RAG 和排期实现；各预留目录的 README 只说明职责。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
 - Swagger UI 使用外部静态资源；离线时 UI 可能无法加载，可直接访问 `/openapi.json` 查看接口描述。
