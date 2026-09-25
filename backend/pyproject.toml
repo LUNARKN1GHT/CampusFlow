@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "CampusFlow Python API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.14,<2.0",
     "fastapi>=0.115,<1.0",
+    "psycopg[binary]>=3.2,<4.0",
     "pydantic-settings>=2.8,<3.0",
+    "sqlalchemy>=2.0,<3.0",
     "uvicorn>=0.34,<1.0",
 ]
 
