@@ -1,0 +1,43 @@
+# CampusFlow 本地开发基础设施：PostgreSQL 17 + pgvector、Redis 7
+# 在 infra/ 目录下运行：
+#   docker compose up -d     启动（首次会自动拉取镜像）
+#   docker compose ps        查看状态
+#   docker compose down      停止（数据保留在命名卷中，不会丢）
+#   docker compose down -v   停止并清空数据（慎用）
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: campusflow-db
+    environment:
+      POSTGRES_USER: campusflow
+      POSTGRES_PASSWORD: campusflow
+      POSTGRES_DB: campusflow
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campusflow -d campusflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: campusflow-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
