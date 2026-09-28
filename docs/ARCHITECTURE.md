@@ -1,6 +1,6 @@
 # CampusFlow 技术方案与项目架构
 
-本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前实现仅包括前后端骨架、健康检查、配置和基础测试；数据库、资料处理、模型调用、排期和队列均待实现。**
+本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前已合并工程骨架、健康检查、PostgreSQL 迁移和学期／课程／手动任务／固定日程／可用时间后端；业务前端、访问控制、资料处理、模型调用、排期和队列处理尚待实现。** 已合并实现的独立复验与后续任务见 [开发路线](planning/ROADMAP.md)，不以代码存在代替验收通过。
 
 ## 1. 总体决策
 
@@ -14,16 +14,16 @@
 | --- | --- | --- |
 | 前端 | Vue 3 + TypeScript + Vite | 页面、组件与 API 调用分开，类型检查帮助维护接口；本次建立最小页面。多页时加 Vue Router，有共享状态需求时加 Pinia |
 | Python 运行环境 | Python 3.12 + uv | 小组统一解释器小版本，使用 `pyproject.toml` 和 `uv.lock` 管理依赖；本次落地 |
-| HTTP API | FastAPI + Uvicorn | Pydantic 请求／响应校验、OpenAPI 文档、路由拆分；本次实现 `/api/v1/health` |
+| HTTP API | FastAPI + Uvicorn | Pydantic 校验、OpenAPI 与路由拆分；已注册健康及手动管理接口 |
 | 配置 | pydantic-settings | 环境变量与本地 `.env` 注入，配置集中定义；本次落地 |
-| 持久化 | PostgreSQL 17 + SQLAlchemy 2 + psycopg 3 + Alembic | 保存资料版本、引用、任务与计划；首个持久化功能时引入。默认同步 Session，HTTP 同步数据库路径使用 `def`，不得在 `async def` 中直接执行阻塞 I/O |
-| 向量检索 | PostgreSQL 的 pgvector 扩展 | 语义向量与业务记录共享数据库，便于按课程、学期、资料版本过滤；RAG 阶段引入 |
+| 持久化 | PostgreSQL 17 + SQLAlchemy 2 + psycopg 3 + Alembic | 已接入六张基础业务表及迁移；资料、引用和计划模型随功能扩展。默认同步 Session，HTTP 同步数据库路径使用 `def`，不得在 `async def` 中直接执行阻塞 I/O |
+| 向量检索 | PostgreSQL 的 pgvector 扩展 | Compose 初始化已启用扩展；向量模型、索引及实际检索在 RAG 阶段实现 |
 | 文件存储 | 后端私有本地目录 + 存储接口 | 单实例开发先降低运维成本；文件元数据进数据库，原文件不进 Git。需要多实例时替换为 S3 兼容存储 |
 | 资料解析 | pypdf + 可替换 OCR／多模态适配器 | PDF 文本优先直接提取；扫描件和复杂表格走识别流程，保留页码及定位；资料功能阶段引入 |
 | AI 与 RAG | 应用层显式流程 + 模型适配接口 | 区分生成、多模态识别和 embedding 能力。具体供应商与模型待授权样本评估、费用和可用性验证后确定，不让 SDK 类型进入业务层 |
-| 后台作业 | RQ + Redis 7 + Python Worker | 用于 PDF／图片处理、模型调用与索引；资料处理阶段引入。业务状态以 PostgreSQL 为准，Redis 不作为事实来源 |
+| 后台作业 | RQ + Redis 7 + Python Worker | Compose 已提供 Redis；RQ、Worker 和实际作业在资料处理阶段接入。业务状态以 PostgreSQL 为准，Redis 不作为事实来源 |
 | 质量检查 | pytest + HTTPX + Ruff；vue-tsc + Vite build | 后端接口和规则测试、格式与静态检查，前端类型检查和构建；本次提供可执行命令 |
-| 部署 | 开发时本地双进程；后续 Docker Compose + 同源反向代理 | 持久化接入后添加数据库与 Worker；当前不提供公网生产部署 |
+| 部署 | 开发时前后端双进程 + 数据库和 Redis Compose | 后续增加 Worker 与同源反向代理；当前没有公网生产部署或认证实现 |
 
 Python 版本写在 `backend/.python-version`，前端建议 Node 24（见 `.nvmrc`，最低 22.12）。应用依赖的精确版本以实际生成的 `uv.lock`、`package-lock.json` 为准，不手工修改锁文件。
 
@@ -37,7 +37,7 @@ Python 版本写在 `backend/.python-version`，前端建议 Node 24（见 `.nvm
 
 ## 2. 系统架构图
 
-实线表示本次已实现的调用链，虚线表示目标 MVP 组件及连接。
+实线表示代码已接入的调用链，虚线表示待实现组件及连接；不表示所有链路已完成运行复验。浏览器当前仅接通健康检查，业务接口可由 API 客户端或 Swagger 调用。
 
 ```mermaid
 flowchart TB
@@ -46,10 +46,12 @@ flowchart TB
     Proxy --> API[FastAPI 路由 /api/v1]
     API --> Health[进程健康检查]
 
-    API -.-> UseCases[应用层：课程、资料、问答、任务、计划]
-    UseCases -.-> Domain[领域层：适用范围、状态、依赖、时间约束]
-    UseCases -.-> Adapters[基础设施适配器]
-    Adapters -.-> DB[(PostgreSQL + pgvector)]
+    API --> UseCases[应用层：课程、任务、固定日程]
+    UseCases --> Domain[领域层：日期、状态与时间范围]
+    UseCases --> Adapters[基础设施仓储]
+    Adapters --> DB[(PostgreSQL)]
+    API -.-> Future[待实现：资料、核对、问答与计划]
+    Future -.-> Adapters
     Adapters -.-> Files[(私有原文件存储)]
     Adapters -.-> Queue[(Redis / RQ)]
     Adapters -.-> Models[模型服务：生成、视觉、embedding]
@@ -59,7 +61,7 @@ flowchart TB
 
 开发前端通过 Vite 将 `/api` 转发到 `127.0.0.1:8000`，无需开放通配 CORS。生产目标由同一个域名提供前端静态文件和 `/api`，由反向代理替代 Vite。API、Worker、数据库和文件存储不直接暴露给浏览器。
 
-当前健康接口仅表示 API 进程存活；接入数据库后另设 readiness 检查，不用 liveness 返回值宣称数据库或模型可用。
+当前健康接口仅表示 API 进程存活；数据库 readiness 检查尚待 W011 实现，不用 liveness 返回值宣称数据库或模型可用。
 
 ## 3. 文件分层
 
@@ -80,11 +82,11 @@ CampusFlow/
 │   │   ├── main.py              # 应用工厂、依赖装配、路由注册
 │   │   ├── core/                # 配置与运行时通用设施
 │   │   ├── api/                 # HTTP 路由与输入输出 schema
-│   │   ├── application/         # 预留：业务用例与外部能力接口
-│   │   ├── domain/              # 预留：纯业务对象与规则
-│   │   ├── infrastructure/      # 预留：数据库、解析、模型、存储、队列
+│   │   ├── application/         # 课程、任务、日程用例及仓储端口
+│   │   ├── domain/              # 日期、状态和时间范围业务规则
+│   │   ├── infrastructure/      # 数据库与仓储；其余适配器待实现
 │   │   └── workers/             # 预留：后台作业入口
-│   ├── migrations/             # 预留：Alembic 迁移
+│   ├── migrations/             # Alembic 环境及初始六表迁移
 │   └── tests/                  # 接口及后续领域、集成测试
 ├── frontend/
 │   ├── package.json
@@ -100,11 +102,12 @@ CampusFlow/
 │       ├── components/          # 预留：跨页面共享组件
 │       ├── api/                 # HTTP 调用与接口数据处理
 │       └── styles.css
-├── infra/                      # 预留：Compose 和部署配置
+├── infra/                      # PostgreSQL、Redis Compose 与初始化脚本
 └── docs/
     ├── ARCHITECTURE.md          # 本文：选型、架构、边界
     ├── DEVELOPMENT.md           # 环境与执行命令
-    └── GitLab.md                # 已有仓库连接说明
+    ├── GitLab.md                # 已有仓库连接说明
+    └── planning/                # Milestone、Issue、标签与验收覆盖
 ```
 
 ### 后端依赖方向
@@ -119,6 +122,7 @@ flowchart LR
 ```
 
 - `api` 只处理 HTTP 校验、依赖注入、调用用例与响应转换，不直接查库或调用模型。
+- 当前 `api/deps.py` 的默认工作空间初始化仍直接查询 ORM；W005 跟踪移至应用接口和基础设施实现，W006 补齐对象授权。
 - `application` 协调流程、事务与授权确认，依赖接口；按 `materials`、`qa`、`tasks`、`planning` 等业务组织文件。
 - `domain` 不导入 FastAPI、ORM、供应商 SDK 或运行配置；日期与冲突规则可以脱离服务器独立测试。
 - `infrastructure` 实现接口，SQLAlchemy 模型只在该层使用，不直接返回给前端。
@@ -182,19 +186,19 @@ sequenceDiagram
 
 时间采用带时区的 ISO 8601 表示，数据库时间点使用 `timestamptz`，另存原始文本与来源时区。只有日期而没有时刻的 DDL 保留日期精度，不伪装成午夜或 23:59 的确定时间。学校教学周需依赖适用校历换算。
 
-业务错误未来统一为稳定错误码、可读消息和请求 ID；当前仅健康接口，未知路由沿用 FastAPI 的 `404`。模型密钥只在后端配置，日志避免原始资料全文和个人信息。
+当前业务错误通过 `DomainError` 和 `NotFoundError` 映射为可读消息及 HTTP 400／404，参数校验使用 422。后续完善统一稳定错误码与请求 ID；模型密钥只在后端配置，日志避免原始资料全文和个人信息。
 
-当前骨架未实现认证，只监听本机地址。引入真实学习资料或共享部署前，必须实现身份校验与工作空间访问控制；“单用户”不等于可以把资料公开访问。
+当前未实现认证，开发服务默认仅监听本机。W004–W006 在资料导入前补齐身份校验与工作空间访问控制；“单用户”不等于可以把资料公开访问。
 
 ## 6. 实施顺序与完成条件
 
-1. **骨架（本次）：** 前端调用真实健康接口，后端 OpenAPI 可访问，配置可覆盖，后端测试与前端构建可执行。
-2. **首个持久化切片：** PostgreSQL、Alembic、工作空间与课程、手动任务；用真实数据库测试迁移、事务与课程范围，避免用 SQLite 代替 pgvector 集成验证。
-3. **资料切片：** 私有文件存储、RQ Worker、解析与来源定位、事项核对；验证失败重试与删除后的索引失效。
-4. **问答切片：** embedding、检索、模型适配器、带引用回答；用中文授权样本评估缺失信息和来源冲突。
-5. **计划切片：** 固定日程、可用时间、两周计划、冲突检查与草案接受，完成业务 MVP 验收。
+1. **M0–M1：** 工程骨架和首个持久化切片已合并；完成样本、CI、真实数据库复验、身份与空间授权、手动管理前端，形成可验收闭环。
+2. **M2–M3：** 私有文件存储、RQ Worker、解析与来源定位、事项提取和核对；验证失败重试与删除派生失效。
+3. **M4：** embedding、检索、模型适配器和带引用回答；用中文授权样本评估缺失信息和来源冲突。
+4. **M5：** 两周计划、冲突检查和草案接受，完成八项业务 MVP 验收。
+5. **M6–M9：** 按第二、第三阶段接入扩展导入、变更、依赖、提醒、导出、课程路径及外部日历。具体完成条件与叶子任务见 [开发路线](planning/ROADMAP.md)。
 
-上述是第一阶段内部的工程实施顺序，不改变 README 对第二、第三阶段的功能边界。后续引入的依赖在实际使用时加入锁文件；本次不为未实现能力预装整套 AI 和数据库 SDK。
+上述顺序细化 README 的三阶段功能边界。后续依赖在实际使用时加入锁文件，不为未实现能力预装整套 AI SDK。
 
 ## 7. 官方资料
 
