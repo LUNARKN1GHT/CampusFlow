@@ -1,0 +1,17 @@
+{
+  "repository": "LUNARKN1GHT/CampusFlow",
+  "checked_at": "2026-09-28T02:58:28Z",
+  "milestones": 10,
+  "managed_labels": 44,
+  "new_issues": 246,
+  "epics": 25,
+  "leaf_tasks": 221,
+  "closed_historical": 5,
+  "existing_issues_preserved": [
+    2
+  ],
+  "native_parent_relationships_checked": 246,
+  "version_tags_unchanged": true,
+  "errors": [],
+  "passed": true
+}

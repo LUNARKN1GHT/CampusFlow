@@ -1,9 +1,33 @@
-# 基础设施配置（待实现）
+# 基础设施配置
 
-当前骨架只需要本地 Python API 和 Vite 开发服务，无需 Docker、数据库、Redis 或模型密钥。
+本地开发基础设施使用 Docker Compose（[docker-compose.yml](docker-compose.yml)），包含两个服务：
 
-接入持久化时在此添加 Docker Compose：PostgreSQL 17 + pgvector、本地持久卷；接入解析作业时再加入 Redis 7 和同一后端包的 RQ Worker。
+- **db**：PostgreSQL 17 + pgvector（镜像 `pgvector/pgvector:pg17`）。默认库 `campusflow`；首次初始化时通过 [postgres/init/01-init-dbs.sql](postgres/init/01-init-dbs.sql) 自动创建测试库 `campusflow_test` 并为两个库启用 `vector` 扩展。仅绑定 `127.0.0.1:5432`。
+- **redis**：Redis 7，供 RQ 作业队列使用。仅绑定 `127.0.0.1:6379`。
 
-生产目标为同源部署：反向代理提供前端静态文件，`/api/` 转发到 Python API，文件、数据库和 Redis 仅在私网访问。认证、TLS、备份和恢复检查完成之前，开发骨架不能作为公网服务直接发布。
+数据保存在 Docker 命名卷（`pgdata`、`redisdata`）中，`docker compose down` 不会丢数据；只有 `docker compose down -v` 才会清空。
 
-镜像版本和启动方式在实际验证后锁定；当前没有可执行的 Compose 配置或部署脚本。
+## 使用
+
+在本目录打开终端：
+
+```bash
+docker compose up -d        # 启动（首次会自动拉取镜像，国内网络可能需要配置镜像加速）
+docker compose ps           # 查看状态，两个服务都应显示 healthy
+docker compose logs -f db   # 查看数据库日志
+docker compose down         # 停止（数据保留）
+docker compose down -v      # 停止并清空数据（慎用；清空后再次启动会重新执行初始化脚本）
+```
+
+## 连接信息（本地开发默认值）
+
+| 项 | 值 |
+| --- | --- |
+| 主机 | 127.0.0.1 |
+| PostgreSQL 端口 / Redis 端口 | 5432 / 6379 |
+| 用户 / 密码 | campusflow / campusflow |
+| 业务库 / 测试库 | campusflow / campusflow_test |
+
+连接字符串样例见 `backend/.env.example`。这些是仅限本机开发环境的默认值；公网部署目标见 [ARCHITECTURE.md](../docs/ARCHITECTURE.md)，认证、TLS、备份与恢复检查完成之前，不得将本配置作为公网服务发布。
+
+> 验证状态：Compose 配置已按镜像官方用法编写，启动与初始化脚本尚待本机 Docker 环境就绪后实测确认。

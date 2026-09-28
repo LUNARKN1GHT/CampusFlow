@@ -1,6 +1,6 @@
 # CampusFlow 贡献指南
 
-本文约定小组成员及后续贡献者如何提交需求、文档和代码。项目当前处于工程骨架阶段，技术分层见 [架构文档](docs/ARCHITECTURE.md)，环境与检查命令见 [开发文档](docs/DEVELOPMENT.md)。
+本文约定小组成员及后续贡献者如何提交需求、文档和代码。项目已合并基础持久化后端，MVP 开发中；技术分层见 [架构文档](docs/ARCHITECTURE.md)，环境与检查命令见 [开发文档](docs/DEVELOPMENT.md)，任务拆分与里程碑见 [开发路线](docs/planning/ROADMAP.md)。
 
 ## 开始之前
 
@@ -8,6 +8,8 @@
 - 阅读 [AGENTS.md](AGENTS.md)，了解必须保持的业务规则及团队背景。
 - 仓库连接可参考 [GitLab 说明](docs/GitLab.md)。执行远程操作前使用 `git remote -v` 核实配置；远程名称取决于本机设置，不能假定 `origin` 一定是 GitHub 或 GitLab，也不要重复添加已有远程。
 - 具体成员分工尚未确定。认领任务时在 Issue 或小组现有任务记录中写明负责人、范围、交付物与验收条件，避免重复修改同一部分。
+- 当前任务统一在 GitHub `LUNARKN1GHT/CampusFlow` 管理，不在学校 GitLab 重复建单。优先认领前置依赖已完成的叶子 Issue；预计超过两天继续拆原生 Sub-issue。父 Issue 聚合成果，不重复计入工作量。
+- 叶子 Issue 的提交和关闭以其验收证据为准；历史实现补录不代表所属 Milestone 已验收。标签、认领状态和版本 tag 规则见开发路线，已发布 tag 不移动或覆盖。
 
 ## 可以贡献什么
 
