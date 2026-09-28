@@ -1,0 +1,54 @@
+{
+  "repository": "LUNARKN1GHT/CampusFlow",
+  "labels": [
+    {
+      "name": "accessibility"
+    },
+    {
+      "name": "bug"
+    },
+    {
+      "name": "documentation"
+    },
+    {
+      "name": "duplicate"
+    },
+    {
+      "name": "enhancement"
+    },
+    {
+      "name": "good first issue"
+    },
+    {
+      "name": "help wanted"
+    },
+    {
+      "name": "invalid"
+    },
+    {
+      "name": "question"
+    },
+    {
+      "name": "wontfix"
+    }
+  ],
+  "issues": [
+    {
+      "number": 2,
+      "title": "优化查询方式",
+      "body": "\"上传一组课程群截图\"实际上是一个低效且容易遗漏的工作,可以考虑接入QQbot自动化过滤群聊信息,捕捉课程群内的要求和作业等",
+      "state": "open",
+      "milestone": null,
+      "assignees": []
+    },
+    {
+      "number": 1,
+      "title": "feat: M1 持久化切片——数据库迁移与学期/课程/任务/日程管理",
+      "body": "- 接入 PostgreSQL 17 + pgvector（Docker Compose，含测试库初始化）\r\n- Alembic 迁移：workspaces/semesters/courses/tasks/fixed_events/availability_slots\r\n- 分层落地：domain 业务规则、application 用例与端口、infrastructure 仓储、api 路由\r\n- 只含日期的 DDL 保持日期精度，不伪装成午夜或 23:59\r\n- 核对状态与任务执行进度两套状态枚举分离\r\n- 22 个测试（含真实 PostgreSQL 集成测试）全部通过",
+      "state": "closed",
+      "milestone": null,
+      "assignees": []
+    }
+  ],
+  "tags": []
+}

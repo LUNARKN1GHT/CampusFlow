@@ -1,6 +1,6 @@
 # 本地开发
 
-当前可运行内容为 Vue 前端环境页、Python API 健康检查和 OpenAPI 文档；本地 PostgreSQL + pgvector 与 Redis 可通过 Docker Compose 启动（见下文"本地基础设施"）。业务功能尚未接入数据库，健康检查仍不需要数据库、Redis 或模型密钥。技术方案和目标架构见 [ARCHITECTURE.md](ARCHITECTURE.md)。
+当前代码包括 Vue 前端环境页、Python API 健康检查、OpenAPI 和学期／课程／手动任务／固定日程／可用时间 API。业务接口已接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查不访问数据库。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -37,16 +37,17 @@ docker compose down -v      # 停止并清空数据（慎用）
 ```bash
 cd backend
 uv sync --locked
+uv run --locked alembic upgrade head
 uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-默认配置即可启动。需要自定义时复制 `backend/.env.example` 为同目录 `.env` 并修改；目前只提供 `CAMPUSFLOW_APP_NAME`。环境变量优先于 `.env`，不要把 `.env` 提交到仓库。
+先启动上述数据库，再执行迁移和后端启动命令。需要自定义时复制 `backend/.env.example` 为同目录 `.env`；支持应用名称、业务库、测试库与 Redis 地址配置，具体名称见样例。环境变量优先于 `.env`，不要把 `.env` 提交到仓库。
 
 - 健康检查：<http://127.0.0.1:8000/api/v1/health>
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
-健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。业务接口尚未实现，访问不存在的地址应返回 404。
+健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
 
 ## 启动前端
 
@@ -74,6 +75,8 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
+当前测试夹具在每个用例前清空六张业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 分别跟踪纯领域测试脱离数据库和测试目标保护，目前这些改进尚未合并。
+
 ## 验证
 
 后端，在 `backend/` 下执行：
@@ -97,7 +100,8 @@ npm run build
 
 ## 当前限制
 
-- 暂无数据库迁移、Worker 命令、认证、上传、RAG 和排期实现；各预留目录的 README 只说明职责。
+- 数据库迁移与手动管理后端已合并；暂无业务前端、Worker 命令、认证、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
+- PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
 - Swagger UI 使用外部静态资源；离线时 UI 可能无法加载，可直接访问 `/openapi.json` 查看接口描述。

@@ -1,0 +1,7684 @@
+{
+  "schema_version": 1,
+  "repository": "LUNARKN1GHT/CampusFlow",
+  "baseline_commit": "b63018ea7cc7de3b8e526efc872f42363a9cecea",
+  "milestones": [
+    {
+      "key": "M0",
+      "title": "M0 · 工程基线与验收准备",
+      "phase": "MVP",
+      "goal": "把已合并工作、开发流程、授权样本和原型变成可复用基线。",
+      "gates": [
+        "现有实现与待验收项清晰分开",
+        "本地及 CI 检查入口可复现",
+        "合成或获授权样本与 MVP 八项验收场景建立对应",
+        "导入、核对、问答、计划原型完成评审"
+      ],
+      "depends_on": [],
+      "release_tag": null
+    },
+    {
+      "key": "M1",
+      "title": "M1 · 手动学习事务管理",
+      "phase": "MVP",
+      "goal": "用户可在界面管理学期、课程、任务、固定日程与可用时间，数据可持久保存。",
+      "gates": [
+        "PR #1 的迁移与接口在真实 PostgreSQL 复验通过",
+        "单用户身份与工作空间授权覆盖全部对象访问",
+        "手动管理前后端闭环通过",
+        "日期精度、时区、状态及调整记录符合业务规则"
+      ],
+      "depends_on": [
+        "M0"
+      ],
+      "release_tag": "v0.1.0"
+    },
+    {
+      "key": "M2",
+      "title": "M2 · 资料导入与来源定位",
+      "phase": "MVP",
+      "goal": "PDF、图片和粘贴文本可以私有保存、异步解析并定位原文。",
+      "gates": [
+        "三种输入均可定位来源且处理范围可见",
+        "失败可重试且重复投递不重复写入",
+        "资料删除与索引、派生内容失效及保留任务策略一致",
+        "访问控制、大小与类型限制通过"
+      ],
+      "depends_on": [
+        "M1"
+      ],
+      "release_tag": "v0.2.0"
+    },
+    {
+      "key": "M3",
+      "title": "M3 · 事项提取与人工核对",
+      "phase": "MVP",
+      "goal": "把资料转为有证据的候选任务、日程和规则，经核对后保存正式事项。",
+      "gates": [
+        "缺失日期、同名课、截图不完整进入待核对",
+        "核对状态与执行进度独立",
+        "确认幂等且正式事项保留来源",
+        "待核对页面可集中完成修正、确认和忽略"
+      ],
+      "depends_on": [
+        "M2"
+      ],
+      "release_tag": "v0.3.0"
+    },
+    {
+      "key": "M4",
+      "title": "M4 · 带引用的问答",
+      "phase": "MVP",
+      "goal": "按适用范围检索并回答课程问题，用户可检查每条引用。",
+      "gates": [
+        "DDL 答案与原文相符且引用可定位",
+        "资料不足、部分解析和来源矛盾明确展示",
+        "检索不跨工作空间或适用学期",
+        "中文评估集及模型失败降级通过"
+      ],
+      "depends_on": [
+        "M3"
+      ],
+      "release_tag": "v0.4.0"
+    },
+    {
+      "key": "M5",
+      "title": "M5 · 两周计划与 MVP 验收",
+      "phase": "MVP",
+      "goal": "生成可解释的未来两周草案、检查冲突，接受后跟踪执行。",
+      "gates": [
+        "已排任务满足固定日程、截止及已知必要约束",
+        "缺少信息和无法排入的任务逐项展示",
+        "草案接受、过期拒绝与实质变更再确认有效",
+        "README 八项 MVP 验收全部通过并附证据"
+      ],
+      "depends_on": [
+        "M4"
+      ],
+      "release_tag": "v0.5.0"
+    },
+    {
+      "key": "M6",
+      "title": "M6 · 扩展导入与通知变更",
+      "phase": "第二阶段",
+      "goal": "增加 Word 和公开网页，并对资料版本及重复事项提供可核对的变更。",
+      "gates": [
+        "Word 与公开网页保留可回溯来源",
+        "导入更晚不自动覆盖旧要求",
+        "字段差异、适用范围与影响事项可见",
+        "版本接受和重复合并保留历史且可追踪"
+      ],
+      "depends_on": [
+        "M5"
+      ],
+      "release_tag": "v0.6.0"
+    },
+    {
+      "key": "M7",
+      "title": "M7 · 日常执行与局部调整",
+      "phase": "第二阶段",
+      "goal": "支持依赖任务、局部重排、应用内提醒和清单、日历文件导出。",
+      "gates": [
+        "任务依赖与剩余耗时参与排期",
+        "局部重排保留锁定安排并经接受生效",
+        "提醒去重且完成、暂停状态有效",
+        "导出时区、日期精度和隐私边界通过",
+        "第二阶段通知冲突验收通过"
+      ],
+      "depends_on": [
+        "M6"
+      ],
+      "release_tag": "v0.7.0"
+    },
+    {
+      "key": "M8",
+      "title": "M8 · 课程关系与修读路径",
+      "phase": "第三阶段",
+      "goal": "根据适用培养方案构建有来源的课程依赖，辅助判断修读顺序。",
+      "gates": [
+        "强制先修、并修和建议先学分开建模",
+        "成环、课程缺项、来源冲突均展示阻塞",
+        "已修、在修、待修及开课约束正确参与判断",
+        "资料不足时不宣称满足选课或毕业要求"
+      ],
+      "depends_on": [
+        "M7"
+      ],
+      "release_tag": "v0.8.0"
+    },
+    {
+      "key": "M9",
+      "title": "M9 · 外部日历与完整流程验收",
+      "phase": "第三阶段",
+      "goal": "在用户确认具体内容后写入选定日历服务，并可靠跟踪结果。",
+      "gates": [
+        "授权可撤销且凭据只存后端",
+        "写入与最新确认的内容、账户、时区一致",
+        "逐项结果、失败重试和幂等通过",
+        "内部任务不因外部失败丢失",
+        "三阶段端到端回归及发布检查通过"
+      ],
+      "depends_on": [
+        "M8"
+      ],
+      "release_tag": "v0.9.0"
+    }
+  ],
+  "labels": [
+    {
+      "name": "type:epic",
+      "color": "5319e7",
+      "description": "功能组父 Issue；通过原生子 Issue 跟踪，不作为独立工作量"
+    },
+    {
+      "name": "type:feature",
+      "color": "a2eeef",
+      "description": "可独立验收的业务功能"
+    },
+    {
+      "name": "type:bug",
+      "color": "d73a4a",
+      "description": "已有行为不符合约定，需要修复"
+    },
+    {
+      "name": "type:test",
+      "color": "0e8a16",
+      "description": "验收、回归与实际验证证据"
+    },
+    {
+      "name": "type:docs",
+      "color": "0075ca",
+      "description": "项目文档、操作说明与协作约定"
+    },
+    {
+      "name": "type:chore",
+      "color": "ededed",
+      "description": "工程配置、流程与历史实现登记"
+    },
+    {
+      "name": "type:research",
+      "color": "d876e3",
+      "description": "需要结论或范围决策的调研"
+    },
+    {
+      "name": "type:design",
+      "color": "f9d0c4",
+      "description": "可评审的交互或接口设计"
+    },
+    {
+      "name": "type:refactor",
+      "color": "c5def5",
+      "description": "在既有行为基础上调整内部结构"
+    },
+    {
+      "name": "area:platform",
+      "color": "1d76db",
+      "description": "工程基线与开发协作"
+    },
+    {
+      "name": "area:quality",
+      "color": "1d76db",
+      "description": "样本、评估、验收与发布"
+    },
+    {
+      "name": "area:courses",
+      "color": "1d76db",
+      "description": "工作空间、学期和课程"
+    },
+    {
+      "name": "area:tasks",
+      "color": "1d76db",
+      "description": "任务与固定日程基础"
+    },
+    {
+      "name": "area:frontend",
+      "color": "1d76db",
+      "description": "基础页面与交互"
+    },
+    {
+      "name": "area:materials",
+      "color": "1d76db",
+      "description": "资料导入存储及生命周期"
+    },
+    {
+      "name": "area:parsing",
+      "color": "1d76db",
+      "description": "文本、图像和表格解析"
+    },
+    {
+      "name": "area:jobs",
+      "color": "1d76db",
+      "description": "后台作业与可靠处理"
+    },
+    {
+      "name": "area:extraction",
+      "color": "1d76db",
+      "description": "候选事实提取"
+    },
+    {
+      "name": "area:review",
+      "color": "1d76db",
+      "description": "核对与正式事项生成"
+    },
+    {
+      "name": "area:qa",
+      "color": "1d76db",
+      "description": "检索与可追溯问答"
+    },
+    {
+      "name": "area:planning",
+      "color": "1d76db",
+      "description": "排期、冲突及调整"
+    },
+    {
+      "name": "area:changes",
+      "color": "1d76db",
+      "description": "版本差异与重复合并"
+    },
+    {
+      "name": "area:reminders",
+      "color": "1d76db",
+      "description": "应用内提醒"
+    },
+    {
+      "name": "area:export",
+      "color": "1d76db",
+      "description": "清单和日历文件导出"
+    },
+    {
+      "name": "area:paths",
+      "color": "1d76db",
+      "description": "培养方案与课程路径"
+    },
+    {
+      "name": "area:calendar",
+      "color": "1d76db",
+      "description": "外部日历授权与同步"
+    },
+    {
+      "name": "area:research",
+      "color": "1d76db",
+      "description": "后续探索与范围决策"
+    },
+    {
+      "name": "priority:P0",
+      "color": "b60205",
+      "description": "阻塞所在里程碑验收或关键前置，不等于全项目立即开工"
+    },
+    {
+      "name": "priority:P1",
+      "color": "fbca04",
+      "description": "所属里程碑的正常交付范围"
+    },
+    {
+      "name": "priority:P2",
+      "color": "c2e0c6",
+      "description": "可后置优化或尚未立项探索"
+    },
+    {
+      "name": "size:XS",
+      "color": "bfdadc",
+      "description": "预计半天以内；包含交付和必要验证"
+    },
+    {
+      "name": "size:S",
+      "color": "bfdadc",
+      "description": "预计半天至一天；认领时根据经验校准"
+    },
+    {
+      "name": "size:M",
+      "color": "bfdadc",
+      "description": "预计一至两天；超过两天继续拆子任务"
+    },
+    {
+      "name": "layer:backend",
+      "color": "d4c5f9",
+      "description": "后端代码与业务规则"
+    },
+    {
+      "name": "layer:frontend",
+      "color": "d4c5f9",
+      "description": "浏览器页面与交互"
+    },
+    {
+      "name": "layer:fullstack",
+      "color": "d4c5f9",
+      "description": "需要前后端共同验证的集成任务"
+    },
+    {
+      "name": "layer:infra",
+      "color": "d4c5f9",
+      "description": "数据库、CI 与运行环境"
+    },
+    {
+      "name": "layer:docs",
+      "color": "d4c5f9",
+      "description": "文档、样本、设计和评估记录"
+    },
+    {
+      "name": "status:backfilled",
+      "color": "bfd4f2",
+      "description": "补录已合并实现；不等于业务阶段验收通过"
+    },
+    {
+      "name": "status:needs-decision",
+      "color": "fef2c0",
+      "description": "需要范围或方案决策；不自动计入开发承诺"
+    },
+    {
+      "name": "status:in-progress",
+      "color": "fbca04",
+      "description": "已有负责人且正在实施"
+    },
+    {
+      "name": "status:blocked",
+      "color": "d93f0b",
+      "description": "存在明确阻塞，正文说明依赖或缺失条件"
+    },
+    {
+      "name": "status:in-review",
+      "color": "c5def5",
+      "description": "实现已提交 PR，等待评审或验收"
+    },
+    {
+      "name": "good first issue",
+      "color": "7057ff",
+      "description": "边界清晰、适合首次贡献；先完成前置任务并认领"
+    }
+  ],
+  "issues": [
+    {
+      "key": "E00",
+      "title": "工程基线与协作流程",
+      "kind": "epic",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "补录已有工程成果并建立后续可复现的开发、评审和检查流程。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:platform",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "B001",
+      "title": "补录：Vue 与 FastAPI 健康检查骨架已合并",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "fullstack",
+      "size": "XS",
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "登记前端健康页、API 健康接口、配置和锁文件的已合并实现。",
+      "acceptance": [
+        "代码包含前端真实健康请求和后端健康路由",
+        "历史记录明确实现已合并不等于本机复验通过"
+      ],
+      "depends_on": [],
+      "parent": "E00",
+      "state": "closed",
+      "evidence": "04c4da8；frontend/src/views/HealthView.vue；backend/src/campusflow/api/health.py",
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P1",
+        "layer:fullstack",
+        "size:XS",
+        "status:backfilled"
+      ]
+    },
+    {
+      "key": "B002",
+      "title": "同步项目当前实现状态与规划入口",
+      "kind": "docs",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P0",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "更新 README、AGENTS、架构和开发文档中过时的骨架状态描述，链接任务规划。",
+      "acceptance": [
+        "明确数据库与手动接口已合并、前端业务及 AI 尚未完成",
+        "所有开发入口链接有效"
+      ],
+      "depends_on": [
+        "B001"
+      ],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:platform",
+        "priority:P0",
+        "layer:docs",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B003",
+      "title": "建立小任务与缺陷 Issue 模板",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "docs",
+      "size": "XS",
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "模板要求场景、交付物、验收、范围、依赖与验证证据。",
+      "acceptance": [
+        "功能与缺陷可按模板提交",
+        "父子任务规则不把父 Issue 计为独立实现工作"
+      ],
+      "depends_on": [],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P1",
+        "layer:docs",
+        "size:XS",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B004",
+      "title": "建立 PR 模板与关闭 Issue 约定",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "docs",
+      "size": "XS",
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "PR 列出关联叶子 Issue、结果、验证与迁移影响。",
+      "acceptance": [
+        "模板包括实测结果与未验证项",
+        "要求其他成员评审且避免误关父 Issue"
+      ],
+      "depends_on": [],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P1",
+        "layer:docs",
+        "size:XS",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B005",
+      "title": "配置后端 CI：PostgreSQL 集成测试与 Ruff",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "infra",
+      "size": "M",
+      "priority": "P0",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "在临时测试库上迁移，执行 pytest、Ruff 检查与格式检查。",
+      "acceptance": [
+        "全新 runner 不依赖开发者机器可运行",
+        "失败项能阻止该检查通过"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P0",
+        "layer:infra",
+        "size:M"
+      ]
+    },
+    {
+      "key": "B006",
+      "title": "配置前端 CI：锁文件安装与类型构建",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "infra",
+      "size": "S",
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "执行 npm ci 和含类型检查的 npm run build。",
+      "acceptance": [
+        "干净 runner 构建成功",
+        "类型错误导致检查失败"
+      ],
+      "depends_on": [
+        "B001"
+      ],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P1",
+        "layer:infra",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B007",
+      "title": "制定并落实默认分支合并检查",
+      "kind": "chore",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "infra",
+      "size": "S",
+      "priority": "P1",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "核实仓库套餐能力，设置或记录评审和必需检查流程。",
+      "acceptance": [
+        "普通功能通过 PR 合并并有其他成员评审",
+        "平台不支持的保护明确记录替代流程"
+      ],
+      "depends_on": [
+        "B004",
+        "B005",
+        "B006"
+      ],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:platform",
+        "priority:P1",
+        "layer:infra",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B008",
+      "title": "确定许可证并同步正式声明",
+      "kind": "research",
+      "milestone": "M0",
+      "area": "platform",
+      "layer": "docs",
+      "size": "XS",
+      "priority": "P2",
+      "source": "CONTRIBUTING.md；docs/ARCHITECTURE.md §1–3",
+      "scope": "由小组明确许可证决策，决定后更新 LICENSE 与第三方说明。",
+      "acceptance": [
+        "存在可追溯的小组决策",
+        "LICENSE、README、CONTRIBUTING 声明一致且未决定前不擅自授权"
+      ],
+      "depends_on": [],
+      "parent": "E00",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:platform",
+        "priority:P2",
+        "layer:docs",
+        "size:XS"
+      ]
+    },
+    {
+      "key": "E01",
+      "title": "样本、验收集与交互原型",
+      "kind": "epic",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "建立安全可用的样本与可判断通过或失败的场景，先验证关键交互。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:quality",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "B009",
+      "title": "建立样本授权与脱敏登记表",
+      "kind": "docs",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "给每个真实样本记录授权范围、脱敏方式、保留位置；可用合成样本起步。",
+      "acceptance": [
+        "仓库中不出现未授权原始资料",
+        "每个验收样本有来源类型和使用许可记录"
+      ],
+      "depends_on": [],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:quality",
+        "priority:P0",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B010",
+      "title": "制作文本 PDF 与跨页表格样本",
+      "kind": "test",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "构造课程通知、作业 DDL、跨页表格及对应人工答案。",
+      "acceptance": [
+        "逐条答案带页码或段落定位",
+        "表格跨页信息和普通段落均有预期结果"
+      ],
+      "depends_on": [
+        "B009"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B011",
+      "title": "制作模糊扫描和不完整截图样本",
+      "kind": "test",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "提供可识别、部分失败、缺页与截断截图样本。",
+      "acceptance": [
+        "每个样本标注可读区域与未覆盖范围",
+        "验收能识别错误的全部成功状态"
+      ],
+      "depends_on": [
+        "B009"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B012",
+      "title": "制作日期、同名课程和来源冲突样本",
+      "kind": "test",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "覆盖相对日期、缺少年份时刻、同名不同班及通知相互矛盾。",
+      "acceptance": [
+        "给出可换算依据和必须待核对的预期",
+        "不同学期或教学班要求不混用"
+      ],
+      "depends_on": [
+        "B009"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B013",
+      "title": "建立 MVP 八项验收用例表",
+      "kind": "test",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "将 README 的八项 MVP 场景写成输入、步骤、预期和证据位置。",
+      "acceptance": [
+        "八项无遗漏且能独立判定通过",
+        "包含删除、容量不足和资料未覆盖场景"
+      ],
+      "depends_on": [
+        "B010",
+        "B011",
+        "B012"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P0",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "B014",
+      "title": "绘制资料导入与原文查看原型",
+      "kind": "design",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "覆盖选择课程、来源补充、处理进度、部分失败与定位原文。",
+      "acceptance": [
+        "原型展示完成、部分成功和失败",
+        "原文入口与引用位置可辨认"
+      ],
+      "depends_on": [
+        "B013"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:design",
+        "area:quality",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B015",
+      "title": "绘制集中核对与问答原型",
+      "kind": "design",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "展示待核对字段、引用、确认修正忽略，以及问答缺资料状态。",
+      "acceptance": [
+        "待核对事项有独立集中入口",
+        "引用与不确定信息不只藏在聊天记录"
+      ],
+      "depends_on": [
+        "B013"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:design",
+        "area:quality",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B016",
+      "title": "绘制任务与两周计划原型",
+      "kind": "design",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "展示草案、已接受计划、锁定安排、未排任务和容量缺口。",
+      "acceptance": [
+        "接受动作与草案状态明确",
+        "移动时间块与修改 DDL 在交互上分开"
+      ],
+      "depends_on": [
+        "B013"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:design",
+        "area:quality",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "B017",
+      "title": "定义样本评估指标与记录格式",
+      "kind": "docs",
+      "milestone": "M0",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5、§7、§9–10；AGENTS.md 验收与后续推进",
+      "scope": "制定提取、引用支持、不确定性、计划可行性和修改成本的计量方式。",
+      "acceptance": [
+        "每项指标有分母和失败定义",
+        "性能阈值留待样本测量后确定"
+      ],
+      "depends_on": [
+        "B013"
+      ],
+      "parent": "E01",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:quality",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "E10",
+      "title": "持久化、工作空间与课程",
+      "kind": "epic",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "承接已合并数据层，补齐访问边界、个人时间设置和学期课程管理。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:courses",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "W001",
+      "title": "补录：PostgreSQL 与六张基础表迁移已合并",
+      "kind": "chore",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "infra",
+      "size": "XS",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "登记 Compose、SQLAlchemy、psycopg 和初始 Alembic 迁移。",
+      "acceptance": [
+        "模型与迁移包含工作空间、学期、课程、任务、固定日程、可用时间",
+        "记录尚需独立迁移复验"
+      ],
+      "depends_on": [],
+      "parent": "E10",
+      "state": "closed",
+      "evidence": "42bebb7；backend/migrations/versions/c95d3606e7ee_initial_workspace_semester_course_task_.py；infra/docker-compose.yml",
+      "labels": [
+        "type:chore",
+        "area:courses",
+        "priority:P1",
+        "layer:infra",
+        "size:XS",
+        "status:backfilled"
+      ]
+    },
+    {
+      "key": "W002",
+      "title": "补录：学期与课程 API 已合并",
+      "kind": "chore",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "XS",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "登记学期创建查询归档及课程创建查询修改接口。",
+      "acceptance": [
+        "路由与仓储中存在相应实现",
+        "不将业务前端或访问授权计入已完成范围"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E10",
+      "state": "closed",
+      "evidence": "42bebb7；backend/src/campusflow/api/courses.py",
+      "labels": [
+        "type:chore",
+        "area:courses",
+        "priority:P1",
+        "layer:backend",
+        "size:XS",
+        "status:backfilled"
+      ]
+    },
+    {
+      "key": "W003",
+      "title": "复验基础迁移的升级与回退",
+      "kind": "test",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "infra",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "使用独立 PostgreSQL 测试库验证空库升级、回退与再次升级。",
+      "acceptance": [
+        "六张表和外键与模型一致",
+        "保存命令、环境及结果，开发数据不被测试清空"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:courses",
+        "priority:P0",
+        "layer:infra",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W004",
+      "title": "实现单用户身份校验与会话退出",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "为本地单用户定义并实现身份机制，服务端校验业务请求。",
+      "acceptance": [
+        "未登录不能读取或修改私有业务数据",
+        "退出后原会话失效且登录方式有文档"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "W005",
+      "title": "将当前工作空间注入应用用例",
+      "kind": "refactor",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "把默认空间查询从 HTTP 依赖中的 ORM 操作移到应用接口及实现。",
+      "acceptance": [
+        "API 不直接查询 Workspace 模型",
+        "空间初始化并发时不会创建多个默认空间"
+      ],
+      "depends_on": [
+        "W004"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:refactor",
+        "area:courses",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W006",
+      "title": "为对象读取、修改及关联增加空间授权",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "按当前空间检查课程、任务、日程及它们的学期课程关联。",
+      "acceptance": [
+        "不能通过猜 ID 跨空间访问或建立关联",
+        "错误不泄露其他空间的对象信息"
+      ],
+      "depends_on": [
+        "W005"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "W007",
+      "title": "保存个人时区与每周学习容量设置",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "新增个人配置读写接口，存储有效时区及学习容量、休息和缓冲偏好。",
+      "acceptance": [
+        "非法时区或负容量被拒绝",
+        "设置持久化后可读取并说明默认值"
+      ],
+      "depends_on": [
+        "W005"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W008",
+      "title": "让日期时间转换使用工作空间时区",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "替换 schemas 中固定 Asia/Shanghai 的隐式时区策略。",
+      "acceptance": [
+        "无偏移时间按该空间配置解释",
+        "带偏移时间保留实际时间点且覆盖跨日案例"
+      ],
+      "depends_on": [
+        "W007"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W009",
+      "title": "明确并实现学期归档后的查询规则",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "规定历史课程、任务和资料的可见性及归档恢复行为。",
+      "acceptance": [
+        "归档不会删除或静默改动任务",
+        "当前和历史学期筛选一致且可恢复"
+      ],
+      "depends_on": [
+        "W002"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W010",
+      "title": "修复 PATCH 将必填字段置空的问题",
+      "kind": "bug",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "区分字段未提交与显式 null，拒绝课程名、任务标题、日程时间等必填值清空。",
+      "acceptance": [
+        "显式 null 返回明确的校验错误而非数据库或类型异常",
+        "可清空字段及未提交字段行为保持正确"
+      ],
+      "depends_on": [
+        "W002",
+        "T001",
+        "T002"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:bug",
+        "area:courses",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "W011",
+      "title": "增加数据库就绪检查",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "courses",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1；AGENTS.md 工程约定；PR #1",
+      "scope": "提供与进程存活分开的 readiness 接口。",
+      "acceptance": [
+        "数据库不可达时就绪失败而存活接口可用",
+        "响应不暴露连接口令"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E10",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:courses",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E11",
+      "title": "手动任务与时间约束",
+      "kind": "epic",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "补齐手动任务和日程的业务边界，为排期提供可靠输入。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:tasks",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "T001",
+      "title": "补录：手动任务 API 与进度枚举已合并",
+      "kind": "chore",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "XS",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "登记任务创建修改筛选、执行进度以及日期与时刻分列实现。",
+      "acceptance": [
+        "任务可在代码中持久保存进度、优先级和耗时",
+        "核对枚举仅属预留，不宣称已有核对流程"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E11",
+      "state": "closed",
+      "evidence": "42bebb7；backend/src/campusflow/api/tasks.py；backend/src/campusflow/domain/states.py",
+      "labels": [
+        "type:chore",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:XS",
+        "status:backfilled"
+      ]
+    },
+    {
+      "key": "T002",
+      "title": "补录：固定日程与可用时间 API 已合并",
+      "kind": "chore",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "XS",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "登记固定日程增改查删、每周可用时间增查删及基础范围校验。",
+      "acceptance": [
+        "固定日程记录重复规则和截止日",
+        "未实现重复展开或冲突计算的边界明确"
+      ],
+      "depends_on": [
+        "W001"
+      ],
+      "parent": "E11",
+      "state": "closed",
+      "evidence": "42bebb7；backend/src/campusflow/api/schedule.py",
+      "labels": [
+        "type:chore",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:XS",
+        "status:backfilled"
+      ]
+    },
+    {
+      "key": "T003",
+      "title": "复验 PR #1 的接口集成与日期精度",
+      "kind": "test",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "在真实 PostgreSQL 上执行既有测试并补充持久化重读证据。",
+      "acceptance": [
+        "记录 22 个既有测试的实际结果",
+        "日期 DDL 不被补成午夜或 23:59"
+      ],
+      "depends_on": [
+        "W003",
+        "T001",
+        "T002"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:tasks",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T004",
+      "title": "分离无需数据库的领域单元测试",
+      "kind": "bug",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "调整 autouse 清库 fixture 的使用范围，使纯业务测试不依赖数据库。",
+      "acceptance": [
+        "只运行 test_domain.py 时不尝试连接数据库",
+        "集成测试仍独立清理专用测试库"
+      ],
+      "depends_on": [
+        "T003"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:bug",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T005",
+      "title": "保护测试数据库目标并隔离测试配置",
+      "kind": "test",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "对测试库地址作显式安全检查，避免测试迁移和清表污染开发库。",
+      "acceptance": [
+        "测试拒绝明显的业务库地址并说明原因",
+        "环境变量修改在测试结束后恢复"
+      ],
+      "depends_on": [
+        "W003"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:tasks",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T006",
+      "title": "增加任务进度变更历史与调整原因",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "保存完成、取消、重新打开、受阻等状态变更的时间和说明。",
+      "acceptance": [
+        "当前进度与历史一致",
+        "取消或重新打开不删除既有变更记录"
+      ],
+      "depends_on": [
+        "T001",
+        "W006"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T007",
+      "title": "增加个人目标日期与正式 DDL 的区分",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "为个人安排目标与课程正式截止信息保存独立字段和来源类型。",
+      "acceptance": [
+        "修改个人目标不改变正式 DDL",
+        "正式截止修改保留用户说明或来源依据"
+      ],
+      "depends_on": [
+        "T001"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T008",
+      "title": "计算逾期标记并保留执行状态",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "根据截止精度、个人时区和完成取消状态派生逾期信息。",
+      "acceptance": [
+        "只有日期的任务在当天不伪造精确时刻",
+        "逾期不覆盖进行中或受阻状态"
+      ],
+      "depends_on": [
+        "T001",
+        "W008"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T009",
+      "title": "增加任务剩余耗时维护",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "保存用户可编辑的剩余分钟数并区分原估计与当前剩余。",
+      "acceptance": [
+        "不接受负数",
+        "完成、重新打开时的剩余耗时规则可解释并有用例"
+      ],
+      "depends_on": [
+        "T006"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T010",
+      "title": "为任务列表增加学期与截止区间筛选",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "沿课程学期关联筛选任务并定义未关联课程任务的归类。",
+      "acceptance": [
+        "历史学期任务不混入当前筛选",
+        "日期缺失项有明确位置且筛选组合可用"
+      ],
+      "depends_on": [
+        "W009",
+        "T001"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T011",
+      "title": "实现每周日程在指定日期范围内展开",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "将存储的 weekly 规则展开为实际时间区间供日历和规划使用。",
+      "acceptance": [
+        "不超出 repeat_until",
+        "跨时区和查询边界无重复或遗漏"
+      ],
+      "depends_on": [
+        "T002",
+        "W008"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "T012",
+      "title": "定义可用时间重叠与跨日录入规则",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "tasks",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7；AGENTS.md 任务、时间与计划；PR #1",
+      "scope": "规范重复可用时段的拒绝或合并，以及跨日时段录入方式。",
+      "acceptance": [
+        "重复输入不让可用容量重复累加",
+        "跨日输入有明确校验或拆分结果"
+      ],
+      "depends_on": [
+        "T002",
+        "W008"
+      ],
+      "parent": "E11",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:tasks",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E12",
+      "title": "基础业务前端",
+      "kind": "epic",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "用真实 API 完成手动学习事务管理页面，不展示伪造业务数据。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:frontend",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "U001",
+      "title": "建立业务页面导航与路由",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "加入总览、课程、任务计划、资料、核对、问答、设置的阶段性入口。",
+      "acceptance": [
+        "已开放入口对应真实页面",
+        "未实现能力不显示为可用功能"
+      ],
+      "depends_on": [
+        "B001",
+        "B014",
+        "B015",
+        "B016"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U002",
+      "title": "建立统一业务 API 客户端与错误展示",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "统一请求、类型、登录失效、加载失败和重试处理。",
+      "acceptance": [
+        "各页面通过 api 目录调用",
+        "400、404、422、网络失败可理解且无敏感信息"
+      ],
+      "depends_on": [
+        "W004"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U003",
+      "title": "实现登录退出与受保护页面",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "实现单用户登录表单、会话状态及退出入口。",
+      "acceptance": [
+        "未登录访问业务页面转入登录",
+        "会话失效后不能继续展示私有缓存"
+      ],
+      "depends_on": [
+        "W004",
+        "U001",
+        "U002"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U004",
+      "title": "实现学期列表创建与归档恢复界面",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "支持选择当前学期、填写日期并查看历史学期。",
+      "acceptance": [
+        "前端与 API 的归档筛选一致",
+        "错误日期显示具体提示"
+      ],
+      "depends_on": [
+        "W009",
+        "U002"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U005",
+      "title": "实现课程列表与编辑表单",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "按学期显示课程，维护课程代码、教师和教学班。",
+      "acceptance": [
+        "同名不同班可区分",
+        "刷新后数据仍存在且未修改字段不被清空"
+      ],
+      "depends_on": [
+        "W010",
+        "U004"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U006",
+      "title": "实现任务列表与手动编辑表单",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "展示课程、DDL、优先级、剩余耗时和筛选入口。",
+      "acceptance": [
+        "日期不完整按原精度展示",
+        "表单保存后与重新加载结果一致"
+      ],
+      "depends_on": [
+        "T007",
+        "T008",
+        "T009",
+        "T010",
+        "U005"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "U007",
+      "title": "实现任务进度与调整记录界面",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "支持完成、取消、重新打开、受阻及原因录入。",
+      "acceptance": [
+        "操作后列表和详情一致",
+        "用户能查看历史调整原因"
+      ],
+      "depends_on": [
+        "T006",
+        "U006"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U008",
+      "title": "实现固定日程录入与周视图",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "显示实际展开日程，支持编辑、删除和每周重复。",
+      "acceptance": [
+        "时区及重复截止日清晰",
+        "固定日程与任务 DDL 视觉和操作分开"
+      ],
+      "depends_on": [
+        "T011",
+        "U002"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "U009",
+      "title": "实现时区、可用时间和学习偏好设置页",
+      "kind": "feature",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "维护每周可用时段、时区、每日容量与休息缓冲。",
+      "acceptance": [
+        "重叠与跨日规则有提示",
+        "保存后真实配置可重新加载"
+      ],
+      "depends_on": [
+        "T012",
+        "W007",
+        "U002"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:frontend",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "U010",
+      "title": "验收手动管理端到端流程",
+      "kind": "test",
+      "milestone": "M1",
+      "area": "frontend",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §5；docs/ARCHITECTURE.md 前端边界",
+      "scope": "浏览器完成建学期、建课程、建任务、录日程、改进度并刷新。",
+      "acceptance": [
+        "真实 API 与数据库闭环通过",
+        "空列表、接口失败与键盘操作有覆盖"
+      ],
+      "depends_on": [
+        "U003",
+        "U005",
+        "U007",
+        "U008",
+        "U009"
+      ],
+      "parent": "E12",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:frontend",
+        "priority:P0",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E20",
+      "title": "资料存储与生命周期",
+      "kind": "epic",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "保存私有资料、适用范围与版本，并确保归档删除的关联行为正确。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:materials",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "D001",
+      "title": "建立资料、版本与来源元数据模型",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "保存发布方、发布时间、导入时间、学期、教学班、来源类型和版本。",
+      "acceptance": [
+        "发布时间与导入时间分开",
+        "未知来源字段可保留未知且版本关联稳定"
+      ],
+      "depends_on": [
+        "W006",
+        "B014"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D002",
+      "title": "实现私有原文件存储适配器",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "使用服务端生成的存储键保存文件，定义读写删除接口。",
+      "acceptance": [
+        "用户文件名不能决定磁盘路径",
+        "文件不能绕过授权直接公开访问"
+      ],
+      "depends_on": [
+        "D001"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D003",
+      "title": "实现 PDF 与图片上传校验",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "校验允许格式、真实类型、大小和数量限制并配置上限。",
+      "acceptance": [
+        "伪造扩展名与超限文件被拒绝",
+        "错误说明可理解且不留下孤立文件"
+      ],
+      "depends_on": [
+        "D002"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D004",
+      "title": "实现粘贴文本导入",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "把用户粘贴内容保存为稳定原文版本并关联来源及课程范围。",
+      "acceptance": [
+        "段落位置在重复读取时稳定",
+        "空文本和超限输入返回明确错误"
+      ],
+      "depends_on": [
+        "D001"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D005",
+      "title": "实现资料列表筛选与元数据修订",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "按学期、课程、类型、处理状态查询并补充来源信息。",
+      "acceptance": [
+        "修订元数据不覆盖原文版本",
+        "范围变更触发相关检索范围更新"
+      ],
+      "depends_on": [
+        "D001"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D006",
+      "title": "检测完全相同文件的重复导入",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "对同空间原文件计算指纹并返回复用选择。",
+      "acceptance": [
+        "完全重复可提示已有资料",
+        "不同版本或不同空间不被静默合并"
+      ],
+      "depends_on": [
+        "D003"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D007",
+      "title": "实现资料归档与恢复",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "让归档资料保留原文和历史，在默认检索中按策略排除。",
+      "acceptance": [
+        "归档不删除正式任务",
+        "恢复后的引用状态与资料有效范围一致"
+      ],
+      "depends_on": [
+        "D005"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D008",
+      "title": "实现资料删除影响预览与确认",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "列出将失效的片段、引用、候选事项及关联个人任务，生成确认内容。",
+      "acceptance": [
+        "用户能选择保留个人任务或一并删除",
+        "执行内容改变后旧确认失效"
+      ],
+      "depends_on": [
+        "D005"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D009",
+      "title": "实现确认后的资料删除与派生失效",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "删除原文件和派生记录，保留所选任务并标记来源不可验证。",
+      "acceptance": [
+        "文件、片段、索引和候选结果均清理或失效",
+        "保留的任务不会静默消失或仍显示来源可验证"
+      ],
+      "depends_on": [
+        "D008",
+        "J007"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "D010",
+      "title": "说明备份保留与恢复后的删除策略",
+      "kind": "docs",
+      "milestone": "M2",
+      "area": "materials",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§6–7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "定义本地存储和后续备份的保留期限、恢复与删除对账流程。",
+      "acceptance": [
+        "删除界面可说明备份残留期限",
+        "恢复后不会悄悄复活已删除资料"
+      ],
+      "depends_on": [
+        "D008"
+      ],
+      "parent": "E20",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:materials",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "E21",
+      "title": "PDF、图片解析与原文定位",
+      "kind": "epic",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "将输入转为带页码、段落或区域位置的片段，保留未识别范围。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:parsing",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "D011",
+      "title": "定义可替换解析器输出协议",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "统一页面、片段、区域、置信信息和部分失败的表示。",
+      "acceptance": [
+        "PDF、文本、图片适配器均可遵守",
+        "位置与原文版本绑定且错误有范围"
+      ],
+      "depends_on": [
+        "D001",
+        "B010",
+        "B011"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D012",
+      "title": "实现 pypdf 文本页解析",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "提取文本 PDF 并保留页号与稳定片段位置。",
+      "acceptance": [
+        "多页样本的引用能回到对应页",
+        "空白页与无文本扫描页区分"
+      ],
+      "depends_on": [
+        "D011"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D013",
+      "title": "评估并选择 OCR 或视觉识别适配器",
+      "kind": "research",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "用授权样本比较中文、表格、模糊图片的效果与调用成本。",
+      "acceptance": [
+        "记录真实样本结果、失败范围与费用",
+        "选择结论有依据且不把模型输出当事实"
+      ],
+      "depends_on": [
+        "D011",
+        "B011"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D014",
+      "title": "实现图片 OCR 或视觉识别适配器",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "输出识别文本及截图区域，不能定位的结果明确降级。",
+      "acceptance": [
+        "可定位区域与原图一致",
+        "识别失败可报告而非生成确定事实"
+      ],
+      "depends_on": [
+        "D013"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "D015",
+      "title": "为扫描 PDF 增加逐页识别回退",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "检测缺少可提取文本的页面并调用图片识别。",
+      "acceptance": [
+        "文本页优先使用文本解析",
+        "单页失败不抹掉其他成功页面"
+      ],
+      "depends_on": [
+        "D012",
+        "D014"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D016",
+      "title": "处理表格和跨页续表的来源关联",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "保留表头、行列或续表关系及各片段原始位置。",
+      "acceptance": [
+        "跨页作业要求不会丢掉原页证据",
+        "无法可靠重建表格时显示限制"
+      ],
+      "depends_on": [
+        "D012",
+        "D014",
+        "B010"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "D017",
+      "title": "持久化来源片段与定位坐标",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "将页码、段落、区域和解析文本保存为可稳定引用的对象。",
+      "acceptance": [
+        "重试不产生重复片段",
+        "版本变化后旧引用不误指向新文本"
+      ],
+      "depends_on": [
+        "D011"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D018",
+      "title": "实现授权原文读取与定位接口",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "读取指定版本的 PDF、图片或文本，并返回定位信息。",
+      "acceptance": [
+        "空间权限贯穿原文件和预览",
+        "删除或失效引用返回明确状态"
+      ],
+      "depends_on": [
+        "D002",
+        "D017",
+        "W006"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "D019",
+      "title": "实现资料库上传与处理状态界面",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "显示待处理、处理中、完成、部分成功、失败并允许重试。",
+      "acceptance": [
+        "部分成功显示未覆盖页面区域",
+        "上传结果与后台实际状态一致"
+      ],
+      "depends_on": [
+        "D003",
+        "D004",
+        "D005",
+        "J006",
+        "U002"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "D020",
+      "title": "实现 PDF、图片和文本原文定位视图",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "用户从片段入口跳到对应页面、截图区域或文本段落。",
+      "acceptance": [
+        "三种输入均能核对原文",
+        "引用失效时显示原因而不假装仍可验证"
+      ],
+      "depends_on": [
+        "D018",
+        "U002"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "D021",
+      "title": "实现资料归档删除交互",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "parsing",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2–4.3；docs/ARCHITECTURE.md 资料到可查询事实",
+      "scope": "展示归档恢复和删除影响、任务保留选择与确认结果。",
+      "acceptance": [
+        "只执行展示过的删除范围",
+        "失败后不显示删除成功"
+      ],
+      "depends_on": [
+        "D007",
+        "D009",
+        "D010",
+        "D019"
+      ],
+      "parent": "E21",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:parsing",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E22",
+      "title": "异步处理与可恢复作业",
+      "kind": "epic",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "用数据库记录作业状态，可靠调度解析任务并处理失败与重复执行。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:jobs",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "J001",
+      "title": "建立处理作业状态与尝试记录模型",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "保存作业阶段、覆盖范围、错误原因、尝试次数与当前版本。",
+      "acceptance": [
+        "完成与部分成功可区分",
+        "失败信息不包含密钥或原始隐私全文"
+      ],
+      "depends_on": [
+        "D001"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J002",
+      "title": "接入 RQ 与独立 Worker 启动入口",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "在实际资料处理流程加入 RQ、Redis 依赖和 Worker 装配。",
+      "acceptance": [
+        "Worker 调用应用用例",
+        "HTTP 返回 job_id 后无需等待解析完成"
+      ],
+      "depends_on": [
+        "J001",
+        "D011"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J003",
+      "title": "实现资料和待投递记录同事务保存",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "使用 Outbox 或等效持久化记录处理数据库提交与入队分离。",
+      "acceptance": [
+        "Redis 不可用时资料和待投递记录不丢",
+        "未提交资料不能被 Worker 处理"
+      ],
+      "depends_on": [
+        "J002"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J004",
+      "title": "实现待投递补偿与作业幂等领取",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "补偿漏投递，重复消息使用稳定作业键。",
+      "acceptance": [
+        "重复投递不重复生成片段或候选结果",
+        "投递中断后可恢复"
+      ],
+      "depends_on": [
+        "J003"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J005",
+      "title": "实现分阶段失败重试与超时处理",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "区分可重试和永久失败，保留成功阶段与尝试历史。",
+      "acceptance": [
+        "重试不重复写入已完成阶段",
+        "超时后状态不会长期停在处理中"
+      ],
+      "depends_on": [
+        "J004"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J006",
+      "title": "提供作业状态查询与失败重试 API",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "返回阶段、覆盖范围和可重试性，验证当前空间权限。",
+      "acceptance": [
+        "前端能轮询直到终态",
+        "无权访问的 job_id 不泄露状态"
+      ],
+      "depends_on": [
+        "J005",
+        "W006"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J007",
+      "title": "阻止删除或过期版本的作业回写",
+      "kind": "feature",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "写入解析、索引或候选结果前核对资料版本与删除状态。",
+      "acceptance": [
+        "删除中或删除后的晚到 Worker 不恢复资料",
+        "新版本不能接收旧版本结果"
+      ],
+      "depends_on": [
+        "J004",
+        "D001"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:jobs",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "J008",
+      "title": "验证队列断连、重复消息和部分失败恢复",
+      "kind": "test",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "用故障注入检查数据库、Redis、Worker 的中断场景。",
+      "acceptance": [
+        "部分失败可见且成功页保留",
+        "恢复后结果无重复且删除竞态不回写"
+      ],
+      "depends_on": [
+        "J005",
+        "J007",
+        "D015",
+        "D017"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:jobs",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "J009",
+      "title": "补全资料处理运行文档与诊断入口",
+      "kind": "docs",
+      "milestone": "M2",
+      "area": "jobs",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "docs/ARCHITECTURE.md 资料到可查询事实；README.md 文件部分识别失败验收",
+      "scope": "记录 Worker 启动、模型配置、作业查错及安全重试方式。",
+      "acceptance": [
+        "新成员可运行三种输入处理",
+        "日志只保留必要 ID、阶段与脱敏错误"
+      ],
+      "depends_on": [
+        "J006",
+        "D019"
+      ],
+      "parent": "E22",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:jobs",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "E30",
+      "title": "候选事实提取与不确定性",
+      "kind": "epic",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "从已解析资料中提取候选任务、日程和规则，保留证据与缺失信息。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:extraction",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "X001",
+      "title": "定义候选事项与字段证据模型",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "保存事项类型、字段值、来源片段、适用范围和核对状态。",
+      "acceptance": [
+        "字段标明原文、用户补充、系统推断或规划建议",
+        "候选状态独立于任务执行进度"
+      ],
+      "depends_on": [
+        "D017"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X002",
+      "title": "建立模型生成适配接口与结构化校验",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "约束模型输出为预定义候选结构，隔离供应商 SDK。",
+      "acceptance": [
+        "无效字段或不存在的片段 ID 被拒绝",
+        "领域层不导入模型 SDK"
+      ],
+      "depends_on": [
+        "X001",
+        "D013"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X003",
+      "title": "实现任务要求与 DDL 候选提取",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "提取标题、提交方式、产出物和截止日期原文。",
+      "acceptance": [
+        "耗时估计明确为建议",
+        "缺少年份、时刻或提交方式保留缺失标记"
+      ],
+      "depends_on": [
+        "X002",
+        "B010",
+        "B012"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X004",
+      "title": "实现固定日程候选提取",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "提取活动时间区间、地点与参加条件。",
+      "acceptance": [
+        "截止前完成的作业不被当作固定活动",
+        "缺少开始或结束时间进入待核对"
+      ],
+      "depends_on": [
+        "X002"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X005",
+      "title": "实现课程规则候选提取",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "提取实验准入、格式、考核等规则及条件与生效范围。",
+      "acceptance": [
+        "规则保留支持原文",
+        "不把有条件规定转换为无条件事实"
+      ],
+      "depends_on": [
+        "X002"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X006",
+      "title": "实现有依据的相对日期换算",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "使用发布日或适用校历换算下周五、第八周等表达。",
+      "acceptance": [
+        "输出换算依据",
+        "缺少锚点或年份时不生成确定日期"
+      ],
+      "depends_on": [
+        "X003",
+        "B012"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "X007",
+      "title": "实现课程教学班匹配与歧义标记",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "依据选定学期、课程名及教学班匹配候选事项。",
+      "acceptance": [
+        "同名不同班不会自动唯一匹配",
+        "无法匹配时保留候选与原文供用户选择"
+      ],
+      "depends_on": [
+        "X001",
+        "W002"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X008",
+      "title": "识别截图截断和来源矛盾的待核对原因",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "把解析覆盖范围和相互矛盾的字段转为明确核对项。",
+      "acceptance": [
+        "截断信息不被标记已确认",
+        "矛盾证据并列保留而非覆盖"
+      ],
+      "depends_on": [
+        "X001",
+        "D011",
+        "B011",
+        "B012"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X009",
+      "title": "为资料内指令建立执行隔离回归",
+      "kind": "test",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "验证导入内容中的命令只能作为资料进入提取流程。",
+      "acceptance": [
+        "恶意片段不能触发文件操作、消息或外部写入",
+        "输出只能通过结构和来源校验"
+      ],
+      "depends_on": [
+        "X002"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:extraction",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "X010",
+      "title": "评估候选提取与不确定信息识别",
+      "kind": "test",
+      "milestone": "M3",
+      "area": "extraction",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3；AGENTS.md 来源、事实与不确定性",
+      "scope": "按样本逐项记录准确、遗漏、误提取和缺失字段识别结果。",
+      "acceptance": [
+        "四类困难样本有实际结果",
+        "不以解析成功率代替事实提取准确性"
+      ],
+      "depends_on": [
+        "X003",
+        "X004",
+        "X005",
+        "X006",
+        "X007",
+        "X008",
+        "B017"
+      ],
+      "parent": "E30",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:extraction",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E31",
+      "title": "集中核对与正式事项生成",
+      "kind": "epic",
+      "milestone": "M3",
+      "area": "review",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "让用户看证据、修正、确认或忽略候选事项，并可靠生成正式任务和日程。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:review",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "R001",
+      "title": "提供待核对事项列表与原因筛选",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "按课程、来源和缺失原因列出待核对候选及计数。",
+      "acceptance": [
+        "待核对与任务进度筛选互不混用",
+        "未覆盖范围也可从列表进入查看"
+      ],
+      "depends_on": [
+        "X001",
+        "X008"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R002",
+      "title": "实现候选字段修正与用户补充记录",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "保存修正前后值、操作者和补充来源类型。",
+      "acceptance": [
+        "用户填写的日期不会伪装成原文规定",
+        "原始提取和证据保留"
+      ],
+      "depends_on": [
+        "X001"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R003",
+      "title": "实现候选确认、忽略和失效状态转换",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "定义合法转换与确认前必填条件。",
+      "acceptance": [
+        "被忽略或失效项不参与正式约束",
+        "缺少必须字段不能被无提示确认"
+      ],
+      "depends_on": [
+        "R002"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R004",
+      "title": "将确认的任务转换为正式任务",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "使用事务关联候选、任务及来源，保留日期精度。",
+      "acceptance": [
+        "重复确认不会创建重复任务",
+        "任务可独立更新进度且不改核对状态"
+      ],
+      "depends_on": [
+        "R003",
+        "T001"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R005",
+      "title": "将确认的日程转换为固定日程",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "保存已核对区间与来源关联并校验时间。",
+      "acceptance": [
+        "缺少必需时间不能成为确定日程",
+        "重复确认不重复建项"
+      ],
+      "depends_on": [
+        "R003",
+        "T002"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R006",
+      "title": "保存确认规则并提供规则查询",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "保存有效规则及适用课程、学期、条件和证据。",
+      "acceptance": [
+        "未确认规则不能当作正式要求",
+        "失效或删除来源的规则状态可见"
+      ],
+      "depends_on": [
+        "R003",
+        "X005"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R007",
+      "title": "建立任务与日程的来源详情接口",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "返回用户补充、原文要求及引用可验证状态。",
+      "acceptance": [
+        "手动事项与提取事项的来源类型清晰",
+        "资料删除后不继续返回可验证引用"
+      ],
+      "depends_on": [
+        "R004",
+        "R005",
+        "D009"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R008",
+      "title": "实现集中核对列表与详情界面",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "展示原文、缺失项、适用范围和确认忽略操作。",
+      "acceptance": [
+        "用户可以从待核对入口处理全部候选",
+        "核对错误不会被成功提示掩盖"
+      ],
+      "depends_on": [
+        "R001",
+        "R002",
+        "R003",
+        "D020",
+        "U002"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "R009",
+      "title": "实现逐字段修正和确认结果反馈",
+      "kind": "feature",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "在核对界面展示修改来源及生成的任务日程入口。",
+      "acceptance": [
+        "确认后可打开正确正式事项",
+        "重复点击或请求重试不出现重复事项"
+      ],
+      "depends_on": [
+        "R004",
+        "R005",
+        "R006",
+        "R008"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:review",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "R010",
+      "title": "验收资料到正式事项的完整链路",
+      "kind": "test",
+      "milestone": "M3",
+      "area": "review",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.3、§5；AGENTS.md 任务、时间与计划",
+      "scope": "导入样本、等待提取、修正、确认并查看正式任务和原文。",
+      "acceptance": [
+        "日期不完整和同名课必须停留待核对",
+        "删除来源后任务和引用状态正确"
+      ],
+      "depends_on": [
+        "R007",
+        "R009",
+        "X010"
+      ],
+      "parent": "E31",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:review",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E40",
+      "title": "检索索引与模型适配",
+      "kind": "epic",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "按授权和适用范围检索带稳定引用的证据片段。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:qa",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "Q001",
+      "title": "评估中文检索与生成模型组合",
+      "kind": "research",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "基于样本比较 embedding、生成模型效果、延迟与费用。",
+      "acceptance": [
+        "供应商选择有样本数据",
+        "记录隐私传输边界与无法覆盖的输入"
+      ],
+      "depends_on": [
+        "B017",
+        "X010"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q002",
+      "title": "实现 embedding 适配器和版本记录",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "保存向量模型标识、维度和生成配置。",
+      "acceptance": [
+        "不同模型版本的向量不被混查",
+        "失败可重试且日志无密钥"
+      ],
+      "depends_on": [
+        "Q001",
+        "D017"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q003",
+      "title": "实现保留来源位置的文本分块",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "按段落、表格或页面边界组织检索块并关联原片段。",
+      "acceptance": [
+        "每块可追溯到原位置",
+        "重叠分块不生成互相矛盾的引用身份"
+      ],
+      "depends_on": [
+        "D017",
+        "Q001"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q004",
+      "title": "建立 pgvector 索引与异步索引流程",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "在真实 PostgreSQL 写入分块向量并记录索引状态。",
+      "acceptance": [
+        "重复作业不重复建索引",
+        "部分失败不会标记整个资料可完整检索"
+      ],
+      "depends_on": [
+        "Q002",
+        "Q003",
+        "J004"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q005",
+      "title": "实现工作空间和适用范围前置过滤",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "检索前按空间、学期、教学班及版本有效性限制候选。",
+      "acceptance": [
+        "跨空间片段不会进入模型上下文",
+        "不同适用范围不得事后由模型猜测隔离"
+      ],
+      "depends_on": [
+        "Q004",
+        "W006"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q006",
+      "title": "实现关键词与向量检索基线比较",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "用中文课程名、编号和日期场景比较单路与混合检索并采用验证方案。",
+      "acceptance": [
+        "结果排序可复现",
+        "模型缺少课程名信息时关键词样本也有评估"
+      ],
+      "depends_on": [
+        "Q005",
+        "Q001"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q007",
+      "title": "建立稳定引用 ID 与候选集校验",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "回答引用绑定资料版本和检索候选片段。",
+      "acceptance": [
+        "不存在或不在候选集内的引用被拒绝",
+        "合法 ID 不被当作语义正确的充分证据"
+      ],
+      "depends_on": [
+        "Q005"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q008",
+      "title": "在删除归档和范围变更时失效索引",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "索引读取和写入都核对资料当前有效状态。",
+      "acceptance": [
+        "删除的资料无法再次检索",
+        "归档恢复和范围修订按新范围生效"
+      ],
+      "depends_on": [
+        "Q004",
+        "D007",
+        "D009",
+        "J007"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q009",
+      "title": "增加模型超时、限额与失败降级",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "对生成与 embedding 配置超时、重试上限和可见错误。",
+      "acceptance": [
+        "失败时不伪造答案或引用",
+        "用户能理解服务不可用与资料不足的区别"
+      ],
+      "depends_on": [
+        "Q002",
+        "X002"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q010",
+      "title": "建立检索召回与引用支持评估集",
+      "kind": "test",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；docs/ARCHITECTURE.md 检索、回答与计划",
+      "scope": "用人工标注证据测量召回、引用支持及跨范围错误。",
+      "acceptance": [
+        "记录实际指标及错误示例",
+        "删除、相似课程和不同学期样本通过范围检查"
+      ],
+      "depends_on": [
+        "Q006",
+        "Q007",
+        "Q008",
+        "B017"
+      ],
+      "parent": "E40",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E41",
+      "title": "可追溯问答与交互",
+      "kind": "epic",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "回答用户问题并展示支持依据、覆盖范围和不确定性。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:qa",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "Q011",
+      "title": "实现问答用例与请求响应协议",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "接收课程、学期、时间和问题，返回答案、引用和覆盖信息。",
+      "acceptance": [
+        "回答内容与引用结构分离",
+        "服务端校验所有范围参数"
+      ],
+      "depends_on": [
+        "Q007",
+        "Q009",
+        "R006"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q012",
+      "title": "实现资料不足和部分覆盖的回答策略",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "在无命中或部分解析时说明未发现与未覆盖范围。",
+      "acceptance": [
+        "不把未发现说成没有作业",
+        "部分解析失败在回答中可见"
+      ],
+      "depends_on": [
+        "Q011",
+        "D011"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q013",
+      "title": "实现多资料对照与矛盾展示",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "并列显示同一事项的支持片段、差异及适用对象。",
+      "acceptance": [
+        "矛盾要求不自动选较晚导入者",
+        "无法判断生效版本时提示核对"
+      ],
+      "depends_on": [
+        "Q011",
+        "X008"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q014",
+      "title": "实现有范围的连续追问上下文",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "保存会话所选课程和已引用资料并允许切换范围。",
+      "acceptance": [
+        "追问不混入其他学期或空间",
+        "来源删除后旧会话明确引用失效"
+      ],
+      "depends_on": [
+        "Q011",
+        "Q008"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q015",
+      "title": "实现查询、规划、冲突检查的意图协议",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "定义结构化意图与参数，规划检查意图调用对应已上线用例。",
+      "acceptance": [
+        "生成文字不能直接变成任意工具执行",
+        "未上线意图给出明确能力边界"
+      ],
+      "depends_on": [
+        "Q011"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q016",
+      "title": "实现问答页面和引用卡片",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "显示答案、适用范围、缺失项和可点击的引用。",
+      "acceptance": [
+        "点击引用定位原文",
+        "加载失败和无依据状态独立展示"
+      ],
+      "depends_on": [
+        "Q012",
+        "Q013",
+        "Q014",
+        "D020",
+        "U002"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "Q017",
+      "title": "实现来源失效与回答覆盖提示",
+      "kind": "feature",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "在会话界面显示已删除资料、未识别范围和待核对冲突。",
+      "acceptance": [
+        "旧回答不会继续显示已删除来源可验证",
+        "用户可进入核对或导入资料"
+      ],
+      "depends_on": [
+        "Q008",
+        "Q016",
+        "R008"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:qa",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "Q018",
+      "title": "验收 DDL 回答与引用语义一致",
+      "kind": "test",
+      "milestone": "M4",
+      "area": "qa",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.4；README.md DDL、未覆盖课程验收",
+      "scope": "逐样本检查具体日期、适用对象与支持原文。",
+      "acceptance": [
+        "不能只检查引用 ID 存在",
+        "日期不完整和冲突场景明确不确定性"
+      ],
+      "depends_on": [
+        "Q010",
+        "Q017",
+        "B013"
+      ],
+      "parent": "E41",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:qa",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E50",
+      "title": "两周排期核心与输入校验",
+      "kind": "epic",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "以确定性规则生成两周计划并如实列出缺口与未安排事项。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:planning",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "P001",
+      "title": "建立计划草案、版本与时间块模型",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "保存任务关联、生成输入快照、假设和接受状态。",
+      "acceptance": [
+        "计划时间块与原始 DDL 独立",
+        "同一草案有稳定版本可做并发校验"
+      ],
+      "depends_on": [
+        "T007",
+        "T009"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P002",
+      "title": "汇总未来两周的任务与时间约束",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "读取确认任务、剩余耗时、固定日程、可用时间和偏好。",
+      "acceptance": [
+        "使用当前空间时区定义两周边界",
+        "已完成取消项不作为待排任务"
+      ],
+      "depends_on": [
+        "P001",
+        "T011",
+        "T012",
+        "W007"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P003",
+      "title": "识别缺失日期耗时与待核对约束",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "在排期前返回待补充项和可选规划假设。",
+      "acceptance": [
+        "没有用户选择的假设不变为事实",
+        "候选未确认事项不自动成为硬约束"
+      ],
+      "depends_on": [
+        "P002",
+        "R003"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P004",
+      "title": "计算扣除固定日程后的可用时间片",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "求可用区间差集，处理重复固定活动与重叠可用时段。",
+      "acceptance": [
+        "相邻边界不误判重叠",
+        "重叠输入不重复计算学习容量"
+      ],
+      "depends_on": [
+        "P002"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P005",
+      "title": "实现截止约束下的任务时间分配",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "按明确截止和已知必要先后约束安排任务。",
+      "acceptance": [
+        "时间块不越过确定截止或占用固定活动",
+        "无法满足约束时保留未排入原因"
+      ],
+      "depends_on": [
+        "P003",
+        "P004"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "P006",
+      "title": "实现优先级、学习容量与休息偏好",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "在硬约束可行范围内使用重要性、连续学习和每日容量规则。",
+      "acceptance": [
+        "偏好不会覆盖截止或固定日程",
+        "容量与休息设置改变后结果可解释"
+      ],
+      "depends_on": [
+        "P005",
+        "W007"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P007",
+      "title": "支持可编辑任务分段与提交缓冲",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "生成大任务时间段及检查提交缓冲，记录为规划建议。",
+      "acceptance": [
+        "分段总量与耗时一致",
+        "用户可调整建议且原任务要求不被改写"
+      ],
+      "depends_on": [
+        "P006"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P008",
+      "title": "输出未排任务、容量缺口和调整选项",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "逐任务返回安排不足的分钟、原因与可选处理方式。",
+      "acceptance": [
+        "所有输入任务都有去向",
+        "不能隐藏任务来生成表面完整计划"
+      ],
+      "depends_on": [
+        "P005",
+        "P007"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P009",
+      "title": "生成时间块安排理由与约束来源",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "从排期输入生成可追溯的安排说明。",
+      "acceptance": [
+        "理由对应真实约束或用户偏好",
+        "估计导致的风险明确标为估计"
+      ],
+      "depends_on": [
+        "P008",
+        "R007"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P010",
+      "title": "验证排期边界与不可行输入",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.6–4.7；AGENTS.md 任务、时间与计划",
+      "scope": "覆盖零可用时间、紧邻 DDL、超容量、跨日和未知耗时。",
+      "acceptance": [
+        "每个已排块符合约束",
+        "每个未排任务有原因且原 DDL 未改动"
+      ],
+      "depends_on": [
+        "P009",
+        "B013"
+      ],
+      "parent": "E50",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:planning",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E51",
+      "title": "冲突检查、计划接受与调整",
+      "kind": "epic",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "检查计划冲突，草案经用户接受成为当前安排，实质变更重新确认。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:planning",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "P011",
+      "title": "检测固定日程及学习时间块重叠",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "返回重叠区间、涉及事项和哪些时间块可调整。",
+      "acceptance": [
+        "固定事件之间及事件与学习块都覆盖",
+        "必要时间缺失时显示检查限制"
+      ],
+      "depends_on": [
+        "P004",
+        "P001"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P012",
+      "title": "计算截止风险与学习负荷风险",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "对比剩余耗时、可用容量和截止窗口。",
+      "acceptance": [
+        "确定重叠与估计风险分开",
+        "缺少耗时时不宣称没有风险"
+      ],
+      "depends_on": [
+        "P008",
+        "T009"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P013",
+      "title": "实现草案生成查询与版本化接受 API",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "保存草案并在接受时检查输入版本和当前计划。",
+      "acceptance": [
+        "未接受不修改当前安排",
+        "过期草案或重复请求不会覆盖较新计划"
+      ],
+      "depends_on": [
+        "P001",
+        "P010"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P014",
+      "title": "支持手动移动和锁定已接受时间块",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "保存个人调整并重查约束，对实质变更展示差异和确认。",
+      "acceptance": [
+        "移动不改变正式 DDL",
+        "锁定状态保存且冲突提示清晰"
+      ],
+      "depends_on": [
+        "P013",
+        "P011"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P015",
+      "title": "实现两周草案与当前计划界面",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "显示分日时间块、工作量、理由、未排任务和接受入口。",
+      "acceptance": [
+        "草案与当前计划明确区分",
+        "容量不足时逐项展示缺口"
+      ],
+      "depends_on": [
+        "P009",
+        "P012",
+        "P013",
+        "U006",
+        "U008"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "P016",
+      "title": "实现冲突详情、时间块调整与锁定界面",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "用户可查看证据、移动可调整块、锁定及确认变化。",
+      "acceptance": [
+        "确定冲突与风险不同展示",
+        "过期草案拒绝后界面引导刷新"
+      ],
+      "depends_on": [
+        "P014",
+        "P015"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P017",
+      "title": "接通规划与冲突检查自然语言入口",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "把已校验意图交给实际规划检查用例，并返回草案入口。",
+      "acceptance": [
+        "问时间不自动接受计划",
+        "自由文本不能绕过接受确认"
+      ],
+      "depends_on": [
+        "Q015",
+        "P013",
+        "P012"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "P018",
+      "title": "实现近期任务与今日安排总览",
+      "kind": "feature",
+      "milestone": "M5",
+      "area": "planning",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.6–4.7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "汇总待核对、近期 DDL、当前计划和未解决冲突。",
+      "acceptance": [
+        "总览链接到真实事项",
+        "空资料和未生成计划不显示假数据"
+      ],
+      "depends_on": [
+        "P015",
+        "R008",
+        "Q016"
+      ],
+      "parent": "E51",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E52",
+      "title": "MVP 集成验收与发布准备",
+      "kind": "epic",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "按八项业务验收证明首版闭环成立，保留运行证据与已知限制。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:quality",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "V001",
+      "title": "执行八项 MVP 端到端验收",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "使用授权或合成样本逐项演示导入、核对、问答、计划、删除。",
+      "acceptance": [
+        "八项均记录实际结果和证据",
+        "失败项关联缺陷且关闭前不宣称 MVP 完成"
+      ],
+      "depends_on": [
+        "B013",
+        "R010",
+        "Q018",
+        "P010",
+        "P016"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "V002",
+      "title": "验证空间隔离与资料内指令边界",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "覆盖文件、预览、索引、会话、任务及计划的越权访问。",
+      "acceptance": [
+        "猜 ID 或跨空间关联不能访问私有内容",
+        "资料命令无法执行敏感操作"
+      ],
+      "depends_on": [
+        "W006",
+        "D018",
+        "Q005",
+        "P013",
+        "X009"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "V003",
+      "title": "验证删除与运行中处理的端到端竞态",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "处理资料期间删除，等待后台结束并检索旧引用。",
+      "acceptance": [
+        "索引和派生内容不复活",
+        "保留任务可见且标明来源不可验证"
+      ],
+      "depends_on": [
+        "D021",
+        "Q008",
+        "R010",
+        "J008"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "V004",
+      "title": "完成 MVP 页面易用性与无障碍走查",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "覆盖键盘、错误提示、窄屏、空状态和长文本引用。",
+      "acceptance": [
+        "关键流程可键盘完成",
+        "用户不会因隐藏缺口或待核对信息误判结果"
+      ],
+      "depends_on": [
+        "P018",
+        "Q017",
+        "D021"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "V005",
+      "title": "测量典型样本处理时延与模型成本",
+      "kind": "test",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "记录文件规模、解析时间、检索响应和模型用量，形成基线。",
+      "acceptance": [
+        "测量环境与样本明确",
+        "根据实测提出限制和指标而非虚报达标"
+      ],
+      "depends_on": [
+        "V001",
+        "B017"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:quality",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "V006",
+      "title": "完善本地整套启动与故障恢复说明",
+      "kind": "docs",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "整理前端、API、数据库、Redis、Worker、模型配置和迁移顺序。",
+      "acceptance": [
+        "新环境按文档能完成示例闭环",
+        "数据库停机与 Worker 失败有恢复路径"
+      ],
+      "depends_on": [
+        "J009",
+        "P017"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:docs",
+        "area:quality",
+        "priority:P1",
+        "layer:docs",
+        "size:S"
+      ]
+    },
+    {
+      "key": "V007",
+      "title": "准备 MVP 发布说明与候选版本验收",
+      "kind": "chore",
+      "milestone": "M5",
+      "area": "quality",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §8–9；CONTRIBUTING.md 验证要求",
+      "scope": "汇总能力、未完成项、已知限制、迁移和回滚办法。",
+      "acceptance": [
+        "所有阻塞缺陷有结论且验收有证据",
+        "满足发布规则后才创建 v0.5.0 tag"
+      ],
+      "depends_on": [
+        "V001",
+        "V002",
+        "V003",
+        "V004",
+        "V005",
+        "V006"
+      ],
+      "parent": "E52",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:chore",
+        "area:quality",
+        "priority:P0",
+        "layer:docs",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E60",
+      "title": "Word 与公开网页导入",
+      "kind": "epic",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "扩展输入格式并沿用私有存储、定位与处理状态体系。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:materials",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "N001",
+      "title": "制作 Word 与公开网页验收样本",
+      "kind": "test",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "覆盖表格、段落、公开通知、无法访问与需要登录页面。",
+      "acceptance": [
+        "样本获授权或合成",
+        "每份都有原文位置和预期失败范围"
+      ],
+      "depends_on": [
+        "B009"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:materials",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "N002",
+      "title": "实现 Word 格式与大小校验",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "限定首个支持的 Word 格式并处理损坏或不支持文件。",
+      "acceptance": [
+        "不支持格式明确说明",
+        "拒绝超限或伪造类型且不留下孤立文件"
+      ],
+      "depends_on": [
+        "D003",
+        "N001"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N003",
+      "title": "实现 Word 段落表格解析及定位",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "输出文档版本、段落和表格单元定位。",
+      "acceptance": [
+        "引用能定位到稳定段落或单元",
+        "不能可靠得出的页码不伪造"
+      ],
+      "depends_on": [
+        "N002",
+        "D011"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "N004",
+      "title": "实现公开网页抓取的目标校验",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "限制协议、地址、重定向、响应大小和超时，保护私有网络。",
+      "acceptance": [
+        "本机及内网目标不能经重定向绕过限制",
+        "仅处理用户主动请求的公开 URL"
+      ],
+      "depends_on": [
+        "N001",
+        "W006"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N005",
+      "title": "保存网页快照与发布来源",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "保存 URL、抓取时间、发布信息和快照版本。",
+      "acceptance": [
+        "抓取时间不冒充发布时间",
+        "网页后续变化不让旧引用指向新内容"
+      ],
+      "depends_on": [
+        "N004",
+        "D001"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N006",
+      "title": "实现网页正文提取与段落定位",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "提取通知正文和表格，关联快照中的段落锚点。",
+      "acceptance": [
+        "导航广告不会大量进入事实提取",
+        "引用可返回保存的原始版本"
+      ],
+      "depends_on": [
+        "N005",
+        "D011"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N007",
+      "title": "展示网页不可访问时的替代输入",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "登录页、反爬或失效页面给出上传或粘贴原文入口。",
+      "acceptance": [
+        "不自动登录教务系统",
+        "失败原因和未覆盖范围可见"
+      ],
+      "depends_on": [
+        "N006",
+        "D004"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N008",
+      "title": "接通 Word 与网页导入界面和作业流程",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "在资料库增加格式入口并复用异步解析、核对与引用。",
+      "acceptance": [
+        "两种输入可进入核对及问答",
+        "格式失败不会标记全部成功"
+      ],
+      "depends_on": [
+        "N003",
+        "N006",
+        "N007",
+        "J006",
+        "D019"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:materials",
+        "priority:P1",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "N009",
+      "title": "验收扩展输入到引用问答的链路",
+      "kind": "test",
+      "milestone": "M6",
+      "area": "materials",
+      "layer": "fullstack",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.2、§8 第二阶段",
+      "scope": "对 Word、网页及失败样本检查定位和回答依据。",
+      "acceptance": [
+        "无依据页码或发布时间不被补造",
+        "已保存网页在原站变化后仍可核对"
+      ],
+      "depends_on": [
+        "N008",
+        "Q018"
+      ],
+      "parent": "E60",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:materials",
+        "priority:P1",
+        "layer:fullstack",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E61",
+      "title": "资料版本、通知差异与重复合并",
+      "kind": "epic",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "比较版本与事项差异，确认后更新并保留来源和历史。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:changes",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "N010",
+      "title": "实现资料版本关联与替代声明记录",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "用户为同源资料关联版本，保存发布信息及明确替代关系。",
+      "acceptance": [
+        "导入顺序不决定生效顺序",
+        "适用学期班级不同的版本不直接替代"
+      ],
+      "depends_on": [
+        "D001",
+        "R006"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N011",
+      "title": "生成日期、地点、要求与范围字段差异",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "对新旧候选或确认事项比较语义字段并保留证据。",
+      "acceptance": [
+        "每个差异指向新旧来源",
+        "字段缺失与明确删除分开显示"
+      ],
+      "depends_on": [
+        "N010",
+        "X001"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N012",
+      "title": "判定版本适用性与待核对冲突",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "根据发布信息、范围和替代说明给出生效候选或冲突。",
+      "acceptance": [
+        "较晚导入的旧通知不能自动覆盖",
+        "证据不足进入待核对"
+      ],
+      "depends_on": [
+        "N011"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N013",
+      "title": "查询通知变更影响的任务与时间块",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "追踪来源关联，列出可能受影响的当前事项和计划。",
+      "acceptance": [
+        "已完成和锁定安排也明确列出影响",
+        "当前尚无的提醒或外部连接不伪装已同步"
+      ],
+      "depends_on": [
+        "N011",
+        "R007",
+        "P001"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N014",
+      "title": "实现版本接受与变更历史",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "用户接受具体字段差异后事务更新当前版本和受影响事实。",
+      "acceptance": [
+        "接受范围改变后旧确认失效",
+        "旧版本、原因与证据均可查看"
+      ],
+      "depends_on": [
+        "N012",
+        "N013"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N015",
+      "title": "识别重复候选任务与日程",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "按课程、范围、时间和内容生成重复建议。",
+      "acceptance": [
+        "同名不同学期事项不被当作同一项",
+        "重复建议不自动删除或合并"
+      ],
+      "depends_on": [
+        "X001",
+        "R004",
+        "N010"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N016",
+      "title": "实现重复事项合并与关联迁移",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "合并用户选择的候选或正式事项并保留全部有效来源。",
+      "acceptance": [
+        "原有进度和来源的保留规则明确",
+        "重试不会重复迁移或丢失历史"
+      ],
+      "depends_on": [
+        "N015",
+        "T006"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "N017",
+      "title": "实现版本对照与变更接受界面",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "并列展示原文、字段差异、影响事项和待确认冲突。",
+      "acceptance": [
+        "用户能识别版本适用范围",
+        "未接受时当前安排不变化"
+      ],
+      "depends_on": [
+        "N014",
+        "D020"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "N018",
+      "title": "实现重复建议与合并预览界面",
+      "kind": "feature",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "展示将保留字段、来源、进度及合并影响。",
+      "acceptance": [
+        "只合并预览过的范围",
+        "取消或请求失败不隐藏原事项"
+      ],
+      "depends_on": [
+        "N016",
+        "R008"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:changes",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "N019",
+      "title": "验证通知冲突与变更历史不被覆盖",
+      "kind": "test",
+      "milestone": "M6",
+      "area": "changes",
+      "layer": "fullstack",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.9；AGENTS.md 课程依赖与变更",
+      "scope": "覆盖旧通知后导入、跨学期同名、缺替代声明和合并重试。",
+      "acceptance": [
+        "冲突未确认不改当前要求",
+        "接受后能追溯原版本及任务变化"
+      ],
+      "depends_on": [
+        "N017",
+        "N018",
+        "B012"
+      ],
+      "parent": "E61",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:changes",
+        "priority:P0",
+        "layer:fullstack",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E70",
+      "title": "依赖任务、分解与局部重排",
+      "kind": "epic",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "让依赖、进度变化和新通知进入可确认的局部调整流程。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:planning",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "A001",
+      "title": "建立任务依赖与子任务模型",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "保存必要先后关系、子任务归属和可编辑分解建议。",
+      "acceptance": [
+        "依赖与包含关系分开",
+        "子任务保留父任务与来源关联"
+      ],
+      "depends_on": [
+        "T006",
+        "T009"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A002",
+      "title": "校验任务依赖成环和缺失前置",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "检查新增依赖与删除取消前置的影响。",
+      "acceptance": [
+        "成环不能被当作可执行顺序",
+        "缺失或取消前置展示阻塞原因"
+      ],
+      "depends_on": [
+        "A001"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A003",
+      "title": "在排期中满足必要任务依赖",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "将有向无环依赖纳入任务排序和可安排窗口。",
+      "acceptance": [
+        "后续任务不早于必要前置完成",
+        "依赖不可满足的任务列为未排入"
+      ],
+      "depends_on": [
+        "A002",
+        "P005"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "A004",
+      "title": "实现可编辑子任务与耗时汇总",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "提供拆分、调整子任务及父任务进度耗时汇总。",
+      "acceptance": [
+        "系统拆分标为建议",
+        "父子耗时不会在排期中重复计入"
+      ],
+      "depends_on": [
+        "A001",
+        "T009"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A005",
+      "title": "实现保留锁定时间块的局部重排",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "选择受影响范围生成新的调整草案。",
+      "acceptance": [
+        "范围外安排尽量保持",
+        "锁定块无法兼容时展示阻塞而非静默移动"
+      ],
+      "depends_on": [
+        "A003",
+        "P014"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "A006",
+      "title": "根据通知、进度或可用时间变化生成调整建议",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "检测变化影响并让用户选择是否生成局部草案。",
+      "acceptance": [
+        "新通知接受后只提出调整",
+        "不会未经接受覆盖当前计划"
+      ],
+      "depends_on": [
+        "A005",
+        "N014",
+        "T009",
+        "W007"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A007",
+      "title": "增加今天、本周与自定义规划区间",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "复用确定性排期器并明确时区和范围边界。",
+      "acceptance": [
+        "区间外当前安排不被覆盖",
+        "跨周跨月及空范围有清晰结果"
+      ],
+      "depends_on": [
+        "A005"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A008",
+      "title": "实现依赖、子任务与局部调整界面",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "展示阻塞前置、可编辑分解、变更差异和接受动作。",
+      "acceptance": [
+        "用户能看见保留与移动的块",
+        "确认后的调整与预览一致"
+      ],
+      "depends_on": [
+        "A004",
+        "A006",
+        "A007",
+        "P016"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:planning",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "A009",
+      "title": "验证依赖排期与局部重排不变量",
+      "kind": "test",
+      "milestone": "M7",
+      "area": "planning",
+      "layer": "fullstack",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.5–4.7、§4.9；第二阶段范围",
+      "scope": "覆盖成环、锁定冲突、耗时增加、通知变更和已完成前置。",
+      "acceptance": [
+        "没有遗漏未排任务或重复耗时",
+        "局部接受不修改原始 DDL"
+      ],
+      "depends_on": [
+        "A008",
+        "N019"
+      ],
+      "parent": "E70",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:planning",
+        "priority:P0",
+        "layer:fullstack",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E71",
+      "title": "应用内提醒",
+      "kind": "epic",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "在应用内呈现可配置、可暂停且不会重复轰炸的学习提醒。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:reminders",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "A010",
+      "title": "建立提醒规则与触发记录模型",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "保存提前量、重复设置、暂停状态和关联任务计划。",
+      "acceptance": [
+        "规则与实际触发记录分开",
+        "默认策略和时区定义清楚"
+      ],
+      "depends_on": [
+        "T006",
+        "P001"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A011",
+      "title": "实现近期截止与待核对提醒生成",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "根据截止精度及核对状态产生应用内提醒。",
+      "acceptance": [
+        "日期 DDL 不被伪装成确定时刻",
+        "已失效来源不继续产生确定要求提醒"
+      ],
+      "depends_on": [
+        "A010",
+        "R003",
+        "T008"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A012",
+      "title": "实现提醒幂等与重复调度保护",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "用事项、规则版本和触发窗口生成幂等键。",
+      "acceptance": [
+        "重试或多个调度周期不重复创建同一提醒",
+        "失败可以安全恢复"
+      ],
+      "depends_on": [
+        "A011",
+        "J004"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A013",
+      "title": "处理完成、取消、暂停和重新打开",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "按任务进度或用户配置停止或恢复后续提醒。",
+      "acceptance": [
+        "完成取消后停止未触发提醒",
+        "重新打开不会重复发送历史提醒"
+      ],
+      "depends_on": [
+        "A012",
+        "T006"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A014",
+      "title": "在计划通知变化后重算受影响提醒",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "失效旧触发并根据最新已接受安排计算新提醒。",
+      "acceptance": [
+        "未接受草案不改变当前提醒",
+        "变更后不同时保留两套过时提醒"
+      ],
+      "depends_on": [
+        "A013",
+        "A006",
+        "N014"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A015",
+      "title": "实现提醒中心及规则设置界面",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "展示未读、已读、暂停及具体事项入口。",
+      "acceptance": [
+        "可操作提前量和暂停",
+        "无提醒时不代表没有待办或冲突"
+      ],
+      "depends_on": [
+        "A014",
+        "P018"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:reminders",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "A016",
+      "title": "验证提醒漏发与重复边界",
+      "kind": "test",
+      "milestone": "M7",
+      "area": "reminders",
+      "layer": "fullstack",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段范围",
+      "scope": "覆盖时区变化、完成重开、暂停恢复、调度重试和通知变更。",
+      "acceptance": [
+        "相同触发窗口不重复",
+        "停止和恢复符合规则且有实际记录"
+      ],
+      "depends_on": [
+        "A015"
+      ],
+      "parent": "E71",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:reminders",
+        "priority:P1",
+        "layer:fullstack",
+        "size:S"
+      ]
+    },
+    {
+      "key": "E72",
+      "title": "清单、日历文件与第二阶段验收",
+      "kind": "epic",
+      "milestone": "M7",
+      "area": "export",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "提供用户可控的导出，并验证日常流程完整性。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:export",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "A017",
+      "title": "定义清单与日历导出范围和字段",
+      "kind": "design",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "docs",
+      "size": "XS",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "确定只导出用户所选任务或已接受计划及必要来源提示。",
+      "acceptance": [
+        "导出前可预览范围",
+        "无关姓名联系方式及私有原文默认不包含"
+      ],
+      "depends_on": [
+        "T007",
+        "P013"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:design",
+        "area:export",
+        "priority:P1",
+        "layer:docs",
+        "size:XS",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "A018",
+      "title": "实现任务清单导出",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "生成明确格式的清单，保留课程、进度、DDL 精度和来源状态。",
+      "acceptance": [
+        "缺失时间不被补造",
+        "中文、长文本及特殊字符正确输出"
+      ],
+      "depends_on": [
+        "A017"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:export",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A019",
+      "title": "实现日历草案 ICS 导出",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "为固定日程和所选时间块生成稳定 UID 与时区信息。",
+      "acceptance": [
+        "日期型与具体时刻型条目区分",
+        "重复导出不改变同一事项 UID"
+      ],
+      "depends_on": [
+        "A017",
+        "T011",
+        "W008"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:export",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A020",
+      "title": "实现导出预览与下载界面",
+      "kind": "feature",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "选择范围、查看内容和来源失效提示后下载。",
+      "acceptance": [
+        "草案文件不会显示已写入外部日历",
+        "下载范围与预览一致"
+      ],
+      "depends_on": [
+        "A018",
+        "A019"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:export",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A021",
+      "title": "验证导出文件的日期和时区互操作",
+      "kind": "test",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "将样本 ICS 在选定日历客户端导入并检查展示。",
+      "acceptance": [
+        "周重复、跨日和日期型 DDL 无时间漂移",
+        "清单无多余隐私信息"
+      ],
+      "depends_on": [
+        "A020"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:export",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "A022",
+      "title": "执行第二阶段端到端验收与发布记录",
+      "kind": "test",
+      "milestone": "M7",
+      "area": "export",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.10；第二阶段验收",
+      "scope": "串联 Word网页、通知变更、依赖重排、提醒及导出。",
+      "acceptance": [
+        "通知冲突验收通过且无静默覆盖",
+        "记录 v0.7.0 发布候选证据和已知限制"
+      ],
+      "depends_on": [
+        "N009",
+        "N019",
+        "A009",
+        "A016",
+        "A021"
+      ],
+      "parent": "E72",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:export",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E80",
+      "title": "培养方案与课程关系数据",
+      "kind": "epic",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "保存适用培养方案、已修状态以及有证据的三类课程关系。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:paths",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "C001",
+      "title": "制作培养方案与课程依赖验收样本",
+      "kind": "test",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "覆盖先修、并修、建议先学、成环、缺项和不同方案版本。",
+      "acceptance": [
+        "每条关系有人工标注来源",
+        "包含不能得出完整顺序的反例"
+      ],
+      "depends_on": [
+        "B009"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:paths",
+        "priority:P1",
+        "layer:docs",
+        "size:S",
+        "good first issue"
+      ]
+    },
+    {
+      "key": "C002",
+      "title": "建立专业年级与培养方案版本模型",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "保存用户专业年级、适用方案及已知修读规则。",
+      "acceptance": [
+        "不同年级或版本规则不混用",
+        "缺失版本和专业信息明确待补充"
+      ],
+      "depends_on": [
+        "W007",
+        "D001"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C003",
+      "title": "实现培养方案课程和条件候选提取",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "从文档提取课程、学分、开课学期及关系候选。",
+      "acceptance": [
+        "保留原文和范围",
+        "不能确定的关系不直接写成正式依赖"
+      ],
+      "depends_on": [
+        "C001",
+        "C002",
+        "X002"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "C004",
+      "title": "分别建模强制先修、并修与建议先学",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "保存关系类型、方向、适用方案与引用依据。",
+      "acceptance": [
+        "三种关系可分别查询",
+        "建议先学不成为阻止修读的硬约束"
+      ],
+      "depends_on": [
+        "C002",
+        "X001"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C005",
+      "title": "实现课程关系人工核对与确认",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "为提取关系提供修正、确认、忽略与来源入口。",
+      "acceptance": [
+        "确认关系不会丢失适用方案",
+        "缺失课程或矛盾来源可保留待核对"
+      ],
+      "depends_on": [
+        "C003",
+        "C004",
+        "R003"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C006",
+      "title": "实现课程别名与唯一匹配规则",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "管理简称、正式课名和教学班，供检索及培养方案匹配。",
+      "acceptance": [
+        "别名跨学期或跨班有歧义时不自动匹配",
+        "维护别名不会合并真实课程"
+      ],
+      "depends_on": [
+        "C002",
+        "X007"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C007",
+      "title": "实现已修、在修与待修状态维护",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "保存个人修读状态及完成记录，与教学班课程实例区分。",
+      "acceptance": [
+        "修改状态不伪造学分或成绩事实",
+        "课程重复修读和未知状态有规则"
+      ],
+      "depends_on": [
+        "C002",
+        "W002"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C008",
+      "title": "实现个人方案、别名和修读状态界面",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.1、§4.8；AGENTS.md 课程依赖与变更",
+      "scope": "在设置和课程页维护适用方案及修读信息。",
+      "acceptance": [
+        "当前方案版本显著可见",
+        "切换方案时提示受影响关系"
+      ],
+      "depends_on": [
+        "C005",
+        "C006",
+        "C007",
+        "U005"
+      ],
+      "parent": "E80",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E81",
+      "title": "课程依赖图与修读辅助",
+      "kind": "epic",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "在正确适用范围内分析依赖，展示可行顺序与阻塞条件。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:paths",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "C009",
+      "title": "构建适用方案内的课程关系图",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "只读取当前方案有效且已确认的关系，保留边来源。",
+      "acceptance": [
+        "不同方案的同名课程不被混接",
+        "三类边在数据输出中可区分"
+      ],
+      "depends_on": [
+        "C005",
+        "C007"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C010",
+      "title": "检测强制先修环并返回具体路径",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "分析有向先修图，输出环内课程及支持关系。",
+      "acceptance": [
+        "自环和多节点环都可定位",
+        "成环时不返回伪造完整顺序"
+      ],
+      "depends_on": [
+        "C009"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C011",
+      "title": "检测缺失课程和来源矛盾",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "识别悬空依赖、无法匹配课程及互相矛盾的条件。",
+      "acceptance": [
+        "展示所缺节点或证据",
+        "问题未核对前不宣称图完整"
+      ],
+      "depends_on": [
+        "C009",
+        "C006"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C012",
+      "title": "对合法强制先修图进行拓扑排序",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "在范围一致、课程完整且无环时输出可行层次。",
+      "acceptance": [
+        "只对强制先修排序",
+        "多个可行顺序说明可替换层次"
+      ],
+      "depends_on": [
+        "C010",
+        "C011"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C013",
+      "title": "根据修读状态展示下一步可学课程",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "将已修与在修状态应用于先修、并修和建议条件。",
+      "acceptance": [
+        "未满足条件明确列出",
+        "建议先学单独显示且不误当强制阻塞"
+      ],
+      "depends_on": [
+        "C012",
+        "C007"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C014",
+      "title": "根据已知开课学期和学分限制辅助排学期",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "在有可靠规则时提示时间和负荷限制，缺失时降级。",
+      "acceptance": [
+        "不把依赖顺序冒充选课或毕业资格审核",
+        "缺少规则时说明检查范围"
+      ],
+      "depends_on": [
+        "C013",
+        "C003"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "C015",
+      "title": "实现课程关系图与证据查看界面",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "区分边类型、状态与环缺项提示，点击可查看依据。",
+      "acceptance": [
+        "不同关系有图例",
+        "环和缺项不被布局隐藏"
+      ],
+      "depends_on": [
+        "C010",
+        "C011",
+        "D020",
+        "C008"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "C016",
+      "title": "实现修读顺序与学期辅助界面",
+      "kind": "feature",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "展示可替换层次、阻塞条件、已知限制和待补充信息。",
+      "acceptance": [
+        "用户能看到为何某课不可学",
+        "界面不宣称完整毕业审核"
+      ],
+      "depends_on": [
+        "C014",
+        "C015"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:paths",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "C017",
+      "title": "验收课程成环缺项与范围隔离",
+      "kind": "test",
+      "milestone": "M8",
+      "area": "paths",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.8；README.md 课程依赖存在环或缺项验收",
+      "scope": "执行方案版本差异、三类关系、环、缺项和学分未知样本。",
+      "acceptance": [
+        "反例均展示阻塞或限制",
+        "合法顺序每条强制关系都被满足"
+      ],
+      "depends_on": [
+        "C001",
+        "C016"
+      ],
+      "parent": "E81",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:paths",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E90",
+      "title": "日历授权与操作确认",
+      "kind": "epic",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "选择首个日历供应商，实现可撤销授权和内容绑定的操作确认。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:calendar",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "K001",
+      "title": "评估首个外部日历供应商与连接范围",
+      "kind": "research",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "比较团队实际可用账户、权限、API 能力、成本与限制。",
+      "acceptance": [
+        "只选有可测试账户的首个供应商",
+        "明确首版支持的新增修改删除范围"
+      ],
+      "depends_on": [
+        "A019",
+        "C017"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K002",
+      "title": "建立日历连接与凭据存储接口",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "只在后端保存授权凭据及账户、日历标识，限制日志输出。",
+      "acceptance": [
+        "前端不获得密钥或 refresh token",
+        "连接与当前空间绑定"
+      ],
+      "depends_on": [
+        "K001",
+        "W006"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K003",
+      "title": "实现授权回调、过期与撤销流程",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "按所选供应商实现授权、状态校验、续期和用户撤销。",
+      "acceptance": [
+        "错误回调不可建立连接",
+        "撤销后无法继续执行待写入操作"
+      ],
+      "depends_on": [
+        "K002"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "K004",
+      "title": "建立外部操作草案与确认版本模型",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "保存目标账户日历、操作类型、内容、时区和来源版本。",
+      "acceptance": [
+        "查询时间不会生成已授权写入",
+        "确认内容有不可混用的版本身份"
+      ],
+      "depends_on": [
+        "K002",
+        "P001"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K005",
+      "title": "实现外部写入影响预览",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "逐条展示新增修改删除及目标账户、时间、时区和影响。",
+      "acceptance": [
+        "批量范围逐项可见",
+        "未展示的事件不在确认范围内"
+      ],
+      "depends_on": [
+        "K004",
+        "A019"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K006",
+      "title": "校验操作确认与最新内容完全一致",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P0",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "执行前核对当前连接、对象版本和确认范围。",
+      "acceptance": [
+        "内容实质变化或账户切换使旧确认失效",
+        "过期确认不能执行"
+      ],
+      "depends_on": [
+        "K005",
+        "K003"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P0",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K007",
+      "title": "实现日历连接与逐项确认界面",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "frontend",
+      "size": "M",
+      "priority": "P1",
+      "source": "README.md §4.10、§7；AGENTS.md 产品内的确认与数据边界",
+      "scope": "显示连接账户、撤销入口、预览差异和用户选择范围。",
+      "acceptance": [
+        "用户明确确认后才提交执行",
+        "取消不会创建外部事件"
+      ],
+      "depends_on": [
+        "K003",
+        "K005",
+        "K006",
+        "U002"
+      ],
+      "parent": "E90",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:frontend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "E91",
+      "title": "日历执行可靠性与完整流程验收",
+      "kind": "epic",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": null,
+      "size": null,
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "保存逐项结果并安全重试，外部失败不破坏内部学习事务。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:calendar",
+        "priority:P1"
+      ]
+    },
+    {
+      "key": "K008",
+      "title": "建立外部执行记录与幂等标识",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "保存操作状态、确认版本、外部事件 ID 和错误类别。",
+      "acceptance": [
+        "内部任务独立保存",
+        "未成功状态不显示已同步"
+      ],
+      "depends_on": [
+        "K004"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K009",
+      "title": "实现已确认日历事件新增适配器",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "把确认操作映射为供应商事件并保存返回结果。",
+      "acceptance": [
+        "账户、时区和内容与确认一致",
+        "失败不删除内部任务"
+      ],
+      "depends_on": [
+        "K006",
+        "K008"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K010",
+      "title": "实现外部事件修改和删除适配器",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "只处理连接范围内且有明确确认的已有外部事件。",
+      "acceptance": [
+        "保留外部事件映射",
+        "目标已不存在时显示实际结果并避免改错事件"
+      ],
+      "depends_on": [
+        "K009"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K011",
+      "title": "处理超时后的未知结果与安全重试",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "利用供应商幂等键或查询对账确定是否已创建。",
+      "acceptance": [
+        "成功但响应丢失时重试不重复建项",
+        "无法确认时保持待核实状态"
+      ],
+      "depends_on": [
+        "K009"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P0",
+        "layer:backend",
+        "size:M"
+      ]
+    },
+    {
+      "key": "K012",
+      "title": "实现批量逐项结果与只重试失败项",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "分别记录成功失败未知，不把整批简单标为成功。",
+      "acceptance": [
+        "重试只覆盖仍有效确认中的失败项",
+        "已成功事件不重复执行"
+      ],
+      "depends_on": [
+        "K010",
+        "K011"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K013",
+      "title": "处理通知和计划变化引起的同步差异",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "backend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "生成外部更新草案并让用户重新确认。",
+      "acceptance": [
+        "内部安排改变不自动复用旧授权",
+        "撤销连接后仅保留内部变化"
+      ],
+      "depends_on": [
+        "K012",
+        "N014",
+        "A006"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:backend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K014",
+      "title": "实现同步结果、失败重试和撤销提示界面",
+      "kind": "feature",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "frontend",
+      "size": "S",
+      "priority": "P1",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "展示每条操作的实际状态、错误原因和下一步。",
+      "acceptance": [
+        "未知结果不显示成功",
+        "外部失败时仍能看到保存好的内部任务"
+      ],
+      "depends_on": [
+        "K012",
+        "K013",
+        "K007"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:feature",
+        "area:calendar",
+        "priority:P1",
+        "layer:frontend",
+        "size:S"
+      ]
+    },
+    {
+      "key": "K015",
+      "title": "验收确认范围、撤销、超时和幂等",
+      "kind": "test",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "用测试账户验证成功、失败、部分成功、响应丢失和授权撤销。",
+      "acceptance": [
+        "执行与确认一致且重试不重复",
+        "证据不包含账户凭据"
+      ],
+      "depends_on": [
+        "K014"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:calendar",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "K016",
+      "title": "执行三阶段完整回归与发布检查",
+      "kind": "test",
+      "milestone": "M9",
+      "area": "calendar",
+      "layer": "fullstack",
+      "size": "M",
+      "priority": "P0",
+      "source": "README.md §4.10；README.md 外部日历写入验收",
+      "scope": "回归 MVP、日常流程、课程路径和日历操作并整理发布说明。",
+      "acceptance": [
+        "所有阶段验收可定位到实测证据",
+        "v0.9.0 发布条件满足后才创建 tag"
+      ],
+      "depends_on": [
+        "V007",
+        "A022",
+        "C017",
+        "K015"
+      ],
+      "parent": "E91",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:test",
+        "area:calendar",
+        "priority:P0",
+        "layer:fullstack",
+        "size:M"
+      ]
+    },
+    {
+      "key": "EF0",
+      "title": "后续探索：自动获取、多设备与协作",
+      "kind": "epic",
+      "milestone": null,
+      "area": "research",
+      "layer": null,
+      "size": null,
+      "priority": "P2",
+      "source": "README.md §8 后续探索；现有 Issue #2",
+      "scope": "只进行可行性、授权和产品需求研究，未通过范围评审前不承诺实现或日期。",
+      "acceptance": [
+        "所有子 Issue 的交付物与验收证据齐全，开放缺陷有明确去向。",
+        "按本组业务目标完成集成演示；父 Issue 不代替子任务工作量统计。"
+      ],
+      "depends_on": [],
+      "parent": null,
+      "state": "open",
+      "labels": [
+        "type:epic",
+        "area:research",
+        "priority:P2",
+        "status:needs-decision"
+      ]
+    },
+    {
+      "key": "F001",
+      "title": "评估自动通知更新的来源与授权边界",
+      "kind": "research",
+      "milestone": null,
+      "area": "research",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P2",
+      "source": "README.md §8 后续探索；现有 Issue #2",
+      "scope": "调研公开通知订阅、用户主动触发与后台更新的可行方式。",
+      "acceptance": [
+        "形成访问权限和更新频率建议",
+        "未经范围决策不纳入前三阶段交付"
+      ],
+      "depends_on": [],
+      "parent": "EF0",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:research",
+        "priority:P2",
+        "layer:docs",
+        "size:S",
+        "status:needs-decision"
+      ]
+    },
+    {
+      "key": "F002",
+      "title": "评估多设备访问与数据一致性需求",
+      "kind": "research",
+      "milestone": null,
+      "area": "research",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P2",
+      "source": "README.md §8 后续探索；现有 Issue #2",
+      "scope": "收集离线、多端同步、会话安全与冲突处理的实际需求。",
+      "acceptance": [
+        "记录目标场景和成本",
+        "给出是否立项及前置条件"
+      ],
+      "depends_on": [],
+      "parent": "EF0",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:research",
+        "priority:P2",
+        "layer:docs",
+        "size:S",
+        "status:needs-decision"
+      ]
+    },
+    {
+      "key": "F003",
+      "title": "评估协作共享和角色权限范围",
+      "kind": "research",
+      "milestone": null,
+      "area": "research",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P2",
+      "source": "README.md §8 后续探索；现有 Issue #2",
+      "scope": "明确教师协作、班级管理是否属于独立产品范围。",
+      "acceptance": [
+        "形成角色、共享授权与撤销需求",
+        "不默认开放个人工作空间数据"
+      ],
+      "depends_on": [],
+      "parent": "EF0",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:research",
+        "priority:P2",
+        "layer:docs",
+        "size:S",
+        "status:needs-decision"
+      ]
+    },
+    {
+      "key": "F004",
+      "title": "评估其他校内系统连接需求",
+      "kind": "research",
+      "milestone": null,
+      "area": "research",
+      "layer": "docs",
+      "size": "S",
+      "priority": "P2",
+      "source": "README.md §8 后续探索；现有 Issue #2",
+      "scope": "盘点实际可授权接口、数据范围和稳定性限制。",
+      "acceptance": [
+        "说明可行入口和禁止自动执行的操作",
+        "不承诺自动登录选课或提交作业"
+      ],
+      "depends_on": [],
+      "parent": "EF0",
+      "state": "open",
+      "evidence": null,
+      "labels": [
+        "type:research",
+        "area:research",
+        "priority:P2",
+        "layer:docs",
+        "size:S",
+        "status:needs-decision"
+      ]
+    }
+  ],
+  "existing_issues": [
+    {
+      "number": 2,
+      "parent": "EF0",
+      "labels": [
+        "type:research",
+        "area:research",
+        "priority:P2",
+        "status:needs-decision"
+      ],
+      "milestone": null,
+      "note": "优化查询方式：QQbot 自动过滤群聊，现有建议保留原文；需先评估授权和范围，不纳入 MVP。"
+    }
+  ],
+  "release_policy": {
+    "pattern": "vMAJOR.MINOR.PATCH",
+    "prerelease": "v0.MINOR.0-rc.N",
+    "first_release": "v0.1.0 after M1 acceptance",
+    "rules": [
+      "M0 是基线与准备，不追溯创建发布 tag。",
+      "里程碑号代表交付次序；版本号代表通过验收的代码快照，二者不代替 Issue 标签。",
+      "v0.1.0 至 v0.9.0 分别对应 M1 至 M9；兼容修复增加 PATCH。",
+      "候选版本采用 -rc.1、-rc.2；未经验收不打正式 tag。",
+      "只在主分支已合并且验证通过的提交创建附注 tag，记录验收与迁移说明。",
+      "已发布 tag 不移动或覆盖；修复发布新版本。",
+      "v1.0.0 需另行定义稳定性、部署和兼容承诺，不因 M9 完成自动宣称生产可用。",
+      "本次只建立命名与发布规则，不实际创建任何 Git tag。"
+    ]
+  },
+  "attribution": {
+    "pull_request": 1,
+    "author": "24151735",
+    "merged_by": "24151735",
+    "commit_author": "IVANLEE",
+    "implementation_commit": "42bebb712a25c98118940f337c9299c83de6d718",
+    "note": "GitHub 记录确认 PR 创建及合并者为 24151735；Git 提交作者为 IVANLEE。历史任务保留证据，不据此自动分配未来任务。"
+  }
+}
