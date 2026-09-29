@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusFlow 原型 - 任务与两周计划</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">CF</div><div><strong>CampusFlow</strong><span>学习事务助理</span></div></div>
+      <p class="nav-title">工作空间</p>
+      <nav class="nav-list">
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>总览</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>课程</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>资料库</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>待核对</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>智能问答</span></a>
+        <a class="nav-item active" href="#"><span class="nav-dot"></span><span>任务与计划</span></a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <p class="prototype-note">M0 交互原型 · 合成任务与时间 · 接受计划、移动和编辑按钮只展示交互边界，不会保存任何变更</p>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">任务与计划 / 未来两周</p>
+          <h1>把约束变成可执行的草案</h1>
+          <p>优先满足固定日程与截止时间；排不下的任务和容量缺口保持可见。</p>
+        </div>
+        <div class="segmented" data-state-switcher="plan" aria-label="切换计划状态">
+          <button type="button" data-state="draft" aria-pressed="true">草案</button>
+          <button type="button" data-state="accepted" aria-pressed="false">已接受计划</button>
+        </div>
+      </header>
+
+      <div class="plan-summary" aria-label="两周计划摘要">
+        <div class="plan-stat"><span>计划范围</span><strong>10/05–10/18</strong></div>
+        <div class="plan-stat"><span>待安排任务</span><strong>6 项</strong></div>
+        <div class="plan-stat"><span>可用学习时间</span><strong>10 小时</strong></div>
+        <div class="plan-stat warning"><span>容量缺口</span><strong>4 小时</strong></div>
+      </div>
+
+      <section class="card" aria-labelledby="calendar-title">
+        <div data-state-panel="plan" data-value="draft" class="is-visible">
+          <div class="plan-banner"><div><strong>草案 v3 · 尚未成为当前计划</strong><p>生成于 09-29 20:30；接受后才会替换当前计划。</p></div><button class="primary-button" type="button">接受这份草案</button></div>
+        </div>
+        <div data-state-panel="plan" data-value="accepted">
+          <div class="plan-banner accepted"><div><strong>当前计划 v3 · 已接受</strong><p>接受于 09-29 20:42；实质重排需再次确认。</p></div><button class="secondary-button" type="button">基于当前计划生成新草案</button></div>
+        </div>
+        <div class="section-head"><div><h2 id="calendar-title">第 1 周安排</h2><span class="muted small">北京时间 · 锁定块会在重排时保留</span></div><div class="actions" style="margin:0"><button class="ghost-button" type="button">上一周</button><button class="ghost-button" type="button">下一周</button></div></div>
+        <div class="schedule" aria-label="2026 年 10 月 5 日至 9 日安排">
+          <div class="day"><div class="day-head"><strong>周一 · 10/05</strong><span>可用 2.5 小时</span></div><div class="time-block"><strong>数据结构 · 作业三</strong><span>19:00–20:30 · 1.5h</span><span>理由：距 DDL 3 天</span></div><div class="time-block fixed"><strong>固定日程 · 课程</strong><span>14:00–16:00</span></div></div>
+          <div class="day"><div class="day-head"><strong>周二 · 10/06</strong><span>可用 2 小时</span></div><div class="time-block locked"><strong>算法设计 · 阅读</strong><span>20:00–21:00 · 已锁定</span><span>重排时保留</span></div></div>
+          <div class="day"><div class="day-head"><strong>周三 · 10/07</strong><span>可用 1.5 小时</span></div><div class="time-block fixed"><strong>固定日程 · 实验</strong><span>14:00–16:00</span></div><div class="time-block"><strong>数据结构 · 检查提交</strong><span>20:00–20:30 · 缓冲</span></div></div>
+          <div class="day"><div class="day-head"><strong>周四 · 10/08</strong><span>DDL 18:00</span></div><div class="time-block"><strong>作业三 · 最终检查</strong><span>16:30–17:00</span><span>提交前缓冲 1 小时</span></div></div>
+          <div class="day"><div class="day-head"><strong>周五 · 10/09</strong><span>可用 2 小时</span></div><div class="time-block"><strong>操作系统 · 实验一</strong><span>19:30–21:00 · 1.5h</span></div></div>
+        </div>
+      </section>
+
+      <div class="task-plan-layout" style="margin-top:18px">
+        <section class="card" aria-labelledby="tasks-title">
+          <div class="section-head"><h2 id="tasks-title">任务与安排结果</h2><span class="tag info">6 项均保留</span></div>
+          <div class="task-row"><div class="task-row-top"><strong>数据结构 · 作业三</strong><span class="tag success">已排 2.0h</span></div><p>原始 DDL：10 月 8 日 18:00 · 来源：CF-PDF-001 第 1 页</p></div>
+          <div class="task-row"><div class="task-row-top"><strong>算法设计 · 阅读第 5 章</strong><span class="tag success">已排 1.0h</span></div><p>个人安排已锁定；没有修改课程要求。</p></div>
+          <div class="task-row"><div class="task-row-top"><strong>操作系统 · 实验一</strong><span class="tag success">已排 1.5h</span></div><p>日期仍待核对；本草案按用户假设“10 月 15 日”安排。</p></div>
+          <div class="task-row"><div class="task-row-top"><strong>数据库系统 · 实验二</strong><span class="tag warning">未排 2.5h</span></div><p>原因：截止日前的可用时间不足；补交规则仍未覆盖。</p></div>
+          <div class="task-row"><div class="task-row-top"><strong>计算机网络 · 实验报告</strong><span class="tag warning">未排 1.5h</span></div><p>原因：两个截止时间来源冲突，需先核对。</p></div>
+          <div class="task-row"><div class="task-row-top"><strong>线性代数 · 复习</strong><span class="tag warning">未排 4.0h</span></div><p>原因：两周容量不足；无明确 DDL，可向后移动。</p></div>
+        </section>
+
+        <aside class="grid">
+          <section class="card" aria-labelledby="gap-title">
+            <div class="section-head"><h2 id="gap-title">容量风险</h2><span class="tag warning">预计缺口 4h</span></div>
+            <div class="gap-meter" role="img" aria-label="需要 14 小时，可用 10 小时，缺口 4 小时"><span></span></div>
+            <p class="small"><strong>需要 14h</strong> · 可用 10h · 不会隐藏未排任务来制造可行计划。</p>
+            <ul class="option-list"><li>增加 4 小时可用时间后重新生成草案</li><li>把无明确 DDL 的复习任务移到下一周期</li><li>修改可编辑的耗时估计，再重新检查风险</li></ul>
+            <div class="actions"><button class="secondary-button" type="button">调整输入</button></div>
+          </section>
+
+          <section class="card" aria-labelledby="move-title">
+            <div class="section-head"><h2 id="move-title">移动时间块</h2><span class="tag success">个人安排</span></div>
+            <div class="deadline-separation">
+              <div class="deadline-box personal"><span>将要移动</span><strong>10/05 19:00–20:30 学习时间块</strong><p>可移动到其他空闲时段；移动后重新检查冲突。</p></div>
+              <div class="deadline-box source"><span>不会改变</span><strong>10/08 18:00 课程原始 DDL</strong><p>来自 CF-PDF-001 第 1 页，属于课程事实。</p></div>
+            </div>
+            <div class="actions"><button class="ghost-button" type="button">编辑任务 DDL</button><button class="primary-button" type="button">移动学习时间块</button></div>
+            <p class="small muted">两个动作分开：编辑 DDL 需要进入任务字段并说明依据；拖动或移动只更新个人计划。</p>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
