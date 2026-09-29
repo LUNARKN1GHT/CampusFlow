@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "scope": "CampusFlow MVP business acceptance definition; no case is marked as executed",
+  "result_statuses": ["passed", "failed", "blocked"],
+  "result_required_fields": [
+    "case_id",
+    "commit",
+    "environment",
+    "started_at",
+    "finished_at",
+    "status",
+    "actual_results",
+    "evidence_files",
+    "defect_links",
+    "executed_by"
+  ],
+  "cases": [
+    {
+      "case_id": "MVP-01",
+      "readme_scenario": "从资料回答作业 DDL",
+      "sample_ids": ["CF-PDF-001"],
+      "preconditions": ["新建测试工作空间", "导入 CF-PDF-001 并等待处理结束"],
+      "steps": [
+        "提问：作业三的截止时间、提交方式和适用对象是什么？",
+        "打开答案引用并定位原文",
+        "对照 samples/synthetic/b010/expected.json"
+      ],
+      "expected_results": [
+        "答案为作业三、2026-10-08 18:00 Asia/Shanghai、课程平台作业三入口、CS2026-A",
+        "引用定位到 PDF 第 1 页的截止时间、提交方式和适用对象字段",
+        "回答区分原文事实和系统表述"
+      ],
+      "failure_conditions": ["日期或教学班错误", "引用不存在或不支持结论", "混入 CS2026-B 要求"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-01/answer.json",
+        "evidence/mvp/<run-id>/MVP-01/source-location.png"
+      ]
+    },
+    {
+      "case_id": "MVP-02",
+      "readme_scenario": "截图日期不完整",
+      "sample_ids": ["CF-IMG-004", "CF-TXT-002"],
+      "preconditions": ["新建测试工作空间", "分别导入截断截图和缺少年份时刻的文本通知"],
+      "steps": ["查看提取候选和待核对原因", "尝试从候选生成正式任务", "检查任务截止字段"],
+      "expected_results": [
+        "年份、时刻、提交入口和截断范围按各自输入显示为待核对",
+        "月日原文可以保留，但未确认前不产生完整截止时间",
+        "待核对事项在集中入口可再次访问"
+      ],
+      "failure_conditions": ["补成当前年份", "补成 00:00 或 23:59", "候选被自动确认为正式 DDL"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-02/candidate-fields.json",
+        "evidence/mvp/<run-id>/MVP-02/review-state.png"
+      ]
+    },
+    {
+      "case_id": "MVP-03",
+      "readme_scenario": "用户询问未覆盖课程",
+      "sample_ids": ["CF-PDF-001"],
+      "preconditions": ["工作空间仅导入 CF-PDF-001", "未导入任何离散数学资料"],
+      "steps": ["提问：离散数学最近有作业吗？", "检查回答措辞、引用和副作用"],
+      "expected_results": [
+        "回答明确表示现有资料中未发现离散数学相关信息",
+        "回答说明当前资料覆盖范围",
+        "不创建任务且不提供伪造引用"
+      ],
+      "failure_conditions": ["断言没有作业", "编造作业或引用", "在无确认的情况下创建任务"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-03/answer.json",
+        "evidence/mvp/<run-id>/MVP-03/task-list.json"
+      ]
+    },
+    {
+      "case_id": "MVP-04",
+      "readme_scenario": "生成未来两周计划",
+      "sample_ids": [],
+      "preconditions": [
+        "时区为 Asia/Shanghai，计划范围为 2026-10-05 至 2026-10-18",
+        "固定日程：10 月 7 日 14:00-16:00",
+        "可用时间和三项带截止时间、耗时的测试任务已录入"
+      ],
+      "steps": ["请求生成未来两周计划草案", "核对每个时间块、任务和约束", "查看未排入列表"],
+      "expected_results": [
+        "草案状态与已接受计划明确区分",
+        "已排时间块不与固定日程重叠且不晚于对应截止时间",
+        "每个未排任务保留并显示具体原因"
+      ],
+      "failure_conditions": ["与固定日程重叠", "遗漏任务", "未接受的草案被显示为当前计划"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-04/input-snapshot.json",
+        "evidence/mvp/<run-id>/MVP-04/plan-draft.json",
+        "evidence/mvp/<run-id>/MVP-04/plan-view.png"
+      ]
+    },
+    {
+      "case_id": "MVP-05",
+      "readme_scenario": "工作量超出可用时间",
+      "sample_ids": [],
+      "preconditions": ["未来两周可用学习容量为 10 小时", "未完成测试任务总剩余耗时为 14 小时"],
+      "steps": ["生成计划草案", "汇总已排和未排耗时", "查看容量风险与调整选项"],
+      "expected_results": [
+        "显示至少 4 小时容量缺口",
+        "所有任务均出现在已排或未排列表",
+        "提供增加容量、调整范围或修改估时等可编辑选项"
+      ],
+      "failure_conditions": ["隐藏任务以显示可行", "缺口小于输入差额且无解释", "直接修改原始截止时间"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-05/input-snapshot.json",
+        "evidence/mvp/<run-id>/MVP-05/capacity-gap.json",
+        "evidence/mvp/<run-id>/MVP-05/risk-view.png"
+      ]
+    },
+    {
+      "case_id": "MVP-06",
+      "readme_scenario": "修改学习时间块",
+      "sample_ids": ["CF-PDF-001"],
+      "preconditions": ["作业三已确认且原始 DDL 为 2026-10-08 18:00", "已有一个已接受且未锁定的学习时间块"],
+      "steps": ["记录任务 DDL、来源和值版本", "移动个人学习时间块", "再次读取任务和计划"],
+      "expected_results": [
+        "只更新学习时间块起止时间和计划版本",
+        "任务 DDL、时区、来源和原文引用完全不变",
+        "界面将移动时间块与编辑 DDL 作为不同动作"
+      ],
+      "failure_conditions": ["移动导致 DDL 改变", "来源关联丢失", "未提示移动后的新冲突"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-06/before.json",
+        "evidence/mvp/<run-id>/MVP-06/after.json",
+        "evidence/mvp/<run-id>/MVP-06/move-interaction.png"
+      ]
+    },
+    {
+      "case_id": "MVP-07",
+      "readme_scenario": "文件部分识别失败",
+      "sample_ids": ["CF-IMG-002", "CF-IMG-003"],
+      "preconditions": ["新建测试工作空间", "导入局部模糊扫描和缺页扫描"],
+      "steps": ["等待处理结束", "查看资料状态、已提取字段和原文定位", "打开未覆盖范围"],
+      "expected_results": [
+        "两份资料状态均为部分完成而非完成",
+        "可读区域的结果和来源定位可查看",
+        "模糊坐标以及缺失第 1、3 页明确显示"
+      ],
+      "failure_conditions": ["显示全部成功", "已有结果因局部失败不可查看", "从未覆盖范围生成确认事实"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-07/processing-results.json",
+        "evidence/mvp/<run-id>/MVP-07/partial-coverage.png"
+      ]
+    },
+    {
+      "case_id": "MVP-08",
+      "readme_scenario": "删除被引用资料",
+      "sample_ids": ["CF-PDF-001"],
+      "preconditions": ["资料已产生一条带引用回答和一项已确认任务", "记录资料、引用和任务 ID"],
+      "steps": ["请求删除资料并查看影响预览", "确认删除", "重新打开旧回答、任务和资料列表"],
+      "expected_results": [
+        "确认前列出受影响引用、派生内容和任务保留选项",
+        "确认后原文件、索引和派生引用失效",
+        "保留的个人任务仍可见但明确标记来源失效"
+      ],
+      "failure_conditions": ["未确认即删除", "删除后仍声称引用可验证", "关联任务静默消失"],
+      "evidence_to_capture": [
+        "evidence/mvp/<run-id>/MVP-08/impact-preview.json",
+        "evidence/mvp/<run-id>/MVP-08/delete-result.json",
+        "evidence/mvp/<run-id>/MVP-08/post-delete-view.png"
+      ]
+    }
+  ]
+}
