@@ -1,0 +1,101 @@
+name: 缺陷报告
+description: 报告可复现的错误、异常行为或验收结果偏差
+title: "[缺陷] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先搜索已有 Issue。日志、截图和样本必须脱敏，不要提交密钥、账户凭据或真实课程隐私。
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 场景与影响
+      description: 说明缺陷出现的业务场景、影响对象和严重程度。
+      placeholder: 谁在什么场景下受到什么影响？
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 提供能够稳定重现问题的最小步骤和必要的脱敏输入。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      placeholder: 按业务规则或验收标准，本应发生什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      placeholder: 实际发生了什么？请附必要的脱敏错误信息。
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境与版本
+      description: 填写提交编号、分支、操作系统、浏览器或运行时版本；不适用项可省略。
+      placeholder: |
+        提交／分支：
+        操作系统：
+        浏览器：
+        Python／Node：
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 修复范围与验收条件
+      description: 描述建议修复的边界和能证明问题已解决的回归条件。
+      placeholder: |
+        修复范围：
+        - [ ] 回归验收条件
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与关联任务
+      description: 填写父 Issue、前置任务、阻塞项和重复 Issue；没有时写“无”。
+      placeholder: |
+        父 Issue：#
+        相关任务：#
+        阻塞项：
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 诊断与验证证据
+      description: 附脱敏日志、截图或最小复现，并说明已尝试的检查；尚未验证的内容要明确标注。
+      placeholder: |
+        已尝试：
+        证据：
+        暂未验证：
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 数据与任务边界确认
+      options:
+        - label: 我确认附件和日志已完成必要脱敏，且本 Issue 若作为父任务只聚合子任务进度，不重复统计实现工作量。
+          required: true
