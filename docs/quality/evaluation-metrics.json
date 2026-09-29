@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "threshold_policy": "Targets are set only after a measured baseline on the registered sample set.",
+  "metrics": [
+    {
+      "metric_id": "EXT-RECALL",
+      "name": "事实字段召回率",
+      "numerator": "正确提取且值、适用范围与人工预期一致的字段数",
+      "denominator": "人工预期要求提取的字段总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "漏提、结构化校验失败、超时或运行失败均作为未命中计入分母",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "EXT-PRECISION",
+      "name": "事实字段精确率",
+      "numerator": "输出字段中与人工预期一致且有来源的字段数",
+      "denominator": "系统输出的事实字段总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "错值、错范围、无来源、重复字段和幻觉字段均记为错误输出",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "CIT-SUPPORT",
+      "name": "引用支持率",
+      "numerator": "引用原文直接支持对应事实性主张的数量",
+      "denominator": "回答中所有需要来源依据的事实性主张数量",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "缺引、错引、失效引用、语义不支持或运行失败均记为不支持",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "UNC-RECALL",
+      "name": "不确定信息识别召回率",
+      "numerator": "正确标记待核对且原因与人工标注一致的单元数",
+      "denominator": "人工标注为不确定的单元总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "自动确认、漏标原因、错误原因或运行失败均记为漏检",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "UNC-PRECISION",
+      "name": "不确定信息识别精确率",
+      "numerator": "系统待核对单元中人工标注确需核对的数量",
+      "denominator": "系统标记为待核对的单元总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "可由当前依据确认的事实被标成不确定时记为误报",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "PLAN-CONSTRAINT",
+      "name": "排期约束满足率",
+      "numerator": "满足全部适用硬约束的已排时间块数量",
+      "denominator": "系统生成的已排时间块总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "固定日程、DDL、依赖、锁定或时区任一冲突即该时间块失败；生成失败计入场景失败",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "PLAN-COVERAGE",
+      "name": "计划事项覆盖率",
+      "numerator": "在已排或带原因未排列表中恰好出现一次的输入任务数",
+      "denominator": "进入本次计划范围的输入任务总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "任务遗漏、重复或生成失败均记为未覆盖",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "EDIT-COST",
+      "name": "用户修改成本",
+      "numerator": "达到可接受结果所需的字段编辑、移动、删除与新增动作总数",
+      "denominator": "最终被用户接受的任务或计划项总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "未达到可接受结果的会话记为失败并单列，不能从样本运行中静默排除",
+      "unit": "actions_per_item",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "REMINDER-OMISSION",
+      "name": "提醒遗漏率",
+      "numerator": "应提醒但未在容差窗口内出现的事项数",
+      "denominator": "人工预期应提醒的事项总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "运行失败或调度失败导致未提醒时计为遗漏",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "REMINDER-DUPLICATE",
+      "name": "提醒重复率",
+      "numerator": "同一事项和触发窗口内超出一次的提醒数",
+      "denominator": "系统实际发出的提醒总数",
+      "aggregation": "sum(numerator) / sum(denominator)",
+      "failure_definition": "重试造成的重复发送计入分子；没有发出提醒时指标不适用而不是零",
+      "unit": "ratio",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "PERF-LATENCY",
+      "name": "端到端处理 P95 时延",
+      "numerator": "同场景成功运行的第 95 百分位耗时毫秒值",
+      "denominator": "预热后同配置的成功运行次数",
+      "aggregation": "p95(duration_ms) with successful_run_count",
+      "failure_definition": "超时和失败单列计数且不得进入成功时延样本或被描述为快速成功",
+      "unit": "milliseconds",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    },
+    {
+      "metric_id": "MODEL-COST",
+      "name": "每个成功样本模型成本",
+      "numerator": "成功样本的全部计费调用成本总和且包含失败重试",
+      "denominator": "成功完成并产生有效结果的样本数",
+      "aggregation": "sum(cost_for_successful_samples) / successful_sample_count",
+      "failure_definition": "失败样本成本作为浪费成本单列；失败样本不能进入成功分母",
+      "unit": "currency_per_sample",
+      "target": null,
+      "target_status": "deferred_until_baseline"
+    }
+  ]
+}
