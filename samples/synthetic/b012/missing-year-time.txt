@@ -1,0 +1,11 @@
+[CampusFlow synthetic notice]
+publisher: 操作系统课程组（合成）
+published_at: 2026-09-29T10:30:00+08:00
+timezone: Asia/Shanghai
+term: 2026-fall
+section: OS2026-A
+
+通知正文：
+实验一请在 10 月 15 日提交到课程平台。
+
+已知缺口：正文未写年份和具体时刻，发布信息也没有声明默认截止时刻。
