@@ -110,13 +110,50 @@ h1 { margin: 0; color: #173a30; font-size: clamp(27px, 4vw, 38px); line-height: 
 [data-state-panel].is-visible { display: block; }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; margin-top: 16px; }
 
+.review-layout { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); gap: 18px; align-items: start; }
+.queue { display: grid; gap: 8px; }
+.queue-item { width: 100%; min-height: 0; border: 1px solid transparent; border-radius: 10px; padding: 12px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.queue-item:hover { background: var(--surface-soft); }
+.queue-item.active { border-color: #adc1b6; background: var(--brand-soft); }
+.queue-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.queue-item strong { font-size: 14px; }
+.queue-item p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.summary-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.summary-chip { min-width: 94px; border-radius: 9px; padding: 9px 11px; background: var(--surface-soft); }
+.summary-chip strong { display: block; font-size: 20px; line-height: 1.2; }
+.summary-chip span { color: var(--muted); font-size: 11px; }
+.candidate-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.candidate-field { border: 1px solid #dbe2dd; border-radius: 10px; padding: 11px; background: #fbfcfb; }
+.candidate-field.needs-review { border-color: #e1b45a; background: #fffaf0; }
+.candidate-field span { display: block; color: var(--muted); font-size: 11px; }
+.candidate-field strong { display: block; margin: 4px 0; font-size: 14px; }
+.candidate-field small { color: var(--muted); }
+.source-quote { margin: 14px 0 0; border-left: 4px solid #d6aa3d; border-radius: 0 8px 8px 0; padding: 12px 14px; background: #fff9e8; color: #4c4634; }
+.source-quote p { margin: 0 0 7px; }
+.source-quote footer { color: #766c51; font-size: 12px; }
+.danger-button { border: 1px solid #d9a493; border-radius: 8px; padding: 9px 15px; background: #fff; color: var(--danger); cursor: pointer; }
+
+.qa-shell { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr); gap: 18px; }
+.messages { display: grid; gap: 13px; }
+.message { max-width: 88%; border-radius: 12px; padding: 13px 15px; background: #f1f4f2; }
+.message.user { margin-left: auto; background: #dfece5; }
+.message p { margin: 0; }
+.message .message-meta { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.coverage-notice { border-radius: 10px; padding: 12px 14px; background: var(--info-soft); color: #274d6e; font-size: 13px; }
+.citation-card { display: grid; gap: 7px; border: 1px solid #cfd9d3; border-radius: 10px; padding: 13px; background: #fff; }
+.citation-card p { margin: 0; }
+.citation-card .quote { color: #394a43; font-size: 13px; }
+.citation-meta { color: var(--muted); font-size: 11px; }
+.empty-answer { display: grid; place-items: center; min-height: 190px; border: 1px dashed #bdc9c2; border-radius: 10px; background: var(--surface-soft); padding: 24px; text-align: center; }
+.empty-answer strong { display: block; margin-bottom: 6px; }
+
 @media (max-width: 980px) {
   .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
   .sidebar { padding: 22px 12px; }
   .brand div, .nav-title, .nav-item span:last-child { display: none; }
   .brand { justify-content: center; }
   .nav-item { justify-content: center; }
-  .grid.two, .source-layout { grid-template-columns: 1fr; }
+  .grid.two, .source-layout, .review-layout, .qa-shell { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 620px) {
@@ -125,6 +162,7 @@ h1 { margin: 0; color: #173a30; font-size: clamp(27px, 4vw, 38px); line-height: 
   .workspace { padding: 20px 14px 44px; }
   .page-head { align-items: flex-start; flex-direction: column; }
   .field-grid { grid-template-columns: 1fr; }
+  .candidate-fields { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }
   .document { padding: 26px 24px; }
 }
