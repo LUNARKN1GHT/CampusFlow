@@ -1,0 +1,75 @@
+{
+  "coordinate_system": "pixel coordinates [left, top, right, bottom] from the top-left origin",
+  "samples": [
+    {
+      "sample_id": "CF-IMG-001",
+      "file": "samples/synthetic/b011/readable-scan.png",
+      "expected_processing_state": "completed",
+      "readable_regions": [{"bbox": [56, 48, 1144, 1552], "coverage": "all document fields"}],
+      "uncovered_ranges": [],
+      "expected_facts": {
+        "task": "动态规划练习",
+        "deadline": "2026-10-12T21:00:00+08:00",
+        "section": "ALG2026-A"
+      },
+      "failure_if": ["显示部分成功或失败", "未保留教学班范围"]
+    },
+    {
+      "sample_id": "CF-IMG-002",
+      "file": "samples/synthetic/b011/blurred-partial-scan.png",
+      "expected_processing_state": "partially_completed",
+      "readable_regions": [
+        {"bbox": [72, 48, 1128, 510], "coverage": "title, task, deadline, section"}
+      ],
+      "uncovered_ranges": [
+        {
+          "bbox": [72, 520, 1128, 1430],
+          "reason": "intentional Gaussian blur",
+          "fields": ["late submission deadline", "deduction rate", "contact"]
+        },
+        {"pages": [2], "reason": "declared page count is 2 but only page 1 is present"}
+      ],
+      "expected_facts": {
+        "task": "实验二：事务隔离级别",
+        "deadline": "2026-10-16T18:00:00+08:00",
+        "section": "DB2026-A"
+      },
+      "failure_if": ["标记全部成功", "从模糊区域补造字段", "忽略缺少第 2 页"]
+    },
+    {
+      "sample_id": "CF-IMG-003",
+      "file": "samples/synthetic/b011/missing-pages-scan.png",
+      "expected_processing_state": "partially_completed",
+      "readable_regions": [
+        {"bbox": [100, 260, 1100, 850], "coverage": "page 2 environment and steps"}
+      ],
+      "uncovered_ranges": [
+        {"pages": [1], "reason": "page not imported", "fields": ["goals", "submission requirements"]},
+        {"pages": [3], "reason": "page not imported", "fields": ["deadline", "grading rules"]}
+      ],
+      "expected_facts": {"section": "NET2026-A", "provided_page": 2, "declared_page_count": 3},
+      "failure_if": ["声称文档完整", "推断截止时间或完整提交要求"]
+    },
+    {
+      "sample_id": "CF-IMG-004",
+      "file": "samples/synthetic/b011/cropped-chat-screenshot.png",
+      "expected_processing_state": "partially_completed",
+      "readable_regions": [
+        {"bbox": [54, 205, 846, 884], "coverage": "three complete chat messages"}
+      ],
+      "uncovered_ranges": [
+        {
+          "bbox": [54, 1014, 846, 1200],
+          "reason": "last message is cut by screenshot boundary",
+          "fields": ["full supplemental requirement"]
+        },
+        {
+          "reason": "message only says Friday",
+          "fields": ["deadline year", "deadline time", "submission channel"]
+        }
+      ],
+      "expected_facts": {"section": "ALG2026-A", "deadline_status": "needs_review"},
+      "failure_if": ["把周五转换为已确认截止时间", "把截断消息视为完整", "标记全部成功"]
+    }
+  ]
+}

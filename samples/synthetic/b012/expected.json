@@ -1,0 +1,63 @@
+{
+  "scenarios": [
+    {
+      "id": "relative-date-with-basis",
+      "sample_ids": ["CF-TXT-001"],
+      "expected": {
+        "task": "需求分析作业",
+        "deadline": "2026-10-07T18:00:00+08:00",
+        "deadline_status": "confirmed",
+        "section": "SE2026-A",
+        "conversion_basis": [
+          "published_at=2026-09-28T09:00:00+08:00",
+          "2026-09-28 is Monday",
+          "timezone=Asia/Shanghai",
+          "下周三 means the Wednesday of the following calendar week"
+        ]
+      },
+      "failure_if": ["未展示换算依据", "使用导入时间而非发布时间换算", "丢失时区或教学班"]
+    },
+    {
+      "id": "missing-year-and-time",
+      "sample_ids": ["CF-TXT-002"],
+      "expected": {
+        "task": "实验一",
+        "deadline_partial": {"month": 10, "day": 15, "year": null, "time": null},
+        "deadline_status": "needs_review",
+        "section": "OS2026-A",
+        "missing_fields": ["deadline.year", "deadline.time"]
+      },
+      "failure_if": ["根据发布时间补造年份", "将时刻补成 00:00 或 23:59", "标记为已确认截止时间"]
+    },
+    {
+      "id": "same-name-different-sections",
+      "sample_ids": ["CF-TXT-003", "CF-TXT-004"],
+      "expected": {
+        "course_name": "大学物理",
+        "records": [
+          {"section": "PHY2026-A", "deadline": "2026-10-10T20:00:00+08:00"},
+          {"section": "PHY2026-B", "deadline": "2026-10-12T18:00:00+08:00"}
+        ],
+        "merge_allowed": false
+      },
+      "failure_if": ["按课程名合并两个任务", "将 A 班截止时间回答给 B 班", "忽略教学班适用范围"]
+    },
+    {
+      "id": "conflicting-sources-without-replacement",
+      "sample_ids": ["CF-TXT-005", "CF-TXT-006"],
+      "expected": {
+        "section": "NET2026-A",
+        "field": "deadline",
+        "values": ["2026-10-18T18:00:00+08:00", "2026-10-20T20:00:00+08:00"],
+        "resolution_status": "needs_review",
+        "effective_version": null,
+        "reason": "same published_at and no replacement declaration"
+      },
+      "failure_if": [
+        "仅按 imported_at 选择 v2",
+        "静默覆盖 v1",
+        "不同时展示两个值、来源版本和冲突原因"
+      ]
+    }
+  ]
+}
