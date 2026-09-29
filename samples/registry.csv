@@ -1,1 +1,2 @@
 sample_id,title,origin_type,source_description,license_or_permission,allowed_uses,deidentification,repository_path,retention,status,reviewed_by,reviewed_on,notes
+CF-PDF-001,B010 文本与跨页表格 PDF,synthetic,ReportLab 构造的课程通知与跨页事项表,project-internal,解析定位与引用验收,not-applicable-synthetic,output/pdf/b010-text-and-cross-page-table.pdf,随验收集版本保留,active,quality-owner,2026-09-29,人工预期见 samples/synthetic/b010/expected.json
