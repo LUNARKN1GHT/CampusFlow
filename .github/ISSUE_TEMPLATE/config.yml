@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: CampusFlow 贡献指南
+    url: https://github.com/LUNARKN1GHT/CampusFlow/blob/main/CONTRIBUTING.md
+    about: 提交前查看任务拆分、验证、隐私与协作约定。
