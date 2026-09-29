@@ -147,13 +147,50 @@ h1 { margin: 0; color: #173a30; font-size: clamp(27px, 4vw, 38px); line-height: 
 .empty-answer { display: grid; place-items: center; min-height: 190px; border: 1px dashed #bdc9c2; border-radius: 10px; background: var(--surface-soft); padding: 24px; text-align: center; }
 .empty-answer strong { display: block; margin-bottom: 6px; }
 
+.plan-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px; }
+.plan-stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--surface); }
+.plan-stat span { display: block; color: var(--muted); font-size: 11px; }
+.plan-stat strong { display: block; margin-top: 3px; color: #173a30; font-size: 21px; }
+.plan-stat.warning { border-color: #e2bd72; background: #fffaef; }
+.plan-banner { display: flex; justify-content: space-between; gap: 16px; align-items: center; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; background: var(--info-soft); color: #274d6e; }
+.plan-banner.accepted { background: var(--brand-soft); color: var(--brand); }
+.plan-banner strong { display: block; }
+.plan-banner p { margin: 3px 0 0; font-size: 12px; }
+.schedule { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+.day { min-height: 274px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #fbfcfb; }
+.day-head { padding-bottom: 8px; border-bottom: 1px solid #e3e8e5; }
+.day-head strong { display: block; font-size: 13px; }
+.day-head span { color: var(--muted); font-size: 11px; }
+.time-block { margin-top: 9px; border-left: 4px solid #6d9f8a; border-radius: 7px; padding: 8px 9px; background: #e8f2ed; color: #23473b; font-size: 12px; }
+.time-block.fixed { border-left-color: #788695; background: #eef1f4; color: #485562; }
+.time-block.locked { border-left-color: #a56c18; background: #fff2d8; color: #65420e; }
+.time-block strong { display: block; margin-bottom: 2px; }
+.time-block span { display: block; color: inherit; opacity: .82; }
+.task-plan-layout { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; align-items: start; }
+.task-row { padding: 12px 0; border-bottom: 1px solid #e6ebe8; }
+.task-row:last-child { border-bottom: 0; }
+.task-row-top { display: flex; justify-content: space-between; gap: 10px; }
+.task-row p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.gap-meter { height: 10px; border-radius: 999px; overflow: hidden; background: #e7ebe8; }
+.gap-meter span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #5d937c 0 71%, #cb7d31 71% 100%); }
+.option-list { margin: 12px 0 0; padding-left: 18px; color: #56452e; font-size: 13px; }
+.option-list li + li { margin-top: 7px; }
+.deadline-separation { display: grid; gap: 10px; }
+.deadline-box { border: 1px solid var(--line); border-radius: 9px; padding: 11px; }
+.deadline-box.personal { background: var(--brand-soft); }
+.deadline-box.source { background: #f7f8f7; }
+.deadline-box span { display: block; color: var(--muted); font-size: 11px; }
+.deadline-box strong { display: block; margin: 4px 0; font-size: 14px; }
+.deadline-box p { margin: 0; color: var(--muted); font-size: 12px; }
+
 @media (max-width: 980px) {
   .app-shell { grid-template-columns: 76px minmax(0, 1fr); }
   .sidebar { padding: 22px 12px; }
   .brand div, .nav-title, .nav-item span:last-child { display: none; }
   .brand { justify-content: center; }
   .nav-item { justify-content: center; }
-  .grid.two, .source-layout, .review-layout, .qa-shell { grid-template-columns: 1fr; }
+  .grid.two, .source-layout, .review-layout, .qa-shell, .task-plan-layout { grid-template-columns: 1fr; }
+  .plan-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 620px) {
@@ -165,4 +202,5 @@ h1 { margin: 0; color: #173a30; font-size: clamp(27px, 4vw, 38px); line-height: 
   .candidate-fields { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }
   .document { padding: 26px 24px; }
+  .plan-summary { grid-template-columns: 1fr 1fr; }
 }
