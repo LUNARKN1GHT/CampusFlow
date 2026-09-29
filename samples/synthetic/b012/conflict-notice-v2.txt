@@ -1,0 +1,13 @@
+[CampusFlow synthetic notice]
+publisher: 计算机网络课程组（合成）
+published_at: 2026-09-27T09:00:00+08:00
+imported_at: 2026-09-29T11:05:00+08:00
+timezone: Asia/Shanghai
+term: 2026-fall
+section: NET2026-A
+source_version: v2-unverified
+
+通知正文：
+实验报告截止时间为 2026 年 10 月 20 日 20:00，通过课程平台提交。
+
+已知缺口：文件没有“更正”“替代旧通知”或新的发布时间，不能仅因导入更晚就判定其生效。

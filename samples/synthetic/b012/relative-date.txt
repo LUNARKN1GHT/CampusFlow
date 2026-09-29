@@ -1,0 +1,11 @@
+[CampusFlow synthetic notice]
+publisher: 软件工程课程组（合成）
+published_at: 2026-09-28T09:00:00+08:00
+timezone: Asia/Shanghai
+term: 2026-fall
+section: SE2026-A
+
+通知正文：
+需求分析作业将在下周三 18:00 截止，请通过课程平台提交。
+
+换算依据：本通知发布时间为 2026 年 9 月 28 日（星期一），课程日历按北京时间计算。
