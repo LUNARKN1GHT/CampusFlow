@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusFlow 原型 - 集中核对与问答</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">CF</div><div><strong>CampusFlow</strong><span>学习事务助理</span></div></div>
+      <p class="nav-title">工作空间</p>
+      <nav class="nav-list">
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>总览</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>课程</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>资料库</span></a>
+        <a class="nav-item active" href="#"><span class="nav-dot"></span><span>待核对</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>智能问答</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>任务与计划</span></a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <p class="prototype-note">M0 交互原型 · 待核对事项是独立工作入口；引用、缺失字段和冲突不会只留在聊天记录中</p>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">待核对 / 集中处理</p>
+          <h1>先把不确定信息说清楚</h1>
+          <p>逐字段查看依据，修正、确认或忽略，不把模型输出直接当成事实。</p>
+        </div>
+        <button class="secondary-button" type="button">批量操作说明</button>
+      </header>
+
+      <div class="summary-row" aria-label="待核对统计">
+        <div class="summary-chip"><strong>4</strong><span>全部待核对</span></div>
+        <div class="summary-chip"><strong>2</strong><span>日期缺失</span></div>
+        <div class="summary-chip"><strong>1</strong><span>来源冲突</span></div>
+        <div class="summary-chip"><strong>1</strong><span>截图截断</span></div>
+      </div>
+
+      <div class="review-layout">
+        <section class="card" aria-labelledby="queue-title">
+          <div class="section-head"><h2 id="queue-title">待核对队列</h2><span class="tag warning">4 项</span></div>
+          <div class="queue">
+            <button class="queue-item active" type="button">
+              <div class="queue-top"><strong>算法设计 · 本周练习</strong><span class="tag warning">日期缺失</span></div>
+              <p>截图只写“周五”，末条消息被截断 · 2 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>操作系统 · 实验一</strong><span class="tag warning">年份/时刻</span></div>
+              <p>原文为“10 月 15 日” · 8 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>计算机网络 · 实验报告</strong><span class="tag danger">来源冲突</span></div>
+              <p>两个版本给出不同 DDL · 15 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>数据库系统 · 实验二</strong><span class="tag info">部分识别</span></div>
+              <p>补交规则区域无法识别 · 21 分钟前</p>
+            </button>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="candidate-title">
+          <div class="section-head"><div><h2 id="candidate-title">候选任务详情</h2><span class="muted small">信息状态：待核对 · 执行进度：未开始</span></div><span class="tag warning">截图截断</span></div>
+          <div class="candidate-fields">
+            <div class="candidate-field"><span>课程与教学班</span><strong>算法设计 · ALG2026-A</strong><small>来源字段明确</small></div>
+            <div class="candidate-field"><span>任务名称</span><strong>本周练习</strong><small>来源字段明确</small></div>
+            <div class="candidate-field needs-review"><span>截止日期</span><strong>待补充年份与日期</strong><small>原文仅出现“周五”</small></div>
+            <div class="candidate-field needs-review"><span>截止时刻</span><strong>待补充</strong><small>不能按“晚上”补成固定时刻</small></div>
+            <div class="candidate-field needs-review"><span>提交方式</span><strong>待补充</strong><small>截图未显示课程平台入口</small></div>
+            <div class="candidate-field"><span>候选状态</span><strong>待核对</strong><small>确认后才可生成正式任务</small></div>
+          </div>
+          <blockquote class="source-quote">
+            <p>“请以课程平台为准。截图只显示到‘周五’，没有年份、具体时刻和提交入口。”</p>
+            <footer>CF-IMG-004 · 完整消息 3 · 区域 x=54–776, y=650–884</footer>
+          </blockquote>
+          <div class="coverage-box" style="margin-top:12px"><strong>未覆盖范围：</strong>最后一条“补充要求”在 y=1200 处被截断。当前字段不能据此确认。</div>
+          <div class="field-grid" style="margin-top:14px">
+            <div class="field"><label for="review-date">用户补充：截止日期</label><input id="review-date" type="date"></div>
+            <div class="field"><label for="review-time">用户补充：截止时刻</label><input id="review-time" type="time"></div>
+            <div class="field full"><label for="review-note">修正依据或备注</label><textarea id="review-note" placeholder="说明补充信息来自哪里；用户补充会与原文事实分开记录"></textarea></div>
+          </div>
+          <div class="actions"><button class="danger-button" type="button">忽略候选</button><button class="ghost-button" type="button">保存修正</button><button class="primary-button" type="button">确认并生成任务</button></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="qa-title" style="margin-top:18px">
+        <div class="section-head">
+          <div><h2 id="qa-title">带引用问答状态</h2><span class="muted small">切换查看有依据、资料不足与来源冲突的表达</span></div>
+          <div class="segmented" data-state-switcher="qa" aria-label="切换问答状态">
+            <button type="button" data-state="supported" aria-pressed="true">有依据</button>
+            <button type="button" data-state="missing" aria-pressed="false">资料不足</button>
+            <button type="button" data-state="conflict" aria-pressed="false">来源冲突</button>
+          </div>
+        </div>
+
+        <div class="is-visible" data-state-panel="qa" data-value="supported">
+          <div class="qa-shell">
+            <div class="messages">
+              <div class="message user"><div class="message-meta">你</div><p>数据结构作业三什么时候截止？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 依据现有资料</div><p>作业三在 <strong>2026 年 10 月 8 日 18:00（北京时间）</strong>截止，适用于 CS2026-A 班。[1]</p></div>
+              <div class="coverage-notice">覆盖范围：已检索 2026 秋季 · CS2026-A 的 1 份当前资料。未检索其他教学班。</div>
+            </div>
+            <aside class="citation-card"><span class="tag success">引用 [1] 可验证</span><p class="quote">“截止时间　2026 年 10 月 8 日 18:00（北京时间）。”</p><p class="citation-meta">CF-PDF-001 · 第 1 页 · “截止时间”段落</p><button class="secondary-button" type="button">打开原文位置</button></aside>
+          </div>
+        </div>
+
+        <div data-state-panel="qa" data-value="missing">
+          <div class="qa-shell">
+            <div class="messages">
+              <div class="message user"><div class="message-meta">你</div><p>离散数学最近有作业吗？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 资料不足</div><p>现有资料中未发现离散数学相关信息，因此不能判断是否有作业。你可以导入课程通知或选择其他学期继续查询。</p></div>
+              <div class="coverage-notice">当前仅有数据结构、算法设计和操作系统资料；未生成任务，也没有“无作业”的断言。</div>
+            </div>
+            <aside class="empty-answer"><div><strong>没有可支持结论的引用</strong><span class="muted small">缺少资料时不生成占位引用。</span><div class="actions" style="justify-content:center"><button class="secondary-button" type="button">前往资料库</button></div></div></aside>
+          </div>
+        </div>
+
+        <div data-state-panel="qa" data-value="conflict">
+          <div class="qa-shell">
+            <div class="messages">
+              <div class="message user"><div class="message-meta">你</div><p>计算机网络实验报告什么时候截止？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 来源冲突</div><p>两份同范围资料给出不同截止时间：10 月 18 日 18:00 [1] 与 10 月 20 日 20:00 [2]。两者发布时间相同，且没有替代声明，需要先核对。</p></div>
+              <div class="status-banner partial"><div class="status-icon">!</div><div><strong>不会自动选择导入更晚的版本</strong><p>冲突已同时加入集中核对入口。</p></div></div>
+            </div>
+            <aside class="locator"><div class="citation-card"><span class="tag warning">引用 [1]</span><p class="quote">“截止时间为 2026 年 10 月 18 日 18:00”</p><p class="citation-meta">CF-TXT-005 · v1</p></div><div class="citation-card"><span class="tag warning">引用 [2]</span><p class="quote">“截止时间为 2026 年 10 月 20 日 20:00”</p><p class="citation-meta">CF-TXT-006 · v2-unverified</p></div></aside>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
