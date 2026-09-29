@@ -4,7 +4,7 @@
 
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
-- [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目许可证待定，确定后同步更新正式 LICENSE 和相关说明。
+- [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
 - 当前基础持久化后端已合并，MVP 开发中。已有 Vue 前端环境页、FastAPI 健康检查、PostgreSQL 迁移和学期／课程／手动任务／固定日程／可用时间 API；业务前端、身份与空间授权、资料处理、问答和排期尚未实现。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
