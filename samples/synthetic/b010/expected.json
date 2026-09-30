@@ -1,0 +1,57 @@
+{
+  "sample_id": "CF-PDF-001",
+  "file": "output/pdf/b010-text-and-cross-page-table.pdf",
+  "document": {
+    "page_count": 3,
+    "is_synthetic": true,
+    "applies_to": {
+      "term": "2026-fall",
+      "section": "CS2026-A",
+      "timezone": "Asia/Shanghai"
+    }
+  },
+  "questions": [
+    {
+      "id": "paragraph-ddl",
+      "question": "作业三的截止时间、提交方式和适用对象是什么？",
+      "expected_answer": {
+        "title": "作业三",
+        "deadline": "2026-10-08T18:00:00+08:00",
+        "submission": "课程平台的作业三入口",
+        "section": "CS2026-A"
+      },
+      "evidence": [
+        {"page": 1, "label": "截止时间"},
+        {"page": 1, "label": "提交方式"},
+        {"page": 1, "label": "适用对象"}
+      ],
+      "failure_if": [
+        "引用未定位到第 1 页对应字段",
+        "把 CS2026-B 的要求混入答案",
+        "将截止时间改写为日期精度或其他时区"
+      ]
+    },
+    {
+      "id": "cross-page-first-part",
+      "question": "实验一报告的截止时间是什么？",
+      "expected_answer": {
+        "row": 4,
+        "deadline": "2026-10-08T18:00:00+08:00",
+        "section": "CS2026-A"
+      },
+      "evidence": [{"page": 2, "table": "课程事项表", "row": 4}],
+      "failure_if": ["未引用第 2 页表格第 4 行", "未保留教学班范围"]
+    },
+    {
+      "id": "cross-page-continuation",
+      "question": "课程项目提案的截止时间是什么？",
+      "expected_answer": {
+        "row": 19,
+        "deadline": "2026-11-20T20:00:00+08:00",
+        "section": "CS2026-A"
+      },
+      "evidence": [{"page": 3, "table": "课程事项表（续表）", "row": 19}],
+      "failure_if": ["续表被忽略", "行号跨页后被重置", "未引用第 3 页"]
+    }
+  ]
+}

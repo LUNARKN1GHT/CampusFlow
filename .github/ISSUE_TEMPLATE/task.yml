@@ -1,0 +1,79 @@
+name: 小任务
+description: 提交可在半天至两天内独立交付和验收的功能、文档、测试或工程任务
+title: "[任务] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先确认没有重复 Issue，并尽量把任务拆成可独立验收的叶子任务。预计超过两天的工作应继续拆分 Sub-issue。
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 场景与问题
+      description: 谁在什么场景下遇到什么问题？为什么现在需要处理？
+      placeholder: 描述使用场景、当前行为及影响。
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与边界
+      description: 明确本任务包含和不包含的内容，以及所属交付阶段。
+      placeholder: |
+        包含：
+        不包含：
+        所属阶段：
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: 交付物
+      description: 列出完成后可以检查的代码、文档、设计、样本或配置。
+      placeholder: "- [ ] 交付物 1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收条件
+      description: 使用可观察、可复现的结果描述完成标准。
+      placeholder: "- [ ] 验收条件 1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依赖与关联任务
+      description: 填写父 Issue、前置任务、阻塞项和相关任务；没有时写“无”。
+      placeholder: |
+        父 Issue：#
+        前置任务：#
+        相关任务：#
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: 验证计划与证据
+      description: 说明要执行的检查，以及完成后附在哪里；未验证项必须明确标注。
+      placeholder: |
+        验证命令或步骤：
+        预期证据：
+        暂不验证：
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: leaf_rule
+    attributes:
+      label: 任务拆分确认
+      options:
+        - label: 我确认本 Issue 是实际交付工作的叶子任务；若它是父 Issue，只聚合子任务进度，不重复统计实现工作量。
+          required: true

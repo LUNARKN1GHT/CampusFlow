@@ -1,0 +1,1534 @@
+{
+  "repository": "LUNARKN1GHT/CampusFlow",
+  "milestones": {
+    "M0": {
+      "number": 1,
+      "node_id": "MI_kwDOUqUpYc4BFJmy",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/1"
+    },
+    "M1": {
+      "number": 2,
+      "node_id": "MI_kwDOUqUpYc4BFJm-",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/2"
+    },
+    "M2": {
+      "number": 3,
+      "node_id": "MI_kwDOUqUpYc4BFJm_",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/3"
+    },
+    "M3": {
+      "number": 4,
+      "node_id": "MI_kwDOUqUpYc4BFJnA",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/4"
+    },
+    "M4": {
+      "number": 5,
+      "node_id": "MI_kwDOUqUpYc4BFJnC",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/5"
+    },
+    "M5": {
+      "number": 6,
+      "node_id": "MI_kwDOUqUpYc4BFJnD",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/6"
+    },
+    "M6": {
+      "number": 7,
+      "node_id": "MI_kwDOUqUpYc4BFJnE",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/7"
+    },
+    "M7": {
+      "number": 8,
+      "node_id": "MI_kwDOUqUpYc4BFJnH",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/8"
+    },
+    "M8": {
+      "number": 9,
+      "node_id": "MI_kwDOUqUpYc4BFJnN",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/9"
+    },
+    "M9": {
+      "number": 10,
+      "node_id": "MI_kwDOUqUpYc4BFJnS",
+      "html_url": "https://github.com/LUNARKN1GHT/CampusFlow/milestone/10"
+    }
+  },
+  "issues": {
+    "Q008": {
+      "number": 135,
+      "node_id": "I_kwDOUqUpYc8AAAABTkxOQQ",
+      "id": 5608590913,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/135"
+    },
+    "Q007": {
+      "number": 134,
+      "node_id": "I_kwDOUqUpYc8AAAABTkxL5A",
+      "id": 5608590308,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/134"
+    },
+    "Q006": {
+      "number": 133,
+      "node_id": "I_kwDOUqUpYc8AAAABTkxF2A",
+      "id": 5608588760,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/133"
+    },
+    "Q005": {
+      "number": 132,
+      "node_id": "I_kwDOUqUpYc8AAAABTkxCFw",
+      "id": 5608587799,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/132"
+    },
+    "Q004": {
+      "number": 131,
+      "node_id": "I_kwDOUqUpYc8AAAABTkxADA",
+      "id": 5608587276,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/131"
+    },
+    "Q003": {
+      "number": 130,
+      "node_id": "I_kwDOUqUpYc8AAAABTkw9xQ",
+      "id": 5608586693,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/130"
+    },
+    "Q002": {
+      "number": 129,
+      "node_id": "I_kwDOUqUpYc8AAAABTkw7PQ",
+      "id": 5608586045,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/129"
+    },
+    "Q001": {
+      "number": 128,
+      "node_id": "I_kwDOUqUpYc8AAAABTkw3XA",
+      "id": 5608585052,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/128"
+    },
+    "R010": {
+      "number": 127,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwzWg",
+      "id": 5608584026,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/127"
+    },
+    "R009": {
+      "number": 126,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwxKw",
+      "id": 5608583467,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/126"
+    },
+    "R008": {
+      "number": 125,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwu_w",
+      "id": 5608582911,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/125"
+    },
+    "R007": {
+      "number": 124,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwsWA",
+      "id": 5608582232,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/124"
+    },
+    "R006": {
+      "number": 123,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwpug",
+      "id": 5608581562,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/123"
+    },
+    "R005": {
+      "number": 122,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwn4Q",
+      "id": 5608581089,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/122"
+    },
+    "R004": {
+      "number": 121,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwlvQ",
+      "id": 5608580541,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/121"
+    },
+    "R003": {
+      "number": 120,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwjcg",
+      "id": 5608579954,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/120"
+    },
+    "R002": {
+      "number": 119,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwhoA",
+      "id": 5608579488,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/119"
+    },
+    "R001": {
+      "number": 118,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwe8A",
+      "id": 5608578800,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/118"
+    },
+    "X010": {
+      "number": 117,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwcOA",
+      "id": 5608578104,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/117"
+    },
+    "X009": {
+      "number": 116,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwZUg",
+      "id": 5608577362,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/116"
+    },
+    "X008": {
+      "number": 115,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwXeQ",
+      "id": 5608576889,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/115"
+    },
+    "X007": {
+      "number": 114,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwVrw",
+      "id": 5608576431,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/114"
+    },
+    "X006": {
+      "number": 113,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwUAQ",
+      "id": 5608576001,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/113"
+    },
+    "X005": {
+      "number": 112,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwReQ",
+      "id": 5608575353,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/112"
+    },
+    "X004": {
+      "number": 111,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwO1A",
+      "id": 5608574676,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/111"
+    },
+    "X003": {
+      "number": 110,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwMqw",
+      "id": 5608574123,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/110"
+    },
+    "X002": {
+      "number": 109,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwLAg",
+      "id": 5608573698,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/109"
+    },
+    "X001": {
+      "number": 108,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwIcQ",
+      "id": 5608573041,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/108"
+    },
+    "J009": {
+      "number": 107,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwGww",
+      "id": 5608572611,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/107"
+    },
+    "J008": {
+      "number": 106,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwFAA",
+      "id": 5608572160,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/106"
+    },
+    "D021": {
+      "number": 105,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwC8w",
+      "id": 5608571635,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/105"
+    },
+    "D020": {
+      "number": 104,
+      "node_id": "I_kwDOUqUpYc8AAAABTkwAOA",
+      "id": 5608570936,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/104"
+    },
+    "D019": {
+      "number": 103,
+      "node_id": "I_kwDOUqUpYc8AAAABTkv9ng",
+      "id": 5608570270,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/103"
+    },
+    "J006": {
+      "number": 102,
+      "node_id": "I_kwDOUqUpYc8AAAABTkv8Cg",
+      "id": 5608569866,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/102"
+    },
+    "J005": {
+      "number": 101,
+      "node_id": "I_kwDOUqUpYc8AAAABTkv55g",
+      "id": 5608569318,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/101"
+    },
+    "D018": {
+      "number": 100,
+      "node_id": "I_kwDOUqUpYc8AAAABTkv3Ng",
+      "id": 5608568630,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/100"
+    },
+    "D017": {
+      "number": 99,
+      "node_id": "I_kwDOUqUpYc8AAAABTkv1Eg",
+      "id": 5608568082,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/99"
+    },
+    "D016": {
+      "number": 98,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvyKA",
+      "id": 5608567336,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/98"
+    },
+    "D015": {
+      "number": 97,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvvuA",
+      "id": 5608566712,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/97"
+    },
+    "D014": {
+      "number": 96,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvr2g",
+      "id": 5608565722,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/96"
+    },
+    "D013": {
+      "number": 95,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvn5g",
+      "id": 5608564710,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/95"
+    },
+    "D012": {
+      "number": 94,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvkhw",
+      "id": 5608563847,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/94"
+    },
+    "D010": {
+      "number": 93,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvifg",
+      "id": 5608563326,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/93"
+    },
+    "D009": {
+      "number": 92,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvgkw",
+      "id": 5608562835,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/92"
+    },
+    "J007": {
+      "number": 91,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvd_g",
+      "id": 5608562174,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/91"
+    },
+    "J004": {
+      "number": 90,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvbsQ",
+      "id": 5608561585,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/90"
+    },
+    "J003": {
+      "number": 89,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvYeQ",
+      "id": 5608560761,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/89"
+    },
+    "J002": {
+      "number": 88,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvWqg",
+      "id": 5608560298,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/88"
+    },
+    "D011": {
+      "number": 87,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvUVQ",
+      "id": 5608559701,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/87"
+    },
+    "J001": {
+      "number": 86,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvSFQ",
+      "id": 5608559125,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/86"
+    },
+    "D008": {
+      "number": 85,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvPGA",
+      "id": 5608558360,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/85"
+    },
+    "D007": {
+      "number": 84,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvMsQ",
+      "id": 5608557745,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/84"
+    },
+    "D006": {
+      "number": 83,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvIdw",
+      "id": 5608556663,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/83"
+    },
+    "D005": {
+      "number": 82,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvF6g",
+      "id": 5608556010,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/82"
+    },
+    "D004": {
+      "number": 81,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvC7Q",
+      "id": 5608555245,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/81"
+    },
+    "D003": {
+      "number": 80,
+      "node_id": "I_kwDOUqUpYc8AAAABTkvAuQ",
+      "id": 5608554681,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/80"
+    },
+    "D002": {
+      "number": 79,
+      "node_id": "I_kwDOUqUpYc8AAAABTku9QQ",
+      "id": 5608553793,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/79"
+    },
+    "D001": {
+      "number": 78,
+      "node_id": "I_kwDOUqUpYc8AAAABTku6HQ",
+      "id": 5608552989,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/78"
+    },
+    "U010": {
+      "number": 77,
+      "node_id": "I_kwDOUqUpYc8AAAABTku31g",
+      "id": 5608552406,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/77"
+    },
+    "U009": {
+      "number": 76,
+      "node_id": "I_kwDOUqUpYc8AAAABTku0gg",
+      "id": 5608551554,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/76"
+    },
+    "U008": {
+      "number": 75,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuycQ",
+      "id": 5608551025,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/75"
+    },
+    "U007": {
+      "number": 74,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuu5w",
+      "id": 5608550119,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/74"
+    },
+    "U006": {
+      "number": 73,
+      "node_id": "I_kwDOUqUpYc8AAAABTkusZg",
+      "id": 5608549478,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/73"
+    },
+    "U005": {
+      "number": 72,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuqEw",
+      "id": 5608548883,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/72"
+    },
+    "U004": {
+      "number": 71,
+      "node_id": "I_kwDOUqUpYc8AAAABTkun6g",
+      "id": 5608548330,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/71"
+    },
+    "U003": {
+      "number": 70,
+      "node_id": "I_kwDOUqUpYc8AAAABTkukrQ",
+      "id": 5608547501,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/70"
+    },
+    "U002": {
+      "number": 69,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuiUQ",
+      "id": 5608546897,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/69"
+    },
+    "U001": {
+      "number": 68,
+      "node_id": "I_kwDOUqUpYc8AAAABTkueng",
+      "id": 5608545950,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/68"
+    },
+    "T012": {
+      "number": 67,
+      "node_id": "I_kwDOUqUpYc8AAAABTkub4w",
+      "id": 5608545251,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/67"
+    },
+    "T011": {
+      "number": 66,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuY-Q",
+      "id": 5608544505,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/66"
+    },
+    "T010": {
+      "number": 65,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuWSw",
+      "id": 5608543819,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/65"
+    },
+    "T009": {
+      "number": 64,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuTRQ",
+      "id": 5608543045,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/64"
+    },
+    "T008": {
+      "number": 63,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuQDw",
+      "id": 5608542223,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/63"
+    },
+    "T007": {
+      "number": 62,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuNGg",
+      "id": 5608541466,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/62"
+    },
+    "T006": {
+      "number": 61,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuJ1w",
+      "id": 5608540631,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/61"
+    },
+    "T005": {
+      "number": 60,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuGXw",
+      "id": 5608539743,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/60"
+    },
+    "T004": {
+      "number": 59,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuDQQ",
+      "id": 5608538945,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/59"
+    },
+    "T003": {
+      "number": 58,
+      "node_id": "I_kwDOUqUpYc8AAAABTkuBLw",
+      "id": 5608538415,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/58"
+    },
+    "W011": {
+      "number": 57,
+      "node_id": "I_kwDOUqUpYc8AAAABTkt-Xw",
+      "id": 5608537695,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/57"
+    },
+    "W010": {
+      "number": 56,
+      "node_id": "I_kwDOUqUpYc8AAAABTkt8bw",
+      "id": 5608537199,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/56"
+    },
+    "T002": {
+      "number": 55,
+      "node_id": "I_kwDOUqUpYc8AAAABTkt4Ug",
+      "id": 5608536146,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/55"
+    },
+    "T001": {
+      "number": 54,
+      "node_id": "I_kwDOUqUpYc8AAAABTkt2YA",
+      "id": 5608535648,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/54"
+    },
+    "W009": {
+      "number": 53,
+      "node_id": "I_kwDOUqUpYc8AAAABTktz8Q",
+      "id": 5608535025,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/53"
+    },
+    "W008": {
+      "number": 52,
+      "node_id": "I_kwDOUqUpYc8AAAABTktxsA",
+      "id": 5608534448,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/52"
+    },
+    "W007": {
+      "number": 51,
+      "node_id": "I_kwDOUqUpYc8AAAABTktumA",
+      "id": 5608533656,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/51"
+    },
+    "W006": {
+      "number": 50,
+      "node_id": "I_kwDOUqUpYc8AAAABTktsoQ",
+      "id": 5608533153,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/50"
+    },
+    "W005": {
+      "number": 49,
+      "node_id": "I_kwDOUqUpYc8AAAABTktq0w",
+      "id": 5608532691,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/49"
+    },
+    "W004": {
+      "number": 48,
+      "node_id": "I_kwDOUqUpYc8AAAABTktoDw",
+      "id": 5608531983,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/48"
+    },
+    "W003": {
+      "number": 47,
+      "node_id": "I_kwDOUqUpYc8AAAABTktlvQ",
+      "id": 5608531389,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/47"
+    },
+    "W002": {
+      "number": 46,
+      "node_id": "I_kwDOUqUpYc8AAAABTktj-Q",
+      "id": 5608530937,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/46"
+    },
+    "B017": {
+      "number": 45,
+      "node_id": "I_kwDOUqUpYc8AAAABTkthfw",
+      "id": 5608530303,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/45"
+    },
+    "B016": {
+      "number": 44,
+      "node_id": "I_kwDOUqUpYc8AAAABTktedg",
+      "id": 5608529526,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/44"
+    },
+    "B015": {
+      "number": 43,
+      "node_id": "I_kwDOUqUpYc8AAAABTktcZg",
+      "id": 5608528998,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/43"
+    },
+    "B014": {
+      "number": 42,
+      "node_id": "I_kwDOUqUpYc8AAAABTktYgg",
+      "id": 5608528002,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/42"
+    },
+    "B013": {
+      "number": 41,
+      "node_id": "I_kwDOUqUpYc8AAAABTktVjg",
+      "id": 5608527246,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/41"
+    },
+    "B012": {
+      "number": 40,
+      "node_id": "I_kwDOUqUpYc8AAAABTktSyQ",
+      "id": 5608526537,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/40"
+    },
+    "B011": {
+      "number": 39,
+      "node_id": "I_kwDOUqUpYc8AAAABTktQQw",
+      "id": 5608525891,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/39"
+    },
+    "B010": {
+      "number": 38,
+      "node_id": "I_kwDOUqUpYc8AAAABTktNpg",
+      "id": 5608525222,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/38"
+    },
+    "B009": {
+      "number": 37,
+      "node_id": "I_kwDOUqUpYc8AAAABTktJ_w",
+      "id": 5608524287,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/37"
+    },
+    "B008": {
+      "number": 36,
+      "node_id": "I_kwDOUqUpYc8AAAABTktHRg",
+      "id": 5608523590,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/36"
+    },
+    "B007": {
+      "number": 35,
+      "node_id": "I_kwDOUqUpYc8AAAABTktD8g",
+      "id": 5608522738,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/35"
+    },
+    "B006": {
+      "number": 34,
+      "node_id": "I_kwDOUqUpYc8AAAABTktA8w",
+      "id": 5608521971,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/34"
+    },
+    "B005": {
+      "number": 33,
+      "node_id": "I_kwDOUqUpYc8AAAABTks9Ug",
+      "id": 5608521042,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/33"
+    },
+    "W001": {
+      "number": 32,
+      "node_id": "I_kwDOUqUpYc8AAAABTks60A",
+      "id": 5608520400,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/32"
+    },
+    "B004": {
+      "number": 31,
+      "node_id": "I_kwDOUqUpYc8AAAABTks3cA",
+      "id": 5608519536,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/31"
+    },
+    "B003": {
+      "number": 30,
+      "node_id": "I_kwDOUqUpYc8AAAABTks0YA",
+      "id": 5608518752,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/30"
+    },
+    "B002": {
+      "number": 29,
+      "node_id": "I_kwDOUqUpYc8AAAABTksx_g",
+      "id": 5608518142,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/29"
+    },
+    "B001": {
+      "number": 28,
+      "node_id": "I_kwDOUqUpYc8AAAABTksvyg",
+      "id": 5608517578,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/28"
+    },
+    "EF0": {
+      "number": 27,
+      "node_id": "I_kwDOUqUpYc8AAAABTkstlQ",
+      "id": 5608517013,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/27"
+    },
+    "E91": {
+      "number": 26,
+      "node_id": "I_kwDOUqUpYc8AAAABTksrUw",
+      "id": 5608516435,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/26"
+    },
+    "E90": {
+      "number": 25,
+      "node_id": "I_kwDOUqUpYc8AAAABTkspLw",
+      "id": 5608515887,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/25"
+    },
+    "E81": {
+      "number": 24,
+      "node_id": "I_kwDOUqUpYc8AAAABTksmkg",
+      "id": 5608515218,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/24"
+    },
+    "E80": {
+      "number": 23,
+      "node_id": "I_kwDOUqUpYc8AAAABTksj_g",
+      "id": 5608514558,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/23"
+    },
+    "E72": {
+      "number": 22,
+      "node_id": "I_kwDOUqUpYc8AAAABTksiLA",
+      "id": 5608514092,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/22"
+    },
+    "E71": {
+      "number": 21,
+      "node_id": "I_kwDOUqUpYc8AAAABTksguQ",
+      "id": 5608513721,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/21"
+    },
+    "E70": {
+      "number": 20,
+      "node_id": "I_kwDOUqUpYc8AAAABTkse1g",
+      "id": 5608513238,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/20"
+    },
+    "E61": {
+      "number": 19,
+      "node_id": "I_kwDOUqUpYc8AAAABTksdDg",
+      "id": 5608512782,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/19"
+    },
+    "E60": {
+      "number": 18,
+      "node_id": "I_kwDOUqUpYc8AAAABTksa6g",
+      "id": 5608512234,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/18"
+    },
+    "E52": {
+      "number": 17,
+      "node_id": "I_kwDOUqUpYc8AAAABTksZOw",
+      "id": 5608511803,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/17"
+    },
+    "E51": {
+      "number": 16,
+      "node_id": "I_kwDOUqUpYc8AAAABTksXxg",
+      "id": 5608511430,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/16"
+    },
+    "E50": {
+      "number": 15,
+      "node_id": "I_kwDOUqUpYc8AAAABTksWDw",
+      "id": 5608510991,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/15"
+    },
+    "E41": {
+      "number": 14,
+      "node_id": "I_kwDOUqUpYc8AAAABTksT4A",
+      "id": 5608510432,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/14"
+    },
+    "E40": {
+      "number": 13,
+      "node_id": "I_kwDOUqUpYc8AAAABTksR9w",
+      "id": 5608509943,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/13"
+    },
+    "E31": {
+      "number": 12,
+      "node_id": "I_kwDOUqUpYc8AAAABTksQWw",
+      "id": 5608509531,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/12"
+    },
+    "E30": {
+      "number": 11,
+      "node_id": "I_kwDOUqUpYc8AAAABTksNZQ",
+      "id": 5608508773,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/11"
+    },
+    "E22": {
+      "number": 10,
+      "node_id": "I_kwDOUqUpYc8AAAABTksLfg",
+      "id": 5608508286,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/10"
+    },
+    "E21": {
+      "number": 9,
+      "node_id": "I_kwDOUqUpYc8AAAABTksIeg",
+      "id": 5608507514,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/9"
+    },
+    "E20": {
+      "number": 8,
+      "node_id": "I_kwDOUqUpYc8AAAABTksGRw",
+      "id": 5608506951,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/8"
+    },
+    "E12": {
+      "number": 7,
+      "node_id": "I_kwDOUqUpYc8AAAABTksDmg",
+      "id": 5608506266,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/7"
+    },
+    "E11": {
+      "number": 6,
+      "node_id": "I_kwDOUqUpYc8AAAABTksBkA",
+      "id": 5608505744,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/6"
+    },
+    "E10": {
+      "number": 5,
+      "node_id": "I_kwDOUqUpYc8AAAABTkr_Rw",
+      "id": 5608505159,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/5"
+    },
+    "E01": {
+      "number": 4,
+      "node_id": "I_kwDOUqUpYc8AAAABTkr9hQ",
+      "id": 5608504709,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/4"
+    },
+    "E00": {
+      "number": 3,
+      "node_id": "I_kwDOUqUpYc8AAAABTkr8Gw",
+      "id": 5608504347,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/3"
+    },
+    "Q009": {
+      "number": 136,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyCjw",
+      "id": 5608604303,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/136"
+    },
+    "Q010": {
+      "number": 137,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyC9Q",
+      "id": 5608604405,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/137"
+    },
+    "P001": {
+      "number": 138,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyDVA",
+      "id": 5608604500,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/138"
+    },
+    "V003": {
+      "number": 139,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyDkg",
+      "id": 5608604562,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/139"
+    },
+    "N001": {
+      "number": 140,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyD6g",
+      "id": 5608604650,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/140"
+    },
+    "Q011": {
+      "number": 141,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyIWA",
+      "id": 5608605784,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/141"
+    },
+    "P002": {
+      "number": 142,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyIrQ",
+      "id": 5608605869,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/142"
+    },
+    "N002": {
+      "number": 143,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyJFQ",
+      "id": 5608605973,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/143"
+    },
+    "N004": {
+      "number": 144,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyJUw",
+      "id": 5608606035,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/144"
+    },
+    "N010": {
+      "number": 145,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyJqA",
+      "id": 5608606120,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/145"
+    },
+    "Q012": {
+      "number": 146,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyOFg",
+      "id": 5608607254,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/146"
+    },
+    "Q013": {
+      "number": 147,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyOcg",
+      "id": 5608607346,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/147"
+    },
+    "Q014": {
+      "number": 148,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyOwA",
+      "id": 5608607424,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/148"
+    },
+    "Q015": {
+      "number": 149,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyPBQ",
+      "id": 5608607493,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/149"
+    },
+    "P003": {
+      "number": 150,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyPQw",
+      "id": 5608607555,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/150"
+    },
+    "Q016": {
+      "number": 151,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyT7A",
+      "id": 5608608748,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/151"
+    },
+    "P004": {
+      "number": 152,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyU-Q",
+      "id": 5608609017,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/152"
+    },
+    "N003": {
+      "number": 153,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyVUA",
+      "id": 5608609104,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/153"
+    },
+    "N005": {
+      "number": 154,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyVpw",
+      "id": 5608609191,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/154"
+    },
+    "N011": {
+      "number": 155,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyV9g",
+      "id": 5608609270,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/155"
+    },
+    "Q017": {
+      "number": 156,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyaSw",
+      "id": 5608610379,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/156"
+    },
+    "P005": {
+      "number": 157,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyarA",
+      "id": 5608610476,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/157"
+    },
+    "P011": {
+      "number": 158,
+      "node_id": "I_kwDOUqUpYc8AAAABTkybAA",
+      "id": 5608610560,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/158"
+    },
+    "N006": {
+      "number": 159,
+      "node_id": "I_kwDOUqUpYc8AAAABTkybYQ",
+      "id": 5608610657,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/159"
+    },
+    "N012": {
+      "number": 160,
+      "node_id": "I_kwDOUqUpYc8AAAABTkybtw",
+      "id": 5608610743,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/160"
+    },
+    "Q018": {
+      "number": 161,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyiKA",
+      "id": 5608612392,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/161"
+    },
+    "P006": {
+      "number": 162,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyihQ",
+      "id": 5608612485,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/162"
+    },
+    "N007": {
+      "number": 163,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyi0g",
+      "id": 5608612562,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/163"
+    },
+    "N013": {
+      "number": 164,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyjGA",
+      "id": 5608612632,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/164"
+    },
+    "N015": {
+      "number": 165,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyjUw",
+      "id": 5608612691,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/165"
+    },
+    "P007": {
+      "number": 166,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyn-Q",
+      "id": 5608613881,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/166"
+    },
+    "N008": {
+      "number": 167,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyofQ",
+      "id": 5608614013,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/167"
+    },
+    "N014": {
+      "number": 168,
+      "node_id": "I_kwDOUqUpYc8AAAABTkypHg",
+      "id": 5608614174,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/168"
+    },
+    "N016": {
+      "number": 169,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyp8w",
+      "id": 5608614387,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/169"
+    },
+    "A001": {
+      "number": 170,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyqaA",
+      "id": 5608614504,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/170"
+    },
+    "P008": {
+      "number": 171,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyu_w",
+      "id": 5608615679,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/171"
+    },
+    "N009": {
+      "number": 172,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyvgA",
+      "id": 5608615808,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/172"
+    },
+    "N017": {
+      "number": 173,
+      "node_id": "I_kwDOUqUpYc8AAAABTkyv7g",
+      "id": 5608615918,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/173"
+    },
+    "N018": {
+      "number": 174,
+      "node_id": "I_kwDOUqUpYc8AAAABTkywVg",
+      "id": 5608616022,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/174"
+    },
+    "A002": {
+      "number": 175,
+      "node_id": "I_kwDOUqUpYc8AAAABTkywvw",
+      "id": 5608616127,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/175"
+    },
+    "P009": {
+      "number": 176,
+      "node_id": "I_kwDOUqUpYc8AAAABTky0zw",
+      "id": 5608617167,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/176"
+    },
+    "P012": {
+      "number": 177,
+      "node_id": "I_kwDOUqUpYc8AAAABTky1DQ",
+      "id": 5608617229,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/177"
+    },
+    "N019": {
+      "number": 178,
+      "node_id": "I_kwDOUqUpYc8AAAABTky1Rw",
+      "id": 5608617287,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/178"
+    },
+    "A003": {
+      "number": 179,
+      "node_id": "I_kwDOUqUpYc8AAAABTky1jg",
+      "id": 5608617358,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/179"
+    },
+    "A004": {
+      "number": 180,
+      "node_id": "I_kwDOUqUpYc8AAAABTky12Q",
+      "id": 5608617433,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/180"
+    },
+    "P010": {
+      "number": 181,
+      "node_id": "I_kwDOUqUpYc8AAAABTky6Ng",
+      "id": 5608618550,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/181"
+    },
+    "A010": {
+      "number": 182,
+      "node_id": "I_kwDOUqUpYc8AAAABTky6ow",
+      "id": 5608618659,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/182"
+    },
+    "C001": {
+      "number": 183,
+      "node_id": "I_kwDOUqUpYc8AAAABTky69Q",
+      "id": 5608618741,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/183"
+    },
+    "C002": {
+      "number": 184,
+      "node_id": "I_kwDOUqUpYc8AAAABTky7SA",
+      "id": 5608618824,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/184"
+    },
+    "F001": {
+      "number": 185,
+      "node_id": "I_kwDOUqUpYc8AAAABTky7pQ",
+      "id": 5608618917,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/185"
+    },
+    "P013": {
+      "number": 186,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzBPQ",
+      "id": 5608620349,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/186"
+    },
+    "A011": {
+      "number": 187,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzBpg",
+      "id": 5608620454,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/187"
+    },
+    "C003": {
+      "number": 188,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzB_g",
+      "id": 5608620542,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/188"
+    },
+    "C004": {
+      "number": 189,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzCUA",
+      "id": 5608620624,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/189"
+    },
+    "C006": {
+      "number": 190,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzCsA",
+      "id": 5608620720,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/190"
+    },
+    "P014": {
+      "number": 191,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzHjg",
+      "id": 5608621966,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/191"
+    },
+    "P015": {
+      "number": 192,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzH4Q",
+      "id": 5608622049,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/192"
+    },
+    "P017": {
+      "number": 193,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzIGA",
+      "id": 5608622104,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/193"
+    },
+    "V002": {
+      "number": 194,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzIWg",
+      "id": 5608622170,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/194"
+    },
+    "A012": {
+      "number": 195,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzIlA",
+      "id": 5608622228,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/195"
+    },
+    "P016": {
+      "number": 196,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzMvg",
+      "id": 5608623294,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/196"
+    },
+    "P018": {
+      "number": 197,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzNKA",
+      "id": 5608623400,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/197"
+    },
+    "V006": {
+      "number": 198,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzNbA",
+      "id": 5608623468,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/198"
+    },
+    "A005": {
+      "number": 199,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzNrw",
+      "id": 5608623535,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/199"
+    },
+    "A013": {
+      "number": 200,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzOBQ",
+      "id": 5608623621,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/200"
+    },
+    "V001": {
+      "number": 201,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzR8w",
+      "id": 5608624627,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/201"
+    },
+    "V004": {
+      "number": 202,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzSOw",
+      "id": 5608624699,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/202"
+    },
+    "A006": {
+      "number": 203,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzSeA",
+      "id": 5608624760,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/203"
+    },
+    "A007": {
+      "number": 204,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzSuw",
+      "id": 5608624827,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/204"
+    },
+    "A017": {
+      "number": 205,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzTDA",
+      "id": 5608624908,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/205"
+    },
+    "V005": {
+      "number": 206,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzYeg",
+      "id": 5608626298,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/206"
+    },
+    "A008": {
+      "number": 207,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzY9Q",
+      "id": 5608626421,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/207"
+    },
+    "A014": {
+      "number": 208,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzZRg",
+      "id": 5608626502,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/208"
+    },
+    "A018": {
+      "number": 209,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzZpA",
+      "id": 5608626596,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/209"
+    },
+    "A019": {
+      "number": 210,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzZ9A",
+      "id": 5608626676,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/210"
+    },
+    "V007": {
+      "number": 211,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzeHw",
+      "id": 5608627743,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/211"
+    },
+    "A009": {
+      "number": 212,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzedw",
+      "id": 5608627831,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/212"
+    },
+    "A015": {
+      "number": 213,
+      "node_id": "I_kwDOUqUpYc8AAAABTkze2A",
+      "id": 5608627928,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/213"
+    },
+    "A020": {
+      "number": 214,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzfJw",
+      "id": 5608628007,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/214"
+    },
+    "C005": {
+      "number": 215,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzfaw",
+      "id": 5608628075,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/215"
+    },
+    "A016": {
+      "number": 216,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzj5Q",
+      "id": 5608629221,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/216"
+    },
+    "A021": {
+      "number": 217,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzkPw",
+      "id": 5608629311,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/217"
+    },
+    "C007": {
+      "number": 218,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzkeg",
+      "id": 5608629370,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/218"
+    },
+    "F002": {
+      "number": 219,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzkyA",
+      "id": 5608629448,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/219"
+    },
+    "F003": {
+      "number": 220,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzk_g",
+      "id": 5608629502,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/220"
+    },
+    "A022": {
+      "number": 221,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzopA",
+      "id": 5608630436,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/221"
+    },
+    "C008": {
+      "number": 222,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzpJw",
+      "id": 5608630567,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/222"
+    },
+    "C009": {
+      "number": 223,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzphw",
+      "id": 5608630663,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/223"
+    },
+    "F004": {
+      "number": 224,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzp3w",
+      "id": 5608630751,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/224"
+    },
+    "C010": {
+      "number": 225,
+      "node_id": "I_kwDOUqUpYc8AAAABTkztCw",
+      "id": 5608631563,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/225"
+    },
+    "C011": {
+      "number": 226,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzteA",
+      "id": 5608631672,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/226"
+    },
+    "C012": {
+      "number": 227,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzwWg",
+      "id": 5608632410,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/227"
+    },
+    "C015": {
+      "number": 228,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzwxg",
+      "id": 5608632518,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/228"
+    },
+    "C013": {
+      "number": 229,
+      "node_id": "I_kwDOUqUpYc8AAAABTkzzFw",
+      "id": 5608633111,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/229"
+    },
+    "C014": {
+      "number": 230,
+      "node_id": "I_kwDOUqUpYc8AAAABTkz2Lg",
+      "id": 5608633902,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/230"
+    },
+    "C016": {
+      "number": 231,
+      "node_id": "I_kwDOUqUpYc8AAAABTkz4Ow",
+      "id": 5608634427,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/231"
+    },
+    "C017": {
+      "number": 232,
+      "node_id": "I_kwDOUqUpYc8AAAABTkz7FA",
+      "id": 5608635156,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/232"
+    },
+    "K001": {
+      "number": 233,
+      "node_id": "I_kwDOUqUpYc8AAAABTkz9Kg",
+      "id": 5608635690,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/233"
+    },
+    "K002": {
+      "number": 234,
+      "node_id": "I_kwDOUqUpYc8AAAABTkz_vg",
+      "id": 5608636350,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/234"
+    },
+    "K003": {
+      "number": 235,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0CiQ",
+      "id": 5608637065,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/235"
+    },
+    "K004": {
+      "number": 236,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0C7w",
+      "id": 5608637167,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/236"
+    },
+    "K005": {
+      "number": 237,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0F7A",
+      "id": 5608637932,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/237"
+    },
+    "K008": {
+      "number": 238,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0GUA",
+      "id": 5608638032,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/238"
+    },
+    "K006": {
+      "number": 239,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0JMA",
+      "id": 5608638768,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/239"
+    },
+    "K007": {
+      "number": 240,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0L8w",
+      "id": 5608639475,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/240"
+    },
+    "K009": {
+      "number": 241,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0MTw",
+      "id": 5608639567,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/241"
+    },
+    "K010": {
+      "number": 242,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0Ozw",
+      "id": 5608640207,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/242"
+    },
+    "K011": {
+      "number": 243,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0PYQ",
+      "id": 5608640353,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/243"
+    },
+    "K012": {
+      "number": 244,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0SLw",
+      "id": 5608641071,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/244"
+    },
+    "K013": {
+      "number": 245,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0UXA",
+      "id": 5608641628,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/245"
+    },
+    "K014": {
+      "number": 246,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0WaQ",
+      "id": 5608642153,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/246"
+    },
+    "K015": {
+      "number": 247,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0Z-Q",
+      "id": 5608643065,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/247"
+    },
+    "K016": {
+      "number": 248,
+      "node_id": "I_kwDOUqUpYc8AAAABTk0cWA",
+      "id": 5608643672,
+      "url": "https://github.com/LUNARKN1GHT/CampusFlow/issues/248"
+    }
+  },
+  "publication_complete": true
+}
