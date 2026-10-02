@@ -1,5 +1,7 @@
 """SQLAlchemy 仓储实现。ORM 模型只在本层使用，向外返回端口 DTO。"""
 
+from __future__ import annotations
+
 from datetime import date, datetime, time
 
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from campusflow.application.ports.repositories import (
     SemesterData,
     TaskData,
     TaskProgressChangeData,
+    WorkspaceData,
 )
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.models import (
@@ -21,6 +24,7 @@ from campusflow.infrastructure.db.models import (
     Semester,
     Task,
     TaskProgressChange,
+    Workspace,
 )
 
 
@@ -43,6 +47,17 @@ def _semester_to_data(row: Semester) -> SemesterData:
         start_date=row.start_date,
         end_date=row.end_date,
         archived=row.archived,
+    )
+
+
+def _workspace_to_data(row: Workspace) -> WorkspaceData:
+    return WorkspaceData(
+        id=row.id,
+        name=row.name,
+        timezone=row.timezone,
+        daily_capacity_minutes=row.daily_capacity_minutes,
+        break_minutes=row.break_minutes,
+        buffer_minutes=row.buffer_minutes,
     )
 
 
@@ -149,6 +164,34 @@ class SqlAlchemySemesterRepository:
         row.archived = archived
         self._session.flush()
         return _semester_to_data(row)
+
+
+class SqlAlchemyWorkspaceRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, workspace_id: int) -> WorkspaceData | None:
+        row = self._session.get(Workspace, workspace_id)
+        return _workspace_to_data(row) if row is not None else None
+
+    def update_settings(
+        self,
+        workspace_id: int,
+        *,
+        timezone: str,
+        daily_capacity_minutes: int,
+        break_minutes: int,
+        buffer_minutes: int,
+    ) -> WorkspaceData | None:
+        row = self._session.get(Workspace, workspace_id)
+        if row is None:
+            return None
+        row.timezone = timezone
+        row.daily_capacity_minutes = daily_capacity_minutes
+        row.break_minutes = break_minutes
+        row.buffer_minutes = buffer_minutes
+        self._session.flush()
+        return _workspace_to_data(row)
 
 
 class SqlAlchemyCourseRepository:

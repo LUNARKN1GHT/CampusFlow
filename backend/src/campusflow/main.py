@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from campusflow.api import auth as auth_api
 from campusflow.api import courses as courses_api
 from campusflow.api import schedule as schedule_api
+from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api.health import router as health_router
 from campusflow.core.config import Settings
@@ -23,7 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for router in (health_router, auth_api.router):
         app.include_router(router, prefix="/api/v1")
-    for router in (courses_api.router, tasks_api.router, schedule_api.router):
+    for router in (courses_api.router, tasks_api.router, schedule_api.router, settings_api.router):
         app.include_router(
             router,
             prefix="/api/v1",

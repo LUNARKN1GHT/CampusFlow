@@ -77,3 +77,11 @@ export type CourseInput = Omit<Course, 'id'>
 export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_date' | 'due_time' | 'priority' | 'estimated_minutes' | 'remaining_minutes'>
 export type FixedEventInput = Omit<FixedEvent, 'id'>
 export type AvailabilitySlotInput = Omit<AvailabilitySlot, 'id'>
+
+export type WorkspaceSettings = {
+  workspace_id: number
+  timezone: string
+  daily_capacity_minutes: number
+  break_minutes: number
+  buffer_minutes: number
+}

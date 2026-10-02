@@ -3,6 +3,8 @@
 应用层只依赖本文件定义的接口；具体实现位于 infrastructure/repositories.py。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
@@ -24,6 +26,16 @@ class SemesterData:
     start_date: date
     end_date: date
     archived: bool
+
+
+@dataclass
+class WorkspaceData:
+    id: int
+    name: str
+    timezone: str
+    daily_capacity_minutes: int
+    break_minutes: int
+    buffer_minutes: int
 
 
 @dataclass
@@ -98,6 +110,20 @@ class SemesterRepository(Protocol):
     ) -> SemesterData: ...
 
     def set_archived(self, semester_id: int, archived: bool) -> SemesterData | None: ...
+
+
+class WorkspaceRepository(Protocol):
+    def get(self, workspace_id: int) -> WorkspaceData | None: ...
+
+    def update_settings(
+        self,
+        workspace_id: int,
+        *,
+        timezone: str,
+        daily_capacity_minutes: int,
+        break_minutes: int,
+        buffer_minutes: int,
+    ) -> WorkspaceData | None: ...
 
 
 class CourseRepository(Protocol):
@@ -217,6 +243,7 @@ class ScheduleRepository(Protocol):
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
+    workspaces: WorkspaceRepository
     semesters: SemesterRepository
     courses: CourseRepository
     tasks: TaskRepository
