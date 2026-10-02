@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import AppShell from './components/AppShell.vue'
 import { useAuth } from './composables/useAuth'
+import CoursesView from './views/CoursesView.vue'
 import HealthView from './views/HealthView.vue'
 import LoginView from './views/LoginView.vue'
 import StageView from './views/StageView.vue'
@@ -18,8 +19,7 @@ const router = createRouter({
         {
           path: 'courses',
           name: 'courses',
-          component: StageView,
-          props: { title: '课程', description: '学期与课程管理将在本阶段接入。' },
+          component: CoursesView,
         },
         {
           path: 'tasks',
