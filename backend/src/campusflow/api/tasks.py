@@ -9,6 +9,7 @@ from campusflow.api.deps import get_default_workspace_id, get_repositories
 from campusflow.api.schemas import (
     TaskCreate,
     TaskOut,
+    TaskProgressChangeOut,
     TaskProgressPatch,
     TaskUpdate,
 )
@@ -82,5 +83,13 @@ def update_task(task_id: int, payload: TaskUpdate, repos: Repos) -> TaskOut:
 
 @router.patch("/tasks/{task_id}/progress", response_model=TaskOut)
 def update_task_progress(task_id: int, payload: TaskProgressPatch, repos: Repos) -> TaskOut:
-    task = use_cases.set_progress(repos, task_id, payload.progress)
+    task = use_cases.set_progress(repos, task_id, payload.progress, payload.reason)
     return TaskOut.model_validate(task)
+
+
+@router.get("/tasks/{task_id}/progress-history", response_model=list[TaskProgressChangeOut])
+def list_task_progress_history(task_id: int, repos: Repos) -> list[TaskProgressChangeOut]:
+    return [
+        TaskProgressChangeOut.model_validate(change)
+        for change in use_cases.list_progress_changes(repos, task_id)
+    ]

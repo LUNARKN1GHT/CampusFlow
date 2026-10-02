@@ -55,6 +55,18 @@ class TaskData:
 
 
 @dataclass
+class TaskProgressChangeData:
+    id: int
+    task_id: int
+    from_progress: TaskProgress
+    to_progress: TaskProgress
+    reason: str | None
+    previous_remaining_minutes: int | None
+    new_remaining_minutes: int | None
+    changed_at: datetime
+
+
+@dataclass
 class FixedEventData:
     id: int
     workspace_id: int
@@ -153,7 +165,11 @@ class TaskRepository(Protocol):
         remaining_minutes: int | None,
     ) -> TaskData | None: ...
 
-    def set_progress(self, task_id: int, progress: TaskProgress) -> TaskData | None: ...
+    def set_progress(
+        self, task_id: int, progress: TaskProgress, reason: str | None
+    ) -> TaskData | None: ...
+
+    def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
 class ScheduleRepository(Protocol):
