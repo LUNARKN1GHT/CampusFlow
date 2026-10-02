@@ -97,6 +97,7 @@ class TaskUpdate(BaseModel):
 
 class TaskProgressPatch(BaseModel):
     progress: TaskProgress
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class TaskOut(BaseModel):
@@ -113,6 +114,18 @@ class TaskOut(BaseModel):
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class TaskProgressChangeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    task_id: int
+    from_progress: TaskProgress
+    to_progress: TaskProgress
+    reason: str | None
+    previous_remaining_minutes: int | None
+    new_remaining_minutes: int | None
+    changed_at: datetime
 
 
 class FixedEventCreate(BaseModel):

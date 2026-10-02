@@ -33,6 +33,17 @@ export type Task = {
   updated_at: string
 }
 
+export type TaskProgressChange = {
+  id: number
+  task_id: number
+  from_progress: TaskProgress
+  to_progress: TaskProgress
+  reason: string | null
+  previous_remaining_minutes: number | null
+  new_remaining_minutes: number | null
+  changed_at: string
+}
+
 export type EventRecurrence = 'none' | 'weekly'
 export type FixedEvent = {
   id: number
