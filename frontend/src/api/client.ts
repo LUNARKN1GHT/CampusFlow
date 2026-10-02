@@ -22,7 +22,7 @@ function validationMessage(issues: ValidationIssue[]): string {
   return `${field ? `${field}：` : ''}${first.msg ?? '内容格式不正确'}`
 }
 
-async function toApiError(response: Response): Promise<ApiError> {
+async function toApiError(response: Response, notifySessionExpiry: boolean): Promise<ApiError> {
   let payload: ErrorPayload | null = null
   try {
     payload = await response.json() as ErrorPayload
@@ -31,8 +31,12 @@ async function toApiError(response: Response): Promise<ApiError> {
   }
 
   if (response.status === 401) {
-    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
-    return new ApiError('登录已失效，请重新登录。', 401, 'http')
+    if (notifySessionExpiry) window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT))
+    return new ApiError(
+      notifySessionExpiry ? '登录已失效，请重新登录。' : '用户名或密码错误。',
+      401,
+      'http',
+    )
   }
   if (response.status === 422 && Array.isArray(payload?.detail)) {
     return new ApiError(validationMessage(payload.detail), 422, 'validation')
@@ -60,7 +64,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
       cache: init.method === undefined || init.method === 'GET' ? 'no-store' : init.cache,
       signal: controller.signal,
     })
-    if (!response.ok) throw await toApiError(response)
+    if (!response.ok) throw await toApiError(response, !path.startsWith('/auth/'))
     if (response.status === 204) return undefined as T
     try {
       return await response.json() as T

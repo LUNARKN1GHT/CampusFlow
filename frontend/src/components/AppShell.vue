@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
+
+import { useAuth } from '../composables/useAuth'
+
+const router = useRouter()
+const { state, logout } = useAuth()
 const availableItems = [
   { label: '总览', to: '/' },
   { label: '课程', to: '/courses' },
@@ -7,6 +13,11 @@ const availableItems = [
 ]
 
 const futureItems = ['资料库', '待核对', '智能问答']
+
+async function signOut() {
+  await logout()
+  await router.replace('/login')
+}
 </script>
 
 <template>
@@ -37,7 +48,10 @@ const futureItems = ['资料库', '待核对', '智能问答']
           <p class="eyebrow">个人工作空间</p>
           <p class="topbar-title">把重要的学习事项放在一处</p>
         </div>
-        <span class="stage-badge">M1 · 手动管理</span>
+        <div class="topbar-actions">
+          <span class="stage-badge">{{ state.session?.username }}</span>
+          <button type="button" class="text-button" @click="signOut">退出</button>
+        </div>
       </header>
       <RouterView />
     </div>
