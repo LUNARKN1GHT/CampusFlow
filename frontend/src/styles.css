@@ -91,6 +91,16 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .compact-empty { padding: 24px; border: 1px dashed #cbd4cd; border-radius: 12px; color: var(--muted); text-align: center; background: #fafbf8; }
 .courses-placeholder { margin-top: 22px; }
 .muted { color: var(--muted); }
+.course-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.course-card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.course-card h3 { margin: 5px 0 14px; font-size: 18px; }
+.course-code { color: var(--brand); font-size: 12px; font-weight: 800; }
+.course-card dl { display: grid; gap: 5px; margin: 0 0 16px; }
+.course-card dl div { display: flex; justify-content: space-between; gap: 12px; }
+.course-card dt { color: var(--muted); font-size: 12px; }
+.course-card dd { margin: 0; font-size: 13px; font-weight: 700; }
+.editor-panel { margin-top: 22px; }
+.form-help { margin: -4px 0 0; color: var(--muted); font-size: 12px; }
 
 @media (max-width: 760px) {
   .app-frame { display: block; }
