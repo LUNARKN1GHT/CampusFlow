@@ -62,6 +62,7 @@ class Task(Base):
     progress: Mapped[str] = mapped_column(String(20), default=TaskProgress.NOT_STARTED)
     priority: Mapped[str] = mapped_column(String(20), default=TaskPriority.MEDIUM)
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
+    remaining_minutes: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

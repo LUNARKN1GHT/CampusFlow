@@ -68,6 +68,7 @@ def _task_to_data(row: Task) -> TaskData:
         progress=TaskProgress(row.progress),
         priority=TaskPriority(row.priority),
         estimated_minutes=row.estimated_minutes,
+        remaining_minutes=row.remaining_minutes,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -226,6 +227,7 @@ class SqlAlchemyTaskRepository:
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData:
         row = Task(
             workspace_id=workspace_id,
@@ -236,6 +238,7 @@ class SqlAlchemyTaskRepository:
             due_time=due_time,
             priority=priority,
             estimated_minutes=estimated_minutes,
+            remaining_minutes=remaining_minutes,
         )
         self._session.add(row)
         self._session.flush()
@@ -252,6 +255,7 @@ class SqlAlchemyTaskRepository:
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData | None:
         row = self._session.get(Task, task_id)
         if row is None:
@@ -263,6 +267,7 @@ class SqlAlchemyTaskRepository:
         row.due_time = due_time
         row.priority = priority
         row.estimated_minutes = estimated_minutes
+        row.remaining_minutes = remaining_minutes
         self._session.flush()
         return _task_to_data(row)
 

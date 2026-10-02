@@ -47,6 +47,11 @@ def create_task(payload: TaskCreate, workspace_id: WorkspaceId, repos: Repos) ->
         due_time=payload.due_time,
         priority=payload.priority,
         estimated_minutes=payload.estimated_minutes,
+        remaining_minutes=(
+            payload.remaining_minutes
+            if payload.remaining_minutes is not None
+            else payload.estimated_minutes
+        ),
     )
     return TaskOut.model_validate(task)
 
@@ -70,6 +75,7 @@ def update_task(task_id: int, payload: TaskUpdate, repos: Repos) -> TaskOut:
         due_time=merged.due_time,
         priority=merged.priority,
         estimated_minutes=merged.estimated_minutes,
+        remaining_minutes=merged.remaining_minutes,
     )
     return TaskOut.model_validate(task)
 
