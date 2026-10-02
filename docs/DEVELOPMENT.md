@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 前端环境页、Python API 健康检查、OpenAPI 和学期／课程／手动任务／固定日程／可用时间 API。业务接口已接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查不访问数据库。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查仍只表示进程存活。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -47,6 +47,8 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
+业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
+
 健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
 
 ## 启动前端
@@ -92,15 +94,16 @@ uv run --locked ruff format --check .
 ```bash
 npm run typecheck
 npm run build
+npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自动启动 Vite
 ```
 
-`build` 已包含类型检查，提交前执行一次 `npm run build` 即可。界面修改还应在浏览器中检查显示和交互；后续业务页面加入时再增加对应组件和端到端测试。
+`build` 已包含类型检查。`test:e2e` 使用 Chromium 完成登录、学期、课程、任务、固定日程、进度、设置、刷新持久化、错误重试与退出保护流程；首次运行需在 `frontend/` 执行 `npx playwright install chromium`。CI 会启动真实 PostgreSQL 与后端后执行该流程。
 
 仓库根目录可运行 `git diff --check` 检查空白问题。依赖变更必须同步锁文件：后端使用 `uv add`／`uv lock`，前端使用 `npm install`；日常安装使用 `uv sync --locked` 和 `npm ci`。
 
 ## 当前限制
 
-- 数据库迁移与手动管理后端已合并；暂无业务前端、Worker 命令、认证、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
+- 手动管理前后端与本机单用户会话已实现；暂无生产身份系统、跨工作空间对象授权、Worker 命令、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。

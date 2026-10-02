@@ -3,6 +3,8 @@
 应用层只依赖本文件定义的接口；具体实现位于 infrastructure/repositories.py。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
@@ -24,6 +26,16 @@ class SemesterData:
     start_date: date
     end_date: date
     archived: bool
+
+
+@dataclass
+class WorkspaceData:
+    id: int
+    name: str
+    timezone: str
+    daily_capacity_minutes: int
+    break_minutes: int
+    buffer_minutes: int
 
 
 @dataclass
@@ -49,8 +61,21 @@ class TaskData:
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
+    remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class TaskProgressChangeData:
+    id: int
+    task_id: int
+    from_progress: TaskProgress
+    to_progress: TaskProgress
+    reason: str | None
+    previous_remaining_minutes: int | None
+    new_remaining_minutes: int | None
+    changed_at: datetime
 
 
 @dataclass
@@ -85,6 +110,20 @@ class SemesterRepository(Protocol):
     ) -> SemesterData: ...
 
     def set_archived(self, semester_id: int, archived: bool) -> SemesterData | None: ...
+
+
+class WorkspaceRepository(Protocol):
+    def get(self, workspace_id: int) -> WorkspaceData | None: ...
+
+    def update_settings(
+        self,
+        workspace_id: int,
+        *,
+        timezone: str,
+        daily_capacity_minutes: int,
+        break_minutes: int,
+        buffer_minutes: int,
+    ) -> WorkspaceData | None: ...
 
 
 class CourseRepository(Protocol):
@@ -135,6 +174,7 @@ class TaskRepository(Protocol):
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData: ...
 
     def update(
@@ -148,9 +188,14 @@ class TaskRepository(Protocol):
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData | None: ...
 
-    def set_progress(self, task_id: int, progress: TaskProgress) -> TaskData | None: ...
+    def set_progress(
+        self, task_id: int, progress: TaskProgress, reason: str | None
+    ) -> TaskData | None: ...
+
+    def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
 class ScheduleRepository(Protocol):
@@ -198,6 +243,7 @@ class ScheduleRepository(Protocol):
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
+    workspaces: WorkspaceRepository
     semesters: SemesterRepository
     courses: CourseRepository
     tasks: TaskRepository
