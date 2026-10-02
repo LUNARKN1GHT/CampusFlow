@@ -94,9 +94,10 @@ uv run --locked ruff format --check .
 ```bash
 npm run typecheck
 npm run build
+npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自动启动 Vite
 ```
 
-`build` 已包含类型检查，提交前执行一次 `npm run build` 即可。界面修改还应在浏览器中检查显示和交互；后续业务页面加入时再增加对应组件和端到端测试。
+`build` 已包含类型检查。`test:e2e` 使用 Chromium 完成登录、学期、课程、任务、固定日程、进度、设置、刷新持久化、错误重试与退出保护流程；首次运行需在 `frontend/` 执行 `npx playwright install chromium`。CI 会启动真实 PostgreSQL 与后端后执行该流程。
 
 仓库根目录可运行 `git diff --check` 检查空白问题。依赖变更必须同步锁文件：后端使用 `uv add`／`uv lock`，前端使用 `npm install`；日常安装使用 `uv sync --locked` 和 `npm ci`。
 
