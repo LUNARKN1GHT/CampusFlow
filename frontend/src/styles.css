@@ -147,6 +147,12 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .definition-list article span { display: flex; align-items: center; gap: 8px; }
 .definition-list small { color: var(--muted); }
 .danger-button { padding: 7px 10px; color: var(--danger); background: #fff1ec; }
+.settings-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.success-message { margin: 0; color: var(--brand); font-size: 13px; }
+.availability-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.availability-grid article { display: flex; align-items: center; justify-content: space-between; padding: 13px; border: 1px solid var(--line); border-radius: 10px; }
+.availability-grid article span { display: grid; }
+.availability-grid small { color: var(--muted); }
 
 @media (max-width: 760px) {
   .app-frame { display: block; }

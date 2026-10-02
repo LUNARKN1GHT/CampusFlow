@@ -5,7 +5,7 @@ import { useAuth } from './composables/useAuth'
 import CoursesView from './views/CoursesView.vue'
 import HealthView from './views/HealthView.vue'
 import LoginView from './views/LoginView.vue'
-import StageView from './views/StageView.vue'
+import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
 
 const router = createRouter({
@@ -30,8 +30,7 @@ const router = createRouter({
         {
           path: 'settings',
           name: 'settings',
-          component: StageView,
-          props: { title: '设置', description: '时区与可用时间将在本阶段接入。' },
+          component: SettingsView,
         },
       ],
     },
