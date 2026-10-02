@@ -21,6 +21,9 @@ class Workspace(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
+    daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
+    break_minutes: Mapped[int] = mapped_column(Integer, default=15)
+    buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
