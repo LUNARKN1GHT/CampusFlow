@@ -156,6 +156,11 @@ def create_availability_slot(
     error = validate_availability_slot(day_of_week, start_time, end_time)
     if error:
         raise DomainError(error)
+    for existing in repos.schedule.list_availability_slots(workspace_id):
+        if existing.day_of_week != day_of_week:
+            continue
+        if start_time < existing.end_time and end_time > existing.start_time:
+            raise DomainError("可用时间段与已有时段重叠，请调整后再保存")
     slot = repos.schedule.create_availability_slot(workspace_id, day_of_week, start_time, end_time)
     repos.uow.commit()
     return slot
