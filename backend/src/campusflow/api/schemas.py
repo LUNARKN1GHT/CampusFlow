@@ -75,6 +75,7 @@ class TaskCreate(BaseModel):
     due_time: time | None = None
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
 
 
 class TaskUpdate(BaseModel):
@@ -85,6 +86,13 @@ class TaskUpdate(BaseModel):
     due_time: time | None = None
     priority: TaskPriority | None = None
     estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def reject_null_title(self) -> "TaskUpdate":
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title 不能为 null")
+        return self
 
 
 class TaskProgressPatch(BaseModel):
@@ -102,6 +110,7 @@ class TaskOut(BaseModel):
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
+    remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
 

@@ -101,6 +101,26 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .course-card dd { margin: 0; font-size: 13px; font-weight: 700; }
 .editor-panel { margin-top: 22px; }
 .form-help { margin: -4px 0 0; color: var(--muted); font-size: 12px; }
+.form-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.filter-bar { display: flex; align-items: end; gap: 14px; margin-bottom: 22px; padding: 18px 22px; }
+.filter-bar label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.filter-bar select { min-width: 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.filter-bar .count-badge { margin-left: auto; margin-bottom: 7px; }
+.task-list { display: grid; }
+.task-row { display: grid; grid-template-columns: 4px minmax(0, 1fr) auto auto; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.task-row:first-child { padding-top: 0; }
+.task-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.priority-marker { align-self: stretch; min-height: 48px; border-radius: 999px; background: #9eb1aa; }
+.priority-marker[data-priority="high"] { background: #c75d3c; }
+.priority-marker[data-priority="medium"] { background: #d59b42; }
+.task-title-line { display: flex; align-items: center; gap: 9px; }
+.task-title-line h3 { margin: 0; font-size: 16px; }
+.task-main p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+.status-pill { padding: 2px 7px; border-radius: 999px; color: var(--brand); background: var(--brand-soft); font-size: 10px; font-weight: 800; }
+.task-meta { min-width: 108px; display: grid; text-align: right; }
+.task-meta span { color: var(--muted); font-size: 11px; }
+.task-meta strong { font-size: 16px; }
+.task-meta small { color: var(--muted); font-size: 10px; font-weight: 500; }
 
 @media (max-width: 760px) {
   .app-frame { display: block; }
@@ -116,4 +136,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .page-heading-row .switch-field { margin-top: 18px; }
   .two-column-layout { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .filter-bar { align-items: stretch; flex-direction: column; }
+  .filter-bar .count-badge { margin: 0; align-self: flex-start; }
+  .task-row { grid-template-columns: 4px 1fr; }
+  .task-meta, .task-row > button { grid-column: 2; text-align: left; }
 }
