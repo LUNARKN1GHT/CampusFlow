@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import type { Course, Semester, Task, TaskInput, TaskPriority, TaskProgress } from '../api/types'
+import type { Course, Semester, Task, TaskInput, TaskPriority, TaskProgress, TaskProgressChange } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 
 const tasks = ref<Task[]>([])
@@ -15,6 +15,11 @@ const error = ref('')
 const formError = ref('')
 const editorOpen = ref(false)
 const editing = ref<Task | null>(null)
+const progressTask = ref<Task | null>(null)
+const history = ref<TaskProgressChange[]>([])
+const progressSaving = ref(false)
+const progressError = ref('')
+const progressForm = reactive({ progress: 'in_progress' as TaskProgress, reason: '' })
 const filters = reactive({ semesterId: '', courseId: '', progress: '' })
 const form = reactive({
   title: '', description: '', course_id: '', due_date: '', due_time: '',
@@ -102,6 +107,43 @@ function dueText(task: Task): string {
   return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
 }
 
+async function openProgress(task: Task) {
+  progressTask.value = task
+  progressForm.progress = task.progress
+  progressForm.reason = ''
+  progressError.value = ''
+  try {
+    history.value = await tasksApi.progressHistory(task.id)
+  } catch (caught) {
+    progressError.value = errorMessage(caught)
+  }
+}
+
+async function saveProgress() {
+  if (!progressTask.value) return
+  progressSaving.value = true
+  progressError.value = ''
+  try {
+    const updated = await tasksApi.setProgress(
+      progressTask.value.id,
+      progressForm.progress,
+      progressForm.reason || null,
+    )
+    tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
+    progressTask.value = updated
+    history.value = await tasksApi.progressHistory(updated.id)
+    progressForm.reason = ''
+  } catch (caught) {
+    progressError.value = errorMessage(caught)
+  } finally {
+    progressSaving.value = false
+  }
+}
+
+function formatChangedAt(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
 onMounted(load)
 </script>
 
@@ -131,7 +173,7 @@ onMounted(load)
               <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ dueText(task) }}</p>
             </div>
             <div class="task-meta"><span>优先级 {{ priorityLabels[task.priority] }}</span><strong>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong></div>
-            <button type="button" class="button-secondary" @click="openEditor(task)">编辑</button>
+            <div class="task-actions"><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
           </article>
         </div>
         <div v-else class="compact-empty">{{ tasks.length ? '没有符合当前筛选的任务。' : '还没有任务，先添加第一项。' }}</div>
@@ -148,6 +190,26 @@ onMounted(load)
           <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
           <button type="submit" :disabled="saving">{{ saving ? '正在保存…' : '保存任务' }}</button>
         </form>
+      </section>
+
+      <section v-if="progressTask" class="panel editor-panel">
+        <div class="section-heading"><div><p class="eyebrow">执行进度</p><h2>{{ progressTask.title }}</h2></div><button type="button" class="text-button" @click="progressTask = null">关闭</button></div>
+        <div class="progress-layout">
+          <form class="stack-form" @submit.prevent="saveProgress">
+            <label>新状态<select v-model="progressForm.progress"><option v-for="(label, value) in progressLabels" :key="value" :value="value">{{ label }}</option></select></label>
+            <label>调整原因<textarea v-model.trim="progressForm.reason" rows="3" maxlength="500" placeholder="例如：依赖的实验数据尚未提供"></textarea></label>
+            <p class="form-help">完成或取消会将剩余耗时记为 0；重新打开时按原始估计恢复，历史记录不会删除。</p>
+            <p v-if="progressError" class="form-error" role="alert">{{ progressError }}</p>
+            <button type="submit" :disabled="progressSaving || progressForm.progress === progressTask.progress">{{ progressSaving ? '正在保存…' : '更新进度' }}</button>
+          </form>
+          <div>
+            <h3 class="subheading">调整历史</h3>
+            <ol v-if="history.length" class="history-list">
+              <li v-for="change in history" :key="change.id"><div><strong>{{ progressLabels[change.from_progress] }} → {{ progressLabels[change.to_progress] }}</strong><time>{{ formatChangedAt(change.changed_at) }}</time></div><p>{{ change.reason || '未填写原因' }}</p><small>剩余耗时：{{ change.previous_remaining_minutes ?? '—' }} → {{ change.new_remaining_minutes ?? '—' }} 分钟</small></li>
+            </ol>
+            <div v-else class="compact-empty">还没有进度调整记录。</div>
+          </div>
+        </div>
       </section>
     </template>
   </main>

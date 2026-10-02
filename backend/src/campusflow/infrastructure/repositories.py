@@ -11,6 +11,7 @@ from campusflow.application.ports.repositories import (
     FixedEventData,
     SemesterData,
     TaskData,
+    TaskProgressChangeData,
 )
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.models import (
@@ -19,6 +20,7 @@ from campusflow.infrastructure.db.models import (
     FixedEvent,
     Semester,
     Task,
+    TaskProgressChange,
 )
 
 
@@ -71,6 +73,19 @@ def _task_to_data(row: Task) -> TaskData:
         remaining_minutes=row.remaining_minutes,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _progress_change_to_data(row: TaskProgressChange) -> TaskProgressChangeData:
+    return TaskProgressChangeData(
+        id=row.id,
+        task_id=row.task_id,
+        from_progress=TaskProgress(row.from_progress),
+        to_progress=TaskProgress(row.to_progress),
+        reason=row.reason,
+        previous_remaining_minutes=row.previous_remaining_minutes,
+        new_remaining_minutes=row.new_remaining_minutes,
+        changed_at=row.changed_at,
     )
 
 
@@ -271,13 +286,38 @@ class SqlAlchemyTaskRepository:
         self._session.flush()
         return _task_to_data(row)
 
-    def set_progress(self, task_id: int, progress: TaskProgress) -> TaskData | None:
+    def set_progress(
+        self, task_id: int, progress: TaskProgress, reason: str | None
+    ) -> TaskData | None:
         row = self._session.get(Task, task_id)
         if row is None:
             return None
+        previous_progress = TaskProgress(row.progress)
+        previous_remaining = row.remaining_minutes
+        if progress in (TaskProgress.DONE, TaskProgress.CANCELLED):
+            row.remaining_minutes = 0
+        elif previous_progress in (TaskProgress.DONE, TaskProgress.CANCELLED):
+            row.remaining_minutes = row.estimated_minutes
         row.progress = progress
+        change = TaskProgressChange(
+            task_id=row.id,
+            from_progress=previous_progress,
+            to_progress=progress,
+            reason=reason,
+            previous_remaining_minutes=previous_remaining,
+            new_remaining_minutes=row.remaining_minutes,
+        )
+        self._session.add(change)
         self._session.flush()
         return _task_to_data(row)
+
+    def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]:
+        stmt = (
+            select(TaskProgressChange)
+            .where(TaskProgressChange.task_id == task_id)
+            .order_by(TaskProgressChange.changed_at.desc(), TaskProgressChange.id.desc())
+        )
+        return [_progress_change_to_data(row) for row in self._session.scalars(stmt)]
 
 
 class SqlAlchemyScheduleRepository:

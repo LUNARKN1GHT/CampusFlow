@@ -48,13 +48,26 @@ def test_task_create_list_progress(client: TestClient) -> None:
     listed = client.get("/api/v1/tasks").json()
     assert [t["id"] for t in listed] == [task["id"]]
 
-    done = client.patch(f"/api/v1/tasks/{task['id']}/progress", json={"progress": "done"}).json()
+    done = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "done", "reason": "已经提交"},
+    ).json()
     assert done["progress"] == "done"
 
     remaining = client.get("/api/v1/tasks", params={"progress": "not_started"}).json()
     assert remaining == []
     done_list = client.get("/api/v1/tasks", params={"progress": "done"}).json()
     assert [t["id"] for t in done_list] == [task["id"]]
+
+    reopened = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "in_progress", "reason": "教师要求补交附件"},
+    ).json()
+    assert reopened["progress"] == "in_progress"
+
+    history = client.get(f"/api/v1/tasks/{task['id']}/progress-history").json()
+    assert [item["to_progress"] for item in history] == ["in_progress", "done"]
+    assert history[0]["reason"] == "教师要求补交附件"
 
 
 def test_task_update_merges_fields(client: TestClient) -> None:
