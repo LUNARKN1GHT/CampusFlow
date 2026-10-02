@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-import { semestersApi } from '../api/business'
+import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import type { Semester } from '../api/types'
+import type { Course, CourseInput, Semester } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 
 const semesters = ref<Semester[]>([])
@@ -14,6 +14,13 @@ const formError = ref('')
 const showHistory = ref(false)
 const selectedId = ref<number | null>(null)
 const form = reactive({ name: '', start_date: '', end_date: '' })
+const courses = ref<Course[]>([])
+const coursesLoading = ref(false)
+const courseSaving = ref(false)
+const courseError = ref('')
+const editingCourse = ref<Course | null>(null)
+const editorOpen = ref(false)
+const courseForm = reactive({ name: '', code: '', teacher: '', class_name: '' })
 
 const visibleSemesters = computed(() => showHistory.value
   ? semesters.value
@@ -68,6 +75,67 @@ async function toggleArchived(semester: Semester) {
     formError.value = errorMessage(caught)
   }
 }
+
+async function loadCourses() {
+  courses.value = []
+  courseError.value = ''
+  if (selectedId.value === null) return
+  coursesLoading.value = true
+  try {
+    courses.value = await coursesApi.list(selectedId.value)
+  } catch (caught) {
+    courseError.value = errorMessage(caught)
+  } finally {
+    coursesLoading.value = false
+  }
+}
+
+function editCourse(course?: Course) {
+  editorOpen.value = true
+  editingCourse.value = course ?? null
+  Object.assign(courseForm, {
+    name: course?.name ?? '',
+    code: course?.code ?? '',
+    teacher: course?.teacher ?? '',
+    class_name: course?.class_name ?? '',
+  })
+  courseError.value = ''
+}
+
+async function saveCourse() {
+  if (selectedId.value === null) return
+  courseSaving.value = true
+  courseError.value = ''
+  const values = {
+    name: courseForm.name,
+    code: courseForm.code || null,
+    teacher: courseForm.teacher || null,
+    class_name: courseForm.class_name || null,
+  }
+  try {
+    if (editingCourse.value) {
+      const patch: Partial<CourseInput> = {}
+      for (const key of Object.keys(values) as Array<keyof typeof values>) {
+        if (values[key] !== editingCourse.value[key]) Object.assign(patch, { [key]: values[key] })
+      }
+      if (Object.keys(patch).length) {
+        const updated = await coursesApi.update(editingCourse.value.id, patch)
+        courses.value[courses.value.findIndex((course) => course.id === updated.id)] = updated
+      }
+    } else {
+      courses.value.push(await coursesApi.create({ semester_id: selectedId.value, ...values }))
+    }
+    editorOpen.value = false
+    editingCourse.value = null
+    Object.assign(courseForm, { name: '', code: '', teacher: '', class_name: '' })
+  } catch (caught) {
+    courseError.value = errorMessage(caught)
+  } finally {
+    courseSaving.value = false
+  }
+}
+
+watch(selectedId, loadCourses)
 
 onMounted(load)
 </script>
@@ -124,8 +192,42 @@ onMounted(load)
     </div>
 
     <section class="panel courses-placeholder">
-      <div class="section-heading"><div><p class="eyebrow">所选学期</p><h2>{{ selectedSemester?.name ?? '请先选择学期' }}</h2></div></div>
-      <div class="compact-empty">课程列表将在下一项中接入真实 API。</div>
+      <div class="section-heading">
+        <div><p class="eyebrow">所选学期</p><h2>{{ selectedSemester?.name ?? '请先选择学期' }}</h2></div>
+        <button v-if="selectedSemester" type="button" @click="editCourse()">添加课程</button>
+      </div>
+      <ApiFeedback v-if="courseError && !editingCourse" :message="courseError" :busy="coursesLoading" @retry="loadCourses" />
+      <p v-else-if="coursesLoading" class="muted">正在加载课程…</p>
+      <div v-else-if="courses.length" class="course-grid">
+        <article v-for="course in courses" :key="course.id" class="course-card">
+          <div class="course-code">{{ course.code || '未填写代码' }}</div>
+          <h3>{{ course.name }}</h3>
+          <dl>
+            <div><dt>教学班</dt><dd>{{ course.class_name || '未填写' }}</dd></div>
+            <div><dt>教师</dt><dd>{{ course.teacher || '未填写' }}</dd></div>
+          </dl>
+          <button type="button" class="button-secondary" @click="editCourse(course)">编辑课程</button>
+        </article>
+      </div>
+      <div v-else class="compact-empty">{{ selectedSemester ? '这个学期还没有课程。' : '选择学期后查看课程。' }}</div>
+    </section>
+
+    <section v-if="selectedSemester && (editorOpen || !courses.length)" class="panel editor-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">{{ editingCourse ? '编辑' : '新建' }}</p><h2>{{ editingCourse?.name || '添加课程' }}</h2></div>
+        <button v-if="editorOpen" type="button" class="text-button" @click="editorOpen = false">取消</button>
+      </div>
+      <form class="stack-form" @submit.prevent="saveCourse">
+        <div class="form-grid">
+          <label>课程名称<input v-model.trim="courseForm.name" required maxlength="200" /></label>
+          <label>课程代码<input v-model.trim="courseForm.code" maxlength="50" placeholder="例如：CS301" /></label>
+          <label>教学班<input v-model.trim="courseForm.class_name" maxlength="100" placeholder="例如：1 班" /></label>
+          <label>教师<input v-model.trim="courseForm.teacher" maxlength="100" /></label>
+        </div>
+        <p class="form-help">同名课程会通过课程代码和教学班区分；留空的可选字段会明确保存为空。</p>
+        <p v-if="courseError" class="form-error" role="alert">{{ courseError }}</p>
+        <button type="submit" :disabled="courseSaving">{{ courseSaving ? '正在保存…' : '保存课程' }}</button>
+      </form>
     </section>
   </main>
 </template>

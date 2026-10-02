@@ -80,3 +80,12 @@ def test_course_list_filter_and_update(client: TestClient) -> None:
 def test_course_update_missing_course(client: TestClient) -> None:
     response = client.patch("/api/v1/courses/999", json={"name": "x"})
     assert response.status_code == 404
+
+
+def test_course_update_rejects_null_required_fields(client: TestClient) -> None:
+    semester = _create_semester(client)
+    course = _create_course(client, semester["id"])
+
+    response = client.patch(f"/api/v1/courses/{course['id']}", json={"name": None})
+    assert response.status_code == 422
+    assert "name" in response.text
