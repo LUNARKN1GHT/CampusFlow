@@ -50,6 +50,9 @@ h2 { font-size: 18px; margin: 0; }
 button { border: 0; border-radius: 10px; background: var(--brand); color: #fff; padding: 10px 18px; cursor: pointer; }
 button:disabled { opacity: .58; cursor: wait; }
 button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.button-secondary { color: var(--brand); background: var(--brand-soft); }
+.api-feedback { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid #e7b9aa; border-radius: 12px; color: #71321f; background: #fff4ef; }
+.api-feedback p { margin: 3px 0 0; color: #814835; }
 .note { color: var(--muted); font-size: 14px; margin-top: 28px; }
 .empty-state { display: flex; gap: 18px; align-items: flex-start; }
 .empty-state p { color: var(--muted); margin-bottom: 0; }
