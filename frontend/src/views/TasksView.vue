@@ -5,6 +5,7 @@ import { coursesApi, semestersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
 import type { Course, Semester, Task, TaskInput, TaskPriority, TaskProgress, TaskProgressChange } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import FixedSchedule from '../components/FixedSchedule.vue'
 
 const tasks = ref<Task[]>([])
 const courses = ref<Course[]>([])
@@ -211,6 +212,7 @@ onMounted(load)
           </div>
         </div>
       </section>
+      <FixedSchedule />
     </template>
   </main>
 </template>
