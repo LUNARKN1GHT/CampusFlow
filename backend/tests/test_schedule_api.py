@@ -64,6 +64,22 @@ def test_event_rejects_invalid_ranges(client: TestClient) -> None:
     assert weekly_without_end.status_code == 400
 
 
+def test_weekly_event_occurrences_respect_query_and_repeat_end(client: TestClient) -> None:
+    event = _create_event(
+        client,
+        recurrence="weekly",
+        repeat_until="2026-10-12",
+    )
+    response = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-01", "end_date": "2026-10-31"},
+    )
+    assert response.status_code == 200, response.text
+    occurrences = response.json()
+    assert [item["starts_at"][:10] for item in occurrences] == ["2026-10-05", "2026-10-12"]
+    assert {item["source_event_id"] for item in occurrences} == {event["id"]}
+
+
 def test_availability_slot_create_list_delete(client: TestClient) -> None:
     response = client.post(
         "/api/v1/availability-slots",

@@ -15,6 +15,7 @@ from campusflow.infrastructure.repositories import (
     SqlAlchemySemesterRepository,
     SqlAlchemyTaskRepository,
     SqlAlchemyUnitOfWork,
+    SqlAlchemyWorkspaceRepository,
 )
 
 DEFAULT_WORKSPACE_NAME = "默认工作空间"
@@ -28,6 +29,7 @@ def get_session(request: Request) -> Iterator[Session]:
 
 def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repositories:
     return Repositories(
+        workspaces=SqlAlchemyWorkspaceRepository(session),
         semesters=SqlAlchemySemesterRepository(session),
         courses=SqlAlchemyCourseRepository(session),
         tasks=SqlAlchemyTaskRepository(session),

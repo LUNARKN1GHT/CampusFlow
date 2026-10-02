@@ -3,7 +3,7 @@
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
 
@@ -49,6 +49,13 @@ class CourseUpdate(BaseModel):
     teacher: str | None = Field(default=None, max_length=100)
     class_name: str | None = Field(default=None, max_length=100)
 
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "CourseUpdate":
+        for field in ("semester_id", "name"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} 不能为 null")
+        return self
+
 
 class CourseOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -68,6 +75,7 @@ class TaskCreate(BaseModel):
     due_time: time | None = None
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
 
 
 class TaskUpdate(BaseModel):
@@ -78,10 +86,18 @@ class TaskUpdate(BaseModel):
     due_time: time | None = None
     priority: TaskPriority | None = None
     estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def reject_null_title(self) -> "TaskUpdate":
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title 不能为 null")
+        return self
 
 
 class TaskProgressPatch(BaseModel):
     progress: TaskProgress
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class TaskOut(BaseModel):
@@ -95,8 +111,21 @@ class TaskOut(BaseModel):
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
+    remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class TaskProgressChangeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    task_id: int
+    from_progress: TaskProgress
+    to_progress: TaskProgress
+    reason: str | None
+    previous_remaining_minutes: int | None
+    new_remaining_minutes: int | None
+    changed_at: datetime
 
 
 class FixedEventCreate(BaseModel):
@@ -139,6 +168,16 @@ class FixedEventOut(BaseModel):
     location: str | None
     recurrence: EventRecurrence
     repeat_until: date | None
+
+
+class FixedEventOccurrenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    source_event_id: int
+    course_id: int | None
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None
 
 
 class AvailabilitySlotCreate(BaseModel):
