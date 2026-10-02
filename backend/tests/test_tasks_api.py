@@ -77,3 +77,16 @@ def test_task_progress_missing_task(client: TestClient) -> None:
 def test_task_requires_course_exists(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "挂到幽灵课", "course_id": 999})
     assert response.status_code == 404
+
+
+def test_task_remaining_minutes_defaults_and_rejects_negative(client: TestClient) -> None:
+    task = _create_task(client, extra={"estimated_minutes": 90})
+    assert task["estimated_minutes"] == 90
+    assert task["remaining_minutes"] == 90
+
+    updated = client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": 35}).json()
+    assert updated["estimated_minutes"] == 90
+    assert updated["remaining_minutes"] == 35
+
+    rejected = client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": -1})
+    assert rejected.status_code == 422

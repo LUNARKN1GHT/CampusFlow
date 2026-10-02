@@ -41,6 +41,7 @@ def create_task(
     due_time: time | None,
     priority: TaskPriority,
     estimated_minutes: int | None,
+    remaining_minutes: int | None,
 ) -> TaskData:
     error = validate_due(due_date, due_time)
     if error:
@@ -56,6 +57,7 @@ def create_task(
         due_time,
         priority,
         estimated_minutes,
+        remaining_minutes,
     )
     repos.uow.commit()
     return task
@@ -72,6 +74,7 @@ def update_task(
     due_time: time | None,
     priority: TaskPriority,
     estimated_minutes: int | None,
+    remaining_minutes: int | None,
 ) -> TaskData:
     if repos.tasks.get(task_id) is None:
         raise NotFoundError("任务不存在")
@@ -89,6 +92,7 @@ def update_task(
         due_time=due_time,
         priority=priority,
         estimated_minutes=estimated_minutes,
+        remaining_minutes=remaining_minutes,
     )
     repos.uow.commit()
     return updated

@@ -6,6 +6,7 @@ import CoursesView from './views/CoursesView.vue'
 import HealthView from './views/HealthView.vue'
 import LoginView from './views/LoginView.vue'
 import StageView from './views/StageView.vue'
+import TasksView from './views/TasksView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -24,8 +25,7 @@ const router = createRouter({
         {
           path: 'tasks',
           name: 'tasks',
-          component: StageView,
-          props: { title: '任务与计划', description: '手动任务与固定日程将在本阶段接入。' },
+          component: TasksView,
         },
         {
           path: 'settings',

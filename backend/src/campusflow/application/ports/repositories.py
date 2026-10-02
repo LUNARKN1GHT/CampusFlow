@@ -49,6 +49,7 @@ class TaskData:
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
+    remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -135,6 +136,7 @@ class TaskRepository(Protocol):
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData: ...
 
     def update(
@@ -148,6 +150,7 @@ class TaskRepository(Protocol):
         due_time: time | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData | None: ...
 
     def set_progress(self, task_id: int, progress: TaskProgress) -> TaskData | None: ...
