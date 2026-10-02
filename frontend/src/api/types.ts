@@ -56,6 +56,15 @@ export type FixedEvent = {
   repeat_until: string | null
 }
 
+export type FixedEventOccurrence = {
+  source_event_id: number
+  course_id: number | null
+  title: string
+  starts_at: string
+  ends_at: string
+  location: string | null
+}
+
 export type AvailabilitySlot = {
   id: number
   day_of_week: number
