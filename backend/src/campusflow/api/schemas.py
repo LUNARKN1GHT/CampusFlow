@@ -3,7 +3,7 @@
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
 
@@ -48,6 +48,13 @@ class CourseUpdate(BaseModel):
     code: str | None = Field(default=None, max_length=50)
     teacher: str | None = Field(default=None, max_length=100)
     class_name: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "CourseUpdate":
+        for field in ("semester_id", "name"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} 不能为 null")
+        return self
 
 
 class CourseOut(BaseModel):
