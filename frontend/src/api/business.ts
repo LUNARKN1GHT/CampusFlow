@@ -6,6 +6,7 @@ import type {
   CourseInput,
   FixedEvent,
   FixedEventInput,
+  FixedEventOccurrence,
   Semester,
   SemesterInput,
   Task,
@@ -46,6 +47,7 @@ export const tasksApi = {
 
 export const scheduleApi = {
   listEvents: () => apiRequest<FixedEvent[]>('/fixed-events'),
+  listOccurrences: (startDate: string, endDate: string) => apiRequest<FixedEventOccurrence[]>(`/fixed-events/occurrences${queryString({ start_date: startDate, end_date: endDate })}`),
   createEvent: (input: FixedEventInput) => apiRequest<FixedEvent>('/fixed-events', { method: 'POST', body: JSON.stringify(input) }),
   updateEvent: (id: number, input: Partial<FixedEventInput>) => apiRequest<FixedEvent>(`/fixed-events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteEvent: (id: number) => apiRequest<void>(`/fixed-events/${id}`, { method: 'DELETE' }),

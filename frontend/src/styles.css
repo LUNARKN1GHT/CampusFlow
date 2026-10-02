@@ -130,6 +130,23 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .history-list li div { display: flex; justify-content: space-between; gap: 12px; }
 .history-list time, .history-list small { color: var(--muted); font-size: 11px; }
 .history-list p { margin: 3px 0; font-size: 13px; }
+.schedule-panel { margin-top: 28px; border-top: 4px solid #5f7aa5; }
+.schedule-actions { display: flex; gap: 7px; }
+.schedule-note { margin-bottom: 18px; }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); gap: 7px; overflow-x: auto; }
+.week-day { min-height: 160px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fafbf8; }
+.week-day > strong { font-size: 12px; }
+.day-events { display: grid; gap: 6px; margin-top: 8px; }
+.day-events article { display: grid; padding: 8px; border-radius: 8px; color: #243c5e; background: #e7edf6; }
+.day-events time, .day-events span { font-size: 10px; }
+.day-events b { font-size: 12px; }
+.day-empty { display: block; margin-top: 10px; color: #9ba7a1; font-size: 10px; }
+.definition-list { margin-top: 24px; }
+.definition-list > div { display: grid; }
+.definition-list article { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.definition-list article span { display: flex; align-items: center; gap: 8px; }
+.definition-list small { color: var(--muted); }
+.danger-button { padding: 7px 10px; color: var(--danger); background: #fff1ec; }
 
 @media (max-width: 760px) {
   .app-frame { display: block; }
@@ -150,4 +167,5 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .task-row { grid-template-columns: 4px 1fr; }
   .task-meta, .task-actions { grid-column: 2; text-align: left; }
   .progress-layout { grid-template-columns: 1fr; }
+  .schedule-actions { flex-wrap: wrap; }
 }

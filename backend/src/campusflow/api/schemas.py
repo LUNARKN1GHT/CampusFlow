@@ -170,6 +170,16 @@ class FixedEventOut(BaseModel):
     repeat_until: date | None
 
 
+class FixedEventOccurrenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    source_event_id: int
+    course_id: int | None
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None
+
+
 class AvailabilitySlotCreate(BaseModel):
     day_of_week: int = Field(ge=0, le=6)
     start_time: time
