@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from campusflow.api import auth as auth_api
 from campusflow.api import courses as courses_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import tasks as tasks_api
@@ -17,9 +18,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     engine = create_db_engine(settings)
     app.state.session_factory = create_session_factory(engine)
+    app.state.settings = settings
+    app.state.auth_tokens = set()
 
-    for router in (health_router, courses_api.router, tasks_api.router, schedule_api.router):
+    for router in (health_router, auth_api.router):
         app.include_router(router, prefix="/api/v1")
+    for router in (courses_api.router, tasks_api.router, schedule_api.router):
+        app.include_router(
+            router,
+            prefix="/api/v1",
+            dependencies=[Depends(auth_api.require_session)],
+        )
 
     @app.exception_handler(NotFoundError)
     async def handle_not_found(request: Request, exc: NotFoundError) -> JSONResponse:
