@@ -47,6 +47,8 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
+业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
+
 健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
 
 ## 启动前端

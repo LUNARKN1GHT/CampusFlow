@@ -49,6 +49,11 @@ def client() -> Iterator[TestClient]:
 
     settings = Settings(_env_file=None, database_url=TEST_DATABASE_URL)
     with TestClient(create_app(settings)) as test_client:
+        response = test_client.post(
+            "/api/v1/auth/login",
+            json={"username": settings.local_username, "password": settings.local_password},
+        )
+        assert response.status_code == 200
         yield test_client
 
 
