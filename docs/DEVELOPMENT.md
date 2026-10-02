@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 前端环境页、Python API 健康检查、OpenAPI 和学期／课程／手动任务／固定日程／可用时间 API。业务接口已接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查不访问数据库。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查仍只表示进程存活。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -103,7 +103,7 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## 当前限制
 
-- 数据库迁移与手动管理后端已合并；暂无业务前端、Worker 命令、认证、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
+- 手动管理前后端与本机单用户会话已实现；暂无生产身份系统、跨工作空间对象授权、Worker 命令、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
