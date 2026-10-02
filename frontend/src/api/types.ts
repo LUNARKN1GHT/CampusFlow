@@ -28,6 +28,7 @@ export type Task = {
   progress: TaskProgress
   priority: TaskPriority
   estimated_minutes: number | null
+  remaining_minutes: number | null
   created_at: string
   updated_at: string
 }
@@ -53,6 +54,6 @@ export type AvailabilitySlot = {
 
 export type SemesterInput = Pick<Semester, 'name' | 'start_date' | 'end_date'>
 export type CourseInput = Omit<Course, 'id'>
-export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_date' | 'due_time' | 'priority' | 'estimated_minutes'>
+export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_date' | 'due_time' | 'priority' | 'estimated_minutes' | 'remaining_minutes'>
 export type FixedEventInput = Omit<FixedEvent, 'id'>
 export type AvailabilitySlotInput = Omit<AvailabilitySlot, 'id'>
