@@ -98,9 +98,17 @@ def update_task(
     return updated
 
 
-def set_progress(repos: Repositories, task_id: int, progress: TaskProgress) -> TaskData:
-    task = repos.tasks.set_progress(task_id, progress)
+def set_progress(
+    repos: Repositories, task_id: int, progress: TaskProgress, reason: str | None
+) -> TaskData:
+    task = repos.tasks.set_progress(task_id, progress, reason)
     if task is None:
         raise NotFoundError("任务不存在")
     repos.uow.commit()
     return task
+
+
+def list_progress_changes(repos: Repositories, task_id: int):
+    if repos.tasks.get(task_id) is None:
+        raise NotFoundError("任务不存在")
+    return repos.tasks.list_progress_changes(task_id)

@@ -121,6 +121,15 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .task-meta span { color: var(--muted); font-size: 11px; }
 .task-meta strong { font-size: 16px; }
 .task-meta small { color: var(--muted); font-size: 10px; font-weight: 500; }
+.task-actions { display: flex; gap: 5px; }
+.progress-layout { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 1.3fr); gap: 30px; }
+.subheading { margin: 0 0 12px; font-size: 14px; }
+.history-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.history-list li { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.history-list li:first-child { padding-top: 0; }
+.history-list li div { display: flex; justify-content: space-between; gap: 12px; }
+.history-list time, .history-list small { color: var(--muted); font-size: 11px; }
+.history-list p { margin: 3px 0; font-size: 13px; }
 
 @media (max-width: 760px) {
   .app-frame { display: block; }
@@ -139,5 +148,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .filter-bar { align-items: stretch; flex-direction: column; }
   .filter-bar .count-badge { margin: 0; align-self: flex-start; }
   .task-row { grid-template-columns: 4px 1fr; }
-  .task-meta, .task-row > button { grid-column: 2; text-align: left; }
+  .task-meta, .task-actions { grid-column: 2; text-align: left; }
+  .progress-layout { grid-template-columns: 1fr; }
 }

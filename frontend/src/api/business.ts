@@ -11,6 +11,7 @@ import type {
   Task,
   TaskInput,
   TaskProgress,
+  TaskProgressChange,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -39,7 +40,8 @@ export const tasksApi = {
   get: (id: number) => apiRequest<Task>(`/tasks/${id}`),
   create: (input: TaskInput) => apiRequest<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: number, input: Partial<TaskInput>) => apiRequest<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
-  setProgress: (id: number, progress: TaskProgress) => apiRequest<Task>(`/tasks/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress }) }),
+  setProgress: (id: number, progress: TaskProgress, reason: string | null) => apiRequest<Task>(`/tasks/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress, reason }) }),
+  progressHistory: (id: number) => apiRequest<TaskProgressChange[]>(`/tasks/${id}/progress-history`),
 }
 
 export const scheduleApi = {

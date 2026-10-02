@@ -24,7 +24,17 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_test",
 )
 
-TABLES = "workspaces, semesters, courses, tasks, fixed_events, availability_slots"
+TABLES = ", ".join(
+    (
+        "workspaces",
+        "semesters",
+        "courses",
+        "tasks",
+        "task_progress_changes",
+        "fixed_events",
+        "availability_slots",
+    )
+)
 
 
 def _check_database_reachable() -> None:
