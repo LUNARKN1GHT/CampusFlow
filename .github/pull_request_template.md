@@ -4,6 +4,7 @@
 - 父 Issue：#（仅关联，不使用 `Closes`、`Fixes` 或 `Resolves`）
 
 - [ ] 本 PR 只关闭已实际交付并完成验收的叶子 Issue，不会误关父 Issue。
+- [ ] 合并目标正确：叶子任务 PR 指向父 Issue 集成分支（如父 Issue #5 对应 `issue/#5`）；父集成分支 PR 在所有子 Issue 验收齐全后才指向 `develop`；无父 Issue 的独立任务直接指向 `develop`。
 
 ## 问题与结果
 
