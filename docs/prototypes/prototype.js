@@ -8,7 +8,8 @@ document.querySelectorAll('[data-state-switcher]').forEach((switcher) => {
         peer.setAttribute('aria-pressed', String(peer === button))
       })
       panels.forEach((panel) => {
-        panel.classList.toggle('is-visible', panel.getAttribute('data-value') === state)
+        const values = panel.getAttribute('data-value').split(',')
+        panel.classList.toggle('is-visible', values.includes(state))
       })
     })
   })

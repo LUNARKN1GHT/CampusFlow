@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusFlow 原型 - 资料库状态、定位与归档删除</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">CF</div><div><strong>CampusFlow</strong><span>学习事务助理</span></div></div>
+      <p class="nav-title">工作空间</p>
+      <nav class="nav-list">
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>总览</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>课程</span></a>
+        <a class="nav-item active" href="#"><span class="nav-dot"></span><span>资料库</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>待核对</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>智能问答</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>任务与计划</span></a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <p class="prototype-note">M2 交互原型（D019–D021 设计先行）· 使用合成内容 · 不上传、不删除、不代表资料功能已经实现</p>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">资料库 / 状态 · 定位 · 归档删除</p>
+          <h1>资料库</h1>
+          <p>每份资料的处理状态、原文位置和生命周期操作都在这里核对。</p>
+        </div>
+        <button class="primary-button" type="button">导入资料</button>
+      </header>
+
+      <section class="card" aria-labelledby="list-title">
+        <div class="section-head"><h2 id="list-title">资料列表与处理状态（D019）</h2><span class="tag info">状态与后台一致</span></div>
+        <ol class="step-list">
+          <li class="step">
+            <span class="step-marker">1</span>
+            <div><strong>b010-text-and-cross-page-table.pdf</strong><span>数据结构 · 2026 秋季 · 导入于 09-28 09:12</span></div>
+            <span class="tag success">完成</span>
+          </li>
+          <li class="step">
+            <span class="step-marker">2</span>
+            <div>
+              <strong>群通知截图-作业三.png</strong><span>数据结构 · 2026 秋季 · 导入于 09-29 21:03</span>
+              <div class="coverage-box" style="margin-top:8px"><strong>部分成功 · 未覆盖范围</strong><br>截图下缘约 15% 区域模糊，未生成确认事实；缺失内容不会被当作“没有要求”。</div>
+            </div>
+            <span class="tag warning">部分成功</span>
+          </li>
+          <li class="step">
+            <span class="step-marker">3</span>
+            <div><strong>实验安排-粘贴文本</strong><span>暂不关联课程 · 导入于 09-30 08:40</span></div>
+            <span class="tag info">处理中</span>
+          </li>
+          <li class="step">
+            <span class="step-marker">4</span>
+            <div>
+              <strong>培养方案扫描件.pdf</strong><span>软件工程 · 导入于 09-30 07:55 · 上次失败：OCR 服务超时</span>
+              <div class="actions" style="justify-content:flex-start;margin-top:8px"><button class="secondary-button" type="button">重试处理</button><button class="ghost-button" type="button">查看失败详情</button></div>
+            </div>
+            <span class="tag danger">失败</span>
+          </li>
+        </ol>
+        <p class="muted small">列表定时刷新；重试按作业幂等，重复点击不会创建重复任务。</p>
+      </section>
+
+      <section class="card" aria-labelledby="locate-title" style="margin-top:18px">
+        <div class="section-head">
+          <div><h2 id="locate-title">原文定位（D020）</h2><span class="muted small">从片段入口跳回三种输入的原文位置</span></div>
+          <div class="segmented" data-state-switcher="locator" aria-label="切换资料类型示例">
+            <button type="button" data-state="pdf" aria-pressed="true">PDF 页</button>
+            <button type="button" data-state="image" aria-pressed="false">截图区域</button>
+            <button type="button" data-state="text" aria-pressed="false">文本段落</button>
+            <button type="button" data-state="expired" aria-pressed="false">引用失效</button>
+          </div>
+        </div>
+
+        <div class="source-layout">
+          <article class="document is-visible" data-state-panel="locator" data-value="pdf" aria-label="PDF 定位示例">
+            <span class="document-kicker">b010-text-and-cross-page-table.pdf · 第 1 页 · 坐标 x 136–488 · y 286–318</span>
+            <h3>数据结构课程通知（合成样本）</h3>
+            <p><strong>作业三</strong>　请完成教材第 4 章第 1、3、6 题，并提交一份 PDF 解答。</p>
+            <p class="highlight"><strong>截止时间</strong>　2026 年 10 月 8 日 18:00（北京时间）。</p>
+          </article>
+          <article class="document" data-state-panel="locator" data-value="image" aria-label="截图定位示例">
+            <span class="document-kicker">群通知截图-作业三.png · 区域 x 40–620 · y 180–260</span>
+            <h3>群聊截图（合成样本）</h3>
+            <p class="highlight">【群主】作业三提前到 10 月 6 日晚 6 点交，别错过。</p>
+            <p>【同学】收到。</p>
+          </article>
+          <article class="document" data-state-panel="locator" data-value="text" aria-label="文本定位示例">
+            <span class="document-kicker">实验安排-粘贴文本 · 第 2 段</span>
+            <h3>粘贴文本（合成样本）</h3>
+            <p>实验一改为线上进行。</p>
+            <p class="highlight">报告提交截止：第 6 周周五 23:59。</p>
+          </article>
+          <article class="document" data-state-panel="locator" data-value="expired" aria-label="引用失效示例">
+            <div class="status-banner failed"><div class="status-icon">×</div><div><strong>引用已失效</strong><p>来源资料已于 10-01 删除（原因：上传者撤回重发）。该引用不再可验证，相关事项已转入待核对。</p></div></div>
+            <div class="locator-row"><span>原引用 ID</span><strong>src_cf_img_002_deadline</strong></div>
+            <div class="locator-row"><span>失效原因</span><strong>资料删除 · 删除时间 2026-10-01 19:24</strong></div>
+            <div class="locator-row"><span>影响</span><strong>1 个已确认事项、2 个候选事项</strong></div>
+          </article>
+          <aside class="locator is-visible" data-state-panel="locator" data-value="pdf,image,text" aria-label="定位详情">
+            <div class="status-banner success"><div class="status-icon">✓</div><div><strong>引用位置可验证</strong><p>高亮区域直接支持对应事项。</p></div></div>
+            <div class="locator-row"><span>稳定引用 ID</span><strong>src_cf_pdf_001_p1_deadline</strong></div>
+            <div class="locator-row"><span>适用范围</span><strong>2026 秋季 · CS2026-A</strong></div>
+            <button class="secondary-button" type="button">前往待核对事项</button>
+          </aside>
+          <aside class="locator" data-state-panel="locator" data-value="expired" aria-label="失效详情">
+            <div class="status-banner failed"><div class="status-icon">×</div><div><strong>不再可验证</strong><p>失效引用不参与问答回答，仅作为历史记录保留。</p></div></div>
+            <div class="locator-row"><span>后续动作</span><strong>相关事项已转入待核对</strong></div>
+            <button class="secondary-button" type="button">前往待核对事项</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="archive-title" style="margin-top:18px">
+        <div class="section-head">
+          <div><h2 id="archive-title">归档与删除（D021）</h2><span class="muted small">归档可恢复；删除先展示影响，确认后只执行展示过的范围</span></div>
+          <div class="segmented" data-state-switcher="delete" aria-label="切换删除结果示例">
+            <button type="button" data-state="confirm" aria-pressed="true">删除前确认</button>
+            <button type="button" data-state="success" aria-pressed="false">删除成功</button>
+            <button type="button" data-state="failed" aria-pressed="false">删除失败</button>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <h3>归档</h3>
+            <p class="muted small">归档后资料不参与检索与问答，引用保留但标注来源已归档；可随时恢复，恢复后引用重新生效。</p>
+            <div class="actions" style="justify-content:flex-start"><button class="ghost-button" type="button">归档</button><button class="ghost-button" type="button">恢复已归档</button></div>
+          </div>
+          <div>
+            <h3>删除影响预览</h3>
+            <div class="summary-row">
+              <div class="summary-chip"><strong>2</strong><span>候选事项将失效</span></div>
+              <div class="summary-chip"><strong>1</strong><span>已确认事项需重核</span></div>
+              <div class="summary-chip"><strong>3</strong><span>引用将不可验证</span></div>
+            </div>
+            <div class="field"><label for="keep-tasks">关联的个人任务</label><select id="keep-tasks"><option>保留任务，标注来源已删除（推荐）</option><option>随资料一并删除</option></select></div>
+          </div>
+        </div>
+
+        <div class="is-visible" data-state-panel="delete" data-value="confirm">
+          <div class="coverage-box" style="margin-top:16px"><strong>确认范围</strong><br>将删除：原文件、解析结果、检索索引与派生片段。备份保留 30 天。确认仅覆盖以上展示内容；内容变化后需重新确认。</div>
+          <div class="actions"><button class="ghost-button" type="button">取消</button><button class="danger-button" type="button">确认删除以上范围</button></div>
+        </div>
+        <div data-state-panel="delete" data-value="success">
+          <div class="status-banner success" style="margin-top:16px"><div class="status-icon">✓</div><div><strong>删除完成</strong><p>原文件与派生内容已移除，3 处引用已标注不可验证，2 个个人任务已按选择保留。备份保留至 10-31。</p></div></div>
+        </div>
+        <div data-state-panel="delete" data-value="failed">
+          <div class="status-banner failed" style="margin-top:16px"><div class="status-icon">×</div><div><strong>删除未完成</strong><p>索引清理超时，资料仍可访问。不显示已删除；可重试，重试不会重复删除已成功部分。</p></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
