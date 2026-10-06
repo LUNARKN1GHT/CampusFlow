@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusFlow 原型 - 问答页面与引用卡片</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">CF</div><div><strong>CampusFlow</strong><span>学习事务助理</span></div></div>
+      <p class="nav-title">工作空间</p>
+      <nav class="nav-list">
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>总览</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>课程</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>资料库</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>待核对</span></a>
+        <a class="nav-item active" href="#"><span class="nav-dot"></span><span>智能问答</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>任务与计划</span></a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <p class="prototype-note">M4 交互原型（Q016–Q017 设计先行）· 使用合成内容 · 不调用模型，也不代表问答功能已经实现</p>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">智能问答 / 带引用的回答</p>
+          <h1>智能问答</h1>
+          <p>每个结论都带可点击引用；没有依据、加载失败和来源失效分别展示。</p>
+        </div>
+        <div class="segmented" data-state-switcher="answer" aria-label="切换回答状态示例">
+          <button type="button" data-state="normal" aria-pressed="true">有依据</button>
+          <button type="button" data-state="no-evidence" aria-pressed="false">无依据</button>
+          <button type="button" data-state="load-failed" aria-pressed="false">加载失败</button>
+        </div>
+      </header>
+
+      <div class="qa-shell">
+        <section class="card" aria-labelledby="chat-title">
+          <div class="section-head"><h2 id="chat-title">会话（Q016）</h2><span class="muted small">连续追问保留上下文</span></div>
+
+          <div class="is-visible" data-state-panel="answer" data-value="normal">
+            <div class="messages">
+              <div class="message user"><div class="message-meta">你</div><p>数据结构作业三什么时候截止？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 依据现有资料</div><p>作业三在 <strong>2026 年 10 月 8 日 18:00（北京时间）</strong>截止，适用于 CS2026-A 班。<button class="ghost-button" type="button" style="min-height:0;padding:2px 8px">引用 [1]</button></p></div>
+              <div class="coverage-notice">覆盖范围：已检索 2026 秋季 · CS2026-A 的 1 份当前资料；未检索其他教学班。</div>
+              <div class="message user"><div class="message-meta">你</div><p>在哪里提交？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 追问 · 依据同一资料</div><p>进入课程平台“作业三”入口提交。<button class="ghost-button" type="button" style="min-height:0;padding:2px 8px">引用 [2]</button></p></div>
+            </div>
+          </div>
+          <div data-state-panel="answer" data-value="no-evidence">
+            <div class="messages">
+              <div class="message user"><div class="message-meta">你</div><p>离散数学最近有作业吗？</p></div>
+              <div class="message"><div class="message-meta">CampusFlow · 资料不足</div><p>现有资料中未发现离散数学相关信息，因此不能判断是否有作业。不生成占位引用，也不断言“没有作业”。</p></div>
+              <div class="coverage-notice">当前仅覆盖数据结构、算法设计和操作系统的资料。</div>
+            </div>
+            <div class="actions"><button class="secondary-button" type="button">前往资料库导入</button></div>
+          </div>
+          <div data-state-panel="answer" data-value="load-failed">
+            <div class="status-banner failed"><div class="status-icon">×</div><div><strong>回答加载失败</strong><p>检索服务暂时不可用。这是加载失败，不是“没有依据”；请重试，重试不产生重复提问记录。</p></div></div>
+            <div class="actions"><button class="ghost-button" type="button">重试</button><button class="ghost-button" type="button">稍后继续</button></div>
+          </div>
+
+          <div class="field" style="margin-top:14px"><label for="ask">继续提问</label><input id="ask" placeholder="例如：操作系统实验一什么时候交？"></div>
+        </section>
+
+        <aside class="locator" aria-label="引用卡片">
+          <h3>引用卡片</h3>
+          <div class="citation-card">
+            <span class="tag success">引用 [1] 可验证</span>
+            <p class="quote">“截止时间　2026 年 10 月 8 日 18:00（北京时间）。”</p>
+            <p class="citation-meta">CF-PDF-001 · 第 1 页 · “截止时间”段落 · 适用 2026 秋季 CS2026-A</p>
+            <button class="secondary-button" type="button">打开原文位置</button>
+          </div>
+          <div class="citation-card">
+            <span class="tag success">引用 [2] 可验证</span>
+            <p class="quote">“提交方式　进入课程平台‘作业三’入口提交。”</p>
+            <p class="citation-meta">CF-PDF-001 · 第 1 页 · “提交方式”段落</p>
+            <button class="secondary-button" type="button">打开原文位置</button>
+          </div>
+          <p class="muted small">点击引用或卡片跳转原文定位视图（复用 D020）；无依据回答不生成引用卡片。</p>
+        </aside>
+      </div>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
