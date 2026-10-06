@@ -27,6 +27,7 @@ flowchart LR
     Browser[浏览器 / Vue] --> Proxy[Vite /api 代理]
     Proxy --> API[Python FastAPI]
     API --> Health[GET /api/v1/health]
+    API --> Ready[GET /api/v1/ready]
     Client[API 客户端 / Swagger] --> Business[学期、课程、任务、日程 API]
     Business --> UseCases[应用用例与仓储]
     UseCases --> DB[(PostgreSQL)]
