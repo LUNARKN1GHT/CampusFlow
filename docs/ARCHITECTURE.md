@@ -45,6 +45,7 @@ flowchart TB
     Web --> Proxy[Vite 开发代理 /api]
     Proxy --> API[FastAPI 路由 /api/v1]
     API --> Health[进程健康检查]
+    API --> Ready[数据库就绪检查]
 
     API --> UseCases[应用层：课程、任务、固定日程]
     UseCases --> Domain[领域层：日期、状态与时间范围]
@@ -61,7 +62,7 @@ flowchart TB
 
 开发前端通过 Vite 将 `/api` 转发到 `127.0.0.1:8000`，无需开放通配 CORS。生产目标由同一个域名提供前端静态文件和 `/api`，由反向代理替代 Vite。API、Worker、数据库和文件存储不直接暴露给浏览器。
 
-当前健康接口仅表示 API 进程存活；数据库 readiness 检查尚待 W011 实现，不用 liveness 返回值宣称数据库或模型可用。
+健康接口 `/api/v1/health` 仅表示 API 进程存活；就绪接口 `/api/v1/ready` 以短超时连接检查数据库连通，不可达时返回 503 且不泄露连接信息或口令。两者都不宣称模型等尚未接入的能力可用。
 
 ## 3. 文件分层
 

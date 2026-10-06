@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查仍只表示进程存活。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -44,12 +44,13 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 先启动上述数据库，再执行迁移和后端启动命令。需要自定义时复制 `backend/.env.example` 为同目录 `.env`；支持应用名称、业务库、测试库与 Redis 地址配置，具体名称见样例。环境变量优先于 `.env`，不要把 `.env` 提交到仓库。
 
 - 健康检查：<http://127.0.0.1:8000/api/v1/health>
+- 就绪检查：<http://127.0.0.1:8000/api/v1/ready>
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
 业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
 
-健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
+健康检查 `/api/v1/health` 成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。就绪检查 `/api/v1/ready` 以短超时连接数据库并执行 `SELECT 1`，数据库不可达时返回 503 且不包含连接信息或口令。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。
 
 ## 启动前端
 
