@@ -82,6 +82,15 @@ def test_task_update_merges_fields(client: TestClient) -> None:
     assert updated["due_date"] == "2026-10-15"  # 未提交字段不变
 
 
+def test_task_update_rejects_null_required_fields(client: TestClient) -> None:
+    task = _create_task(client)
+
+    for field in ("title", "priority"):
+        response = client.patch(f"/api/v1/tasks/{task['id']}", json={field: None})
+        assert response.status_code == 422
+        assert field in response.text
+
+
 def test_task_progress_missing_task(client: TestClient) -> None:
     response = client.patch("/api/v1/tasks/999/progress", json={"progress": "done"})
     assert response.status_code == 404

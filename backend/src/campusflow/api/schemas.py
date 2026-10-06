@@ -89,9 +89,10 @@ class TaskUpdate(BaseModel):
     remaining_minutes: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def reject_null_title(self) -> "TaskUpdate":
-        if "title" in self.model_fields_set and self.title is None:
-            raise ValueError("title 不能为 null")
+    def reject_null_required_fields(self) -> "TaskUpdate":
+        for field in ("title", "priority"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} 不能为 null")
         return self
 
 
@@ -156,6 +157,13 @@ class FixedEventUpdate(BaseModel):
     @classmethod
     def assume_local(cls, value: datetime | None) -> datetime | None:
         return None if value is None else _assume_local(value)
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "FixedEventUpdate":
+        for field in ("title", "starts_at", "ends_at", "recurrence"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} 不能为 null")
+        return self
 
 
 class FixedEventOut(BaseModel):
