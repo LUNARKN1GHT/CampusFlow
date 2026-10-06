@@ -82,6 +82,35 @@
           <p class="muted small">点击引用或卡片跳转原文定位视图（复用 D020）；无依据回答不生成引用卡片。</p>
         </aside>
       </div>
+
+      <section class="card" aria-labelledby="health-title" style="margin-top:18px">
+        <div class="section-head">
+          <div><h2 id="health-title">来源失效与覆盖提示（Q017）</h2><span class="muted small">历史回答中的引用状态随来源变化实时更新</span></div>
+          <div class="segmented" data-state-switcher="health" aria-label="切换来源健康示例">
+            <button type="button" data-state="expired" aria-pressed="true">来源已删除</button>
+            <button type="button" data-state="unrecognized" aria-pressed="false">部分未识别</button>
+            <button type="button" data-state="conflict" aria-pressed="false">待核对冲突</button>
+          </div>
+        </div>
+
+        <div class="is-visible" data-state-panel="health" data-value="expired">
+          <div class="status-banner failed"><div class="status-icon">×</div><div><strong>该回答的引用来源已删除</strong><p>群通知截图-作业三.png 已于 10-01 删除。以下结论不再可验证，已加入待核对。</p></div></div>
+          <div class="citation-card">
+            <span class="tag danger">引用 [1] 已失效 · 资料删除</span>
+            <p class="quote">“作业三提前到 10 月 6 日晚 6 点交……”</p>
+            <p class="citation-meta">CF-IMG-002 · 失效于 2026-10-01 19:24</p>
+            <div class="actions" style="margin:0;justify-content:flex-start"><button class="secondary-button" type="button">前往待核对</button><button class="ghost-button" type="button">导入替代资料</button></div>
+          </div>
+        </div>
+        <div data-state-panel="health" data-value="unrecognized">
+          <div class="status-banner partial"><div class="status-icon">!</div><div><strong>回答可能不完整</strong><p>所引资料有 2 个区域未识别（第 3 页下半部分、表格末行），缺失内容不会被当作“没有要求”。</p></div></div>
+          <div class="actions" style="justify-content:flex-start"><button class="secondary-button" type="button">查看未覆盖范围</button></div>
+        </div>
+        <div data-state-panel="health" data-value="conflict">
+          <div class="status-banner partial"><div class="status-icon">!</div><div><strong>存在待核对的来源冲突</strong><p>两份资料给出不同截止时间且均未确认，回答暂不采用任何一方。</p></div></div>
+          <div class="actions" style="justify-content:flex-start"><button class="secondary-button" type="button">前往待核对处理冲突</button></div>
+        </div>
+      </section>
     </main>
   </div>
   <script src="prototype.js"></script>
