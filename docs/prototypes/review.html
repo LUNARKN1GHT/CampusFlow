@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampusFlow 原型 - 集中核对与确认反馈</title>
+  <link rel="stylesheet" href="prototype.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand"><div class="brand-mark">CF</div><div><strong>CampusFlow</strong><span>学习事务助理</span></div></div>
+      <p class="nav-title">工作空间</p>
+      <nav class="nav-list">
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>总览</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>课程</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>资料库</span></a>
+        <a class="nav-item active" href="#"><span class="nav-dot"></span><span>待核对</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>智能问答</span></a>
+        <a class="nav-item" href="#"><span class="nav-dot"></span><span>任务与计划</span></a>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <p class="prototype-note">M3 交互原型（R008–R009 设计先行）· 使用合成内容 · 不保存数据，也不代表核对功能已经实现</p>
+      <header class="page-head">
+        <div>
+          <p class="eyebrow">待核对 / 集中处理</p>
+          <h1>待核对</h1>
+          <p>全部候选集中在此处理：查看依据、逐字段修正、确认或忽略。</p>
+        </div>
+        <div class="summary-row" style="margin:0">
+          <div class="summary-chip"><strong>4</strong><span>待核对</span></div>
+          <div class="summary-chip"><strong>2</strong><span>日期缺失</span></div>
+          <div class="summary-chip"><strong>1</strong><span>来源冲突</span></div>
+        </div>
+      </header>
+
+      <div class="review-layout">
+        <section class="card" aria-labelledby="queue-title">
+          <div class="section-head"><h2 id="queue-title">候选队列（R008）</h2><span class="tag warning">4 项</span></div>
+          <div class="queue">
+            <button class="queue-item active" type="button">
+              <div class="queue-top"><strong>算法设计 · 本周练习</strong><span class="tag warning">日期缺失</span></div>
+              <p>截图只写“周五”，末条消息被截断 · 2 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>操作系统 · 实验一</strong><span class="tag warning">年份/时刻缺失</span></div>
+              <p>原文为“10 月 15 日” · 8 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>计算机网络 · 实验报告</strong><span class="tag danger">来源冲突</span></div>
+              <p>两个版本给出不同 DDL · 15 分钟前</p>
+            </button>
+            <button class="queue-item" type="button">
+              <div class="queue-top"><strong>数据库系统 · 实验二</strong><span class="tag info">部分识别</span></div>
+              <p>补交规则区域无法识别 · 21 分钟前</p>
+            </button>
+          </div>
+          <p class="muted small">队列覆盖全部待核对候选，不依赖聊天记录；处理完自动前进到下一项。</p>
+        </section>
+
+        <section class="card" aria-labelledby="candidate-title">
+          <div class="section-head">
+            <div><h2 id="candidate-title">候选详情与逐字段依据</h2><span class="muted small">信息状态：待核对 · 执行进度：未开始（两者独立）</span></div>
+            <div class="segmented" data-state-switcher="feedback" aria-label="切换操作反馈示例">
+              <button type="button" data-state="normal" aria-pressed="true">正常</button>
+              <button type="button" data-state="save-failed" aria-pressed="false">保存失败</button>
+              <button type="button" data-state="partial-failed" aria-pressed="false">部分失败</button>
+            </div>
+          </div>
+
+          <div class="candidate-fields">
+            <div class="candidate-field"><span>课程与教学班 · 原文规定</span><strong>算法设计 · ALG2026-A</strong><small>来源字段明确</small></div>
+            <div class="candidate-field"><span>任务名称 · 原文规定</span><strong>本周练习</strong><small>来源字段明确</small></div>
+            <div class="candidate-field needs-review"><span>截止日期 · 待补充</span><strong>原文仅出现“周五”</strong><small>缺少年份与具体日期，不自动换算</small></div>
+            <div class="candidate-field needs-review"><span>截止时刻 · 待补充</span><strong>待补充</strong><small>不能按“晚上”补成固定时刻</small></div>
+            <div class="candidate-field"><span>预计耗时 · 系统推断</span><strong>约 90 分钟</strong><small>可编辑建议，不参与核对结论</small></div>
+            <div class="candidate-field"><span>适用范围</span><strong>2026 秋季 · ALG2026-A</strong><small>与其他教学班不混用</small></div>
+          </div>
+
+          <blockquote class="source-quote">
+            <p>“请以课程平台为准。截图只显示到‘周五’，没有年份、具体时刻和提交入口。”</p>
+            <footer>CF-IMG-004 · 完整消息 3 · 区域 x=54–776, y=650–884 · <a href="library.html">打开原文位置</a></footer>
+          </blockquote>
+          <div class="coverage-box" style="margin-top:12px"><strong>未覆盖范围：</strong>最后一条“补充要求”在 y=1200 处被截断，当前字段不能据此确认。</div>
+
+          <div class="is-visible" data-state-panel="feedback" data-value="normal">
+            <div class="field-grid" style="margin-top:14px">
+              <div class="field"><label for="review-date">用户补充：截止日期</label><input id="review-date" type="date"></div>
+              <div class="field"><label for="review-time">用户补充：截止时刻</label><input id="review-time" type="time"></div>
+              <div class="field full"><label for="review-note">修正依据或备注</label><textarea id="review-note" placeholder="说明补充信息来自哪里；用户补充与原文规定分开标注"></textarea></div>
+            </div>
+            <div class="actions"><button class="danger-button" type="button">忽略候选</button><button class="ghost-button" type="button">保存修正</button><button class="primary-button" type="button">确认并生成任务</button></div>
+          </div>
+          <div data-state-panel="feedback" data-value="save-failed">
+            <div class="status-banner failed" style="margin-top:14px"><div class="status-icon">×</div><div><strong>修正未保存</strong><p>网络请求超时，字段保持修改前值。请重试；未保存的修改不会进入正式事项。</p></div></div>
+            <div class="actions"><button class="ghost-button" type="button">重试保存</button><button class="ghost-button" type="button">放弃修改</button></div>
+          </div>
+          <div data-state-panel="feedback" data-value="partial-failed">
+            <div class="status-banner partial" style="margin-top:14px"><div class="status-icon">!</div><div><strong>部分操作未完成</strong><p>截止日期已保存；确认生成任务失败（服务暂时不可用）。候选仍为待核对，不会显示为已确认。</p></div></div>
+            <div class="actions"><button class="ghost-button" type="button">重试确认</button><button class="ghost-button" type="button">稍后处理</button></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="prototype.js"></script>
+</body>
+</html>
