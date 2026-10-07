@@ -1,15 +1,17 @@
 """固定日程与可用时间 HTTP 路由。"""
 
 from dataclasses import replace
+from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from campusflow.api.deps import get_default_workspace_id, get_repositories
 from campusflow.api.schemas import (
     AvailabilitySlotCreate,
     AvailabilitySlotOut,
     FixedEventCreate,
+    FixedEventOccurrenceOut,
     FixedEventOut,
     FixedEventUpdate,
 )
@@ -26,6 +28,21 @@ Repos = Annotated[Repositories, Depends(get_repositories)]
 def list_fixed_events(workspace_id: WorkspaceId, repos: Repos) -> list[FixedEventOut]:
     return [
         FixedEventOut.model_validate(e) for e in use_cases.list_fixed_events(repos, workspace_id)
+    ]
+
+
+@router.get("/fixed-events/occurrences", response_model=list[FixedEventOccurrenceOut])
+def list_fixed_event_occurrences(
+    workspace_id: WorkspaceId,
+    repos: Repos,
+    start_date: Annotated[date, Query()],
+    end_date: Annotated[date, Query()],
+) -> list[FixedEventOccurrenceOut]:
+    return [
+        FixedEventOccurrenceOut.model_validate(occurrence)
+        for occurrence in use_cases.list_fixed_event_occurrences(
+            repos, workspace_id, start_date, end_date
+        )
     ]
 
 

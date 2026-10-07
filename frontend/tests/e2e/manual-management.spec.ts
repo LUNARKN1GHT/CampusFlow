@@ -1,0 +1,98 @@
+import { expect, test } from '@playwright/test'
+
+function dateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作', async ({ page }) => {
+  const unique = Date.now().toString().slice(-6)
+  const semesterName = `验收学期 ${unique}`
+  const courseName = `软件工程 ${unique}`
+  const taskName = `完成迭代报告 ${unique}`
+  const eventName = `项目讨论 ${unique}`
+  const today = new Date()
+  const dueDate = dateKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5))
+  const eventDate = dateKey(today)
+
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/login/)
+  await page.getByLabel('用户名').fill('student')
+  await page.getByLabel('密码').fill('campusflow-dev')
+  await page.getByLabel('密码').press('Enter')
+  await expect(page.getByRole('heading', { name: '让学习安排，' })).toBeVisible()
+
+  await page.getByRole('link', { name: '课程' }).click()
+  await expect(page.getByText('没有进行中的学期')).toBeVisible()
+  await page.getByLabel('学期名称').fill(semesterName)
+  await page.getByLabel('开始日期').fill(dateKey(new Date(today.getFullYear(), 8, 1)))
+  await page.getByLabel('结束日期').fill(dateKey(new Date(today.getFullYear() + 1, 0, 31)))
+  await page.getByRole('button', { name: '保存学期' }).click()
+  await expect(page.getByText(semesterName, { exact: true }).first()).toBeVisible()
+
+  await page.getByLabel('课程名称').fill(courseName)
+  await page.getByLabel('课程代码').fill(`SE${unique}`)
+  await page.getByLabel('教学班').fill('2 班')
+  await page.getByLabel('教师').fill('陈老师')
+  await page.getByRole('button', { name: '保存课程' }).click()
+  await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
+
+  await page.getByRole('link', { name: '任务与计划' }).click()
+  await expect(page.getByText('还没有任务')).toBeVisible()
+  await page.getByRole('button', { name: '添加任务' }).click()
+  await page.getByLabel('任务标题').fill(taskName)
+  await page.getByLabel('关联课程').first().selectOption({ label: `${courseName} · 2 班` })
+  await page.getByLabel('正式 DDL 日期').fill(dueDate)
+  await page.getByLabel('优先级').selectOption('high')
+  await page.getByLabel('原始预计分钟').fill('120')
+  await page.getByLabel('当前剩余分钟').fill('90')
+  await page.getByRole('button', { name: '保存任务' }).click()
+  await expect(page.getByText(`${dueDate}（仅日期）`)).toBeVisible()
+  await expect(page.locator('.task-row').filter({ hasText: taskName }).locator('.task-meta strong')).toContainText('90')
+
+  await page.getByRole('button', { name: '添加日程' }).click()
+  await page.getByLabel('标题').fill(eventName)
+  await page.getByLabel('开始时间').fill(`${eventDate}T10:00`)
+  await page.getByLabel('结束时间').fill(`${eventDate}T11:00`)
+  await page.getByLabel('地点').fill('图书馆 3F')
+  await page.getByRole('button', { name: '保存日程' }).click()
+  await expect(page.getByText(eventName).first()).toBeVisible()
+
+  const taskRow = page.locator('.task-row').filter({ hasText: taskName })
+  await taskRow.getByRole('button', { name: '进度' }).click()
+  await page.getByLabel('新状态').selectOption('blocked')
+  await page.getByLabel('调整原因').fill('等待小组数据')
+  await page.getByRole('button', { name: '更新进度' }).click()
+  await expect(page.getByText('等待小组数据')).toBeVisible()
+
+  await page.getByRole('link', { name: '设置' }).click()
+  await page.getByLabel('每日可学习容量（分钟）').fill('210')
+  await page.getByRole('button', { name: '保存设置' }).click()
+  await expect(page.getByText('学习偏好已保存')).toBeVisible()
+  await page.getByLabel('星期').selectOption('5')
+  await page.getByLabel('开始').fill('09:00')
+  await page.getByLabel('结束').fill('11:00')
+  await page.getByRole('button', { name: '添加时段' }).click()
+  await expect(page.locator('.availability-grid article').filter({ hasText: '周六' })).toBeVisible()
+
+  await page.getByRole('link', { name: '任务与计划' }).click()
+  await page.reload()
+  const persistedRow = page.locator('.task-row').filter({ hasText: taskName })
+  await expect(persistedRow.getByText('受阻')).toBeVisible()
+
+  await page.route('**/api/v1/semesters?**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.getByRole('link', { name: '课程' }).click()
+  await expect(page.getByRole('alert')).toContainText('服务暂时不可用')
+  await page.unroute('**/api/v1/semesters?**')
+  await page.getByRole('button', { name: '重新加载' }).click()
+  await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
+
+  await page.getByRole('button', { name: '退出' }).click()
+  await expect(page).toHaveURL(/\/login/)
+  await page.goto('/tasks')
+  await expect(page).toHaveURL(/\/login/)
+})
