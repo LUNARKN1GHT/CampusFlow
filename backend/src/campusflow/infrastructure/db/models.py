@@ -21,6 +21,9 @@ class Workspace(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
+    daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
+    break_minutes: Mapped[int] = mapped_column(Integer, default=15)
+    buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -62,10 +65,24 @@ class Task(Base):
     progress: Mapped[str] = mapped_column(String(20), default=TaskProgress.NOT_STARTED)
     priority: Mapped[str] = mapped_column(String(20), default=TaskPriority.MEDIUM)
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
+    remaining_minutes: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class TaskProgressChange(Base):
+    __tablename__ = "task_progress_changes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    from_progress: Mapped[str] = mapped_column(String(20))
+    to_progress: Mapped[str] = mapped_column(String(20))
+    reason: Mapped[str | None] = mapped_column(String(500))
+    previous_remaining_minutes: Mapped[int | None] = mapped_column(Integer)
+    new_remaining_minutes: Mapped[int | None] = mapped_column(Integer)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class FixedEvent(Base):

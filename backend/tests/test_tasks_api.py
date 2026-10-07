@@ -48,13 +48,26 @@ def test_task_create_list_progress(client: TestClient) -> None:
     listed = client.get("/api/v1/tasks").json()
     assert [t["id"] for t in listed] == [task["id"]]
 
-    done = client.patch(f"/api/v1/tasks/{task['id']}/progress", json={"progress": "done"}).json()
+    done = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "done", "reason": "已经提交"},
+    ).json()
     assert done["progress"] == "done"
 
     remaining = client.get("/api/v1/tasks", params={"progress": "not_started"}).json()
     assert remaining == []
     done_list = client.get("/api/v1/tasks", params={"progress": "done"}).json()
     assert [t["id"] for t in done_list] == [task["id"]]
+
+    reopened = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "in_progress", "reason": "教师要求补交附件"},
+    ).json()
+    assert reopened["progress"] == "in_progress"
+
+    history = client.get(f"/api/v1/tasks/{task['id']}/progress-history").json()
+    assert [item["to_progress"] for item in history] == ["in_progress", "done"]
+    assert history[0]["reason"] == "教师要求补交附件"
 
 
 def test_task_update_merges_fields(client: TestClient) -> None:
@@ -77,3 +90,16 @@ def test_task_progress_missing_task(client: TestClient) -> None:
 def test_task_requires_course_exists(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "挂到幽灵课", "course_id": 999})
     assert response.status_code == 404
+
+
+def test_task_remaining_minutes_defaults_and_rejects_negative(client: TestClient) -> None:
+    task = _create_task(client, extra={"estimated_minutes": 90})
+    assert task["estimated_minutes"] == 90
+    assert task["remaining_minutes"] == 90
+
+    updated = client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": 35}).json()
+    assert updated["estimated_minutes"] == 90
+    assert updated["remaining_minutes"] == 35
+
+    rejected = client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": -1})
+    assert rejected.status_code == 422

@@ -9,6 +9,7 @@ from campusflow.api.deps import get_default_workspace_id, get_repositories
 from campusflow.api.schemas import (
     TaskCreate,
     TaskOut,
+    TaskProgressChangeOut,
     TaskProgressPatch,
     TaskUpdate,
 )
@@ -47,6 +48,11 @@ def create_task(payload: TaskCreate, workspace_id: WorkspaceId, repos: Repos) ->
         due_time=payload.due_time,
         priority=payload.priority,
         estimated_minutes=payload.estimated_minutes,
+        remaining_minutes=(
+            payload.remaining_minutes
+            if payload.remaining_minutes is not None
+            else payload.estimated_minutes
+        ),
     )
     return TaskOut.model_validate(task)
 
@@ -70,11 +76,20 @@ def update_task(task_id: int, payload: TaskUpdate, repos: Repos) -> TaskOut:
         due_time=merged.due_time,
         priority=merged.priority,
         estimated_minutes=merged.estimated_minutes,
+        remaining_minutes=merged.remaining_minutes,
     )
     return TaskOut.model_validate(task)
 
 
 @router.patch("/tasks/{task_id}/progress", response_model=TaskOut)
 def update_task_progress(task_id: int, payload: TaskProgressPatch, repos: Repos) -> TaskOut:
-    task = use_cases.set_progress(repos, task_id, payload.progress)
+    task = use_cases.set_progress(repos, task_id, payload.progress, payload.reason)
     return TaskOut.model_validate(task)
+
+
+@router.get("/tasks/{task_id}/progress-history", response_model=list[TaskProgressChangeOut])
+def list_task_progress_history(task_id: int, repos: Repos) -> list[TaskProgressChangeOut]:
+    return [
+        TaskProgressChangeOut.model_validate(change)
+        for change in use_cases.list_progress_changes(repos, task_id)
+    ]
