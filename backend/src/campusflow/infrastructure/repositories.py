@@ -12,16 +12,26 @@ from campusflow.application.ports.repositories import (
     AvailabilitySlotData,
     CourseData,
     FixedEventData,
+    MaterialData,
+    MaterialVersionData,
     SemesterData,
     TaskData,
     TaskProgressChangeData,
     WorkspaceData,
 )
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import (
+    EventRecurrence,
+    MaterialSourceType,
+    MaterialStatus,
+    TaskPriority,
+    TaskProgress,
+)
 from campusflow.infrastructure.db.models import (
     AvailabilitySlot,
     Course,
     FixedEvent,
+    Material,
+    MaterialVersion,
     Semester,
     Task,
     TaskProgressChange,
@@ -127,6 +137,95 @@ def _slot_to_data(row: AvailabilitySlot) -> AvailabilitySlotData:
         start_time=row.start_time,
         end_time=row.end_time,
     )
+
+
+def _material_to_data(row: Material) -> MaterialData:
+    return MaterialData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        semester_id=row.semester_id,
+        course_id=row.course_id,
+        class_name=row.class_name,
+        title=row.title,
+        publisher=row.publisher,
+        published_at=row.published_at,
+        source_type=MaterialSourceType(row.source_type),
+        source_url=row.source_url,
+        status=MaterialStatus(row.status),
+        archived=row.archived,
+        imported_at=row.imported_at,
+    )
+
+
+def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
+    return MaterialVersionData(
+        id=row.id,
+        material_id=row.material_id,
+        version_no=row.version_no,
+        note=row.note,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyMaterialRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, material_id: int) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        return _material_to_data(row) if row is not None else None
+
+    def create(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_type: MaterialSourceType,
+        source_url: str | None,
+    ) -> MaterialData:
+        row = Material(
+            workspace_id=workspace_id,
+            semester_id=semester_id,
+            course_id=course_id,
+            class_name=class_name,
+            title=title,
+            publisher=publisher,
+            published_at=published_at,
+            source_type=source_type,
+            source_url=source_url,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _material_to_data(row)
+
+    def list_version_numbers(self, material_id: int) -> list[int]:
+        stmt = (
+            select(MaterialVersion.version_no)
+            .where(MaterialVersion.material_id == material_id)
+            .order_by(MaterialVersion.version_no)
+        )
+        return list(self._session.scalars(stmt))
+
+    def create_version(
+        self, material_id: int, version_no: int, note: str | None
+    ) -> MaterialVersionData:
+        row = MaterialVersion(material_id=material_id, version_no=version_no, note=note)
+        self._session.add(row)
+        self._session.flush()
+        return _material_version_to_data(row)
+
+    def list_versions(self, material_id: int) -> list[MaterialVersionData]:
+        stmt = (
+            select(MaterialVersion)
+            .where(MaterialVersion.material_id == material_id)
+            .order_by(MaterialVersion.version_no)
+        )
+        return [_material_version_to_data(row) for row in self._session.scalars(stmt)]
 
 
 class SqlAlchemySemesterRepository:
