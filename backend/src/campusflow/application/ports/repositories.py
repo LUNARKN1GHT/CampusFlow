@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import (
+    EventRecurrence,
+    MaterialSourceType,
+    MaterialStatus,
+    TaskPriority,
+    TaskProgress,
+)
 
 
 class UnitOfWork(Protocol):
@@ -98,6 +104,34 @@ class AvailabilitySlotData:
     day_of_week: int
     start_time: time
     end_time: time
+
+
+@dataclass
+class MaterialData:
+    """资料元数据（D001）。未知来源字段为 None，不伪造。"""
+
+    id: int
+    workspace_id: int
+    semester_id: int | None
+    course_id: int | None
+    class_name: str | None
+    title: str
+    publisher: str | None
+    published_at: datetime | None
+    source_type: MaterialSourceType
+    source_url: str | None
+    status: MaterialStatus
+    archived: bool
+    imported_at: datetime
+
+
+@dataclass
+class MaterialVersionData:
+    id: int
+    material_id: int
+    version_no: int
+    note: str | None
+    created_at: datetime
 
 
 class SemesterRepository(Protocol):
@@ -202,6 +236,32 @@ class TaskRepository(Protocol):
     def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
+class MaterialRepository(Protocol):
+    def get(self, material_id: int) -> MaterialData | None: ...
+
+    def create(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_type: MaterialSourceType,
+        source_url: str | None,
+    ) -> MaterialData: ...
+
+    def list_version_numbers(self, material_id: int) -> list[int]: ...
+
+    def create_version(
+        self, material_id: int, version_no: int, note: str | None
+    ) -> MaterialVersionData: ...
+
+    def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
+
+
 class ScheduleRepository(Protocol):
     def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
 
@@ -252,4 +312,5 @@ class Repositories:
     courses: CourseRepository
     tasks: TaskRepository
     schedule: ScheduleRepository
+    materials: MaterialRepository
     uow: UnitOfWork
