@@ -59,17 +59,18 @@ def create_task(payload: TaskCreate, workspace: CurrentWorkspace, repos: Repos) 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
 def get_task(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskOut:
-    return TaskOut.model_validate(use_cases.get_task(repos, task_id))
+    return TaskOut.model_validate(use_cases.get_task(repos, workspace.id, task_id))
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskOut)
 def update_task(
     task_id: int, payload: TaskUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> TaskOut:
-    current = use_cases.get_task(repos, task_id)
+    current = use_cases.get_task(repos, workspace.id, task_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
     task = use_cases.update_task(
         repos,
+        workspace.id,
         task_id,
         course_id=merged.course_id,
         title=merged.title,
@@ -87,7 +88,7 @@ def update_task(
 def update_task_progress(
     task_id: int, payload: TaskProgressPatch, workspace: CurrentWorkspace, repos: Repos
 ) -> TaskOut:
-    task = use_cases.set_progress(repos, task_id, payload.progress, payload.reason)
+    task = use_cases.set_progress(repos, workspace.id, task_id, payload.progress, payload.reason)
     return TaskOut.model_validate(task)
 
 
@@ -97,5 +98,5 @@ def list_task_progress_history(
 ) -> list[TaskProgressChangeOut]:
     return [
         TaskProgressChangeOut.model_validate(change)
-        for change in use_cases.list_progress_changes(repos, task_id)
+        for change in use_cases.list_progress_changes(repos, workspace.id, task_id)
     ]

@@ -68,10 +68,11 @@ def create_fixed_event(
 def update_fixed_event(
     event_id: int, payload: FixedEventUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> FixedEventOut:
-    current = use_cases.get_fixed_event(repos, event_id)
+    current = use_cases.get_fixed_event(repos, workspace.id, event_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
     event = use_cases.update_fixed_event(
         repos,
+        workspace.id,
         event_id,
         course_id=merged.course_id,
         title=merged.title,
@@ -86,7 +87,7 @@ def update_fixed_event(
 
 @router.delete("/fixed-events/{event_id}", status_code=204)
 def delete_fixed_event(event_id: int, workspace: CurrentWorkspace, repos: Repos) -> Response:
-    use_cases.delete_fixed_event(repos, event_id)
+    use_cases.delete_fixed_event(repos, workspace.id, event_id)
     return Response(status_code=204)
 
 
@@ -114,5 +115,5 @@ def create_availability_slot(
 
 @router.delete("/availability-slots/{slot_id}", status_code=204)
 def delete_availability_slot(slot_id: int, workspace: CurrentWorkspace, repos: Repos) -> Response:
-    use_cases.delete_availability_slot(repos, slot_id)
+    use_cases.delete_availability_slot(repos, workspace.id, slot_id)
     return Response(status_code=204)
