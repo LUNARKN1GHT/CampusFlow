@@ -16,6 +16,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_test"
     )
     redis_url: str = "redis://127.0.0.1:6379/0"
+    # 原文件私有存储根目录（相对后端工作目录；不进 Git，不对外公开）
+    storage_dir: str = "data/materials"
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"
