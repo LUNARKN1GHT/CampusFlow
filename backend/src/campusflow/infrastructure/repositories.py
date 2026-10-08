@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from campusflow.application.ports.repositories import (
@@ -173,6 +174,27 @@ class SqlAlchemyWorkspaceRepository:
     def get(self, workspace_id: int) -> WorkspaceData | None:
         row = self._session.get(Workspace, workspace_id)
         return _workspace_to_data(row) if row is not None else None
+
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        row = self._session.scalar(select(Workspace).where(Workspace.is_default.is_(True)))
+        if row is not None:
+            return _workspace_to_data(row)
+        # 并发初始化安全：依赖 uq_workspaces_default 部分唯一索引 + ON CONFLICT DO NOTHING，
+        # 冲突时不插入，随后重新读取胜出者创建的那一行。
+        stmt = (
+            pg_insert(Workspace)
+            .values(name=name, timezone=timezone, is_default=True)
+            .on_conflict_do_nothing(
+                index_elements=["is_default"],
+                index_where=text("is_default"),
+            )
+        )
+        self._session.execute(stmt)
+        self._session.flush()
+        row = self._session.scalar(select(Workspace).where(Workspace.is_default.is_(True)))
+        if row is None:
+            raise RuntimeError("默认工作空间创建失败")
+        return _workspace_to_data(row)
 
     def update_settings(
         self,

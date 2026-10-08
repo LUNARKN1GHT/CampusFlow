@@ -5,12 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 
-from campusflow.api.deps import get_default_workspace_id, get_repositories
+from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.application import settings as use_cases
-from campusflow.application.ports.repositories import Repositories
+from campusflow.application.ports.repositories import Repositories, WorkspaceData
 
 router = APIRouter(prefix="/settings", tags=["settings"])
-WorkspaceId = Annotated[int, Depends(get_default_workspace_id)]
+CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
 
 
@@ -27,18 +27,18 @@ class SettingsOut(SettingsUpdate):
 
 
 @router.get("", response_model=SettingsOut)
-def get_settings(workspace_id: WorkspaceId, repos: Repos) -> SettingsOut:
-    return SettingsOut.model_validate(use_cases.get_settings(repos, workspace_id))
+def get_settings(workspace: CurrentWorkspace, repos: Repos) -> SettingsOut:
+    return SettingsOut.model_validate(use_cases.get_settings(repos, workspace.id))
 
 
 @router.put("", response_model=SettingsOut)
 def update_settings(
-    payload: SettingsUpdate, workspace_id: WorkspaceId, repos: Repos
+    payload: SettingsUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> SettingsOut:
     return SettingsOut.model_validate(
         use_cases.update_settings(
             repos,
-            workspace_id,
+            workspace.id,
             timezone=payload.timezone,
             daily_capacity_minutes=payload.daily_capacity_minutes,
             break_minutes=payload.break_minutes,
