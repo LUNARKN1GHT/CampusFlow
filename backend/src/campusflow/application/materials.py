@@ -20,7 +20,7 @@ from campusflow.domain.materials import (
     split_paragraphs,
     validate_pasted_text,
 )
-from campusflow.domain.states import MaterialSourceType
+from campusflow.domain.states import MaterialSourceType, MaterialStatus
 
 
 def _require_semester_in_workspace(
@@ -122,3 +122,66 @@ def import_pasted_text(
         storage.delete(storage_key)
         raise
     return material, chunks
+
+
+def list_materials(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None = None,
+    course_id: int | None = None,
+    source_type: MaterialSourceType | None = None,
+    status: MaterialStatus | None = None,
+    include_archived: bool = False,
+) -> list[MaterialData]:
+    """资料列表筛选（D005）：检索范围由学期/课程字段在查询时过滤，
+    因此修订范围元数据后，后续筛选与检索自动按新范围生效。"""
+    return repos.materials.list(
+        workspace_id,
+        semester_id=semester_id,
+        course_id=course_id,
+        source_type=source_type,
+        status=status,
+        include_archived=include_archived,
+    )
+
+
+def get_material(repos: Repositories, workspace_id: int, material_id: int) -> MaterialData:
+    material = repos.materials.get(material_id)
+    if material is None:
+        raise NotFoundError("资料不存在")
+    require_in_workspace(material.workspace_id, workspace_id, "资料不存在")
+    return material
+
+
+def update_material_metadata(
+    repos: Repositories,
+    workspace_id: int,
+    material_id: int,
+    *,
+    title: str,
+    publisher: str | None,
+    published_at: datetime | None,
+    source_url: str | None,
+    semester_id: int | None,
+    course_id: int | None,
+    class_name: str | None,
+) -> MaterialData:
+    """修订资料元数据（D005）。只改元数据，不触碰任何原文版本与片段内容。"""
+    current = repos.materials.get(material_id)
+    if current is None:
+        raise NotFoundError("资料不存在")
+    require_in_workspace(current.workspace_id, workspace_id, "资料不存在")
+    _require_associations(repos, workspace_id, semester_id, course_id)
+    updated = repos.materials.update_metadata(
+        material_id,
+        title=title,
+        publisher=publisher,
+        published_at=published_at,
+        source_url=source_url,
+        semester_id=semester_id,
+        course_id=course_id,
+        class_name=class_name,
+    )
+    repos.uow.commit()
+    return updated

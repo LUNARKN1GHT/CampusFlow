@@ -190,6 +190,55 @@ class SqlAlchemyMaterialRepository:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
 
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None = None,
+        course_id: int | None = None,
+        source_type: MaterialSourceType | None = None,
+        status: MaterialStatus | None = None,
+        include_archived: bool = False,
+    ) -> list[MaterialData]:
+        stmt = select(Material).where(Material.workspace_id == workspace_id)
+        if semester_id is not None:
+            stmt = stmt.where(Material.semester_id == semester_id)
+        if course_id is not None:
+            stmt = stmt.where(Material.course_id == course_id)
+        if source_type is not None:
+            stmt = stmt.where(Material.source_type == source_type)
+        if status is not None:
+            stmt = stmt.where(Material.status == status)
+        if not include_archived:
+            stmt = stmt.where(Material.archived.is_(False))
+        stmt = stmt.order_by(Material.imported_at.desc())
+        return [_material_to_data(row) for row in self._session.scalars(stmt)]
+
+    def update_metadata(
+        self,
+        material_id: int,
+        *,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_url: str | None,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+    ) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.title = title
+        row.publisher = publisher
+        row.published_at = published_at
+        row.source_url = source_url
+        row.semester_id = semester_id
+        row.course_id = course_id
+        row.class_name = class_name
+        self._session.flush()
+        return _material_to_data(row)
+
     def create(
         self,
         workspace_id: int,

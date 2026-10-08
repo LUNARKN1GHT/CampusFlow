@@ -40,4 +40,4 @@ def test_settings_are_injected_and_unknown_routes_do_not_claim_success(monkeypat
     monkeypatch.setenv("CAMPUSFLOW_APP_NAME", "CampusFlow Test")
     with TestClient(create_app(Settings(_env_file=None))) as client:
         assert client.get("/openapi.json").json()["info"]["title"] == "CampusFlow Test"
-        assert client.get("/api/v1/materials").status_code == 404
+        assert client.get("/api/v1/no-such-route").status_code == 404
