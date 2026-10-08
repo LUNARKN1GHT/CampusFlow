@@ -6,6 +6,7 @@
 
 from datetime import datetime
 
+from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
     NewSourceChunk,
@@ -17,7 +18,6 @@ from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.materials import (
     next_version_no,
-    split_paragraphs,
     validate_pasted_text,
 )
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
@@ -60,6 +60,27 @@ def _require_associations(
                 raise DomainError("课程不属于指定学期，请检查适用范围")
 
 
+def fragments_to_chunks(outcome: ParseOutcome, version_id: int) -> list[NewSourceChunk]:
+    """把解析器输出映射为待持久化的来源片段。
+
+    位置信息在此与原文版本绑定（D011 验收：位置与原文版本绑定）；
+    片段顺序即解析器输出顺序。
+    """
+    chunks: list[NewSourceChunk] = []
+    for fragment in outcome.fragments:
+        locator_type, locator_value = fragment.locator.as_chunk_locator()
+        chunks.append(
+            NewSourceChunk(
+                version_id=version_id,
+                seq=fragment.seq,
+                locator_type=locator_type,
+                locator_value=locator_value,
+                text=fragment.text,
+            )
+        )
+    return chunks
+
+
 def import_pasted_text(
     repos: Repositories,
     storage: FileStorage,
@@ -72,11 +93,12 @@ def import_pasted_text(
     semester_id: int | None,
     course_id: int | None,
     class_name: str | None,
+    text_parser: DocumentParser,
 ) -> tuple[MaterialData, list[SourceChunkData]]:
     """粘贴文本导入：保存为稳定原文版本并关联来源与课程范围（D004）。
 
-    返回（资料, 段落片段列表）。片段的段落号由 split_paragraphs 固定规则生成，
-    重复读取保持稳定。
+    返回（资料, 段落片段列表）。段落切分通过 DocumentParser 协议完成（D011），
+    段落号规则固定，重复读取保持稳定。
     """
     error = validate_pasted_text(content)
     if error:
@@ -103,16 +125,10 @@ def import_pasted_text(
             storage_key,
         )
         chunks = repos.materials.add_chunks(
-            [
-                NewSourceChunk(
-                    version_id=version.id,
-                    seq=index,
-                    locator_type="paragraph",
-                    locator_value=str(index + 1),
-                    text=paragraph,
-                )
-                for index, paragraph in enumerate(split_paragraphs(content))
-            ]
+            fragments_to_chunks(
+                text_parser.parse(content.encode("utf-8"), "text/plain"),
+                version.id,
+            )
         )
         # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
         # 不留下无法被资料版本引用的孤立文件。
