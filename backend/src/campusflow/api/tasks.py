@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from campusflow.api.deps import get_default_workspace_id, get_repositories
+from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.api.schemas import (
     TaskCreate,
     TaskOut,
@@ -14,33 +14,33 @@ from campusflow.api.schemas import (
     TaskUpdate,
 )
 from campusflow.application import tasks as use_cases
-from campusflow.application.ports.repositories import Repositories
+from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.domain.states import TaskProgress
 
 router = APIRouter(tags=["tasks"])
 
-WorkspaceId = Annotated[int, Depends(get_default_workspace_id)]
+CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
 
 
 @router.get("/tasks", response_model=list[TaskOut])
 def list_tasks(
-    workspace_id: WorkspaceId,
+    workspace: CurrentWorkspace,
     repos: Repos,
     course_id: Annotated[int | None, Query()] = None,
     progress: Annotated[TaskProgress | None, Query()] = None,
 ) -> list[TaskOut]:
     return [
         TaskOut.model_validate(t)
-        for t in use_cases.list_tasks(repos, workspace_id, course_id=course_id, progress=progress)
+        for t in use_cases.list_tasks(repos, workspace.id, course_id=course_id, progress=progress)
     ]
 
 
 @router.post("/tasks", response_model=TaskOut, status_code=201)
-def create_task(payload: TaskCreate, workspace_id: WorkspaceId, repos: Repos) -> TaskOut:
+def create_task(payload: TaskCreate, workspace: CurrentWorkspace, repos: Repos) -> TaskOut:
     task = use_cases.create_task(
         repos,
-        workspace_id,
+        workspace.id,
         course_id=payload.course_id,
         title=payload.title,
         description=payload.description,
@@ -58,12 +58,14 @@ def create_task(payload: TaskCreate, workspace_id: WorkspaceId, repos: Repos) ->
 
 
 @router.get("/tasks/{task_id}", response_model=TaskOut)
-def get_task(task_id: int, repos: Repos) -> TaskOut:
+def get_task(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskOut:
     return TaskOut.model_validate(use_cases.get_task(repos, task_id))
 
 
 @router.patch("/tasks/{task_id}", response_model=TaskOut)
-def update_task(task_id: int, payload: TaskUpdate, repos: Repos) -> TaskOut:
+def update_task(
+    task_id: int, payload: TaskUpdate, workspace: CurrentWorkspace, repos: Repos
+) -> TaskOut:
     current = use_cases.get_task(repos, task_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
     task = use_cases.update_task(
@@ -82,13 +84,17 @@ def update_task(task_id: int, payload: TaskUpdate, repos: Repos) -> TaskOut:
 
 
 @router.patch("/tasks/{task_id}/progress", response_model=TaskOut)
-def update_task_progress(task_id: int, payload: TaskProgressPatch, repos: Repos) -> TaskOut:
+def update_task_progress(
+    task_id: int, payload: TaskProgressPatch, workspace: CurrentWorkspace, repos: Repos
+) -> TaskOut:
     task = use_cases.set_progress(repos, task_id, payload.progress, payload.reason)
     return TaskOut.model_validate(task)
 
 
 @router.get("/tasks/{task_id}/progress-history", response_model=list[TaskProgressChangeOut])
-def list_task_progress_history(task_id: int, repos: Repos) -> list[TaskProgressChangeOut]:
+def list_task_progress_history(
+    task_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[TaskProgressChangeOut]:
     return [
         TaskProgressChangeOut.model_validate(change)
         for change in use_cases.list_progress_changes(repos, task_id)

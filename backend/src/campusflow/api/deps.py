@@ -1,14 +1,17 @@
-"""API 依赖：会话、仓储与默认工作空间。"""
+"""API 依赖：会话、仓储与当前工作空间。
+
+W005：当前空间通过应用用例解析（get_or_create_default_workspace），
+本层不直接操作 Workspace ORM 模型。
+"""
 
 from collections.abc import Iterator
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from campusflow.application.ports.repositories import Repositories
-from campusflow.infrastructure.db.models import Workspace
+from campusflow.application import workspaces as workspace_use_cases
+from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.infrastructure.repositories import (
     SqlAlchemyCourseRepository,
     SqlAlchemyScheduleRepository,
@@ -17,8 +20,6 @@ from campusflow.infrastructure.repositories import (
     SqlAlchemyUnitOfWork,
     SqlAlchemyWorkspaceRepository,
 )
-
-DEFAULT_WORKSPACE_NAME = "默认工作空间"
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -38,12 +39,8 @@ def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repos
     )
 
 
-def get_default_workspace_id(session: Annotated[Session, Depends(get_session)]) -> int:
-    """MVP 单用户：返回默认工作空间 ID，不存在则创建并立即提交。"""
-    workspace_id = session.scalar(select(Workspace.id).limit(1))
-    if workspace_id is None:
-        workspace = Workspace(name=DEFAULT_WORKSPACE_NAME)
-        session.add(workspace)
-        session.commit()
-        return workspace.id
-    return workspace_id
+def get_current_workspace(
+    repos: Annotated[Repositories, Depends(get_repositories)],
+) -> WorkspaceData:
+    """当前会话的工作空间（MVP 单用户：默认空间，不存在时创建）。"""
+    return workspace_use_cases.get_or_create_default_workspace(repos)
