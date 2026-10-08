@@ -115,6 +115,10 @@ class SemesterRepository(Protocol):
 class WorkspaceRepository(Protocol):
     def get(self, workspace_id: int) -> WorkspaceData | None: ...
 
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        """返回默认空间，不存在时创建；并发调用也必须最多创建一个。"""
+        ...
+
     def update_settings(
         self,
         workspace_id: int,
