@@ -8,7 +8,17 @@
 
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Time, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
@@ -109,3 +119,47 @@ class AvailabilitySlot(Base):
     day_of_week: Mapped[int] = mapped_column(Integer)  # 0=周一 … 6=周日
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
+
+
+class Material(Base):
+    """学习资料（D001）。
+
+    发布时间（published_at，可能未知）与导入时间（imported_at，系统生成）
+    分开保存；未知来源字段保留 NULL，不伪造。学期/课程/教学班均可为空，
+    表示学期公共资料或尚未归类。
+    """
+
+    __tablename__ = "materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    title: Mapped[str] = mapped_column(String(300))
+    publisher: Mapped[str | None] = mapped_column(String(200))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_type: Mapped[str] = mapped_column(String(20))
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class MaterialVersion(Base):
+    """资料版本（D001）。版本与资料通过 (material_id, version_no) 稳定关联。"""
+
+    __tablename__ = "material_versions"
+    __table_args__ = (
+        UniqueConstraint("material_id", "version_no", name="uq_material_versions_no"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materials.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
