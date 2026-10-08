@@ -1,6 +1,7 @@
 """固定日程与可用时间用例。
 
 update_fixed_event 接收"合并后的最终值"（由 API 层把补丁与当前值合并后传入）。
+所有按 ID 的操作校验对象归属当前空间（W006）。
 """
 
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from campusflow.application.ports.repositories import (
     FixedEventData,
     Repositories,
 )
+from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.schedule import validate_availability_slot, validate_fixed_event
 from campusflow.domain.states import EventRecurrence
@@ -71,11 +73,26 @@ def list_fixed_event_occurrences(
     return sorted(occurrences, key=lambda occurrence: occurrence.starts_at)
 
 
-def get_fixed_event(repos: Repositories, event_id: int) -> FixedEventData:
+def get_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> FixedEventData:
+    event = _require_event_in_workspace(repos, workspace_id, event_id)
+    return event
+
+
+def _require_event_in_workspace(
+    repos: Repositories, workspace_id: int, event_id: int
+) -> FixedEventData:
     event = repos.schedule.get_fixed_event(event_id)
     if event is None:
         raise NotFoundError("日程不存在")
+    require_in_workspace(event.workspace_id, workspace_id, "日程不存在")
     return event
+
+
+def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
+    course = repos.courses.get(course_id)
+    if course is None:
+        raise NotFoundError("课程不存在")
+    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
 
 
 def create_fixed_event(
@@ -93,8 +110,8 @@ def create_fixed_event(
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
-    if course_id is not None and repos.courses.get(course_id) is None:
-        raise NotFoundError("课程不存在")
+    if course_id is not None:
+        _require_course_in_workspace(repos, workspace_id, course_id)
     event = repos.schedule.create_fixed_event(
         workspace_id, course_id, title, starts_at, ends_at, location, recurrence, repeat_until
     )
@@ -104,6 +121,7 @@ def create_fixed_event(
 
 def update_fixed_event(
     repos: Repositories,
+    workspace_id: int,
     event_id: int,
     *,
     course_id: int | None,
@@ -114,13 +132,12 @@ def update_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
-    if repos.schedule.get_fixed_event(event_id) is None:
-        raise NotFoundError("日程不存在")
+    _require_event_in_workspace(repos, workspace_id, event_id)
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
-    if course_id is not None and repos.courses.get(course_id) is None:
-        raise NotFoundError("课程不存在")
+    if course_id is not None:
+        _require_course_in_workspace(repos, workspace_id, course_id)
     updated = repos.schedule.update_fixed_event(
         event_id,
         course_id=course_id,
@@ -135,9 +152,9 @@ def update_fixed_event(
     return updated
 
 
-def delete_fixed_event(repos: Repositories, event_id: int) -> None:
-    if not repos.schedule.delete_fixed_event(event_id):
-        raise NotFoundError("日程不存在")
+def delete_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> None:
+    _require_event_in_workspace(repos, workspace_id, event_id)
+    repos.schedule.delete_fixed_event(event_id)
     repos.uow.commit()
 
 
@@ -166,7 +183,11 @@ def create_availability_slot(
     return slot
 
 
-def delete_availability_slot(repos: Repositories, slot_id: int) -> None:
-    if not repos.schedule.delete_availability_slot(slot_id):
+def delete_availability_slot(repos: Repositories, workspace_id: int, slot_id: int) -> None:
+    slot = next(
+        (s for s in repos.schedule.list_availability_slots(workspace_id) if s.id == slot_id), None
+    )
+    if slot is None:
         raise NotFoundError("可用时间段不存在")
+    repos.schedule.delete_availability_slot(slot_id)
     repos.uow.commit()

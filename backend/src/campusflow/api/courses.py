@@ -53,7 +53,9 @@ def create_semester(
 def archive_semester(
     semester_id: int, payload: SemesterArchive, workspace: CurrentWorkspace, repos: Repos
 ) -> SemesterOut:
-    semester = use_cases.set_semester_archived(repos, semester_id, archived=payload.archived)
+    semester = use_cases.set_semester_archived(
+        repos, workspace.id, semester_id, archived=payload.archived
+    )
     return SemesterOut.model_validate(semester)
 
 
@@ -87,10 +89,11 @@ def create_course(payload: CourseCreate, workspace: CurrentWorkspace, repos: Rep
 def update_course(
     course_id: int, payload: CourseUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> CourseOut:
-    current = use_cases.get_course(repos, course_id)
+    current = use_cases.get_course(repos, workspace.id, course_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
     course = use_cases.update_course(
         repos,
+        workspace.id,
         course_id,
         semester_id=merged.semester_id,
         name=merged.name,
