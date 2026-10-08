@@ -21,10 +21,16 @@ class LocalFileStorage:
         self._root = Path(root_dir).resolve()
 
     def _resolve(self, storage_key: str) -> Path:
-        """把存储键解析为根目录内的路径；越界即拒绝。"""
-        if not storage_key or storage_key.startswith(("/", "\\")) or ":" in storage_key:
+        """把存储键解析为根目录内的路径；越界即拒绝。
+
+        反斜杠在所有平台上都视为路径分隔符，保证 Windows 与 Linux 行为一致。
+        """
+        if not storage_key:
             raise StorageKeyError(f"非法存储键：{storage_key!r}")
-        candidate = (self._root / storage_key).resolve()
+        normalized = storage_key.replace("\\", "/")
+        if normalized.startswith("/") or ":" in normalized:
+            raise StorageKeyError(f"非法存储键：{storage_key!r}")
+        candidate = (self._root / normalized).resolve()
         if candidate != self._root and self._root not in candidate.parents:
             raise StorageKeyError(f"非法存储键：{storage_key!r}")
         return candidate
