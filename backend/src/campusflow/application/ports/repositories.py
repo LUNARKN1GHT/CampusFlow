@@ -263,6 +263,17 @@ class TaskRepository(Protocol):
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
 
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None = None,
+        course_id: int | None = None,
+        source_type: MaterialSourceType | None = None,
+        status: MaterialStatus | None = None,
+        include_archived: bool = False,
+    ) -> list[MaterialData]: ...
+
     def create(
         self,
         workspace_id: int,
@@ -276,6 +287,19 @@ class MaterialRepository(Protocol):
         source_type: MaterialSourceType,
         source_url: str | None,
     ) -> MaterialData: ...
+
+    def update_metadata(
+        self,
+        material_id: int,
+        *,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_url: str | None,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+    ) -> MaterialData | None: ...
 
     def list_version_numbers(self, material_id: int) -> list[int]: ...
 
