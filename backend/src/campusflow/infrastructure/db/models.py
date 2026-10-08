@@ -162,4 +162,26 @@ class MaterialVersion(Base):
     )
     version_no: Mapped[int] = mapped_column(Integer)
     note: Mapped[str | None] = mapped_column(String(500))
+    # 原文件在私有存储中的键（D002 生成）；粘贴文本同样落成 .txt 文件
+    storage_key: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SourceChunk(Base):
+    """来源片段：资料版本中的最小定位单元。
+
+    粘贴文本按段落切分，段落号（locator_value）在重复读取时稳定（D004）；
+    PDF 页码、图片区域等定位方式在 D017 扩展。
+    """
+
+    __tablename__ = "source_chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    seq: Mapped[int] = mapped_column(Integer)  # 片段在版本内的顺序，从 0 开始
+    locator_type: Mapped[str] = mapped_column(String(20))  # paragraph / page / region
+    locator_value: Mapped[str] = mapped_column(String(50))  # 如段落号 "3" 或页码 "2"
+    text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

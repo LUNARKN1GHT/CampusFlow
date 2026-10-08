@@ -96,9 +96,9 @@ def test_versions_have_stable_association(workspace_id: int) -> None:
             source_type=MaterialSourceType.TEXT,
             source_url=None,
         )
-        v1 = repo.create_version(material.id, next_version_no([]), "首次导入")
+        v1 = repo.create_version(material.id, next_version_no([]), "首次导入", None)
         existing = repo.list_version_numbers(material.id)
-        v2 = repo.create_version(material.id, next_version_no(existing), "教师更新版")
+        v2 = repo.create_version(material.id, next_version_no(existing), "教师更新版", None)
         session.commit()
 
         versions = repo.list_versions(material.id)
