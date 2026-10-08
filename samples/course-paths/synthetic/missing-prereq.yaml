@@ -1,0 +1,19 @@
+# 合成反例：先修课程缺项
+# 场景：方案内课程 CS911 要求强制先修 CS910，但 CS910 不在培养方案课程表中。
+# 预期行为：不得把 CS910 当作已安排课程静默略过；拓扑排序阻塞或明确标注缺项，
+# 展示阻塞原因，只给出可确定部分的依赖顺序。
+_meta:
+  origin: synthetic
+  generated_by: manual
+  needs_human_review: false
+  scenario: 先修课程缺项
+courses:
+  - {code: CS911, name: 合成进阶课程, credits: 3.0}
+  - {code: CS912, name: 合成基础课程, credits: 2.0}
+relations:
+  - {course: CS911, prereq: CS910, kind: 强制先修}
+  - {course: CS912, prereq: CS911, kind: 强制先修}
+expected:
+  sortable: false
+  missing: [CS910]
+  behavior: 指出 CS910 不在方案课程表中，展示受影响的 CS911、CS912，不输出完整顺序
