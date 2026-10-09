@@ -14,7 +14,9 @@ from campusflow.application.ports.repositories import (
     FixedEventData,
     MaterialData,
     MaterialVersionData,
+    NewSourceChunk,
     SemesterData,
+    SourceChunkData,
     TaskData,
     TaskProgressChangeData,
     WorkspaceData,
@@ -33,6 +35,7 @@ from campusflow.infrastructure.db.models import (
     Material,
     MaterialVersion,
     Semester,
+    SourceChunk,
     Task,
     TaskProgressChange,
     Workspace,
@@ -163,7 +166,19 @@ def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
         material_id=row.material_id,
         version_no=row.version_no,
         note=row.note,
+        storage_key=row.storage_key,
         created_at=row.created_at,
+    )
+
+
+def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
+    return SourceChunkData(
+        id=row.id,
+        version_id=row.version_id,
+        seq=row.seq,
+        locator_type=row.locator_type,
+        locator_value=row.locator_value,
+        text=row.text,
     )
 
 
@@ -212,9 +227,11 @@ class SqlAlchemyMaterialRepository:
         return list(self._session.scalars(stmt))
 
     def create_version(
-        self, material_id: int, version_no: int, note: str | None
+        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
     ) -> MaterialVersionData:
-        row = MaterialVersion(material_id=material_id, version_no=version_no, note=note)
+        row = MaterialVersion(
+            material_id=material_id, version_no=version_no, note=note, storage_key=storage_key
+        )
         self._session.add(row)
         self._session.flush()
         return _material_version_to_data(row)
@@ -226,6 +243,29 @@ class SqlAlchemyMaterialRepository:
             .order_by(MaterialVersion.version_no)
         )
         return [_material_version_to_data(row) for row in self._session.scalars(stmt)]
+
+    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]:
+        rows = [
+            SourceChunk(
+                version_id=chunk.version_id,
+                seq=chunk.seq,
+                locator_type=chunk.locator_type,
+                locator_value=chunk.locator_value,
+                text=chunk.text,
+            )
+            for chunk in chunks
+        ]
+        self._session.add_all(rows)
+        self._session.flush()
+        return [_chunk_to_data(row) for row in rows]
+
+    def list_chunks(self, version_id: int) -> list[SourceChunkData]:
+        stmt = (
+            select(SourceChunk)
+            .where(SourceChunk.version_id == version_id)
+            .order_by(SourceChunk.seq)
+        )
+        return [_chunk_to_data(row) for row in self._session.scalars(stmt)]
 
 
 class SqlAlchemySemesterRepository:
