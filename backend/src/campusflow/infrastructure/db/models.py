@@ -8,7 +8,17 @@
 
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Time, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Time,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
@@ -24,6 +34,8 @@ class Workspace(Base):
     daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
     break_minutes: Mapped[int] = mapped_column(Integer, default=15)
     buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # 默认空间标记：数据库部分唯一索引保证并发初始化不会创建多个默认空间
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -107,3 +119,69 @@ class AvailabilitySlot(Base):
     day_of_week: Mapped[int] = mapped_column(Integer)  # 0=周一 … 6=周日
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
+
+
+class Material(Base):
+    """学习资料（D001）。
+
+    发布时间（published_at，可能未知）与导入时间（imported_at，系统生成）
+    分开保存；未知来源字段保留 NULL，不伪造。学期/课程/教学班均可为空，
+    表示学期公共资料或尚未归类。
+    """
+
+    __tablename__ = "materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    title: Mapped[str] = mapped_column(String(300))
+    publisher: Mapped[str | None] = mapped_column(String(200))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_type: Mapped[str] = mapped_column(String(20))
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    imported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class MaterialVersion(Base):
+    """资料版本（D001）。版本与资料通过 (material_id, version_no) 稳定关联。"""
+
+    __tablename__ = "material_versions"
+    __table_args__ = (
+        UniqueConstraint("material_id", "version_no", name="uq_material_versions_no"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materials.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(String(500))
+    # 原文件在私有存储中的键（D002 生成）；粘贴文本同样落成 .txt 文件
+    storage_key: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SourceChunk(Base):
+    """来源片段：资料版本中的最小定位单元。
+
+    粘贴文本按段落切分，段落号（locator_value）在重复读取时稳定（D004）；
+    PDF 页码、图片区域等定位方式在 D017 扩展。
+    """
+
+    __tablename__ = "source_chunks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    seq: Mapped[int] = mapped_column(Integer)  # 片段在版本内的顺序，从 0 开始
+    locator_type: Mapped[str] = mapped_column(String(20))  # paragraph / page / region
+    locator_value: Mapped[str] = mapped_column(String(50))  # 如段落号 "3" 或页码 "2"
+    text: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
