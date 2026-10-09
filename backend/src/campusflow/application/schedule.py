@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import (
     AvailabilitySlotData,
     FixedEventData,
@@ -31,12 +32,21 @@ class FixedEventOccurrence:
     location: str | None
 
 
-def list_fixed_events(repos: Repositories, workspace_id: int) -> list[FixedEventData]:
-    return repos.schedule.list_fixed_events(workspace_id)
+def list_fixed_events(
+    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
+) -> list[FixedEventData]:
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    return repos.schedule.list_fixed_events(workspace_id, semester_id=semester_id)
 
 
 def list_fixed_event_occurrences(
-    repos: Repositories, workspace_id: int, start_date: date, end_date: date
+    repos: Repositories,
+    workspace_id: int,
+    start_date: date,
+    end_date: date,
+    *,
+    semester_id: int | None = None,
 ) -> list[FixedEventOccurrence]:
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
@@ -47,7 +57,7 @@ def list_fixed_event_occurrences(
     ).astimezone(UTC)
     occurrences: list[FixedEventOccurrence] = []
 
-    for event in repos.schedule.list_fixed_events(workspace_id):
+    for event in list_fixed_events(repos, workspace_id, semester_id=semester_id):
         first_start = event.starts_at.astimezone(timezone)
         duration = event.ends_at.astimezone(UTC) - event.starts_at.astimezone(UTC)
         starts = [first_start]

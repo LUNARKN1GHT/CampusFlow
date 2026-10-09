@@ -8,6 +8,7 @@
 
 from datetime import date, time
 
+from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.dates import validate_due
@@ -21,8 +22,13 @@ def list_tasks(
     *,
     course_id: int | None = None,
     progress: TaskProgress | None = None,
+    semester_id: int | None = None,
 ) -> list[TaskData]:
-    return repos.tasks.list(workspace_id, course_id=course_id, progress=progress)
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    return repos.tasks.list(
+        workspace_id, course_id=course_id, progress=progress, semester_id=semester_id
+    )
 
 
 def _require_task_in_workspace(repos: Repositories, workspace_id: int, task_id: int) -> TaskData:

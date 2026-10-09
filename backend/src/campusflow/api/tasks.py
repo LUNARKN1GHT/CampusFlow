@@ -29,10 +29,13 @@ def list_tasks(
     repos: Repos,
     course_id: Annotated[int | None, Query()] = None,
     progress: Annotated[TaskProgress | None, Query()] = None,
+    semester_id: Annotated[int | None, Query()] = None,
 ) -> list[TaskOut]:
     return [
         TaskOut.model_validate(t)
-        for t in use_cases.list_tasks(repos, workspace.id, course_id=course_id, progress=progress)
+        for t in use_cases.list_tasks(
+            repos, workspace.id, course_id=course_id, progress=progress, semester_id=semester_id
+        )
     ]
 
 
