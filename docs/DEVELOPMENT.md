@@ -84,6 +84,8 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 ## 验证
 
+学期归档与当前／历史查询规则见 [学期归档说明](semester-archive.md)。课程、任务、固定日程和展开实例均支持 `semester_id`；指定不存在／其他空间的学期返回 404。归档不取消任务，未指定学期的列表继续包含历史记录。
+
 后端，在 `backend/` 下执行：
 
 ```bash

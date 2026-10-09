@@ -166,6 +166,7 @@ class TaskRepository(Protocol):
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
     ) -> list[TaskData]: ...
 
     def get(self, task_id: int) -> TaskData | None: ...
@@ -205,7 +206,9 @@ class TaskRepository(Protocol):
 
 
 class ScheduleRepository(Protocol):
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]: ...
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 

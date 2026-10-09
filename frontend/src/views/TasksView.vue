@@ -151,7 +151,7 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading page-heading-row">
-      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p></div>
+      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p><p class="form-help">全部学期包含归档记录，归档不会隐藏待办。可按学期查看当前或历史任务；未关联课程的任务仅在全部学期中显示。</p></div>
       <button type="button" @click="openEditor()">添加任务</button>
     </div>
 

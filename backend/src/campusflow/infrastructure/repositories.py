@@ -287,8 +287,13 @@ class SqlAlchemyTaskRepository:
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
     ) -> list[TaskData]:
         stmt = select(Task).where(Task.workspace_id == workspace_id)
+        if semester_id is not None:
+            stmt = stmt.join(Course, Task.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         if course_id is not None:
             stmt = stmt.where(Task.course_id == course_id)
         if progress is not None:
@@ -392,12 +397,18 @@ class SqlAlchemyScheduleRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]:
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]:
         stmt = (
             select(FixedEvent)
             .where(FixedEvent.workspace_id == workspace_id)
             .order_by(FixedEvent.starts_at)
         )
+        if semester_id is not None:
+            stmt = stmt.join(Course, FixedEvent.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         return [_fixed_event_to_data(row) for row in self._session.scalars(stmt)]
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None:
