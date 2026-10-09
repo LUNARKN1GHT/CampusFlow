@@ -1,6 +1,6 @@
 """固定日程与可用时间的领域规则。"""
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 
 from campusflow.domain.states import EventRecurrence
 
@@ -12,7 +12,9 @@ def validate_fixed_event(
     repeat_until: date | None,
 ) -> str | None:
     """校验固定日程，合法返回 None，否则返回中文错误信息。"""
-    if ends_at <= starts_at:
+    if starts_at.tzinfo is None or ends_at.tzinfo is None:
+        return "日程时间必须先按工作空间时区转换"
+    if ends_at.astimezone(UTC) <= starts_at.astimezone(UTC):
         return "结束时间必须晚于开始时间"
     if recurrence == EventRecurrence.WEEKLY and repeat_until is None:
         return "每周重复的日程必须提供重复截止日期"

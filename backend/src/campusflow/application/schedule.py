@@ -5,7 +5,7 @@ update_fixed_event 接收"合并后的最终值"（由 API 层把补丁与当前
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from campusflow.application.courses import require_semester_in_workspace
@@ -15,11 +15,11 @@ from campusflow.application.ports.repositories import (
     Repositories,
 )
 from campusflow.application.scope import require_in_workspace
+from campusflow.application.settings import get_settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.schedule import validate_availability_slot, validate_fixed_event
 from campusflow.domain.states import EventRecurrence
-
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+from campusflow.domain.timezones import in_workspace_timezone
 
 
 @dataclass
@@ -50,37 +50,45 @@ def list_fixed_event_occurrences(
 ) -> list[FixedEventOccurrence]:
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
-    range_start = datetime.combine(start_date, time.min, tzinfo=LOCAL_TZ)
-    range_end = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=LOCAL_TZ)
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    range_start = datetime.combine(start_date, time.min, tzinfo=timezone).astimezone(UTC)
+    range_end = datetime.combine(
+        end_date + timedelta(days=1), time.min, tzinfo=timezone
+    ).astimezone(UTC)
     occurrences: list[FixedEventOccurrence] = []
 
     for event in list_fixed_events(repos, workspace_id, semester_id=semester_id):
-        first_start = event.starts_at.astimezone(LOCAL_TZ)
-        duration = event.ends_at - event.starts_at
+        first_start = event.starts_at.astimezone(timezone)
+        duration = event.ends_at.astimezone(UTC) - event.starts_at.astimezone(UTC)
         starts = [first_start]
         if event.recurrence == EventRecurrence.WEEKLY and event.repeat_until is not None:
             starts = []
             current = first_start
-            while current.date() <= event.repeat_until and current < range_end:
-                if current + duration > range_start:
-                    starts.append(current)
+            while current.date() <= event.repeat_until and current.astimezone(UTC) < range_end:
+                # 只转换查询范围内的实例；未来 DST 缺失／重复时间明确报错，不静默挪动。
+                if current.astimezone(UTC) + duration > range_start:
+                    starts.append(
+                        first_start
+                        if current == first_start
+                        else in_workspace_timezone(current.replace(tzinfo=None), timezone)
+                    )
                 current += timedelta(days=7)
 
         for occurrence_start in starts:
-            occurrence_end = occurrence_start + duration
-            if occurrence_start < range_end and occurrence_end > range_start:
+            occurrence_end = occurrence_start.astimezone(UTC) + duration
+            if occurrence_start.astimezone(UTC) < range_end and occurrence_end > range_start:
                 occurrences.append(
                     FixedEventOccurrence(
                         source_event_id=event.id,
                         course_id=event.course_id,
                         title=event.title,
                         starts_at=occurrence_start,
-                        ends_at=occurrence_end,
+                        ends_at=occurrence_end.astimezone(timezone),
                         location=event.location,
                     )
                 )
 
-    return sorted(occurrences, key=lambda occurrence: occurrence.starts_at)
+    return sorted(occurrences, key=lambda occurrence: occurrence.starts_at.astimezone(UTC))
 
 
 def get_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> FixedEventData:
@@ -117,6 +125,9 @@ def create_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    starts_at = in_workspace_timezone(starts_at, timezone)
+    ends_at = in_workspace_timezone(ends_at, timezone)
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
@@ -143,6 +154,9 @@ def update_fixed_event(
     repeat_until: date | None,
 ) -> FixedEventData:
     _require_event_in_workspace(repos, workspace_id, event_id)
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    starts_at = in_workspace_timezone(starts_at, timezone)
+    ends_at = in_workspace_timezone(ends_at, timezone)
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
