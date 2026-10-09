@@ -81,6 +81,10 @@ class SourceChunkOut(BaseModel):
     locator_type: str
     locator_value: str
     text: str
+    page: int | None
+    paragraph: int | None
+    bbox: tuple[float, float, float, float] | None
+    confidence: float | None
 
 
 class TextImportOut(BaseModel):
