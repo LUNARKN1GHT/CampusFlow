@@ -15,7 +15,7 @@ const slotSaving = ref(false)
 const error = ref('')
 const message = ref('')
 const slots = ref<AvailabilitySlot[]>([])
-const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, break_minutes: 15, buffer_minutes: 30 })
+const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
 
@@ -84,12 +84,13 @@ onMounted(load)
     <template v-else>
       <div class="two-column-layout settings-layout">
         <section class="panel">
-          <div class="section-heading"><div><p class="eyebrow">时间基准</p><h2>时区与每日容量</h2></div></div>
+          <div class="section-heading"><div><p class="eyebrow">时间基准</p><h2>时区与学习容量</h2></div></div>
           <form class="stack-form" @submit.prevent="saveSettings">
             <label>时区<input v-model.trim="form.timezone" list="timezone-options" required /><datalist id="timezone-options"><option v-for="timezone in commonTimezones" :key="timezone" :value="timezone" /></datalist></label>
             <label>每日可学习容量（分钟）<input v-model.number="form.daily_capacity_minutes" type="number" min="0" max="1440" required /></label>
+            <label>每周可学习容量（分钟）<input v-model.number="form.weekly_capacity_minutes" type="number" min="0" max="10080" required /></label>
             <div class="form-grid"><label>每段休息（分钟）<input v-model.number="form.break_minutes" type="number" min="0" max="240" required /></label><label>提交缓冲（分钟）<input v-model.number="form.buffer_minutes" type="number" min="0" max="1440" required /></label></div>
-            <p class="form-help">默认值：Asia/Shanghai、每日 240 分钟、休息 15 分钟、缓冲 30 分钟。</p>
+            <p class="form-help">默认值：Asia/Shanghai、每日 240 分钟、每周 1680 分钟、休息 15 分钟、缓冲 30 分钟。每日与每周容量独立保存，不会自动改动可用时段或课程 DDL。</p>
             <p v-if="error" class="form-error" role="alert">{{ error }}</p><p v-if="message" class="success-message" role="status">{{ message }}</p>
             <button type="submit" :disabled="saving">{{ saving ? '正在保存…' : '保存设置' }}</button>
           </form>

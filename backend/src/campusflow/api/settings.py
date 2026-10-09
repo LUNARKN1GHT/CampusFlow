@@ -19,11 +19,13 @@ class SettingsUpdate(BaseModel):
     daily_capacity_minutes: int = Field(ge=0, le=1440)
     break_minutes: int = Field(ge=0, le=240)
     buffer_minutes: int = Field(ge=0, le=1440)
+    weekly_capacity_minutes: int | None = Field(default=None, ge=0, le=10080)
 
 
 class SettingsOut(SettingsUpdate):
     model_config = ConfigDict(from_attributes=True)
     workspace_id: int = Field(validation_alias="id")
+    weekly_capacity_minutes: int
 
 
 @router.get("", response_model=SettingsOut)
@@ -43,5 +45,6 @@ def update_settings(
             daily_capacity_minutes=payload.daily_capacity_minutes,
             break_minutes=payload.break_minutes,
             buffer_minutes=payload.buffer_minutes,
+            weekly_capacity_minutes=payload.weekly_capacity_minutes,
         )
     )

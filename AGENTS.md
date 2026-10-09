@@ -144,6 +144,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- 个人设置保存 IANA 时区、独立的每日／每周学习容量、休息和提交缓冲。默认容量为每日 240 分钟、每周 1680 分钟；旧客户端省略每周容量时保留已存值，设置不自动生成计划或修改 DDL。
+
 - 单仓库、前后端分离、模块化单体。后端限定 Python 3.12，使用 FastAPI、Pydantic 和 uv；前端使用 Vue 3、TypeScript、Vite 和 npm。
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。

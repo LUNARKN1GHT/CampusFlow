@@ -54,6 +54,8 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 
 ## 启动前端
 
+个人设置接口为 `GET/PUT /api/v1/settings`。默认时区 `Asia/Shanghai`、每日容量 240 分钟、每周容量 1680 分钟、休息 15 分钟、提交缓冲 30 分钟；日／周容量独立保存。周容量范围为 0–10080 分钟，0 表示该周不安排学习。旧客户端省略或传 `null` 的周容量保留已存值。迁移为既有空间初始化 `daily_capacity_minutes * 7`，以后不自动联动。非法 IANA 时区（含路径式输入）返回 400，负容量／超限输入返回 422 且不改动配置。
+
 在另一个终端从仓库根目录运行：
 
 ```bash
