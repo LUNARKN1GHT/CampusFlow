@@ -115,3 +115,36 @@ def test_material_detail_and_unknown_material(client: TestClient) -> None:
     missing = client.get("/api/v1/materials/999")
     assert missing.status_code == 404
     assert missing.json() == {"detail": "资料不存在"}
+
+
+def test_metadata_revision_rejects_semester_course_mismatch(client: TestClient) -> None:
+    """修订路径同样校验课程与学期一致性（评审回归）。"""
+    semester_a = client.post(
+        "/api/v1/semesters",
+        json={"name": "2026 秋", "start_date": "2026-09-01", "end_date": "2027-01-31"},
+    ).json()
+    semester_b = client.post(
+        "/api/v1/semesters",
+        json={"name": "2027 春", "start_date": "2027-02-15", "end_date": "2027-07-15"},
+    ).json()
+    course = client.post(
+        "/api/v1/courses", json={"semester_id": semester_a["id"], "name": "数据库原理"}
+    ).json()
+
+    imported = _import(client, "正常资料", TEXT_A)
+    material_id = imported["material"]["id"]
+
+    response = client.patch(
+        f"/api/v1/materials/{material_id}",
+        json={"semester_id": semester_b["id"], "course_id": course["id"]},
+    )
+    assert response.status_code == 400
+    assert "学期" in response.json()["detail"]
+
+    # 一致组合正常
+    ok = client.patch(
+        f"/api/v1/materials/{material_id}",
+        json={"semester_id": semester_a["id"], "course_id": course["id"]},
+    )
+    assert ok.status_code == 200
+    assert ok.json()["course_id"] == course["id"]
