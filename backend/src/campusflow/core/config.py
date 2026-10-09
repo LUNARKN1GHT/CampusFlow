@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     # 原文件私有存储根目录（相对后端工作目录；不进 Git，不对外公开）
     storage_dir: str = "data/materials"
+    # 上传限制（D003）：可通过环境变量覆盖
+    upload_max_bytes: int = 20 * 1024 * 1024
+    upload_max_files: int = 5
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

@@ -4,6 +4,7 @@
 全部在同一事务内提交；任何一步失败整体回滚，不产生半成品资料。
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from campusflow.application.ports.repositories import (
@@ -21,6 +22,7 @@ from campusflow.domain.materials import (
     validate_pasted_text,
 )
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
+from campusflow.domain.upload import validate_upload
 
 
 def _require_semester_in_workspace(
@@ -185,3 +187,69 @@ def update_material_metadata(
     )
     repos.uow.commit()
     return updated
+
+
+@dataclass
+class UploadFileResult:
+    """单个文件的上传结果：成功带资料，失败带可读原因。"""
+
+    filename: str
+    material: MaterialData | None
+    error: str | None
+
+
+def import_uploaded_files(
+    repos: Repositories,
+    storage: FileStorage,
+    workspace_id: int,
+    *,
+    files: list[tuple[str, bytes]],
+    publisher: str | None,
+    published_at: datetime | None,
+    semester_id: int | None,
+    course_id: int | None,
+    class_name: str | None,
+    max_bytes: int,
+) -> list[UploadFileResult]:
+    """PDF/图片上传导入（D003）。
+
+    逐文件校验（格式、真实类型、大小）后保存并建档；校验失败的文件不保存、
+    不产生记录；建档失败时删除已存文件，不留下孤立文件。
+    解析与片段生成由后续处理作业完成（本任务只管导入）。
+    """
+    _require_associations(repos, workspace_id, semester_id, course_id)
+    results: list[UploadFileResult] = []
+    for filename, content in files:
+        validation, error = validate_upload(filename, content, max_bytes)
+        if error:
+            results.append(UploadFileResult(filename=filename, material=None, error=error))
+            continue
+        source_type = (
+            MaterialSourceType.PDF if validation.extension == "pdf" else MaterialSourceType.IMAGE
+        )
+        storage_key = storage.save(content, validation.extension)
+        try:
+            material = repos.materials.create(
+                workspace_id,
+                semester_id=semester_id,
+                course_id=course_id,
+                class_name=class_name,
+                title=filename,
+                publisher=publisher,
+                published_at=published_at,
+                source_type=source_type,
+                source_url=None,
+            )
+            repos.materials.create_version(
+                material.id,
+                next_version_no(repos.materials.list_version_numbers(material.id)),
+                "文件上传",
+                storage_key,
+            )
+            repos.uow.commit()
+        except Exception:
+            repos.uow.rollback()
+            storage.delete(storage_key)
+            raise
+        results.append(UploadFileResult(filename=filename, material=material, error=None))
+    return results
