@@ -100,6 +100,37 @@ def verify_relations(yaml_path: Path) -> tuple[list[str], list[tuple[dict, str]]
     return errors, pairs
 
 
+def verify_substitutions(yaml_path: Path) -> tuple[list[str], list[tuple[dict, str]]]:
+    payload = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    pdf = BASE / payload["_meta"]["source"]
+    lines = page_lines(pdf)
+    errors: list[str] = []
+    pairs: list[tuple[dict, str]] = []
+    for g in payload.get("substitutions", []):
+        hay = lines.get(g["slice_page"], [])
+        head_hit = next(
+            (ln for ln in hay if ln.startswith(f"{g['seq']} #{g['group_id']} ")),
+            None,
+        )
+        ok = (
+            head_hit is not None
+            and g["substitute"]["raw"] in hay
+            and g["original"]["raw"] in hay
+            and any(
+                g["direction"].split("（")[0].split(" ")[0][:1] in ln
+                and ("可相互替代" in ln or "单向" in ln)
+                and ("课程组" in ln) == g["is_course_group"]
+                for ln in hay
+                if ln.startswith("↔") or ln.startswith("→")
+            )
+        )
+        if not ok:
+            errors.append(f"{yaml_path.name} 替代组 {g['seq']} 切片第 {g['slice_page']} 页未找到对应原文")
+        else:
+            pairs.append((g, head_hit))
+    return errors, pairs
+
+
 def sample_pairs(pairs: list[tuple[dict, str]], key: str) -> None:
     rng = random.Random(SEED)
     picked = rng.sample(pairs, min(SAMPLE_SIZE, len(pairs)))
@@ -116,6 +147,8 @@ def main() -> int:
         print(f"== {yaml_path.name} ==")
         if "预修关系" in yaml_path.name:
             errors, pairs = verify_relations(yaml_path)
+        elif "替代关系" in yaml_path.name:
+            errors, pairs = verify_substitutions(yaml_path)
         else:
             errors, pairs = verify_plan(yaml_path)
         print(f"  全量校验 {len(pairs)} 条通过, {len(errors)} 条失败")

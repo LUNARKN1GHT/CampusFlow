@@ -17,3 +17,4 @@ CF-PDF-005,C001 课程预修要求公示表计算机切片,public-reference,学�
 CF-YAML-001,C001 强制先修成环反例,synthetic,人工构造的三课程循环先修关系,project-internal,依赖成环阻塞与环路径展示验收,not-applicable-synthetic,samples/course-paths/synthetic/cycle.yaml,随验收集版本保留,active,quality-owner,2026-10-08,不得输出伪造完整顺序
 CF-YAML-002,C001 先修课程缺项反例,synthetic,人工构造的方案外先修课程引用,project-internal,缺项阻塞与部分顺序验收,not-applicable-synthetic,samples/course-paths/synthetic/missing-prereq.yaml,随验收集版本保留,active,quality-owner,2026-10-08,缺项不得静默略过
 CF-YAML-003,C001 并修与建议先学示例,synthetic,人工构造的并修与软约束关系,project-internal,关系分类建模验收,not-applicable-synthetic,samples/course-paths/synthetic/coreq-and-recommended.yaml,随验收集版本保留,active,quality-owner,2026-10-08,真实预修表无并修与建议先学样本
+CF-PDF-006,C001 课程替代关系总表计算机切片,public-reference,学校教务处官网课程替代关系公示表计算机相关 19 页节选,校方公开文件-仅项目内验收使用,替代方向与课程组建模验收,无需脱敏-公开文件无个人信息,samples/course-paths/real/替代关系-计算机切片.pdf,随验收集版本保留,active,quality-owner,2026-10-09,预期标注见 samples/course-paths/expected/替代关系-计算机切片.yaml
