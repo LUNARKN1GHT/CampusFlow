@@ -114,7 +114,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByLabel('显示历史学期').uncheck()
   await expect(page.getByRole('heading', { name: courseName })).not.toBeVisible()
   await page.getByRole('link', { name: '任务与计划' }).click()
-  await page.getByLabel('学期', { exact: true }).selectOption({ label: `${semesterName}（已归档）` })
+  await page.locator('.filter-bar').getByRole('combobox').first().selectOption({ label: `${semesterName}（已归档）` })
   await expect(page.locator('.task-row').filter({ hasText: taskName }).getByText('受阻')).toBeVisible()
   await page.getByRole('link', { name: '课程' }).click()
   await page.getByLabel('显示历史学期').check()
