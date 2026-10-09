@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查仍只表示进程存活。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -44,14 +44,17 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 先启动上述数据库，再执行迁移和后端启动命令。需要自定义时复制 `backend/.env.example` 为同目录 `.env`；支持应用名称、业务库、测试库与 Redis 地址配置，具体名称见样例。环境变量优先于 `.env`，不要把 `.env` 提交到仓库。
 
 - 健康检查：<http://127.0.0.1:8000/api/v1/health>
+- 就绪检查：<http://127.0.0.1:8000/api/v1/ready>
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
 业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
 
-健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
+健康检查 `/api/v1/health` 成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。就绪检查 `/api/v1/ready` 以短超时连接数据库并执行 `SELECT 1`，数据库不可达时返回 503 且不包含连接信息或口令。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。
 
 ## 启动前端
+
+个人设置接口为 `GET/PUT /api/v1/settings`。默认时区 `Asia/Shanghai`、每日容量 240 分钟、每周容量 1680 分钟、休息 15 分钟、提交缓冲 30 分钟；日／周容量独立保存。周容量范围为 0–10080 分钟，0 表示该周不安排学习。旧客户端省略或传 `null` 的周容量保留已存值。迁移为既有空间初始化 `daily_capacity_minutes * 7`，以后不自动联动。非法 IANA 时区（含路径式输入）返回 400，负容量／超限输入返回 422 且不改动配置。
 
 在另一个终端从仓库根目录运行：
 
@@ -77,9 +80,11 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
-当前测试夹具在每个用例前清空六张业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 分别跟踪纯领域测试脱离数据库和测试目标保护，目前这些改进尚未合并。
+当前测试夹具在每个用例前清空七张业务表（含任务进度历史）；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 分别跟踪纯领域测试脱离数据库和测试目标保护，目前这些改进尚未合并。不同集成分支迁移不一致时新建专用库，不重置其他分支的库；本次 E10 使用 `campusflow_e10_test` 和独立迁移库，详见 [集成验收记录](verification/E10-integration-acceptance.md)。
 
 ## 验证
+
+学期归档与当前／历史查询规则见 [学期归档说明](semester-archive.md)。课程、任务、固定日程和展开实例均支持 `semester_id`；指定不存在／其他空间的学期返回 404。归档不取消任务，未指定学期的列表继续包含历史记录。
 
 后端，在 `backend/` 下执行：
 
@@ -103,8 +108,8 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## 当前限制
 
-- 手动管理前后端与本机单用户会话已实现；暂无生产身份系统、跨工作空间对象授权、Worker 命令、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
-- PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
+- 手动管理前后端、本机单用户会话、默认空间注入及对象／关联归属校验已实现；暂无生产身份系统、多人空间选择、Worker 命令、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
+- PR #1 是历史基础实现。W003 迁移复验与本次 E10 汇总验证有独立记录；其他里程碑及 T003 等任务按各自范围验收，不以本次汇总测试代替全部业务验收。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
 - Swagger UI 使用外部静态资源；离线时 UI 可能无法加载，可直接访问 `/openapi.json` 查看接口描述。

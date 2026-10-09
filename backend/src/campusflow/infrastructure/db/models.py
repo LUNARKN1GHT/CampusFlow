@@ -22,8 +22,13 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
     daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
+    weekly_capacity_minutes: Mapped[int] = mapped_column(
+        Integer, default=1680, server_default="1680"
+    )
     break_minutes: Mapped[int] = mapped_column(Integer, default=15)
     buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
+    # 默认空间标记：数据库部分唯一索引保证并发初始化不会创建多个默认空间
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

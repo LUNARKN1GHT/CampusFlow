@@ -36,6 +36,7 @@ class WorkspaceData:
     daily_capacity_minutes: int
     break_minutes: int
     buffer_minutes: int
+    weekly_capacity_minutes: int = 1680
 
 
 @dataclass
@@ -115,6 +116,10 @@ class SemesterRepository(Protocol):
 class WorkspaceRepository(Protocol):
     def get(self, workspace_id: int) -> WorkspaceData | None: ...
 
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        """返回默认空间，不存在时创建；并发调用也必须最多创建一个。"""
+        ...
+
     def update_settings(
         self,
         workspace_id: int,
@@ -123,6 +128,7 @@ class WorkspaceRepository(Protocol):
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None: ...
 
 
@@ -160,6 +166,7 @@ class TaskRepository(Protocol):
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
     ) -> list[TaskData]: ...
 
     def get(self, task_id: int) -> TaskData | None: ...
@@ -199,7 +206,9 @@ class TaskRepository(Protocol):
 
 
 class ScheduleRepository(Protocol):
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]: ...
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 

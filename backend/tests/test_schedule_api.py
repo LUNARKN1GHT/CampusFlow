@@ -34,6 +34,23 @@ def test_event_create_list_update_delete(client: TestClient) -> None:
     assert client.delete(f"/api/v1/fixed-events/{event['id']}").status_code == 404
 
 
+def test_event_update_rejects_null_required_fields(client: TestClient) -> None:
+    event = _create_event(client)
+
+    for field in ("title", "starts_at", "ends_at", "recurrence"):
+        response = client.patch(f"/api/v1/fixed-events/{event['id']}", json={field: None})
+        assert response.status_code == 422
+        assert field in response.text
+
+
+def test_event_update_clears_optional_fields(client: TestClient) -> None:
+    event = _create_event(client)
+
+    updated = client.patch(f"/api/v1/fixed-events/{event['id']}", json={"location": None}).json()
+    assert updated["location"] is None
+    assert updated["title"] == "操作系统实验课"  # 未提交字段不变
+
+
 def test_naive_datetime_is_stored_as_local_time(client: TestClient) -> None:
     """前端不带时区的 "14:00" 按本地时区（Asia/Shanghai）理解，即 06:00 UTC。"""
     event = _create_event(client)
