@@ -45,10 +45,19 @@ def _require_associations(
     semester_id: int | None,
     course_id: int | None,
 ) -> None:
+    """校验关联归属与一致性。
+
+    学期/课程都必须属于当前空间；两者同时提供时，课程必须属于该学期——
+    不允许出现"课程在 A 学期、资料标为 B 学期"的矛盾适用范围（README §4.2）。
+    """
     if semester_id is not None:
         _require_semester_in_workspace(repos, workspace_id, semester_id)
     if course_id is not None:
         _require_course_in_workspace(repos, workspace_id, course_id)
+        if semester_id is not None:
+            course = repos.courses.get(course_id)
+            if course is not None and course.semester_id != semester_id:
+                raise DomainError("课程不属于指定学期，请检查适用范围")
 
 
 def import_pasted_text(
@@ -105,9 +114,11 @@ def import_pasted_text(
                 for index, paragraph in enumerate(split_paragraphs(content))
             ]
         )
+        # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
+        # 不留下无法被资料版本引用的孤立文件。
+        repos.uow.commit()
     except Exception:
         repos.uow.rollback()
         storage.delete(storage_key)
         raise
-    repos.uow.commit()
     return material, chunks

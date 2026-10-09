@@ -4,6 +4,7 @@
 段落位置在重复读取时稳定；空文本和超限输入返回明确错误。
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 from campusflow.domain.materials import MAX_PASTED_TEXT_CHARS, split_paragraphs
@@ -120,3 +121,84 @@ def test_split_paragraphs_normalizes_line_endings() -> None:
     assert split_paragraphs("第一段\r\n\r\n第二段\n\n\n第三段\n") == ["第一段", "第二段", "第三段"]
     assert split_paragraphs("  只有一段  ") == ["只有一段"]
     assert split_paragraphs("\n\n\n") == []
+
+
+def test_commit_failure_cleans_up_file_and_rolls_back(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    """提交失败时：数据库回滚且已保存的原文件被删除，不留孤立文件（评审回归）。"""
+    from conftest import TEST_DATABASE_URL
+    from sqlalchemy import select
+
+    from campusflow.infrastructure.db.models import Material
+    from campusflow.infrastructure.repositories import SqlAlchemyUnitOfWork
+    from campusflow.infrastructure.storage.local import LocalFileStorage
+
+    # 先触发默认空间创建，再打补丁，避免空间初始化被模拟失败波及
+    assert client.get("/api/v1/settings").status_code == 200
+
+    # 用独立临时存储目录观察文件是否被清理
+    storage = LocalFileStorage(tmp_path)
+    client.app.state.file_storage = storage
+
+    real_commit = SqlAlchemyUnitOfWork.commit
+
+    def failing_commit(self) -> None:
+        raise RuntimeError("模拟数据库提交失败")
+
+    monkeypatch.setattr(SqlAlchemyUnitOfWork, "commit", failing_commit)
+    try:
+        with pytest.raises(RuntimeError, match="模拟数据库提交失败"):
+            client.post(
+                "/api/v1/materials/text", json={"title": "会失败的导入", "content": NOTICE_TEXT}
+            )
+    finally:
+        monkeypatch.setattr(SqlAlchemyUnitOfWork, "commit", real_commit)
+    # 不留下任何文件
+    assert list(tmp_path.rglob("*")) == [] or not any(
+        path.is_file() for path in tmp_path.rglob("*")
+    )
+    # 不留下任何资料记录
+    engine = __import__("sqlalchemy").create_engine(TEST_DATABASE_URL)
+    with engine.connect() as connection:
+        count = connection.execute(select(Material)).all()
+    assert count == []
+
+
+def test_semester_course_mismatch_rejected(client: TestClient) -> None:
+    """课程与学期不一致时拒绝导入（评审回归：不混用不同学期要求）。"""
+    semester_a = client.post(
+        "/api/v1/semesters",
+        json={"name": "2026 秋", "start_date": "2026-09-01", "end_date": "2027-01-31"},
+    ).json()
+    semester_b = client.post(
+        "/api/v1/semesters",
+        json={"name": "2027 春", "start_date": "2027-02-15", "end_date": "2027-07-15"},
+    ).json()
+    course = client.post(
+        "/api/v1/courses", json={"semester_id": semester_a["id"], "name": "数据库原理"}
+    ).json()
+
+    response = client.post(
+        "/api/v1/materials/text",
+        json={
+            "title": "矛盾范围",
+            "content": NOTICE_TEXT,
+            "semester_id": semester_b["id"],  # 课程在 A 学期，资料却标 B 学期
+            "course_id": course["id"],
+        },
+    )
+    assert response.status_code == 400
+    assert "学期" in response.json()["detail"]
+
+    # 一致的组合应正常通过
+    ok = client.post(
+        "/api/v1/materials/text",
+        json={
+            "title": "一致范围",
+            "content": NOTICE_TEXT,
+            "semester_id": semester_a["id"],
+            "course_id": course["id"],
+        },
+    )
+    assert ok.status_code == 201
