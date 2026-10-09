@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from campusflow.api.deps import get_current_workspace, get_repositories
@@ -168,3 +168,57 @@ def update_material(
         class_name=merged.class_name,
     )
     return MaterialOut.model_validate(material)
+
+
+class UploadItemOut(BaseModel):
+    """单个文件的上传结果：成功带资料，失败带可读原因（D003）。"""
+
+    filename: str
+    material: MaterialOut | None
+    error: str | None
+
+
+class UploadOut(BaseModel):
+    results: list[UploadItemOut]
+
+
+@router.post("/upload", response_model=UploadOut, status_code=201)
+def upload_files(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+    request: Request,
+    files: Annotated[list[UploadFile], File()],
+    semester_id: Annotated[int | None, Query()] = None,
+    course_id: Annotated[int | None, Query()] = None,
+    class_name: Annotated[str | None, Query()] = None,
+    publisher: Annotated[str | None, Query()] = None,
+) -> UploadOut:
+    settings = request.app.state.settings
+    if len(files) > settings.upload_max_files:
+        from campusflow.domain.errors import DomainError
+
+        raise DomainError(f"一次最多上传 {settings.upload_max_files} 个文件")
+
+    results = use_cases.import_uploaded_files(
+        repos,
+        storage,
+        workspace.id,
+        files=[(f.filename or "未命名", f.file.read()) for f in files],
+        publisher=publisher,
+        published_at=None,
+        semester_id=semester_id,
+        course_id=course_id,
+        class_name=class_name,
+        max_bytes=settings.upload_max_bytes,
+    )
+    return UploadOut(
+        results=[
+            UploadItemOut(
+                filename=r.filename,
+                material=MaterialOut.model_validate(r.material) if r.material else None,
+                error=r.error,
+            )
+            for r in results
+        ]
+    )
