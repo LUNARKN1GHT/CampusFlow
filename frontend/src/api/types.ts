@@ -82,6 +82,7 @@ export type WorkspaceSettings = {
   workspace_id: number
   timezone: string
   daily_capacity_minutes: number
+  weekly_capacity_minutes: number
   break_minutes: number
   buffer_minutes: number
 }

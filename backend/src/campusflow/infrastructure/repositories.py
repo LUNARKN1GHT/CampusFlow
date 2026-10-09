@@ -57,6 +57,7 @@ def _workspace_to_data(row: Workspace) -> WorkspaceData:
         name=row.name,
         timezone=row.timezone,
         daily_capacity_minutes=row.daily_capacity_minutes,
+        weekly_capacity_minutes=row.weekly_capacity_minutes,
         break_minutes=row.break_minutes,
         buffer_minutes=row.buffer_minutes,
     )
@@ -204,12 +205,14 @@ class SqlAlchemyWorkspaceRepository:
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None:
         row = self._session.get(Workspace, workspace_id)
         if row is None:
             return None
         row.timezone = timezone
         row.daily_capacity_minutes = daily_capacity_minutes
+        row.weekly_capacity_minutes = weekly_capacity_minutes
         row.break_minutes = break_minutes
         row.buffer_minutes = buffer_minutes
         self._session.flush()

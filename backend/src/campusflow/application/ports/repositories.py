@@ -36,6 +36,7 @@ class WorkspaceData:
     daily_capacity_minutes: int
     break_minutes: int
     buffer_minutes: int
+    weekly_capacity_minutes: int = 1680
 
 
 @dataclass
@@ -127,6 +128,7 @@ class WorkspaceRepository(Protocol):
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None: ...
 
 
