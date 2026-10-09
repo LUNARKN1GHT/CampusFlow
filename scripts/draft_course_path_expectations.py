@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12,<3.13"
+# dependencies = ["pypdf==6.19.0", "PyYAML==6.0.3"]
+# ///
 """C001 验收样本预期标注的机器起草脚本。
 
 从 samples/course-paths/real/ 下的真实 PDF 抽取结构化内容，生成
@@ -6,7 +9,7 @@ samples/course-paths/expected/ 下的 YAML 起草稿。输出标注
 `needs-human-review: true`，必须经人工抽查后方可作为验收依据。
 
 用法：
-    python3 scripts/draft_course_path_expectations.py
+    uv run scripts/draft_course_path_expectations.py
 
 脚本只读取 samples/course-paths/real/ 中已登记的 PDF，不访问 data/。
 """
@@ -102,11 +105,7 @@ def parse_relation_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
             if not line or line.startswith("#"):
                 continue
             tokens = line.split()
-            ok = (
-                len(tokens) >= 7
-                and tokens[0].isdigit()
-                and tokens[-1] in REL_STATUS
-            )
+            ok = len(tokens) >= 7 and tokens[0].isdigit() and tokens[-1] in REL_STATUS
             if ok:
                 has_semester = REL_SEMESTER.match(tokens[-2]) is not None
                 if has_semester and len(tokens) < 8:
@@ -143,7 +142,27 @@ def parse_relation_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
 
 
 # 替代关系切片：切片页码（1 起）→ 原表页码
-SUBSTITUTE_PAGES = [2, 3, 10, 11, 12, 13, 23, 24, 25, 26, 28, 29, 33, 34, 46, 47, 48, 49, 62]
+SUBSTITUTE_PAGES = [
+    2,
+    3,
+    10,
+    11,
+    12,
+    13,
+    23,
+    24,
+    25,
+    26,
+    28,
+    29,
+    33,
+    34,
+    46,
+    47,
+    48,
+    49,
+    62,
+]
 SUB_HEAD = re.compile(r"^(\d+) #(\d+)\s+(.+)$")
 SUB_CODES = re.compile(r"\d(\.\d+)?\s*学分")
 CS_CODE = re.compile(r"^CS\d{4}")
@@ -180,7 +199,9 @@ def parse_substitute_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
     unmatched: list[str] = []
     for slice_page, page in enumerate(reader.pages, start=1):
         original_page = SUBSTITUTE_PAGES[slice_page - 1]
-        lines = [ln.strip() for ln in (page.extract_text() or "").splitlines() if ln.strip()]
+        lines = [
+            ln.strip() for ln in (page.extract_text() or "").splitlines() if ln.strip()
+        ]
         i = 0
         while i < len(lines):
             m = SUB_HEAD.match(lines[i])
@@ -214,7 +235,9 @@ def parse_substitute_pdf(pdf_path: Path) -> tuple[list[dict], list[str]]:
                         "group_id": m.group(2),
                         "substitute": _parse_side(" ".join(left_names), left_codes),
                         "original": _parse_side(" ".join(right_names), right_codes),
-                        "direction": "可相互替代" if direction.startswith("↔") else "单向（左→右）",
+                        "direction": "可相互替代"
+                        if direction.startswith("↔")
+                        else "单向（左→右）",
                         "is_course_group": "课程组" in direction,
                         "slice_page": slice_page,
                         "original_page": original_page,
@@ -254,7 +277,9 @@ def main() -> int:
         pdf = REAL_DIR / filename
         courses, groups, unmatched = parse_plan_pdf(pdf)
         total_unmatched += len(unmatched)
-        print(f"{filename}: 课程 {len(courses)} 门, 分组 {len(groups)} 组, 疑似漏匹配 {len(unmatched)} 行")
+        print(
+            f"{filename}: 课程 {len(courses)} 门, 分组 {len(groups)} 组, 疑似漏匹配 {len(unmatched)} 行"
+        )
         for u in unmatched:
             print(f"    待核对 {u}")
         payload = meta(f"real/{filename}", scenario)
@@ -294,7 +319,9 @@ def main() -> int:
     )
     for u in unmatched:
         print(f"    待核对 {u}")
-    payload = meta("real/替代关系-计算机切片.pdf", "课程替代关系解析与方向/课程组建模场景")
+    payload = meta(
+        "real/替代关系-计算机切片.pdf", "课程替代关系解析与方向/课程组建模场景"
+    )
     payload["_meta"]["note"] += " original_page 为原表页码；方向恒为替代方 → 被替代方。"
     payload["substitutions"] = subs
     dump_yaml(payload, EXPECTED_DIR / "替代关系-计算机切片.yaml")

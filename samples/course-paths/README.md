@@ -29,9 +29,11 @@
 
 ## 起草与复核流程
 
-1. 运行 `python3 scripts/draft_course_path_expectations.py` 重新生成 `expected/`（脚本只读 real/ 下已登记 PDF）。
+脚本使用 uv 的 PEP 723 内联依赖：Python 3.12、pypdf 6.19.0、PyYAML 6.0.3。首次运行需要下载依赖，不依赖全局 Python 环境，也不增加后端运行依赖。
+
+1. 运行 `uv run scripts/draft_course_path_expectations.py` 重新生成 `expected/`（脚本只读 real/ 下已登记 PDF）。
 2. 脚本会报告"疑似漏匹配"行数，这些行必须人工核对后在 YAML 中处理。
-3. 运行 `python3 scripts/verify_course_path_expectations.py` 做全量字段校验与分层抽样，核对记录写入 [SPOTCHECK.md](SPOTCHECK.md)。
+3. 运行 `uv run scripts/verify_course_path_expectations.py` 核对全部已声明字段与待核对原文；替代关系限定在同一组的连续原文块。运行 `uv run scripts/test_course_path_verification.py` 验证篡改字段与跨组误匹配会被拒绝。核对记录写入 [SPOTCHECK.md](SPOTCHECK.md)。
 4. 所有 `needs_human_review: true` 的文件经人工对照原文抽查后，方可把标记置为 `false` 并作为验收依据；抽查比例与结果记录在 Issue #183。
 
-当前状态：全部 expected/ 文件为机器起草稿，已完成机器辅助核对（289/289 全量字段校验 + 3 页视觉抽查，见 [SPOTCHECK.md](SPOTCHECK.md)），`needs_human_review` 待项目成员抽验确认后解除。
+当前状态：全部 expected/ 文件为机器起草稿，机器字段核对已通过 394/394（353 条课程与关系记录、41 条分组），另核对 6 条待核对原文。历史 Agent 视觉抽查与本次复验见 [SPOTCHECK.md](SPOTCHECK.md)。`needs_human_review` 保持为 true，待项目成员人工抽验确认后解除；本 PR 合并交付核对工具和样本补充，不代表 #183 人工验收完成。
