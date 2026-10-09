@@ -35,6 +35,7 @@ TABLES = ", ".join(
         "availability_slots",
         "materials",
         "material_versions",
+        "source_chunks",
     )
 )
 

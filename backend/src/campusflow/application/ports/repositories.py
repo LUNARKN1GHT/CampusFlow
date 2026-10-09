@@ -131,7 +131,31 @@ class MaterialVersionData:
     material_id: int
     version_no: int
     note: str | None
+    storage_key: str | None
     created_at: datetime
+
+
+@dataclass
+class NewSourceChunk:
+    """待保存的来源片段（尚未分配 id）。"""
+
+    version_id: int
+    seq: int
+    locator_type: str
+    locator_value: str
+    text: str
+
+
+@dataclass
+class SourceChunkData:
+    """来源片段（D004/D017）。locator 决定定位方式：段落号、页码或区域。"""
+
+    id: int
+    version_id: int
+    seq: int
+    locator_type: str
+    locator_value: str
+    text: str
 
 
 class SemesterRepository(Protocol):
@@ -256,10 +280,14 @@ class MaterialRepository(Protocol):
     def list_version_numbers(self, material_id: int) -> list[int]: ...
 
     def create_version(
-        self, material_id: int, version_no: int, note: str | None
+        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
     ) -> MaterialVersionData: ...
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
+
+    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]: ...
+
+    def list_chunks(self, version_id: int) -> list[SourceChunkData]: ...
 
 
 class ScheduleRepository(Protocol):
