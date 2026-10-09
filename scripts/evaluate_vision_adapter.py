@@ -20,7 +20,10 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SAMPLES_DIR = ROOT / "samples" / "synthetic" / "b011"
+SAMPLE_DOCS = [
+    ROOT / "samples" / "synthetic" / "b011" / "expected.json",
+    ROOT / "samples" / "synthetic" / "d013" / "expected.json",
+]
 RESULTS_PATH = ROOT / "docs" / "evaluation" / "d013-results.json"
 API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 MODEL = "glm-4v-flash"
@@ -115,18 +118,19 @@ def evaluate_sample(api_key: str, sample: dict) -> dict:
 
 def main() -> None:
     api_key = load_api_key()
-    expected_doc = json.loads((SAMPLES_DIR / "expected.json").read_text(encoding="utf-8"))
     results = {
         "model": MODEL,
         "note": "模型输出仅用于评测记录，不作为事实（AGENTS 规则）",
         "samples": [],
     }
-    for sample in expected_doc["samples"]:
-        print(f"评测 {sample['sample_id']} ...", flush=True)
-        try:
-            results["samples"].append(evaluate_sample(api_key, sample))
-        except Exception as exc:
-            results["samples"].append({"sample_id": sample["sample_id"], "error": str(exc)})
+    for doc_path in SAMPLE_DOCS:
+        expected_doc = json.loads(doc_path.read_text(encoding="utf-8"))
+        for sample in expected_doc["samples"]:
+            print(f"评测 {sample['sample_id']} ...", flush=True)
+            try:
+                results["samples"].append(evaluate_sample(api_key, sample))
+            except Exception as exc:
+                results["samples"].append({"sample_id": sample["sample_id"], "error": str(exc)})
     RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     RESULTS_PATH.write_text(
         json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
