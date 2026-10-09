@@ -29,6 +29,7 @@
 
 1. 运行 `python3 scripts/draft_course_path_expectations.py` 重新生成 `expected/`（脚本只读 real/ 下已登记 PDF）。
 2. 脚本会报告"疑似漏匹配"行数，这些行必须人工核对后在 YAML 中处理。
-3. 所有 `needs_human_review: true` 的文件经人工对照原文抽查后，方可把标记置为 `false` 并作为验收依据；抽查比例与结果记录在 Issue #183。
+3. 运行 `python3 scripts/verify_course_path_expectations.py` 做全量字段校验与分层抽样，核对记录写入 [SPOTCHECK.md](SPOTCHECK.md)。
+4. 所有 `needs_human_review: true` 的文件经人工对照原文抽查后，方可把标记置为 `false` 并作为验收依据；抽查比例与结果记录在 Issue #183。
 
-当前状态：全部 expected/ 文件为机器起草稿，尚未人工抽查。
+当前状态：全部 expected/ 文件为机器起草稿，已完成机器辅助核对（289/289 全量字段校验 + 3 页视觉抽查，见 [SPOTCHECK.md](SPOTCHECK.md)），`needs_human_review` 待项目成员抽验确认后解除。
