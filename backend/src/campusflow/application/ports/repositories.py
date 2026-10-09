@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import (
+    EventRecurrence,
+    MaterialSourceType,
+    MaterialStatus,
+    TaskPriority,
+    TaskProgress,
+)
 
 
 class UnitOfWork(Protocol):
@@ -100,6 +106,58 @@ class AvailabilitySlotData:
     end_time: time
 
 
+@dataclass
+class MaterialData:
+    """资料元数据（D001）。未知来源字段为 None，不伪造。"""
+
+    id: int
+    workspace_id: int
+    semester_id: int | None
+    course_id: int | None
+    class_name: str | None
+    title: str
+    publisher: str | None
+    published_at: datetime | None
+    source_type: MaterialSourceType
+    source_url: str | None
+    status: MaterialStatus
+    archived: bool
+    imported_at: datetime
+
+
+@dataclass
+class MaterialVersionData:
+    id: int
+    material_id: int
+    version_no: int
+    note: str | None
+    storage_key: str | None
+    created_at: datetime
+
+
+@dataclass
+class NewSourceChunk:
+    """待保存的来源片段（尚未分配 id）。"""
+
+    version_id: int
+    seq: int
+    locator_type: str
+    locator_value: str
+    text: str
+
+
+@dataclass
+class SourceChunkData:
+    """来源片段（D004/D017）。locator 决定定位方式：段落号、页码或区域。"""
+
+    id: int
+    version_id: int
+    seq: int
+    locator_type: str
+    locator_value: str
+    text: str
+
+
 class SemesterRepository(Protocol):
     def list(self, workspace_id: int, *, include_archived: bool = False) -> list[SemesterData]: ...
 
@@ -114,6 +172,10 @@ class SemesterRepository(Protocol):
 
 class WorkspaceRepository(Protocol):
     def get(self, workspace_id: int) -> WorkspaceData | None: ...
+
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        """返回默认空间，不存在时创建；并发调用也必须最多创建一个。"""
+        ...
 
     def update_settings(
         self,
@@ -198,6 +260,60 @@ class TaskRepository(Protocol):
     def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
+class MaterialRepository(Protocol):
+    def get(self, material_id: int) -> MaterialData | None: ...
+
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None = None,
+        course_id: int | None = None,
+        source_type: MaterialSourceType | None = None,
+        status: MaterialStatus | None = None,
+        include_archived: bool = False,
+    ) -> list[MaterialData]: ...
+
+    def create(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_type: MaterialSourceType,
+        source_url: str | None,
+    ) -> MaterialData: ...
+
+    def update_metadata(
+        self,
+        material_id: int,
+        *,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_url: str | None,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+    ) -> MaterialData | None: ...
+
+    def list_version_numbers(self, material_id: int) -> list[int]: ...
+
+    def create_version(
+        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
+    ) -> MaterialVersionData: ...
+
+    def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
+
+    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]: ...
+
+    def list_chunks(self, version_id: int) -> list[SourceChunkData]: ...
+
+
 class ScheduleRepository(Protocol):
     def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
 
@@ -248,4 +364,5 @@ class Repositories:
     courses: CourseRepository
     tasks: TaskRepository
     schedule: ScheduleRepository
+    materials: MaterialRepository
     uow: UnitOfWork

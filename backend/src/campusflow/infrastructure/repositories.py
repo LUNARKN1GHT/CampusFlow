@@ -4,24 +4,38 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from sqlalchemy import select
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from campusflow.application.ports.repositories import (
     AvailabilitySlotData,
     CourseData,
     FixedEventData,
+    MaterialData,
+    MaterialVersionData,
+    NewSourceChunk,
     SemesterData,
+    SourceChunkData,
     TaskData,
     TaskProgressChangeData,
     WorkspaceData,
 )
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import (
+    EventRecurrence,
+    MaterialSourceType,
+    MaterialStatus,
+    TaskPriority,
+    TaskProgress,
+)
 from campusflow.infrastructure.db.models import (
     AvailabilitySlot,
     Course,
     FixedEvent,
+    Material,
+    MaterialVersion,
     Semester,
+    SourceChunk,
     Task,
     TaskProgressChange,
     Workspace,
@@ -128,6 +142,181 @@ def _slot_to_data(row: AvailabilitySlot) -> AvailabilitySlotData:
     )
 
 
+def _material_to_data(row: Material) -> MaterialData:
+    return MaterialData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        semester_id=row.semester_id,
+        course_id=row.course_id,
+        class_name=row.class_name,
+        title=row.title,
+        publisher=row.publisher,
+        published_at=row.published_at,
+        source_type=MaterialSourceType(row.source_type),
+        source_url=row.source_url,
+        status=MaterialStatus(row.status),
+        archived=row.archived,
+        imported_at=row.imported_at,
+    )
+
+
+def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
+    return MaterialVersionData(
+        id=row.id,
+        material_id=row.material_id,
+        version_no=row.version_no,
+        note=row.note,
+        storage_key=row.storage_key,
+        created_at=row.created_at,
+    )
+
+
+def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
+    return SourceChunkData(
+        id=row.id,
+        version_id=row.version_id,
+        seq=row.seq,
+        locator_type=row.locator_type,
+        locator_value=row.locator_value,
+        text=row.text,
+    )
+
+
+class SqlAlchemyMaterialRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get(self, material_id: int) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        return _material_to_data(row) if row is not None else None
+
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None = None,
+        course_id: int | None = None,
+        source_type: MaterialSourceType | None = None,
+        status: MaterialStatus | None = None,
+        include_archived: bool = False,
+    ) -> list[MaterialData]:
+        stmt = select(Material).where(Material.workspace_id == workspace_id)
+        if semester_id is not None:
+            stmt = stmt.where(Material.semester_id == semester_id)
+        if course_id is not None:
+            stmt = stmt.where(Material.course_id == course_id)
+        if source_type is not None:
+            stmt = stmt.where(Material.source_type == source_type)
+        if status is not None:
+            stmt = stmt.where(Material.status == status)
+        if not include_archived:
+            stmt = stmt.where(Material.archived.is_(False))
+        stmt = stmt.order_by(Material.imported_at.desc())
+        return [_material_to_data(row) for row in self._session.scalars(stmt)]
+
+    def update_metadata(
+        self,
+        material_id: int,
+        *,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_url: str | None,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+    ) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.title = title
+        row.publisher = publisher
+        row.published_at = published_at
+        row.source_url = source_url
+        row.semester_id = semester_id
+        row.course_id = course_id
+        row.class_name = class_name
+        self._session.flush()
+        return _material_to_data(row)
+
+    def create(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+        title: str,
+        publisher: str | None,
+        published_at: datetime | None,
+        source_type: MaterialSourceType,
+        source_url: str | None,
+    ) -> MaterialData:
+        row = Material(
+            workspace_id=workspace_id,
+            semester_id=semester_id,
+            course_id=course_id,
+            class_name=class_name,
+            title=title,
+            publisher=publisher,
+            published_at=published_at,
+            source_type=source_type,
+            source_url=source_url,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _material_to_data(row)
+
+    def list_version_numbers(self, material_id: int) -> list[int]:
+        stmt = (
+            select(MaterialVersion.version_no)
+            .where(MaterialVersion.material_id == material_id)
+            .order_by(MaterialVersion.version_no)
+        )
+        return list(self._session.scalars(stmt))
+
+    def create_version(
+        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
+    ) -> MaterialVersionData:
+        row = MaterialVersion(
+            material_id=material_id, version_no=version_no, note=note, storage_key=storage_key
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _material_version_to_data(row)
+
+    def list_versions(self, material_id: int) -> list[MaterialVersionData]:
+        stmt = (
+            select(MaterialVersion)
+            .where(MaterialVersion.material_id == material_id)
+            .order_by(MaterialVersion.version_no)
+        )
+        return [_material_version_to_data(row) for row in self._session.scalars(stmt)]
+
+    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]:
+        rows = [
+            SourceChunk(
+                version_id=chunk.version_id,
+                seq=chunk.seq,
+                locator_type=chunk.locator_type,
+                locator_value=chunk.locator_value,
+                text=chunk.text,
+            )
+            for chunk in chunks
+        ]
+        self._session.add_all(rows)
+        self._session.flush()
+        return [_chunk_to_data(row) for row in rows]
+
+    def list_chunks(self, version_id: int) -> list[SourceChunkData]:
+        stmt = (
+            select(SourceChunk)
+            .where(SourceChunk.version_id == version_id)
+            .order_by(SourceChunk.seq)
+        )
+        return [_chunk_to_data(row) for row in self._session.scalars(stmt)]
+
+
 class SqlAlchemySemesterRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -173,6 +362,27 @@ class SqlAlchemyWorkspaceRepository:
     def get(self, workspace_id: int) -> WorkspaceData | None:
         row = self._session.get(Workspace, workspace_id)
         return _workspace_to_data(row) if row is not None else None
+
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        row = self._session.scalar(select(Workspace).where(Workspace.is_default.is_(True)))
+        if row is not None:
+            return _workspace_to_data(row)
+        # 并发初始化安全：依赖 uq_workspaces_default 部分唯一索引 + ON CONFLICT DO NOTHING，
+        # 冲突时不插入，随后重新读取胜出者创建的那一行。
+        stmt = (
+            pg_insert(Workspace)
+            .values(name=name, timezone=timezone, is_default=True)
+            .on_conflict_do_nothing(
+                index_elements=["is_default"],
+                index_where=text("is_default"),
+            )
+        )
+        self._session.execute(stmt)
+        self._session.flush()
+        row = self._session.scalar(select(Workspace).where(Workspace.is_default.is_(True)))
+        if row is None:
+            raise RuntimeError("默认工作空间创建失败")
+        return _workspace_to_data(row)
 
     def update_settings(
         self,
