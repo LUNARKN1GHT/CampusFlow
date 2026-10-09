@@ -1,18 +1,10 @@
 """API 输入输出 schema。"""
 
 from datetime import date, datetime, time
-from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
-
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
-
-
-def _assume_local(value: datetime) -> datetime:
-    """前端未带时区的日期时间按本地时区理解。"""
-    return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
 
 
 class SemesterCreate(BaseModel):
@@ -138,11 +130,6 @@ class FixedEventCreate(BaseModel):
     recurrence: EventRecurrence = EventRecurrence.NONE
     repeat_until: date | None = None
 
-    @field_validator("starts_at", "ends_at")
-    @classmethod
-    def assume_local(cls, value: datetime) -> datetime:
-        return _assume_local(value)
-
 
 class FixedEventUpdate(BaseModel):
     course_id: int | None = None
@@ -152,11 +139,6 @@ class FixedEventUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=200)
     recurrence: EventRecurrence | None = None
     repeat_until: date | None = None
-
-    @field_validator("starts_at", "ends_at")
-    @classmethod
-    def assume_local(cls, value: datetime | None) -> datetime | None:
-        return None if value is None else _assume_local(value)
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "FixedEventUpdate":
