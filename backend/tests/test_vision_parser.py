@@ -115,3 +115,61 @@ def test_retry_eventually_succeeds() -> None:
     outcome = parser.parse(PNG_BYTES, "image/png")
     assert calls["count"] == 2
     assert outcome.fragments[0].text == "成功"
+
+
+def test_top_level_array_is_reportable_error() -> None:
+    """模型返回合法 JSON 但顶层不是对象（如 []）时，报可报告错误而非泄漏 AttributeError。"""
+    parser = _make_parser({"choices": [{"message": {"content": "[]"}}]})
+    with pytest.raises(VisionRecognitionError, match="顶层"):
+        parser.parse(PNG_BYTES, "image/png")
+
+
+def test_items_with_non_dict_elements_is_reportable_error() -> None:
+    """items 含非对象元素时报可报告错误，不泄漏 AttributeError。"""
+    parser = _make_parser({"choices": [{"message": {"content": '{"items": ["文字串"]}'}}]})
+    with pytest.raises(VisionRecognitionError, match="非对象"):
+        parser.parse(PNG_BYTES, "image/png")
+
+
+def test_items_not_a_list_is_reportable_error() -> None:
+    parser = _make_parser({"choices": [{"message": {"content": '{"items": {"a": 1}}'}}]})
+    with pytest.raises(VisionRecognitionError, match="items"):
+        parser.parse(PNG_BYTES, "image/png")
+
+
+def test_unreadable_string_is_single_failure_not_char_split() -> None:
+    """unreadable 为字符串时作为一条失败项，不逐字符拆分（评审回归）。"""
+    # 构造 unreadable 为字符串的响应
+    content = json.dumps(
+        {"items": [{"text": "可读", "bbox": [0.1, 0.1, 0.5, 0.2]}], "unreadable": "下半页模糊"},
+        ensure_ascii=False,
+    )
+    parser = _make_parser({"choices": [{"message": {"content": content}}]})
+    outcome = parser.parse(PNG_BYTES, "image/png")
+    assert len(outcome.failures) == 1
+    assert outcome.failures[0].reason == "下半页模糊"
+
+
+def test_bbox_order_and_confidence_range_validated() -> None:
+    """bbox 顺序颠倒或越界降级为整页；confidence 越界视为未提供（评审回归）。"""
+    parser = _make_parser(
+        _api_response(
+            [
+                {"text": "顺序颠倒", "bbox": [0.9, 0.1, 0.1, 0.5], "confidence": 0.5},
+                {"text": "y 颠倒", "bbox": [0.1, 0.9, 0.5, 0.1], "confidence": 1},
+                {"text": "置信度越界", "bbox": [0.1, 0.1, 0.5, 0.5], "confidence": 1.7},
+                {"text": "置信度为字符串", "bbox": [0.1, 0.1, 0.5, 0.5], "confidence": "high"},
+            ]
+        )
+    )
+    outcome = parser.parse(PNG_BYTES, "image/png")
+    assert all(f.locator.kind == "page" for f in outcome.fragments[:2])
+    assert outcome.fragments[2].locator.kind == "region"
+    assert outcome.fragments[2].confidence is None
+    assert outcome.fragments[3].confidence is None
+
+
+def test_content_not_string_is_reportable_error() -> None:
+    parser = _make_parser({"choices": [{"message": {"content": {"items": []}}}]})
+    with pytest.raises(VisionRecognitionError, match="文本"):
+        parser.parse(PNG_BYTES, "image/png")
