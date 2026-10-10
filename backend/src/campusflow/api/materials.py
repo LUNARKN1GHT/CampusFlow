@@ -171,11 +171,12 @@ def update_material(
 
 
 class UploadItemOut(BaseModel):
-    """单个文件的上传结果：成功带资料，失败带可读原因（D003）。"""
+    """单个文件的上传结果：成功带资料，失败带可读原因，完全重复带已有资料提示（D003/D006）。"""
 
     filename: str
     material: MaterialOut | None
     error: str | None
+    duplicate_of: MaterialOut | None = None
 
 
 class UploadOut(BaseModel):
@@ -193,6 +194,7 @@ def upload_files(
     course_id: Annotated[int | None, Query()] = None,
     class_name: Annotated[str | None, Query()] = None,
     publisher: Annotated[str | None, Query()] = None,
+    allow_duplicate: Annotated[bool, Query()] = False,
 ) -> UploadOut:
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
@@ -211,6 +213,7 @@ def upload_files(
         course_id=course_id,
         class_name=class_name,
         max_bytes=settings.upload_max_bytes,
+        allow_duplicate=allow_duplicate,
     )
     return UploadOut(
         results=[
@@ -218,6 +221,9 @@ def upload_files(
                 filename=r.filename,
                 material=MaterialOut.model_validate(r.material) if r.material else None,
                 error=r.error,
+                duplicate_of=(
+                    MaterialOut.model_validate(r.duplicate_of) if r.duplicate_of else None
+                ),
             )
             for r in results
         ]
