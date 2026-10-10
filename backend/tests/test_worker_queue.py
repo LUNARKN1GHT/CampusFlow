@@ -88,21 +88,9 @@ def test_worker_executes_parse_use_case(
         json={"title": "Worker 测试", "content": "第一段。\n\n第二段。"},
     )
     assert response.status_code == 201
-    material_id = response.json()["material"]["id"]
 
-    # 粘贴文本接口未挂队列；手工建作业并入队到 fakeredis
     engine = create_engine(TEST_DATABASE_URL)
     factory = sessionmaker(bind=engine)
-    with factory() as session:
-        version_id = (
-            SqlAlchemyJobRepository(session)
-            and __import__(
-                "campusflow.infrastructure.repositories", fromlist=["SqlAlchemyMaterialRepository"]
-            )
-            .SqlAlchemyMaterialRepository(session)
-            .list_versions(material_id)[0]
-            .id
-        )
 
     # Worker 进程视角：装配解析器注册表并执行
     set_parser_registry(
@@ -165,7 +153,9 @@ def test_parse_failure_marks_job_failed(
     import os
 
     os.environ["CAMPUSFLOW_DATABASE_URL"] = TEST_DATABASE_URL
-    with pytest.raises(Exception):
+    from campusflow.infrastructure.llm.errors import VisionRecognitionError
+
+    with pytest.raises(VisionRecognitionError):
         parse_version_job(job_id)
 
     engine = create_engine(TEST_DATABASE_URL)
