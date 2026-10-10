@@ -194,5 +194,7 @@ class SourceChunk(Base):
     bbox_x1: Mapped[float | None] = mapped_column(Float)
     bbox_y1: Mapped[float | None] = mapped_column(Float)
     confidence: Mapped[float | None] = mapped_column(Float)
+    # 跨页表格分组键（D016）：同一表格各分部共享；非表格片段为 NULL
+    table_group: Mapped[str | None] = mapped_column(String(64))
     text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

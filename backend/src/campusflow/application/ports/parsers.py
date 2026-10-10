@@ -39,12 +39,14 @@ class ParserLocator:
 
 @dataclass(frozen=True)
 class ParsedFragment:
-    """解析出的一个片段：文本 + 定位 + 置信度（None 表示解析器不提供）。"""
+    """解析出的一个片段：文本 + 定位 + 置信度（None 表示解析器不提供）。
+    table_group 标识跨页表格分组（D016），同一表格各分部共享同一组键。"""
 
     seq: int
     locator: ParserLocator
     text: str
     confidence: float | None = None
+    table_group: str | None = None
 
 
 @dataclass(frozen=True)
