@@ -38,7 +38,6 @@ class PdfWithVisionFallbackParser:
         failures: list[ParseFailure] = []
         seq = 0
 
-        text_pages = {f.locator.page for f in text_outcome.fragments}
         for fragment in text_outcome.fragments:
             fragments.append(
                 ParsedFragment(
