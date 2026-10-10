@@ -15,6 +15,7 @@ from campusflow.application.ports.repositories import (
     MaterialData,
     MaterialVersionData,
     NewSourceChunk,
+    ProcessingJobData,
     SemesterData,
     SourceChunkData,
     TaskData,
@@ -34,6 +35,7 @@ from campusflow.infrastructure.db.models import (
     FixedEvent,
     Material,
     MaterialVersion,
+    ProcessingJob,
     Semester,
     SourceChunk,
     Task,
@@ -735,3 +737,53 @@ class SqlAlchemyScheduleRepository:
         self._session.delete(row)
         self._session.flush()
         return True
+
+
+def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
+    return ProcessingJobData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        material_id=row.material_id,
+        version_id=row.version_id,
+        stage=row.stage,
+        status=row.status,
+        scope=row.scope,
+        error_reason=row.error_reason,
+        attempts=row.attempts,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+class SqlAlchemyJobRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(
+        self, workspace_id: int, material_id: int, version_id: int, stage: str
+    ) -> ProcessingJobData:
+        row = ProcessingJob(
+            workspace_id=workspace_id, material_id=material_id, version_id=version_id, stage=stage
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _job_to_data(row)
+
+    def get(self, job_id: int) -> ProcessingJobData | None:
+        row = self._session.get(ProcessingJob, job_id)
+        return _job_to_data(row) if row is not None else None
+
+    def record_attempt(
+        self, job_id: int, *, status: str, scope: str | None, error_reason: str | None
+    ) -> ProcessingJobData | None:
+        from campusflow.domain.jobs import sanitize_error_reason
+
+        row = self._session.get(ProcessingJob, job_id)
+        if row is None:
+            return None
+        row.status = status
+        row.scope = scope
+        row.error_reason = sanitize_error_reason(error_reason)
+        row.attempts = row.attempts + 1
+        self._session.flush()
+        return _job_to_data(row)

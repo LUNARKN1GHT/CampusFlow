@@ -191,3 +191,24 @@ class SourceChunk(Base):
     locator_value: Mapped[str] = mapped_column(String(50))  # 如段落号 "3" 或页码 "2"
     text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProcessingJob(Base):
+    """后台处理作业（J001）：阶段、覆盖范围、错误原因、尝试次数。"""
+
+    __tablename__ = "processing_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id"), index=True)
+    version_id: Mapped[int] = mapped_column(ForeignKey("material_versions.id"), index=True)
+    stage: Mapped[str] = mapped_column(String(20))  # JobStage
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # JobStatus
+    # 覆盖范围说明（如"第 1-3 页完成，第 4 页失败"），不含原文全文
+    scope: Mapped[str | None] = mapped_column(String(500))
+    error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

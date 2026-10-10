@@ -160,6 +160,40 @@ class SourceChunkData:
     text: str
 
 
+@dataclass
+class ProcessingJobData:
+    """后台处理作业（J001）。"""
+
+    id: int
+    workspace_id: int
+    material_id: int
+    version_id: int
+    stage: str
+    status: str
+    scope: str | None
+    error_reason: str | None
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobRepository(Protocol):
+    def create(
+        self, workspace_id: int, material_id: int, version_id: int, stage: str
+    ) -> ProcessingJobData: ...
+
+    def get(self, job_id: int) -> ProcessingJobData | None: ...
+
+    def record_attempt(
+        self,
+        job_id: int,
+        *,
+        status: str,
+        scope: str | None,
+        error_reason: str | None,
+    ) -> ProcessingJobData | None: ...
+
+
 class SemesterRepository(Protocol):
     def list(self, workspace_id: int, *, include_archived: bool = False) -> list[SemesterData]: ...
 
