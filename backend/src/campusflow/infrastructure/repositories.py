@@ -295,6 +295,14 @@ class SqlAlchemyMaterialRepository:
         self._session.flush()
         return _material_version_to_data(row)
 
+    def set_archived(self, material_id: int, archived: bool) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.archived = archived
+        self._session.flush()
+        return _material_to_data(row)
+
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
         stmt = (
             select(Material)

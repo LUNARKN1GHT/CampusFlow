@@ -149,6 +149,20 @@ def get_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) ->
     return MaterialOut.model_validate(use_cases.get_material(repos, workspace.id, material_id))
 
 
+@router.post("/{material_id}/archive", response_model=MaterialOut)
+def archive_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    return MaterialOut.model_validate(
+        use_cases.set_material_archived(repos, workspace.id, material_id, archived=True)
+    )
+
+
+@router.post("/{material_id}/restore", response_model=MaterialOut)
+def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    return MaterialOut.model_validate(
+        use_cases.set_material_archived(repos, workspace.id, material_id, archived=False)
+    )
+
+
 @router.patch("/{material_id}", response_model=MaterialOut)
 def update_material(
     material_id: int, payload: MaterialMetadataUpdate, workspace: CurrentWorkspace, repos: Repos
