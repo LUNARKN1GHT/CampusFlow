@@ -152,6 +152,7 @@ class DeleteImpactOut(BaseModel):
     chunk_count: int
     linked_task_ids: list[int]
     confirm_token: str
+    backup_note: str
 
 
 class DeleteConfirmIn(BaseModel):
@@ -160,14 +161,21 @@ class DeleteConfirmIn(BaseModel):
 
 
 @router.get("/{material_id}/delete-impact", response_model=DeleteImpactOut)
-def delete_impact(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> DeleteImpactOut:
+def delete_impact(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos, request: Request
+) -> DeleteImpactOut:
     impact = use_cases.preview_delete_impact(repos, workspace.id, material_id)
+    days = request.app.state.settings.backup_retention_days
     return DeleteImpactOut(
         material=MaterialOut.model_validate(impact.material),
         version_count=impact.version_count,
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
         confirm_token=impact.confirm_token,
+        backup_note=(
+            f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"
+            f"随备份轮换清除，且恢复流程不会复活已删除资料（见 docs/data-retention.md）。"
+        ),
     )
 
 
