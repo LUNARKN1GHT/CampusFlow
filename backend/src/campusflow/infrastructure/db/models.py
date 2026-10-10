@@ -68,6 +68,10 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    # 来源资料（核对转任务时由 R 系列写入）；删除资料时可选择保留任务并置空
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，

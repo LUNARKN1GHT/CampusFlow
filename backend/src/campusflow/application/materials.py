@@ -18,6 +18,7 @@ from campusflow.application.ports.storage import FileStorage
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.materials import (
+    deletion_confirmation_token,
     next_version_no,
     split_paragraphs,
     validate_pasted_text,
@@ -289,3 +290,68 @@ def set_material_archived(
     updated = repos.materials.set_archived(material_id, archived)
     repos.uow.commit()
     return updated
+
+
+@dataclass
+class DeleteImpact:
+    """资料删除影响预览（D008）：将失效的版本、片段与关联个人任务。"""
+
+    material: MaterialData
+    version_count: int
+    chunk_count: int
+    linked_task_ids: list[int]
+    confirm_token: str
+
+
+def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
+    material = get_material(repos, workspace_id, material_id)
+    versions = repos.materials.list_versions(material_id)
+    chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
+    linked_tasks = repos.tasks.list_by_source_material(material_id)
+    token = deletion_confirmation_token(
+        material_id,
+        [v.id for v in versions],
+        chunk_count,
+        [t.id for t in linked_tasks],
+    )
+    return DeleteImpact(
+        material=material,
+        version_count=len(versions),
+        chunk_count=chunk_count,
+        linked_task_ids=[t.id for t in linked_tasks],
+        confirm_token=token,
+    )
+
+
+def delete_material(
+    repos: Repositories,
+    storage: FileStorage,
+    workspace_id: int,
+    material_id: int,
+    *,
+    confirm_token: str,
+    keep_tasks: bool,
+) -> DeleteImpact:
+    """确认后删除资料（D008）。
+
+    确认指纹必须匹配当前影响内容，变化后旧确认失效；
+    keep_tasks=True 时保留个人任务并解除来源关联，False 时一并删除。
+    """
+    impact = preview_delete_impact(repos, workspace_id, material_id)
+    if impact.confirm_token != confirm_token:
+        raise DomainError("影响内容已变化，请重新预览确认")
+
+    versions = repos.materials.list_versions(material_id)
+    if keep_tasks:
+        repos.tasks.unlink_source_material(material_id)
+    else:
+        for task in repos.tasks.list_by_source_material(material_id):
+            repos.tasks.delete(task.id)
+
+    repos.materials.delete(material_id)
+    repos.uow.commit()
+    # 数据库删除成功后清理原文件
+    for version in versions:
+        if version.storage_key:
+            storage.delete(version.storage_key)
+    return impact
