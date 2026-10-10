@@ -10,9 +10,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.application import materials as use_cases
+from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
+from campusflow.infrastructure.parsers.text import TextDocumentParser
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
@@ -27,6 +29,13 @@ def get_file_storage(request: Request) -> FileStorage:
 
 
 Storage = Annotated[FileStorage, Depends(get_file_storage)]
+
+
+def get_text_parser() -> DocumentParser:
+    return TextDocumentParser()
+
+
+TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
 
 
 class TextImportIn(BaseModel):
@@ -72,6 +81,10 @@ class SourceChunkOut(BaseModel):
     locator_type: str
     locator_value: str
     text: str
+    page: int | None
+    paragraph: int | None
+    bbox: tuple[float, float, float, float] | None
+    confidence: float | None
 
 
 class TextImportOut(BaseModel):
@@ -100,7 +113,11 @@ class MaterialMetadataUpdate(BaseModel):
 
 @router.post("/text", response_model=TextImportOut, status_code=201)
 def import_text(
-    payload: TextImportIn, workspace: CurrentWorkspace, repos: Repos, storage: Storage
+    payload: TextImportIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+    text_parser: TextParser,
 ) -> TextImportOut:
     material, chunks = use_cases.import_pasted_text(
         repos,
@@ -113,6 +130,7 @@ def import_text(
         semester_id=payload.semester_id,
         course_id=payload.course_id,
         class_name=payload.class_name,
+        text_parser=text_parser,
     )
     return TextImportOut(
         material=MaterialOut.model_validate(material),

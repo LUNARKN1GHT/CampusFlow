@@ -12,6 +12,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -174,13 +175,15 @@ class MaterialVersion(Base):
 
 
 class SourceChunk(Base):
-    """来源片段：资料版本中的最小定位单元。
+    """来源片段：资料版本中的最小定位单元（D004/D017）。
 
-    粘贴文本按段落切分，段落号（locator_value）在重复读取时稳定（D004）；
-    PDF 页码、图片区域等定位方式在 D017 扩展。
+    片段严格绑定版本（version_id + seq 唯一，重试幂等）；版本更新后
+    旧片段仍指向旧版本文本，引用不会误指向新内容。
+    定位坐标结构化保存：段落号、页码、区域 bbox（0-1 归一化）。
     """
 
     __tablename__ = "source_chunks"
+    __table_args__ = (UniqueConstraint("version_id", "seq", name="uq_source_chunks_version_seq"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     version_id: Mapped[int] = mapped_column(
@@ -188,7 +191,15 @@ class SourceChunk(Base):
     )
     seq: Mapped[int] = mapped_column(Integer)  # 片段在版本内的顺序，从 0 开始
     locator_type: Mapped[str] = mapped_column(String(20))  # paragraph / page / region
-    locator_value: Mapped[str] = mapped_column(String(50))  # 如段落号 "3" 或页码 "2"
+    locator_value: Mapped[str] = mapped_column(String(50))  # 展示用定位文本
+    # 结构化定位坐标（D017）
+    page: Mapped[int | None] = mapped_column(Integer)
+    paragraph: Mapped[int | None] = mapped_column(Integer)
+    bbox_x0: Mapped[float | None] = mapped_column(Float)
+    bbox_y0: Mapped[float | None] = mapped_column(Float)
+    bbox_x1: Mapped[float | None] = mapped_column(Float)
+    bbox_y1: Mapped[float | None] = mapped_column(Float)
+    confidence: Mapped[float | None] = mapped_column(Float)
     text: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
