@@ -31,3 +31,29 @@ def split_paragraphs(content: str) -> list[str]:
     normalized = content.replace("\r\n", "\n").replace("\r", "\n")
     paragraphs = [part.strip() for part in _BLANK_LINE.split(normalized)]
     return [part for part in paragraphs if part]
+
+
+def deletion_confirmation_token(
+    material_id: int,
+    version_ids: list[int],
+    chunk_count: int,
+    linked_task_ids: list[int],
+) -> str:
+    """删除确认指纹：影响内容的稳定哈希（D008）。
+
+    预览与执行必须基于同一份影响内容；任何一项变化（版本、片段数、
+    关联任务）都会使旧确认失效，防止用过期的确认执行新的删除。
+    """
+    import hashlib
+    import json
+
+    canonical = json.dumps(
+        {
+            "material_id": material_id,
+            "version_ids": sorted(version_ids),
+            "chunk_count": chunk_count,
+            "linked_task_ids": sorted(linked_task_ids),
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()[:32]
