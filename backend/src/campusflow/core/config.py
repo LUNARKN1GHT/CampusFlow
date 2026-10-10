@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # 上传限制（D003）：可通过环境变量覆盖
     upload_max_bytes: int = 20 * 1024 * 1024
     upload_max_files: int = 5
+    # 未来备份的保留期限（天），删除界面据此说明备份残留（D010）
+    backup_retention_days: int = 30
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

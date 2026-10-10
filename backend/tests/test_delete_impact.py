@@ -119,3 +119,13 @@ def test_delete_removes_original_files(client: TestClient, tmp_path) -> None:
         json={"confirm_token": token, "keep_tasks": True},
     )
     assert not any(path.is_file() for path in tmp_path.rglob("*"))
+
+
+def test_delete_impact_includes_backup_note(client: TestClient) -> None:
+    """删除界面说明备份残留期限（D010 验收）。"""
+    imported = _import(client)
+    material_id = imported["material"]["id"]
+    impact = client.get(f"/api/v1/materials/{material_id}/delete-impact").json()
+    assert "backup_note" in impact
+    assert "30 天" in impact["backup_note"]
+    assert "复活" in impact["backup_note"] or "清除" in impact["backup_note"]
