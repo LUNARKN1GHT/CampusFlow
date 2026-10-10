@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.application import materials as use_cases
 from campusflow.application.ports.parsers import DocumentParser
+from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
@@ -36,6 +37,14 @@ def get_text_parser() -> DocumentParser:
 
 
 TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
+
+
+def get_job_queue(request: Request) -> JobQueue | None:
+    """队列不可用时返回 None：建档仍可完成，投递补偿由 J004 处理。"""
+    return getattr(request.app.state, "job_queue", None)
+
+
+JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
 
 
 class TextImportIn(BaseModel):
@@ -263,6 +272,7 @@ class UploadItemOut(BaseModel):
     material: MaterialOut | None
     error: str | None
     duplicate_of: MaterialOut | None = None
+    job_id: int | None = None
 
 
 class UploadOut(BaseModel):
@@ -281,6 +291,7 @@ def upload_files(
     class_name: Annotated[str | None, Query()] = None,
     publisher: Annotated[str | None, Query()] = None,
     allow_duplicate: Annotated[bool, Query()] = False,
+    queue: JobQueueDep = None,
 ) -> UploadOut:
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
@@ -300,6 +311,7 @@ def upload_files(
         class_name=class_name,
         max_bytes=settings.upload_max_bytes,
         allow_duplicate=allow_duplicate,
+        queue=queue,
     )
     return UploadOut(
         results=[
@@ -310,6 +322,7 @@ def upload_files(
                 duplicate_of=(
                     MaterialOut.model_validate(r.duplicate_of) if r.duplicate_of else None
                 ),
+                job_id=r.job_id,
             )
             for r in results
         ]

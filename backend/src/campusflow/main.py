@@ -12,6 +12,7 @@ from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.infrastructure.db.engine import create_db_engine
 from campusflow.infrastructure.db.session import create_session_factory
+from campusflow.infrastructure.queue.rq_queue import RQJobQueue
 from campusflow.infrastructure.storage.local import LocalFileStorage
 
 
@@ -24,6 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.auth_tokens = set()
     app.state.file_storage = LocalFileStorage(settings.storage_dir)
+    app.state.job_queue = RQJobQueue(settings.redis_url)
 
     for router in (health_router, auth_api.router):
         app.include_router(router, prefix="/api/v1")
