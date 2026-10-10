@@ -272,3 +272,20 @@ def import_uploaded_files(
             raise
         results.append(UploadFileResult(filename=filename, material=material, error=None))
     return results
+
+
+def set_material_archived(
+    repos: Repositories, workspace_id: int, material_id: int, *, archived: bool
+) -> MaterialData:
+    """归档/恢复资料（D007）。
+
+    归档保留原文与历史（版本、片段不动），默认列表与检索排除；
+    恢复后资料与引用回到有效范围。归档不删除任何正式任务或片段。
+    """
+    current = repos.materials.get(material_id)
+    if current is None:
+        raise NotFoundError("资料不存在")
+    require_in_workspace(current.workspace_id, workspace_id, "资料不存在")
+    updated = repos.materials.set_archived(material_id, archived)
+    repos.uow.commit()
+    return updated
