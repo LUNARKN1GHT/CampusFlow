@@ -92,6 +92,7 @@ def _task_to_data(row: Task) -> TaskData:
         id=row.id,
         workspace_id=row.workspace_id,
         course_id=row.course_id,
+        source_material_id=row.source_material_id,
         title=row.title,
         description=row.description,
         due_date=row.due_date,
@@ -302,6 +303,14 @@ class SqlAlchemyMaterialRepository:
         row.archived = archived
         self._session.flush()
         return _material_to_data(row)
+
+    def delete(self, material_id: int) -> bool:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return False
+        self._session.delete(row)  # 版本与片段随 ondelete=CASCADE 一并删除
+        self._session.flush()
+        return True
 
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
         stmt = (
@@ -601,6 +610,27 @@ class SqlAlchemyTaskRepository:
             .order_by(TaskProgressChange.changed_at.desc(), TaskProgressChange.id.desc())
         )
         return [_progress_change_to_data(row) for row in self._session.scalars(stmt)]
+
+    def list_by_source_material(self, material_id: int) -> list[TaskData]:
+        stmt = select(Task).where(Task.source_material_id == material_id).order_by(Task.id)
+        return [_task_to_data(row) for row in self._session.scalars(stmt)]
+
+    def unlink_source_material(self, material_id: int) -> int:
+        rows = list(
+            self._session.scalars(select(Task).where(Task.source_material_id == material_id))
+        )
+        for row in rows:
+            row.source_material_id = None
+        self._session.flush()
+        return len(rows)
+
+    def delete(self, task_id: int) -> bool:
+        row = self._session.get(Task, task_id)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
 
 
 class SqlAlchemyScheduleRepository:

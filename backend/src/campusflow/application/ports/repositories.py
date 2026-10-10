@@ -60,6 +60,7 @@ class TaskData:
     id: int
     workspace_id: int
     course_id: int | None
+    source_material_id: int | None
     title: str
     description: str | None
     due_date: date | None
@@ -258,6 +259,14 @@ class TaskRepository(Protocol):
         self, task_id: int, progress: TaskProgress, reason: str | None
     ) -> TaskData | None: ...
 
+    def list_by_source_material(self, material_id: int) -> list[TaskData]: ...
+
+    def unlink_source_material(self, material_id: int) -> int:
+        """解除资料与任务的来源关联（删除资料时保留任务）。返回解除数量。"""
+        ...
+
+    def delete(self, task_id: int) -> bool: ...
+
     def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
@@ -318,6 +327,8 @@ class MaterialRepository(Protocol):
         ...
 
     def set_archived(self, material_id: int, archived: bool) -> MaterialData | None: ...
+
+    def delete(self, material_id: int) -> bool: ...
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
 

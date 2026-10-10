@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from campusflow.api.deps import get_current_workspace, get_repositories
@@ -142,6 +142,52 @@ def list_materials(
             include_archived=include_archived,
         )
     ]
+
+
+class DeleteImpactOut(BaseModel):
+    """删除影响预览（D008）：执行删除前必须持有其中 confirm_token。"""
+
+    material: MaterialOut
+    version_count: int
+    chunk_count: int
+    linked_task_ids: list[int]
+    confirm_token: str
+
+
+class DeleteConfirmIn(BaseModel):
+    confirm_token: str = Field(min_length=1)
+    keep_tasks: bool = True
+
+
+@router.get("/{material_id}/delete-impact", response_model=DeleteImpactOut)
+def delete_impact(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> DeleteImpactOut:
+    impact = use_cases.preview_delete_impact(repos, workspace.id, material_id)
+    return DeleteImpactOut(
+        material=MaterialOut.model_validate(impact.material),
+        version_count=impact.version_count,
+        chunk_count=impact.chunk_count,
+        linked_task_ids=impact.linked_task_ids,
+        confirm_token=impact.confirm_token,
+    )
+
+
+@router.post("/{material_id}/delete", status_code=204)
+def delete_material(
+    material_id: int,
+    payload: DeleteConfirmIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+) -> Response:
+    use_cases.delete_material(
+        repos,
+        storage,
+        workspace.id,
+        material_id,
+        confirm_token=payload.confirm_token,
+        keep_tasks=payload.keep_tasks,
+    )
+    return Response(status_code=204)
 
 
 @router.get("/{material_id}", response_model=MaterialOut)
