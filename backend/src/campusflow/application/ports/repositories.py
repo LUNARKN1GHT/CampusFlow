@@ -374,6 +374,8 @@ class MaterialRepository(Protocol):
 
     def set_archived(self, material_id: int, archived: bool) -> MaterialData | None: ...
 
+    def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None: ...
+
     def delete(self, material_id: int) -> bool: ...
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
@@ -437,4 +439,5 @@ class Repositories:
     tasks: TaskRepository
     schedule: ScheduleRepository
     materials: MaterialRepository
+    jobs: JobRepository
     uow: UnitOfWork

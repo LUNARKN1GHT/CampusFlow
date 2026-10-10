@@ -313,6 +313,14 @@ class SqlAlchemyMaterialRepository:
         self._session.flush()
         return _material_to_data(row)
 
+    def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.status = status
+        self._session.flush()
+        return _material_to_data(row)
+
     def delete(self, material_id: int) -> bool:
         row = self._session.get(Material, material_id)
         if row is None:

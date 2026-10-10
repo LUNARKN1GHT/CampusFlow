@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,8 @@ class Settings(BaseSettings):
     upload_max_files: int = 5
     # 未来备份的保留期限（天），删除界面据此说明备份残留（D010）
     backup_retention_days: int = 30
+    # 智谱视觉模型密钥（环境变量 ZHIPU_API_KEY；未配置时不得调用真实模型）
+    zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

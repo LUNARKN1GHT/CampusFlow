@@ -7,6 +7,10 @@
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from campusflow.application.ports.queue import JobQueue
 
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
@@ -219,6 +223,7 @@ class UploadFileResult:
     material: MaterialData | None
     error: str | None
     duplicate_of: MaterialData | None = None
+    job_id: int | None = None  # 解析作业 ID（D006 重复命中时无作业）
 
 
 def import_uploaded_files(
@@ -234,6 +239,7 @@ def import_uploaded_files(
     class_name: str | None,
     max_bytes: int,
     allow_duplicate: bool = False,
+    queue: "JobQueue | None" = None,
 ) -> list[UploadFileResult]:
     """PDF/图片上传导入（D003、D006）。
 
@@ -286,12 +292,19 @@ def import_uploaded_files(
                 storage_key,
                 checksum,
             )
+            version = repos.materials.list_versions(material.id)[-1]
+            job = repos.jobs.create(workspace_id, material.id, version.id, "parse")
             repos.uow.commit()
         except Exception:
             repos.uow.rollback()
             storage.delete(storage_key)
             raise
-        results.append(UploadFileResult(filename=filename, material=material, error=None))
+        # HTTP 立即返回 job_id，不等待解析完成（J002 验收）；投递失败不回滚建档
+        if queue is not None:
+            queue.enqueue_parse(job.id)
+        results.append(
+            UploadFileResult(filename=filename, material=material, error=None, job_id=job.id)
+        )
     return results
 
 
