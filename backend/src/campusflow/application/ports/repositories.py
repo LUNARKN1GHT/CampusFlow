@@ -132,6 +132,7 @@ class MaterialVersionData:
     version_no: int
     note: str | None
     storage_key: str | None
+    checksum: str | None
     created_at: datetime
 
 
@@ -304,8 +305,17 @@ class MaterialRepository(Protocol):
     def list_version_numbers(self, material_id: int) -> list[int]: ...
 
     def create_version(
-        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
+        self,
+        material_id: int,
+        version_no: int,
+        note: str | None,
+        storage_key: str | None,
+        checksum: str | None = None,
     ) -> MaterialVersionData: ...
+
+    def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
+        """按文件指纹在当前空间查找已有资料（重复导入检测，D006）。"""
+        ...
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
 

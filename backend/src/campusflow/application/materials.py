@@ -4,6 +4,7 @@
 全部在同一事务内提交；任何一步失败整体回滚，不产生半成品资料。
 """
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -191,11 +192,12 @@ def update_material_metadata(
 
 @dataclass
 class UploadFileResult:
-    """单个文件的上传结果：成功带资料，失败带可读原因。"""
+    """单个文件的上传结果：成功带资料，失败带可读原因，完全重复带已有资料提示。"""
 
     filename: str
     material: MaterialData | None
     error: str | None
+    duplicate_of: MaterialData | None = None
 
 
 def import_uploaded_files(
@@ -210,11 +212,14 @@ def import_uploaded_files(
     course_id: int | None,
     class_name: str | None,
     max_bytes: int,
+    allow_duplicate: bool = False,
 ) -> list[UploadFileResult]:
-    """PDF/图片上传导入（D003）。
+    """PDF/图片上传导入（D003、D006）。
 
     逐文件校验（格式、真实类型、大小）后保存并建档；校验失败的文件不保存、
     不产生记录；建档失败时删除已存文件，不留下孤立文件。
+    完全相同文件（同空间同指纹）默认不重复建档，返回已有资料供复用；
+    传 allow_duplicate=True 才允许重复建档。不同内容或不同空间不会被合并。
     解析与片段生成由后续处理作业完成（本任务只管导入）。
     """
     _require_associations(repos, workspace_id, semester_id, course_id)
@@ -224,6 +229,19 @@ def import_uploaded_files(
         if error:
             results.append(UploadFileResult(filename=filename, material=None, error=error))
             continue
+
+        checksum = hashlib.sha256(content).hexdigest()
+        if not allow_duplicate:
+            existing = repos.materials.find_material_by_checksum(workspace_id, checksum)
+            if existing is not None:
+                # 完全重复：提示已有资料供复用，不静默新建（D006 验收）
+                results.append(
+                    UploadFileResult(
+                        filename=filename, material=None, error=None, duplicate_of=existing
+                    )
+                )
+                continue
+
         source_type = (
             MaterialSourceType.PDF if validation.extension == "pdf" else MaterialSourceType.IMAGE
         )
@@ -245,6 +263,7 @@ def import_uploaded_files(
                 next_version_no(repos.materials.list_version_numbers(material.id)),
                 "文件上传",
                 storage_key,
+                checksum,
             )
             repos.uow.commit()
         except Exception:

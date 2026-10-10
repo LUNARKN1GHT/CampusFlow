@@ -167,6 +167,7 @@ def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
         version_no=row.version_no,
         note=row.note,
         storage_key=row.storage_key,
+        checksum=row.checksum,
         created_at=row.created_at,
     )
 
@@ -276,14 +277,35 @@ class SqlAlchemyMaterialRepository:
         return list(self._session.scalars(stmt))
 
     def create_version(
-        self, material_id: int, version_no: int, note: str | None, storage_key: str | None
+        self,
+        material_id: int,
+        version_no: int,
+        note: str | None,
+        storage_key: str | None,
+        checksum: str | None = None,
     ) -> MaterialVersionData:
         row = MaterialVersion(
-            material_id=material_id, version_no=version_no, note=note, storage_key=storage_key
+            material_id=material_id,
+            version_no=version_no,
+            note=note,
+            storage_key=storage_key,
+            checksum=checksum,
         )
         self._session.add(row)
         self._session.flush()
         return _material_version_to_data(row)
+
+    def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
+        stmt = (
+            select(Material)
+            .join(MaterialVersion, MaterialVersion.material_id == Material.id)
+            .where(Material.workspace_id == workspace_id)
+            .where(MaterialVersion.checksum == checksum)
+            .order_by(MaterialVersion.version_no.desc())
+            .limit(1)
+        )
+        row = self._session.scalars(stmt).first()
+        return _material_to_data(row) if row is not None else None
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]:
         stmt = (
