@@ -14,6 +14,7 @@ from campusflow.application import workspaces as workspace_use_cases
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.infrastructure.repositories import (
     SqlAlchemyCourseRepository,
+    SqlAlchemyJobRepository,
     SqlAlchemyMaterialRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemySemesterRepository,
@@ -37,6 +38,7 @@ def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repos
         tasks=SqlAlchemyTaskRepository(session),
         schedule=SqlAlchemyScheduleRepository(session),
         materials=SqlAlchemyMaterialRepository(session),
+        jobs=SqlAlchemyJobRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
 

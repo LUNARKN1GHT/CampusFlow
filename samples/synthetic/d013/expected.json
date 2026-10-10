@@ -1,0 +1,26 @@
+{
+  "description": "D013 表格场景评测样本：包含表头与两行的作业安排表格截图（合成）。",
+  "coordinate_system": "pixel coordinates [left, top, right, bottom] from the top-left origin",
+  "samples": [
+    {
+      "sample_id": "CF-IMG-005",
+      "file": "samples/synthetic/d013/table-screenshot.png",
+      "expected_processing_state": "completed",
+      "readable_regions": [
+        {"bbox": [100, 230, 1100, 518], "coverage": "table header and two rows"}
+      ],
+      "uncovered_ranges": [],
+      "expected_facts": {
+        "section": "DS2026-A",
+        "row1_task": "链表与栈练习",
+        "row1_deadline": "2026-10-20T18:00:00+08:00",
+        "row2_task": "二叉树遍历实验",
+        "row2_deadline": "2026-10-27T18:00:00+08:00"
+      },
+      "failure_if": [
+        "表格行列错位（把作业二的截止时间归给作业一）",
+        "编造表格中不存在的行"
+      ]
+    }
+  ]
+}

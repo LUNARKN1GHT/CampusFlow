@@ -176,6 +176,9 @@ def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
 
 
 def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
+    bbox = None
+    if row.bbox_x0 is not None:
+        bbox = (row.bbox_x0, row.bbox_y0, row.bbox_x1, row.bbox_y1)
     return SourceChunkData(
         id=row.id,
         version_id=row.version_id,
@@ -183,6 +186,10 @@ def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
         locator_type=row.locator_type,
         locator_value=row.locator_value,
         text=row.text,
+        page=row.page,
+        paragraph=row.paragraph,
+        bbox=bbox,
+        confidence=row.confidence,
     )
 
 
@@ -306,6 +313,14 @@ class SqlAlchemyMaterialRepository:
         self._session.flush()
         return _material_to_data(row)
 
+    def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None:
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.status = status
+        self._session.flush()
+        return _material_to_data(row)
+
     def delete(self, material_id: int) -> bool:
         row = self._session.get(Material, material_id)
         if row is None:
@@ -335,19 +350,37 @@ class SqlAlchemyMaterialRepository:
         return [_material_version_to_data(row) for row in self._session.scalars(stmt)]
 
     def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]:
-        rows = [
-            SourceChunk(
-                version_id=chunk.version_id,
-                seq=chunk.seq,
-                locator_type=chunk.locator_type,
-                locator_value=chunk.locator_value,
-                text=chunk.text,
+        """幂等写入：依赖 uq_source_chunks_version_seq 唯一约束 +
+        ON CONFLICT DO NOTHING，重试重复提交不产生重复片段，
+        冲突时返回已存在的行（D017 验收）。"""
+        if not chunks:
+            return []
+        stmt = (
+            pg_insert(SourceChunk)
+            .values(
+                [
+                    {
+                        "version_id": chunk.version_id,
+                        "seq": chunk.seq,
+                        "locator_type": chunk.locator_type,
+                        "locator_value": chunk.locator_value,
+                        "text": chunk.text,
+                        "page": chunk.page,
+                        "paragraph": chunk.paragraph,
+                        "bbox_x0": chunk.bbox[0] if chunk.bbox else None,
+                        "bbox_y0": chunk.bbox[1] if chunk.bbox else None,
+                        "bbox_x1": chunk.bbox[2] if chunk.bbox else None,
+                        "bbox_y1": chunk.bbox[3] if chunk.bbox else None,
+                        "confidence": chunk.confidence,
+                    }
+                    for chunk in chunks
+                ]
             )
-            for chunk in chunks
-        ]
-        self._session.add_all(rows)
+            .on_conflict_do_nothing(constraint="uq_source_chunks_version_seq")
+        )
+        self._session.execute(stmt)
         self._session.flush()
-        return [_chunk_to_data(row) for row in rows]
+        return self.list_chunks(chunks[0].version_id)
 
     def list_chunks(self, version_id: int) -> list[SourceChunkData]:
         stmt = (

@@ -139,13 +139,21 @@ class MaterialVersionData:
 
 @dataclass
 class NewSourceChunk:
-    """待保存的来源片段（尚未分配 id）。"""
+    """待保存的来源片段（尚未分配 id）。
+
+    定位坐标结构化保存：段落号、页码或区域 bbox（0-1 归一化），
+    与 locator_type/locator_value 展示文本并存。
+    """
 
     version_id: int
     seq: int
     locator_type: str
     locator_value: str
     text: str
+    page: int | None = None
+    paragraph: int | None = None
+    bbox: tuple[float, float, float, float] | None = None
+    confidence: float | None = None
 
 
 @dataclass
@@ -158,6 +166,10 @@ class SourceChunkData:
     locator_type: str
     locator_value: str
     text: str
+    page: int | None
+    paragraph: int | None
+    bbox: tuple[float, float, float, float] | None
+    confidence: float | None
 
 
 @dataclass
@@ -362,11 +374,16 @@ class MaterialRepository(Protocol):
 
     def set_archived(self, material_id: int, archived: bool) -> MaterialData | None: ...
 
+    def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None: ...
+
     def delete(self, material_id: int) -> bool: ...
 
     def list_versions(self, material_id: int) -> list[MaterialVersionData]: ...
 
-    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]: ...
+    def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]:
+        """保存片段。（version_id, seq）唯一约束保证重试幂等：
+        重复提交不产生重复片段，返回已有行。"""
+        ...
 
     def list_chunks(self, version_id: int) -> list[SourceChunkData]: ...
 
@@ -422,4 +439,5 @@ class Repositories:
     tasks: TaskRepository
     schedule: ScheduleRepository
     materials: MaterialRepository
+    jobs: JobRepository
     uow: UnitOfWork
