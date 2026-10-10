@@ -80,6 +80,7 @@ def fragments_to_chunks(outcome: ParseOutcome, version_id: int) -> list[NewSourc
                 paragraph=fragment.locator.paragraph,
                 bbox=fragment.locator.bbox,
                 confidence=fragment.confidence,
+                table_group=fragment.table_group,
             )
         )
     return chunks

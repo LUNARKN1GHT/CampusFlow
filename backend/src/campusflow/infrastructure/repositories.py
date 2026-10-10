@@ -186,6 +186,7 @@ def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
         paragraph=row.paragraph,
         bbox=bbox,
         confidence=row.confidence,
+        table_group=row.table_group,
     )
 
 
@@ -323,6 +324,7 @@ class SqlAlchemyMaterialRepository:
                         "bbox_x1": chunk.bbox[2] if chunk.bbox else None,
                         "bbox_y1": chunk.bbox[3] if chunk.bbox else None,
                         "confidence": chunk.confidence,
+                        "table_group": chunk.table_group,
                     }
                     for chunk in chunks
                 ]
