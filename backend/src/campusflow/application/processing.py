@@ -8,7 +8,8 @@ Worker 调用本用例完成解析：读取原文件 → 按来源类型选解�
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.repositories import Repositories, SourceChunkData
 from campusflow.application.ports.storage import FileStorage
-from campusflow.domain.errors import DomainError
+from campusflow.domain.errors import DomainError, PermanentError
+from campusflow.domain.jobs import is_retryable
 from campusflow.domain.states import JobStatus, MaterialSourceType, MaterialStatus
 
 
@@ -60,15 +61,22 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
     versions = repos.materials.list_versions(job.material_id)
     version = next((v for v in versions if v.id == job.version_id), None)
     if version is None or version.storage_key is None:
+        # 永久失败（J005）：来源没了，重试多少次都不会成功，不标记为可重试
         repos.jobs.record_attempt(
-            job_id, status=JobStatus.FAILED, scope=None, error_reason="来源已不可用"
+            job_id,
+            status=JobStatus.FAILED,
+            scope=None,
+            error_reason="来源已不可用",
+            retryable=False,
         )
+        repos.materials.set_status(job.material_id, MaterialStatus.FAILED)
         repos.uow.commit()
-        raise DomainError("作业来源已不可用")
+        raise PermanentError("作业来源已不可用")
 
     material = repos.materials.get(job.material_id)
     if material is None:
         raise DomainError("资料不存在")
+    material_id = material.id  # 回滚会让 ORM 对象过期，失败路径只用标量 id
 
     from campusflow.application.materials import fragments_to_chunks
 
@@ -85,15 +93,35 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
         else:
             status = JobStatus.FAILED
         scope = _scope_summary(len(chunks), outcome.failures)
-        repos.jobs.record_attempt(job_id, status=status, scope=scope, error_reason=None)
-        _set_material_status(repos, material.id, status)
+        # 全页失败时把失败原因写进作业，便于状态查询与诊断（J005）
+        error_reason = (
+            "；".join(dict.fromkeys(f.reason for f in outcome.failures))
+            if status == JobStatus.FAILED
+            else None
+        )
+        # 分阶段失败重试（J005）：只要有失败范围是临时故障，就允许重试补齐；
+        # 已完成页面的片段已落库，重试不会重复写入
+        repos.jobs.record_attempt(
+            job_id,
+            status=status,
+            scope=scope,
+            error_reason=error_reason,
+            retryable=any(f.retryable for f in outcome.failures),
+        )
+        _set_material_status(repos, material_id, status)
         repos.uow.commit()
         return chunks
     except Exception as exc:
         repos.uow.rollback()
+        # 临时故障（限流、超时、上游 5xx）标为可重试；其余按永久失败处理（J005）
         repos.jobs.record_attempt(
-            job_id, status=JobStatus.FAILED, scope=None, error_reason=str(exc)
+            job_id,
+            status=JobStatus.FAILED,
+            scope=None,
+            error_reason=str(exc),
+            retryable=is_retryable(exc),
         )
+        repos.materials.set_status(material_id, MaterialStatus.FAILED)
         repos.uow.commit()
         raise
 

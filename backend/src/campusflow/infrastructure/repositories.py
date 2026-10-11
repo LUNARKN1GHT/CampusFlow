@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -15,6 +15,7 @@ from campusflow.application.ports.repositories import (
     MaterialData,
     MaterialVersionData,
     NewSourceChunk,
+    ProcessingJobAttemptData,
     ProcessingJobData,
     Repositories,
     SemesterData,
@@ -37,6 +38,7 @@ from campusflow.infrastructure.db.models import (
     Material,
     MaterialVersion,
     ProcessingJob,
+    ProcessingJobAttempt,
     Semester,
     SourceChunk,
     Task,
@@ -786,8 +788,24 @@ def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
         attempts=row.attempts,
         enqueued_at=row.enqueued_at,
         delivery_attempts=row.delivery_attempts,
+        started_at=row.started_at,
+        retryable=row.retryable,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _attempt_to_data(row: ProcessingJobAttempt) -> ProcessingJobAttemptData:
+    return ProcessingJobAttemptData(
+        id=row.id,
+        job_id=row.job_id,
+        attempt_no=row.attempt_no,
+        stage=row.stage,
+        status=row.status,
+        scope=row.scope,
+        error_reason=row.error_reason,
+        retryable=row.retryable,
+        created_at=row.created_at,
     )
 
 
@@ -815,15 +833,22 @@ class SqlAlchemyJobRepository:
         result = self._session.execute(
             update(ProcessingJob)
             .where(ProcessingJob.id == job_id, ProcessingJob.status == JobStatus.PENDING)
-            .values(status=JobStatus.RUNNING, updated_at=func.now())
+            .values(status=JobStatus.RUNNING, started_at=func.now(), updated_at=func.now())
         )
         self._session.flush()
         return bool(result.rowcount)
 
     def record_attempt(
-        self, job_id: int, *, status: str, scope: str | None, error_reason: str | None
+        self,
+        job_id: int,
+        *,
+        status: str,
+        scope: str | None,
+        error_reason: str | None,
+        retryable: bool | None = None,
     ) -> ProcessingJobData | None:
-        from campusflow.domain.jobs import sanitize_error_reason
+        from campusflow.domain.jobs import TERMINAL_JOB_STATUSES, sanitize_error_reason
+        from campusflow.domain.states import JobStatus
 
         row = self._session.get(ProcessingJob, job_id)
         if row is None:
@@ -831,7 +856,66 @@ class SqlAlchemyJobRepository:
         row.status = status
         row.scope = scope
         row.error_reason = sanitize_error_reason(error_reason)
+        # 可重试性只对"没完全成功"有意义（J005）：失败要区分临时与永久，
+        # 部分成功但失败范围是临时的也允许只补那些阶段；完成则无需重投
+        row.retryable = bool(retryable) if status in (JobStatus.FAILED, JobStatus.PARTIAL) else None
         row.attempts = row.attempts + 1
+        # 尝试历史只在终态落一条（J005）：中间状态来回切换不写历史
+        if status in TERMINAL_JOB_STATUSES:
+            self._session.add(
+                ProcessingJobAttempt(
+                    job_id=job_id,
+                    attempt_no=row.attempts,
+                    stage=row.stage,
+                    status=status,
+                    scope=scope,
+                    error_reason=sanitize_error_reason(error_reason),
+                    retryable=bool(retryable),
+                )
+            )
+        self._session.flush()
+        return _job_to_data(row)
+
+    def list_attempts(self, job_id: int) -> list[ProcessingJobAttemptData]:
+        rows = self._session.scalars(
+            select(ProcessingJobAttempt)
+            .where(ProcessingJobAttempt.job_id == job_id)
+            .order_by(ProcessingJobAttempt.attempt_no)
+        )
+        return [_attempt_to_data(row) for row in rows]
+
+    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStatus
+
+        threshold = datetime.now(UTC) - timedelta(seconds=timeout_seconds)
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(
+                ProcessingJob.status == JobStatus.RUNNING,
+                ProcessingJob.started_at.is_not(None),
+                ProcessingJob.started_at <= threshold,
+            )
+            .order_by(ProcessingJob.id)
+        )
+        return [_job_to_data(row) for row in rows]
+
+    def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
+        from campusflow.domain.states import JobStatus
+
+        row = self._session.get(ProcessingJob, job_id)
+        # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
+        # 成功，反复重投只会白烧资源（J005）
+        if row is None or not row.retryable:
+            return None
+        if row.status not in (JobStatus.FAILED, JobStatus.PARTIAL):
+            return None
+        row.status = JobStatus.PENDING
+        row.scope = None
+        row.error_reason = None
+        row.retryable = None
+        row.started_at = None
+        # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
+        row.enqueued_at = None
         self._session.flush()
         return _job_to_data(row)
 
