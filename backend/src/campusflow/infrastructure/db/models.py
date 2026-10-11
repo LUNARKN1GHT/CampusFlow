@@ -219,6 +219,10 @@ class ProcessingJob(Base):
     scope: Mapped[str | None] = mapped_column(String(500))
     error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # Outbox（J003）：提交与投递分离的待投递记录。
+    # enqueued_at 为空表示尚未成功投递，可由补偿扫描重投；投递成功后才写入时间。
+    enqueued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    delivery_attempts: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

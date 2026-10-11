@@ -49,7 +49,9 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
     """
     job = repos.jobs.get(job_id)
     if job is None:
-        raise DomainError(f"作业不存在：{job_id}")
+        # 未提交（事务已回滚）或已被清理的作业：消息可能是排队期间的残留，
+        # 静默跳过、不产生任何副作用，也不把 RQ 作业记为失败（J003 验收）
+        return []
 
     repos.jobs.record_attempt(job_id, status=JobStatus.RUNNING, scope=None, error_reason=None)
     repos.uow.commit()
