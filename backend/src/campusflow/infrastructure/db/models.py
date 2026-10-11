@@ -223,7 +223,28 @@ class ProcessingJob(Base):
     # enqueued_at 为空表示尚未成功投递，可由补偿扫描重投；投递成功后才写入时间。
     enqueued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     delivery_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # 领取时间（J005）：用于识别长期停在 running 的超时作业
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # 最近一次失败是否可重试（J005）：区分临时故障与永久失败
+    retryable: Mapped[bool | None] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class ProcessingJobAttempt(Base):
+    """作业尝试历史（J005）：每次终态尝试各留一条，保留成功阶段与失败原因。"""
+
+    __tablename__ = "processing_job_attempts"
+    __table_args__ = (UniqueConstraint("job_id", "attempt_no", name="uq_job_attempts_no"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("processing_jobs.id"), index=True)
+    attempt_no: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(20))  # JobStage
+    status: Mapped[str] = mapped_column(String(20))  # JobStatus（终态）
+    scope: Mapped[str | None] = mapped_column(String(500))  # 覆盖范围，不含原文全文
+    error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

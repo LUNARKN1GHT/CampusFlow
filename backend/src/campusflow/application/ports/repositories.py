@@ -187,8 +187,25 @@ class ProcessingJobData:
     attempts: int
     enqueued_at: datetime | None
     delivery_attempts: int
+    started_at: datetime | None
+    retryable: bool | None
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class ProcessingJobAttemptData:
+    """作业尝试历史（J005）：一条记录就是一次结束了的尝试。"""
+
+    id: int
+    job_id: int
+    attempt_no: int
+    stage: str
+    status: str
+    scope: str | None
+    error_reason: str | None
+    retryable: bool
+    created_at: datetime
 
 
 class JobRepository(Protocol):
@@ -202,7 +219,8 @@ class JobRepository(Protocol):
         """幂等领取（J004）：仅当作业仍为 pending 时原子置为 running。
 
         重复消息里只有一条能领取成功，其余返回 False；未提交（不存在）或已结束
-        的作业同样领取失败，因此不会重复解析、重复生成片段。
+        的作业同样领取失败，因此不会重复解析、重复生成片段。领取时记录开始时间，
+        供超时回收识别（J005）。
         """
         ...
 
@@ -213,7 +231,32 @@ class JobRepository(Protocol):
         status: str,
         scope: str | None,
         error_reason: str | None,
-    ) -> ProcessingJobData | None: ...
+        retryable: bool | None = None,
+    ) -> ProcessingJobData | None:
+        """记录一次尝试结果（J001、J005）。
+
+        只有终态（完成/部分成功/失败）才追加一条尝试历史，保留成功阶段与失败
+        原因；running 之类的中间状态只更新当前状态。retryable 表示本次失败是否
+        值得重试，仅在失败时写入作业。
+        """
+        ...
+
+    def list_attempts(self, job_id: int) -> list[ProcessingJobAttemptData]:
+        """按尝试顺序列出终态历史（J005），供状态查询与诊断。"""
+        ...
+
+    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
+        """列出领取后超过阈值仍停在处理中的作业（J005 超时回收）。"""
+        ...
+
+    def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
+        """把可重试的失败/部分成功作业重置为待处理，供重新投递（J005）。
+
+        只有标记为可重试的作业能被重置；永久失败返回 None，避免反复重投。
+        重置后重新进入待投递状态（清空投递时间与开始时间），失败原因留在
+        尝试历史里。
+        """
+        ...
 
     def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
         """登记一次投递尝试（J003）。
