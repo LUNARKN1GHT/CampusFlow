@@ -198,6 +198,14 @@ class JobRepository(Protocol):
 
     def get(self, job_id: int) -> ProcessingJobData | None: ...
 
+    def claim(self, job_id: int) -> bool:
+        """幂等领取（J004）：仅当作业仍为 pending 时原子置为 running。
+
+        重复消息里只有一条能领取成功，其余返回 False；未提交（不存在）或已结束
+        的作业同样领取失败，因此不会重复解析、重复生成片段。
+        """
+        ...
+
     def record_attempt(
         self,
         job_id: int,
