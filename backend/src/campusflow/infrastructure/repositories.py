@@ -900,14 +900,13 @@ class SqlAlchemyJobRepository:
         return [_job_to_data(row) for row in rows]
 
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
+        from campusflow.domain.jobs import can_retry
         from campusflow.domain.states import JobStatus
 
         row = self._session.get(ProcessingJob, job_id)
         # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
-        # 成功，反复重投只会白烧资源（J005）
-        if row is None or not row.retryable:
-            return None
-        if row.status not in (JobStatus.FAILED, JobStatus.PARTIAL):
+        # 成功，反复重投只会白烧资源（J005/J006）
+        if row is None or not can_retry(row.status, row.retryable):
             return None
         row.status = JobStatus.PENDING
         row.scope = None

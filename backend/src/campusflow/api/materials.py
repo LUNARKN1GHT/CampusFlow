@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
@@ -37,11 +37,6 @@ def get_text_parser() -> DocumentParser:
 
 
 TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
-
-
-def get_job_queue(request: Request) -> JobQueue | None:
-    """队列不可用时返回 None：建档仍可完成，投递补偿由 J004 处理。"""
-    return getattr(request.app.state, "job_queue", None)
 
 
 JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]

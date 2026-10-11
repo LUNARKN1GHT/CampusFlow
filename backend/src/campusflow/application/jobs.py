@@ -7,9 +7,35 @@
 
 from campusflow.application.dispatch import dispatch_job
 from campusflow.application.ports.queue import JobQueue
-from campusflow.application.ports.repositories import ProcessingJobData, Repositories
+from campusflow.application.ports.repositories import (
+    ProcessingJobAttemptData,
+    ProcessingJobData,
+    Repositories,
+)
+from campusflow.application.scope import require_in_workspace
+from campusflow.domain.errors import NotFoundError
 from campusflow.domain.jobs import DEFAULT_JOB_TIMEOUT_SECONDS, timeout_reason
 from campusflow.domain.states import JobStatus, MaterialStatus
+
+
+def get_job(repos: Repositories, workspace_id: int, job_id: int) -> ProcessingJobData:
+    """读取当前空间内的作业（J006）。
+
+    归属不符与不存在同样按"作业不存在"处理：不泄露其他空间作业的状态。
+    """
+    job = repos.jobs.get(job_id)
+    if job is None:
+        raise NotFoundError("作业不存在")
+    require_in_workspace(job.workspace_id, workspace_id, "作业不存在")
+    return job
+
+
+def list_job_attempts(
+    repos: Repositories, workspace_id: int, job_id: int
+) -> list[ProcessingJobAttemptData]:
+    """作业尝试历史（J005/J006）：先校验归属，再读历史。"""
+    get_job(repos, workspace_id, job_id)
+    return repos.jobs.list_attempts(job_id)
 
 
 def reclaim_stale_jobs(
