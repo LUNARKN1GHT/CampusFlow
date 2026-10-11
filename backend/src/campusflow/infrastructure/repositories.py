@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -783,6 +783,8 @@ def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
         scope=row.scope,
         error_reason=row.error_reason,
         attempts=row.attempts,
+        enqueued_at=row.enqueued_at,
+        delivery_attempts=row.delivery_attempts,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -820,3 +822,22 @@ class SqlAlchemyJobRepository:
         row.attempts = row.attempts + 1
         self._session.flush()
         return _job_to_data(row)
+
+    def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
+        row = self._session.get(ProcessingJob, job_id)
+        if row is None:
+            return None
+        row.delivery_attempts = row.delivery_attempts + 1
+        if delivered:
+            row.enqueued_at = datetime.now(UTC)
+        self._session.flush()
+        return _job_to_data(row)
+
+    def list_undelivered(self, *, limit: int = 100) -> list[ProcessingJobData]:
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(ProcessingJob.enqueued_at.is_(None))
+            .order_by(ProcessingJob.id)
+            .limit(limit)
+        )
+        return [_job_to_data(row) for row in rows]

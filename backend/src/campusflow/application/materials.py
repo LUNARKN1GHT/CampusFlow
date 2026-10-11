@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from campusflow.application.ports.queue import JobQueue
 
+from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
@@ -299,12 +300,12 @@ def import_uploaded_files(
             repos.uow.rollback()
             storage.delete(storage_key)
             raise
-        # HTTP 立即返回 job_id，不等待解析完成（J002 验收）；投递失败不回滚建档
-        if queue is not None:
-            queue.enqueue_parse(job.id)
         results.append(
             UploadFileResult(filename=filename, material=material, error=None, job_id=job.id)
         )
+    # 提交与投递分离（J003）：待投递记录随建档事务一起落库后才尝试投递；
+    # 队列不可用时不抛异常，记录留待补偿扫描，HTTP 仍返回 job_id（J002 验收）
+    dispatch_pending_jobs(repos, queue, job_ids=[r.job_id for r in results if r.job_id is not None])
     return results
 
 

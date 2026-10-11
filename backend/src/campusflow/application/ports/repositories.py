@@ -185,6 +185,8 @@ class ProcessingJobData:
     scope: str | None
     error_reason: str | None
     attempts: int
+    enqueued_at: datetime | None
+    delivery_attempts: int
     created_at: datetime
     updated_at: datetime
 
@@ -204,6 +206,17 @@ class JobRepository(Protocol):
         scope: str | None,
         error_reason: str | None,
     ) -> ProcessingJobData | None: ...
+
+    def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
+        """登记一次投递尝试（J003）。
+
+        成功投递时写入 enqueued_at；失败只累加尝试次数，记录保持"待投递"。
+        """
+        ...
+
+    def list_undelivered(self, *, limit: int = 100) -> list[ProcessingJobData]:
+        """列出尚未成功投递的作业（按创建顺序），供补偿扫描重投（J004）。"""
+        ...
 
 
 class SemesterRepository(Protocol):
