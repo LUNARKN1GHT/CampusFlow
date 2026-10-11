@@ -47,14 +47,15 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
 
     返回落库片段列表；失败时作业标记 failed 并抛出，由 Worker 层记录。
     """
+    # 幂等领取（J004）：只有仍为 pending 的作业能被领取。重复消息、未提交或
+    # 已结束的作业在这里直接返回，不重复解析、不重复生成片段（J003/J004 验收）
+    if not repos.jobs.claim(job_id):
+        return []
+    repos.uow.commit()
+
     job = repos.jobs.get(job_id)
     if job is None:
-        # 未提交（事务已回滚）或已被清理的作业：消息可能是排队期间的残留，
-        # 静默跳过、不产生任何副作用，也不把 RQ 作业记为失败（J003 验收）
         return []
-
-    repos.jobs.record_attempt(job_id, status=JobStatus.RUNNING, scope=None, error_reason=None)
-    repos.uow.commit()
 
     versions = repos.materials.list_versions(job.material_id)
     version = next((v for v in versions if v.id == job.version_id), None)

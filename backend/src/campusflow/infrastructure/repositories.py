@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,7 @@ from campusflow.application.ports.repositories import (
     MaterialVersionData,
     NewSourceChunk,
     ProcessingJobData,
+    Repositories,
     SemesterData,
     SourceChunkData,
     TaskData,
@@ -808,6 +809,17 @@ class SqlAlchemyJobRepository:
         row = self._session.get(ProcessingJob, job_id)
         return _job_to_data(row) if row is not None else None
 
+    def claim(self, job_id: int) -> bool:
+        from campusflow.domain.states import JobStatus
+
+        result = self._session.execute(
+            update(ProcessingJob)
+            .where(ProcessingJob.id == job_id, ProcessingJob.status == JobStatus.PENDING)
+            .values(status=JobStatus.RUNNING, updated_at=func.now())
+        )
+        self._session.flush()
+        return bool(result.rowcount)
+
     def record_attempt(
         self, job_id: int, *, status: str, scope: str | None, error_reason: str | None
     ) -> ProcessingJobData | None:
@@ -841,3 +853,17 @@ class SqlAlchemyJobRepository:
             .limit(limit)
         )
         return [_job_to_data(row) for row in rows]
+
+
+def build_repositories(session: Session) -> Repositories:
+    """装配全部仓储与工作单元（API 装配、Worker、投递补偿共用）。"""
+    return Repositories(
+        workspaces=SqlAlchemyWorkspaceRepository(session),
+        semesters=SqlAlchemySemesterRepository(session),
+        courses=SqlAlchemyCourseRepository(session),
+        tasks=SqlAlchemyTaskRepository(session),
+        schedule=SqlAlchemyScheduleRepository(session),
+        materials=SqlAlchemyMaterialRepository(session),
+        jobs=SqlAlchemyJobRepository(session),
+        uow=SqlAlchemyUnitOfWork(session),
+    )

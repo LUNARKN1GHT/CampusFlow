@@ -1,3 +1,7 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -8,17 +12,47 @@ from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api.health import router as health_router
+from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.infrastructure.db.engine import create_db_engine
 from campusflow.infrastructure.db.session import create_session_factory
 from campusflow.infrastructure.queue.rq_queue import RQJobQueue
+from campusflow.infrastructure.repositories import build_repositories
 from campusflow.infrastructure.storage.local import LocalFileStorage
+
+logger = logging.getLogger(__name__)
+
+
+def compensate_pending_deliveries(app: FastAPI) -> int:
+    """投递补偿扫描（J004）：重投待投递作业，返回成功投递数。
+
+    尽力而为：任何异常都不影响服务启动。Redis 不可用时记录保持待投递，
+    等下次启动或手动重投；没有待投递记录时不访问 Redis。
+    """
+    settings: Settings = app.state.settings
+    if not settings.dispatch_on_startup:
+        return 0
+    try:
+        with app.state.session_factory() as session:
+            outcome = dispatch_pending_jobs(build_repositories(session), app.state.job_queue)
+        if outcome.delivered or outcome.failed:
+            logger.info("待投递补偿：成功 %s 条，失败 %s 条", outcome.delivered, outcome.failed)
+        return outcome.delivered
+    except Exception:  # 补偿失败绝不阻塞启动
+        logger.warning("待投递补偿扫描失败，保留记录等待下次重投", exc_info=True)
+        return 0
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings()
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        compensate_pending_deliveries(application)
+        yield
+
+    app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
     engine = create_db_engine(settings)
     app.state.session_factory = create_session_factory(engine)
