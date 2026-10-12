@@ -89,6 +89,7 @@ class SourceChunkOut(BaseModel):
     paragraph: int | None
     bbox: tuple[float, float, float, float] | None
     confidence: float | None
+    table_group: str | None
 
 
 class TextImportOut(BaseModel):
@@ -221,6 +222,60 @@ def delete_material(
         keep_tasks=payload.keep_tasks,
     )
     return Response(status_code=204)
+
+
+class MaterialVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    material_id: int
+    version_no: int
+    note: str | None
+    created_at: datetime
+
+
+@router.get("/{material_id}/versions", response_model=list[MaterialVersionOut])
+def list_versions(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[MaterialVersionOut]:
+    return [
+        MaterialVersionOut.model_validate(v)
+        for v in use_cases.list_material_versions(repos, workspace.id, material_id)
+    ]
+
+
+@router.get("/{material_id}/versions/{version_no}/chunks", response_model=list[SourceChunkOut])
+def list_chunks(
+    material_id: int, version_no: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[SourceChunkOut]:
+    return [
+        SourceChunkOut.model_validate(c)
+        for c in use_cases.list_version_chunks(repos, workspace.id, material_id, version_no)
+    ]
+
+
+@router.get("/{material_id}/versions/{version_no}/file")
+def read_original_file(
+    material_id: int,
+    version_no: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+) -> Response:
+    content, storage_key = use_cases.read_original_file(
+        repos, storage, workspace.id, material_id, version_no
+    )
+    extension = storage_key.rsplit(".", 1)[-1]
+    media_types = {
+        "txt": "text/plain; charset=utf-8",
+        "pdf": "application/pdf",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+    }
+    return Response(
+        content=content, media_type=media_types.get(extension, "application/octet-stream")
+    )
 
 
 @router.get("/{material_id}", response_model=MaterialOut)

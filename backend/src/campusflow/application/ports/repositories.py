@@ -166,6 +166,7 @@ class NewSourceChunk:
     paragraph: int | None = None
     bbox: tuple[float, float, float, float] | None = None
     confidence: float | None = None
+    table_group: str | None = None
 
 
 @dataclass
@@ -182,6 +183,7 @@ class SourceChunkData:
     paragraph: int | None
     bbox: tuple[float, float, float, float] | None
     confidence: float | None
+    table_group: str | None
 
 
 @dataclass

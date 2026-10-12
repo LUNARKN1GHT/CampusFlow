@@ -91,6 +91,7 @@ def fragments_to_chunks(outcome: ParseOutcome, version_id: int) -> list[NewSourc
                 paragraph=fragment.locator.paragraph,
                 bbox=fragment.locator.bbox,
                 confidence=fragment.confidence,
+                table_group=fragment.table_group,
             )
         )
     return chunks
@@ -407,3 +408,41 @@ def delete_material(
         if version.storage_key:
             storage.delete(version.storage_key)
     return impact
+
+
+def list_material_versions(repos: Repositories, workspace_id: int, material_id: int) -> list:
+    """版本列表（D018）：先校验空间归属。"""
+    get_material(repos, workspace_id, material_id)
+    return repos.materials.list_versions(material_id)
+
+
+def list_version_chunks(
+    repos: Repositories, workspace_id: int, material_id: int, version_no: int
+) -> list[SourceChunkData]:
+    """指定版本的片段与定位信息（D018）。"""
+    get_material(repos, workspace_id, material_id)
+    version = next(
+        (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
+        None,
+    )
+    if version is None:
+        raise NotFoundError("版本不存在")
+    return repos.materials.list_chunks(version.id)
+
+
+def read_original_file(
+    repos: Repositories, storage: FileStorage, workspace_id: int, material_id: int, version_no: int
+) -> tuple[bytes, str]:
+    """授权读取原文（D018）：空间归属校验贯穿文件内容访问；
+    文件缺失时返回明确的"已不可用"状态，不伪造内容。"""
+    get_material(repos, workspace_id, material_id)
+    version = next(
+        (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
+        None,
+    )
+    if version is None or version.storage_key is None:
+        raise NotFoundError("来源已不可用")
+    try:
+        return storage.read(version.storage_key), version.storage_key
+    except FileNotFoundError as exc:
+        raise NotFoundError("来源已不可用") from exc
