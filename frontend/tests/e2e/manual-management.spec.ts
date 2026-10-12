@@ -127,3 +127,93 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.goto('/tasks')
   await expect(page).toHaveURL(/\/login/)
 })
+
+test.describe('M1 发布边界回归', () => {
+  // 浏览器与工作空间时区不同，验证按空间日期而非浏览器日期切分。
+  test.use({ timezoneId: 'America/Los_Angeles' })
+
+  test('跨日跨周日程按实际占用显示，午夜结束不占用次日', async ({ page }) => {
+    await page.clock.install({ time: new Date('2026-10-12T12:00:00+09:00') })
+    await page.request.post('/api/v1/auth/login', { data: { username: 'student', password: 'campusflow-dev' } })
+    const previousSettings = await (await page.request.get('/api/v1/settings')).json()
+    await page.request.put('/api/v1/settings', { data: { ...previousSettings, timezone: 'Asia/Tokyo' } })
+    const ids: number[] = []
+    const suffix = Date.now()
+    const events = [
+      { title: `跨周 ${suffix}`, starts_at: '2026-10-11T23:00:00', ends_at: '2026-10-12T01:00:00', recurrence: 'weekly', repeat_until: '2026-10-18' },
+      { title: `多日 ${suffix}`, starts_at: '2026-10-13T23:00:00', ends_at: '2026-10-15T01:00:00' },
+      { title: `午夜结束 ${suffix}`, starts_at: '2026-10-16T22:00:00', ends_at: '2026-10-17T00:00:00' },
+    ]
+    try {
+      for (const event of events) {
+        const response = await page.request.post('/api/v1/fixed-events', { data: event })
+        expect(response.status()).toBe(201)
+        ids.push((await response.json()).id)
+      }
+      await page.goto('/tasks')
+      const day = (date: string) => page.locator('.week-day').filter({ hasText: date })
+      const occurrence = (date: string, title: string) => day(date).locator('.day-events article').filter({ hasText: title })
+      await expect(occurrence('10/12', events[0]!.title)).toContainText('00:00–01:00')
+      await expect(occurrence('10/18', events[0]!.title)).toContainText('23:00–24:00')
+      await expect(occurrence('10/13', events[1]!.title)).toContainText('23:00–24:00')
+      await expect(occurrence('10/14', events[1]!.title)).toContainText('00:00–24:00')
+      await expect(occurrence('10/15', events[1]!.title)).toContainText('00:00–01:00')
+      await expect(occurrence('10/16', events[2]!.title)).toContainText('22:00–24:00')
+      await expect(day('10/17').getByText(events[2]!.title)).toHaveCount(0)
+      await page.getByRole('button', { name: '下一周' }).click()
+      await expect(occurrence('10/19', events[0]!.title)).toContainText('00:00–01:00')
+      const saved = await (await page.request.get('/api/v1/fixed-events')).json()
+      expect(new Date(saved.find((event: { id: number }) => event.id === ids[0]).starts_at).toISOString()).toBe('2026-10-11T14:00:00.000Z')
+    } finally {
+      for (const id of ids) await page.request.delete(`/api/v1/fixed-events/${id}`)
+      await page.request.put('/api/v1/settings', { data: previousSettings })
+    }
+  })
+
+  test('目标与来源可保存刷新，逾期不覆盖进度，完成后取消逾期', async ({ page }) => {
+    await page.request.post('/api/v1/auth/login', { data: { username: 'student', password: 'campusflow-dev' } })
+    const title = `目标与逾期回归 ${Date.now()}`
+    await page.goto('/tasks')
+    await page.getByRole('button', { name: '添加任务' }).click()
+    await page.getByLabel('任务标题').fill(title)
+    await page.getByLabel('正式 DDL 日期').fill('2000-10-20')
+    await page.getByLabel('个人目标日期').fill('2000-10-18')
+    await page.getByLabel('截止来源', { exact: true }).selectOption('document')
+    await page.getByLabel('截止来源说明').fill('合成课程大纲第 3 页，用户已核对')
+    await page.getByRole('button', { name: '保存任务' }).click()
+    const row = page.locator('.task-row').filter({ hasText: title })
+    await expect(row.getByText('已逾期', { exact: true })).toBeVisible()
+    const tasks = await (await page.request.get('/api/v1/tasks')).json()
+    const task = tasks.find((item: { title: string }) => item.title === title)
+    expect(task.target_date).toBe('2000-10-18')
+    expect(task.due_source).toBe('document')
+    await page.request.patch(`/api/v1/tasks/${task.id}/progress`, { data: { progress: 'blocked', reason: '等待资料' } })
+    await page.reload()
+    await expect(row.getByText('受阻', { exact: true })).toBeVisible()
+    await expect(row.getByText('已逾期', { exact: true })).toBeVisible()
+    await expect(row).toContainText('截止来源：原文规定 · 合成课程大纲第 3 页，用户已核对')
+    await row.getByRole('button', { name: '编辑', exact: true }).click()
+    await expect(page.getByLabel('个人目标日期')).toHaveValue('2000-10-18')
+    await page.getByLabel('个人目标日期').fill('2000-10-19')
+    await page.getByRole('button', { name: '保存任务' }).click()
+    await page.reload()
+    await expect(row).toContainText('个人目标：2000-10-19')
+    const updated = await (await page.request.get(`/api/v1/tasks/${task.id}`)).json()
+    expect(updated.due_date).toBe('2000-10-20')
+    expect(updated.due_time).toBeNull()
+    expect(updated.due_note).toBe('合成课程大纲第 3 页，用户已核对')
+    await row.getByRole('button', { name: '进度', exact: true }).click()
+    await page.getByLabel('新状态').selectOption('done')
+    await page.getByRole('button', { name: '更新进度' }).click()
+    await expect(row.getByText('已完成', { exact: true })).toBeVisible()
+    await expect(row.getByText('已逾期', { exact: true })).toHaveCount(0)
+    await row.getByRole('button', { name: '编辑', exact: true }).click()
+    await page.getByLabel('个人目标日期').fill('')
+    await page.getByRole('button', { name: '保存任务' }).click()
+    await page.reload()
+    await expect(row.getByText(/个人目标：/)).toHaveCount(0)
+    const cleared = await (await page.request.get(`/api/v1/tasks/${task.id}`)).json()
+    expect(cleared.target_date).toBeNull()
+    expect(cleared.due_date).toBe('2000-10-20')
+  })
+})

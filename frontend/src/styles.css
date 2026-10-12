@@ -117,6 +117,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .task-title-line h3 { margin: 0; font-size: 16px; }
 .task-main p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
 .status-pill { padding: 2px 7px; border-radius: 999px; color: var(--brand); background: var(--brand-soft); font-size: 10px; font-weight: 800; }
+.overdue-pill { color: #a83225; background: #fff0ec; }
 .task-meta { min-width: 108px; display: grid; text-align: right; }
 .task-meta span { color: var(--muted); font-size: 11px; }
 .task-meta strong { font-size: 16px; }
