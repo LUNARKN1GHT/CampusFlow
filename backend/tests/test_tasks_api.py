@@ -101,6 +101,43 @@ def test_task_requires_course_exists(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_personal_target_independent_from_formal_due(client: TestClient) -> None:
+    task = _create_task(
+        client,
+        extra={"due_date": "2026-10-20", "target_date": "2026-10-18", "due_note": "教学网通知"},
+    )
+    assert task["due_date"] == "2026-10-20"
+    assert task["target_date"] == "2026-10-18"
+    assert task["due_source"] == "user"
+    assert task["due_note"] == "教学网通知"
+
+    # 修改个人目标不改变正式 DDL
+    updated = client.patch(f"/api/v1/tasks/{task['id']}", json={"target_date": "2026-10-19"}).json()
+    assert updated["target_date"] == "2026-10-19"
+    assert updated["due_date"] == "2026-10-20"
+    assert updated["due_time"] is None
+
+    # 修改正式截止时未提交说明则保留既有说明与来源
+    moved = client.patch(f"/api/v1/tasks/{task['id']}", json={"due_date": "2026-10-22"}).json()
+    assert moved["due_date"] == "2026-10-22"
+    assert moved["due_note"] == "教学网通知"
+    assert moved["due_source"] == "user"
+
+    # 明确更新来源类型与说明
+    sourced = client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"due_source": "document", "due_note": "大纲第 3 页"},
+    ).json()
+    assert sourced["due_source"] == "document"
+    assert sourced["due_note"] == "大纲第 3 页"
+
+
+def test_due_source_rejects_null(client: TestClient) -> None:
+    task = _create_task(client)
+    response = client.patch(f"/api/v1/tasks/{task['id']}", json={"due_source": None})
+    assert response.status_code == 422
+
+
 def test_task_remaining_minutes_defaults_and_rejects_negative(client: TestClient) -> None:
     task = _create_task(client, extra={"estimated_minutes": 90})
     assert task["estimated_minutes"] == 90

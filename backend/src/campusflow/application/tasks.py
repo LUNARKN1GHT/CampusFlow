@@ -13,7 +13,7 @@ from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.dates import validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
-from campusflow.domain.states import TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
 
 
 def list_tasks(
@@ -59,6 +59,9 @@ def create_task(
     description: str | None,
     due_date: date | None,
     due_time: time | None,
+    target_date: date | None,
+    due_source: DueSourceType,
+    due_note: str | None,
     priority: TaskPriority,
     estimated_minutes: int | None,
     remaining_minutes: int | None,
@@ -75,6 +78,9 @@ def create_task(
         description,
         due_date,
         due_time,
+        target_date,
+        due_source,
+        due_note,
         priority,
         estimated_minutes,
         remaining_minutes,
@@ -93,6 +99,9 @@ def update_task(
     description: str | None,
     due_date: date | None,
     due_time: time | None,
+    target_date: date | None,
+    due_source: DueSourceType,
+    due_note: str | None,
     priority: TaskPriority,
     estimated_minutes: int | None,
     remaining_minutes: int | None,
@@ -110,6 +119,9 @@ def update_task(
         description=description,
         due_date=due_date,
         due_time=due_time,
+        target_date=target_date,
+        due_source=due_source,
+        due_note=due_note,
         priority=priority,
         estimated_minutes=estimated_minutes,
         remaining_minutes=remaining_minutes,
