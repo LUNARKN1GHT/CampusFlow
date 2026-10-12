@@ -3,10 +3,31 @@
 验收：伪造扩展名与超限文件被拒绝；错误说明可理解且不留下孤立文件。
 """
 
+import pytest
 from fastapi.testclient import TestClient
 
 REAL_PDF = b"%PDF-1.4 minimal"
 REAL_PNG = b"\x89PNG\r\n\x1a\n" + b"fake-png-content"
+
+
+class RecordingQueue:
+    """测试队列：只记录投递，不连接真实 Redis（CI 无 Redis 服务）。"""
+
+    def __init__(self) -> None:
+        self.enqueued: list[int] = []
+
+    def enqueue_parse(self, job_id: int) -> str:
+        self.enqueued.append(job_id)
+        return f"fake-{job_id}"
+
+
+@pytest.fixture(autouse=True)
+def local_queue(client: TestClient):
+    """上传会把解析作业投递到队列；测试用替身，不依赖外部 Redis（J002）。"""
+    original = client.app.state.job_queue
+    client.app.state.job_queue = RecordingQueue()
+    yield
+    client.app.state.job_queue = original
 
 
 def _upload(client: TestClient, files: list[tuple[str, bytes]], **params) -> dict:

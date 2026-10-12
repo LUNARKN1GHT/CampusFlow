@@ -36,6 +36,7 @@ TABLES = ", ".join(
         "materials",
         "material_versions",
         "processing_jobs",
+        "processing_job_attempts",
         "source_chunks",
     )
 )
