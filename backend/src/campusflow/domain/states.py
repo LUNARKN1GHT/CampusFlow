@@ -57,3 +57,21 @@ class MaterialStatus(StrEnum):
     DONE = "done"  # 完成
     PARTIAL = "partial"  # 部分成功
     FAILED = "failed"  # 失败
+
+
+class JobStage(StrEnum):
+    """后台处理作业的阶段。"""
+
+    PARSE = "parse"  # 解析原文
+    EXTRACT = "extract"  # 提取事项
+    EMBED = "embed"  # 向量化
+
+
+class JobStatus(StrEnum):
+    """后台处理作业的状态（J001）。完成与部分成功区分。"""
+
+    PENDING = "pending"  # 待处理
+    RUNNING = "running"  # 处理中
+    DONE = "done"  # 完成
+    PARTIAL = "partial"  # 部分成功
+    FAILED = "failed"  # 失败
