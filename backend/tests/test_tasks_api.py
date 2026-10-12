@@ -3,7 +3,11 @@
 重点覆盖验收要求：只有日期的 DDL 保持日期精度，不伪装成午夜/23:59。
 """
 
+from datetime import date
+
+from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
 
 
 def _create_task(
@@ -38,6 +42,20 @@ def test_due_time_without_due_date_rejected(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "只有时刻", "due_time": "23:59:00"})
     assert response.status_code == 400
     assert "日期" in response.json()["detail"]
+
+
+def test_date_only_ddl_persisted_without_fabricated_time(client: TestClient) -> None:
+    task = _create_task(client, due_date="2026-10-15")
+
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT due_date, due_time FROM tasks WHERE id = :task_id"),
+            {"task_id": task["id"]},
+        ).one()
+
+    assert row.due_date == date(2026, 10, 15)
+    assert row.due_time is None
 
 
 def test_task_create_list_progress(client: TestClient) -> None:
@@ -94,6 +112,35 @@ def test_task_update_rejects_null_required_fields(client: TestClient) -> None:
 def test_task_progress_missing_task(client: TestClient) -> None:
     response = client.patch("/api/v1/tasks/999/progress", json={"progress": "done"})
     assert response.status_code == 404
+
+
+def test_progress_history_survives_cancel_and_reopen(client: TestClient) -> None:
+    task = _create_task(client)
+
+    client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "in_progress", "reason": "开始做了"},
+    )
+    client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "cancelled", "reason": "教师取消该作业"},
+    )
+    reopened = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "not_started", "reason": "教师恢复该作业"},
+    ).json()
+    assert reopened["progress"] == "not_started"
+
+    history = client.get(f"/api/v1/tasks/{task['id']}/progress-history").json()
+    # 取消与重新打开只追加历史，不删除既有变更记录
+    assert [item["to_progress"] for item in history] == [
+        "not_started",
+        "cancelled",
+        "in_progress",
+    ]
+    assert history[1]["reason"] == "教师取消该作业"
+    # 当前进度与最新一条历史一致
+    assert history[0]["to_progress"] == reopened["progress"]
 
 
 def test_task_requires_course_exists(client: TestClient) -> None:
