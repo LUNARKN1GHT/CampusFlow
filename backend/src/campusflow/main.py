@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from campusflow.api import auth as auth_api
 from campusflow.api import courses as courses_api
+from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
@@ -90,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         schedule_api.router,
         settings_api.router,
         materials_api.router,
+        jobs_api.router,
     ):
         app.include_router(
             router,
