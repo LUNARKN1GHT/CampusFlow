@@ -383,6 +383,21 @@ class TaskRepository(Protocol):
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
 
+    def exists(self, material_id: int) -> bool:
+        """资料是否仍然存在（J007）。
+
+        直接查库、不读会话里已加载的对象：晚到的作业必须看到删除后的真实状态，
+        而不是本事务早先读到的旧对象。
+        """
+        ...
+
+    def version_numbers_by_id(self, material_id: int) -> dict[int, int]:
+        """版本 id → 版本号（J007），同样直接查库。
+
+        用于判断作业的目标版本是否已被更新的版本取代；空字典表示资料已无版本。
+        """
+        ...
+
     def list(
         self,
         workspace_id: int,
