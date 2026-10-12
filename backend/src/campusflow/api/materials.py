@@ -85,6 +85,7 @@ class SourceChunkOut(BaseModel):
     paragraph: int | None
     bbox: tuple[float, float, float, float] | None
     confidence: float | None
+    table_group: str | None
 
 
 class TextImportOut(BaseModel):
