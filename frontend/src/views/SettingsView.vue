@@ -13,6 +13,7 @@ const loading = ref(true)
 const saving = ref(false)
 const slotSaving = ref(false)
 const error = ref('')
+const loadError = ref('')
 const message = ref('')
 const slots = ref<AvailabilitySlot[]>([])
 const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
@@ -22,12 +23,13 @@ const slotError = ref('')
 async function load() {
   loading.value = true
   error.value = ''
+  loadError.value = ''
   try {
     const [settings, availability] = await Promise.all([settingsApi.get(), scheduleApi.listSlots()])
     Object.assign(form, settings)
     slots.value = availability
   } catch (caught) {
-    error.value = errorMessage(caught)
+    loadError.value = errorMessage(caught)
   } finally {
     loading.value = false
   }
@@ -80,7 +82,8 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading"><p class="eyebrow">个人配置</p><h1>设置</h1><p class="intro">这些偏好决定后续排期可使用的时间与缓冲，但不会修改课程 DDL。</p></div>
-    <ApiFeedback v-if="error && loading" :message="error" :busy="loading" @retry="load" />
+    <ApiFeedback v-if="loadError" :message="loadError" :busy="loading" @retry="load" />
+    <p v-else-if="loading" class="form-help" role="status">正在加载设置…</p>
     <template v-else>
       <div class="two-column-layout settings-layout">
         <section class="panel">
