@@ -288,9 +288,12 @@ class SqlAlchemyTaskRepository:
         course_id: int | None = None,
         progress: TaskProgress | None = None,
         semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]:
         stmt = select(Task).where(Task.workspace_id == workspace_id)
         if semester_id is not None:
+            # 按课程学期筛选：未关联课程的任务不属于任何学期，只在未筛选学期时返回
             stmt = stmt.join(Course, Task.course_id == Course.id).where(
                 Course.workspace_id == workspace_id, Course.semester_id == semester_id
             )
@@ -298,6 +301,10 @@ class SqlAlchemyTaskRepository:
             stmt = stmt.where(Task.course_id == course_id)
         if progress is not None:
             stmt = stmt.where(Task.progress == progress)
+        if due_from is not None:
+            stmt = stmt.where(Task.due_date >= due_from)
+        if due_to is not None:
+            stmt = stmt.where(Task.due_date <= due_to)
         stmt = stmt.order_by(Task.due_date.nulls_last(), Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 

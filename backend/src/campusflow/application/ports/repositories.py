@@ -167,6 +167,8 @@ class TaskRepository(Protocol):
         course_id: int | None = None,
         progress: TaskProgress | None = None,
         semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]: ...
 
     def get(self, task_id: int) -> TaskData | None: ...
