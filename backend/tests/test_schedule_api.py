@@ -97,6 +97,81 @@ def test_weekly_event_occurrences_respect_query_and_repeat_end(client: TestClien
     assert {item["source_event_id"] for item in occurrences} == {event["id"]}
 
 
+def test_weekly_occurrences_are_not_duplicated_or_missed_at_window_edges(
+    client: TestClient,
+) -> None:
+    _create_event(client, recurrence="weekly", repeat_until="2026-10-26")
+
+    full = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-01", "end_date": "2026-10-31"},
+    ).json()
+    first_half = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-01", "end_date": "2026-10-05"},
+    ).json()
+    second_half = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-06", "end_date": "2026-10-31"},
+    ).json()
+
+    merged = [item["starts_at"] for item in first_half + second_half]
+    assert merged == [item["starts_at"] for item in full]
+    assert len(merged) == len(set(merged))
+
+    # 窗口越过 repeat_until 时不产生额外实例（最后一次为 10-26）
+    assert [item["starts_at"][:10] for item in full] == [
+        "2026-10-05",
+        "2026-10-12",
+        "2026-10-19",
+        "2026-10-26",
+    ]
+    beyond = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-20", "end_date": "2026-11-30"},
+    ).json()
+    assert [item["starts_at"][:10] for item in beyond] == ["2026-10-26"]
+
+
+def test_occurrences_clip_to_query_window_and_keep_workspace_offset(client: TestClient) -> None:
+    _create_event(client, recurrence="weekly", repeat_until="2026-10-26")
+
+    # 窗口起点在实例结束之后，该实例不进入结果
+    after_first = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-06", "end_date": "2026-10-11"},
+    ).json()
+    assert [item["starts_at"][:10] for item in after_first] == []
+
+    # 窗口起点落在实例进行中，实例仍被包含
+    mid_occurrence = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-12", "end_date": "2026-10-13"},
+    ).json()
+    assert [item["starts_at"][:10] for item in mid_occurrence] == ["2026-10-12"]
+    # 工作区时区（Asia/Shanghai）下展示本地偏移，UTC 存储未被改写
+    assert mid_occurrence[0]["starts_at"].endswith("+08:00")
+    assert mid_occurrence[0]["ends_at"].endswith("+08:00")
+
+
+def test_cross_midnight_occurrence_appears_once_per_window(client: TestClient) -> None:
+    _create_event(
+        client,
+        title="深夜自习",
+        starts_at="2026-09-28T23:00:00",
+        ends_at="2026-09-29T01:00:00",
+        recurrence="weekly",
+        repeat_until="2026-10-12",
+    )
+
+    spanning = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-10-04", "end_date": "2026-10-06"},
+    ).json()
+    assert [item["starts_at"][:16] for item in spanning] == ["2026-10-05T23:00"]
+    assert spanning[0]["ends_at"][:16] == "2026-10-06T01:00"
+
+
 def test_availability_slot_create_list_delete(client: TestClient) -> None:
     response = client.post(
         "/api/v1/availability-slots",
