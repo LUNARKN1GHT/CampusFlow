@@ -68,7 +68,12 @@ def client() -> Iterator[TestClient]:
 
 
 @pytest.fixture(autouse=True)
-def _clean_tables(client: TestClient) -> None:
+def _clean_tables(request: pytest.FixtureRequest) -> Iterator[None]:
+    # 仅对声明 client 的集成测试清库；纯领域测试不触发数据库连接
+    if "client" not in request.fixturenames:
+        yield
+        return
+    request.getfixturevalue("client")
     engine = create_engine(TEST_DATABASE_URL)
     with engine.connect() as connection:
         connection.execute(text(f"TRUNCATE TABLE {TABLES} RESTART IDENTITY CASCADE"))
