@@ -159,3 +159,28 @@ def test_task_remaining_minutes_defaults_and_rejects_negative(client: TestClient
 
     rejected = client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": -1})
     assert rejected.status_code == 422
+
+
+def test_remaining_minutes_rules_on_complete_cancel_reopen(client: TestClient) -> None:
+    # 规则：完成或取消时剩余归零；从完成/取消重新打开时恢复原估计，历史保留前后值
+    task = _create_task(client, extra={"estimated_minutes": 90})
+
+    client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": 30})
+    done = client.patch(f"/api/v1/tasks/{task['id']}/progress", json={"progress": "done"}).json()
+    assert done["remaining_minutes"] == 0
+
+    reopened = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress", json={"progress": "in_progress"}
+    ).json()
+    assert reopened["remaining_minutes"] == 90
+
+    cancelled = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress", json={"progress": "cancelled"}
+    ).json()
+    assert cancelled["remaining_minutes"] == 0
+
+    history = client.get(f"/api/v1/tasks/{task['id']}/progress-history").json()
+    assert [
+        (item["to_progress"], item["previous_remaining_minutes"], item["new_remaining_minutes"])
+        for item in history
+    ] == [("cancelled", 90, 0), ("in_progress", 0, 90), ("done", 30, 0)]
