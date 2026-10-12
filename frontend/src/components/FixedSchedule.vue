@@ -48,7 +48,16 @@ const days = computed(() => Array.from({ length: 7 }, (_, index) => {
   const date = new Date(weekStart.value)
   date.setDate(date.getDate() + index)
   const key = dateKey(date)
-  return { key, label: new Intl.DateTimeFormat('zh-CN', { weekday: 'short', month: 'numeric', day: 'numeric' }).format(date), events: occurrences.value.filter((item) => workspaceInput(item.starts_at).slice(0, 10) === key) }
+  return {
+    key,
+    label: new Intl.DateTimeFormat('zh-CN', { weekday: 'short', month: 'numeric', day: 'numeric' }).format(date),
+    events: occurrences.value.filter((item) => {
+      const firstDay = workspaceInput(item.starts_at).slice(0, 10)
+      // 结束边界不占用下一天；按空间日期比较，避免使用浏览器时区切分。
+      const lastDay = workspaceInput(new Date(new Date(item.ends_at).getTime() - 1).toISOString()).slice(0, 10)
+      return firstDay <= key && key <= lastDay
+    }),
+  }
 }))
 
 const weekEnd = computed(() => days.value[6]?.key ?? dateKey(weekStart.value))
@@ -126,9 +135,12 @@ async function deleteEvent(event: FixedEvent) {
   }
 }
 
-function timeRange(item: FixedEventOccurrence): string {
-  const formatter = new Intl.DateTimeFormat('zh-CN', { timeZone: timezone.value, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-  return `${formatter.format(new Date(item.starts_at))}–${formatter.format(new Date(item.ends_at))}`
+function timeRange(item: FixedEventOccurrence, day: string): string {
+  const start = workspaceInput(item.starts_at)
+  const end = workspaceInput(item.ends_at)
+  const from = start.slice(0, 10) < day ? '00:00' : start.slice(11)
+  const to = end.slice(0, 10) > day ? '24:00' : end.slice(11)
+  return `${from}–${to}`
 }
 
 onMounted(load)
@@ -144,7 +156,7 @@ onMounted(load)
     <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="load" />
     <p v-else-if="loading" class="muted">正在展开本周日程…</p>
     <div v-else class="week-grid">
-      <div v-for="day in days" :key="day.key" class="week-day"><strong>{{ day.label }}</strong><div v-if="day.events.length" class="day-events"><article v-for="item in day.events" :key="`${item.source_event_id}-${item.starts_at}`"><time>{{ timeRange(item) }}</time><b>{{ item.title }}</b><span>{{ courseMap.get(item.course_id ?? -1)?.name || item.location || '固定安排' }}</span></article></div><span v-else class="day-empty">无固定安排</span></div>
+      <div v-for="day in days" :key="day.key" class="week-day"><strong>{{ day.label }}</strong><div v-if="day.events.length" class="day-events"><article v-for="item in day.events" :key="`${item.source_event_id}-${item.starts_at}`"><time>{{ timeRange(item, day.key) }}</time><b>{{ item.title }}</b><span>{{ courseMap.get(item.course_id ?? -1)?.name || item.location || '固定安排' }}</span></article></div><span v-else class="day-empty">无固定安排</span></div>
     </div>
 
     <div v-if="definitions.length" class="definition-list"><h3 class="subheading">重复规则与编辑</h3><div><article v-for="event in definitions" :key="event.id"><span><strong>{{ event.title }}</strong><small>{{ event.recurrence === 'weekly' ? `每周重复至 ${event.repeat_until}` : '不重复' }}</small></span><span><button type="button" class="text-button" @click="openEditor(event)">编辑</button><button type="button" class="danger-button" @click="deleteEvent(event)">删除</button></span></article></div></div>
