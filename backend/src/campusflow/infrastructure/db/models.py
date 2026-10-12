@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.base import Base
 
 
@@ -33,6 +33,7 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
     daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
+    weekly_capacity_minutes: Mapped[int] = mapped_column(Integer, default=1680)
     break_minutes: Mapped[int] = mapped_column(Integer, default=15)
     buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
     # 默认空间标记：数据库部分唯一索引保证并发初始化不会创建多个默认空间
@@ -87,6 +88,11 @@ class Task(Base):
     priority: Mapped[str] = mapped_column(String(20), default=TaskPriority.MEDIUM)
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
     remaining_minutes: Mapped[int | None] = mapped_column(Integer)
+    # 个人安排目标：与课程正式 DDL 相互独立，修改互不影响
+    target_date: Mapped[date | None] = mapped_column(Date)
+    # 正式截止的来源类型与说明；修改截止本身不自动清空既有说明
+    due_source: Mapped[str] = mapped_column(String(20), default=DueSourceType.USER)
+    due_note: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

@@ -25,6 +25,7 @@ from campusflow.application.ports.repositories import (
     WorkspaceData,
 )
 from campusflow.domain.states import (
+    DueSourceType,
     EventRecurrence,
     MaterialSourceType,
     MaterialStatus,
@@ -86,6 +87,7 @@ def _workspace_to_data(row: Workspace) -> WorkspaceData:
         name=row.name,
         timezone=row.timezone,
         daily_capacity_minutes=row.daily_capacity_minutes,
+        weekly_capacity_minutes=row.weekly_capacity_minutes,
         break_minutes=row.break_minutes,
         buffer_minutes=row.buffer_minutes,
     )
@@ -115,6 +117,9 @@ def _task_to_data(row: Task) -> TaskData:
         description=row.description,
         due_date=row.due_date,
         due_time=row.due_time,
+        target_date=row.target_date,
+        due_source=DueSourceType(row.due_source),
+        due_note=row.due_note,
         progress=TaskProgress(row.progress),
         priority=TaskPriority(row.priority),
         estimated_minutes=row.estimated_minutes,
@@ -500,12 +505,14 @@ class SqlAlchemyWorkspaceRepository:
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None:
         row = self._session.get(Workspace, workspace_id)
         if row is None:
             return None
         row.timezone = timezone
         row.daily_capacity_minutes = daily_capacity_minutes
+        row.weekly_capacity_minutes = weekly_capacity_minutes
         row.break_minutes = break_minutes
         row.buffer_minutes = buffer_minutes
         self._session.flush()
@@ -580,12 +587,24 @@ class SqlAlchemyTaskRepository:
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]:
         stmt = select(Task).where(Task.workspace_id == workspace_id)
+        if semester_id is not None:
+            # 按课程学期筛选：未关联课程的任务不属于任何学期，只在未筛选学期时返回
+            stmt = stmt.join(Course, Task.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         if course_id is not None:
             stmt = stmt.where(Task.course_id == course_id)
         if progress is not None:
             stmt = stmt.where(Task.progress == progress)
+        if due_from is not None:
+            stmt = stmt.where(Task.due_date >= due_from)
+        if due_to is not None:
+            stmt = stmt.where(Task.due_date <= due_to)
         stmt = stmt.order_by(Task.due_date.nulls_last(), Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 
@@ -601,6 +620,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -612,6 +634,9 @@ class SqlAlchemyTaskRepository:
             description=description,
             due_date=due_date,
             due_time=due_time,
+            target_date=target_date,
+            due_source=due_source,
+            due_note=due_note,
             priority=priority,
             estimated_minutes=estimated_minutes,
             remaining_minutes=remaining_minutes,
@@ -629,6 +654,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -641,6 +669,9 @@ class SqlAlchemyTaskRepository:
         row.description = description
         row.due_date = due_date
         row.due_time = due_time
+        row.target_date = target_date
+        row.due_source = due_source
+        row.due_note = due_note
         row.priority = priority
         row.estimated_minutes = estimated_minutes
         row.remaining_minutes = remaining_minutes
@@ -712,12 +743,18 @@ class SqlAlchemyScheduleRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]:
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]:
         stmt = (
             select(FixedEvent)
             .where(FixedEvent.workspace_id == workspace_id)
             .order_by(FixedEvent.starts_at)
         )
+        if semester_id is not None:
+            stmt = stmt.join(Course, FixedEvent.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         return [_fixed_event_to_data(row) for row in self._session.scalars(stmt)]
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None:

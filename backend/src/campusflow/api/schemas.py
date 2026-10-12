@@ -1,18 +1,10 @@
 """API 输入输出 schema。"""
 
 from datetime import date, datetime, time
-from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
-
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
-
-
-def _assume_local(value: datetime) -> datetime:
-    """前端未带时区的日期时间按本地时区理解。"""
-    return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
 class SemesterCreate(BaseModel):
@@ -73,6 +65,9 @@ class TaskCreate(BaseModel):
     description: str | None = None
     due_date: date | None = None
     due_time: time | None = None
+    target_date: date | None = None
+    due_source: DueSourceType = DueSourceType.USER
+    due_note: str | None = Field(default=None, max_length=500)
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = Field(default=None, gt=0)
     remaining_minutes: int | None = Field(default=None, ge=0)
@@ -84,13 +79,16 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     due_date: date | None = None
     due_time: time | None = None
+    target_date: date | None = None
+    due_source: DueSourceType | None = None
+    due_note: str | None = Field(default=None, max_length=500)
     priority: TaskPriority | None = None
     estimated_minutes: int | None = Field(default=None, gt=0)
     remaining_minutes: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "TaskUpdate":
-        for field in ("title", "priority"):
+        for field in ("title", "priority", "due_source"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} 不能为 null")
         return self
@@ -114,10 +112,14 @@ class TaskOut(BaseModel):
     description: str | None
     due_date: date | None
     due_time: time | None
+    target_date: date | None
+    due_source: DueSourceType
+    due_note: str | None
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
+    overdue: bool
     created_at: datetime
     updated_at: datetime
 
@@ -143,11 +145,6 @@ class FixedEventCreate(BaseModel):
     recurrence: EventRecurrence = EventRecurrence.NONE
     repeat_until: date | None = None
 
-    @field_validator("starts_at", "ends_at")
-    @classmethod
-    def assume_local(cls, value: datetime) -> datetime:
-        return _assume_local(value)
-
 
 class FixedEventUpdate(BaseModel):
     course_id: int | None = None
@@ -157,11 +154,6 @@ class FixedEventUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=200)
     recurrence: EventRecurrence | None = None
     repeat_until: date | None = None
-
-    @field_validator("starts_at", "ends_at")
-    @classmethod
-    def assume_local(cls, value: datetime | None) -> datetime | None:
-        return None if value is None else _assume_local(value)
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "FixedEventUpdate":

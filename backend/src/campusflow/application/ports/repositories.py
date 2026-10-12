@@ -10,6 +10,7 @@ from datetime import date, datetime, time
 from typing import Protocol
 
 from campusflow.domain.states import (
+    DueSourceType,
     EventRecurrence,
     MaterialSourceType,
     MaterialStatus,
@@ -42,6 +43,7 @@ class WorkspaceData:
     daily_capacity_minutes: int
     break_minutes: int
     buffer_minutes: int
+    weekly_capacity_minutes: int = 1680
 
 
 @dataclass
@@ -67,12 +69,17 @@ class TaskData:
     description: str | None
     due_date: date | None
     due_time: time | None
+    target_date: date | None
+    due_source: DueSourceType
+    due_note: str | None
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # 读取时按工作空间时区派生，不落库
+    overdue: bool = False
 
     @property
     def source_state(self) -> str:
@@ -317,6 +324,7 @@ class WorkspaceRepository(Protocol):
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None: ...
 
 
@@ -354,6 +362,9 @@ class TaskRepository(Protocol):
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]: ...
 
     def get(self, task_id: int) -> TaskData | None: ...
@@ -366,6 +377,9 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -380,6 +394,9 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -494,7 +511,9 @@ class MaterialRepository(Protocol):
 
 
 class ScheduleRepository(Protocol):
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]: ...
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 

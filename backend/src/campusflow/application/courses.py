@@ -44,6 +44,8 @@ def set_semester_archived(
 def list_courses(
     repos: Repositories, workspace_id: int, *, semester_id: int | None = None
 ) -> list[CourseData]:
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
     return repos.courses.list(workspace_id, semester_id)
 
 
@@ -55,9 +57,7 @@ def get_course(repos: Repositories, workspace_id: int, course_id: int) -> Course
     return course
 
 
-def _require_semester_in_workspace(
-    repos: Repositories, workspace_id: int, semester_id: int
-) -> None:
+def require_semester_in_workspace(repos: Repositories, workspace_id: int, semester_id: int) -> None:
     semester = repos.semesters.get(semester_id)
     if semester is None:
         raise NotFoundError("学期不存在")
@@ -74,7 +74,7 @@ def create_course(
     teacher: str | None,
     class_name: str | None,
 ) -> CourseData:
-    _require_semester_in_workspace(repos, workspace_id, semester_id)
+    require_semester_in_workspace(repos, workspace_id, semester_id)
     course = repos.courses.create(workspace_id, semester_id, name, code, teacher, class_name)
     repos.uow.commit()
     return course
@@ -95,7 +95,7 @@ def update_course(
     if current is None:
         raise NotFoundError("课程不存在")
     require_in_workspace(current.workspace_id, workspace_id, "课程不存在")
-    _require_semester_in_workspace(repos, workspace_id, semester_id)
+    require_semester_in_workspace(repos, workspace_id, semester_id)
     updated = repos.courses.update(
         course_id,
         semester_id=semester_id,

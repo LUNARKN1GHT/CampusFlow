@@ -122,6 +122,7 @@ def main() -> None:
                 capture_output=True,
                 text=True,
                 timeout=120,
+                check=False,
             )
             if result.returncode:
                 raise RuntimeError("独立 Worker 退出失败：" + result.stderr[-1500:])
