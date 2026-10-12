@@ -3,7 +3,11 @@
 重点覆盖验收要求：只有日期的 DDL 保持日期精度，不伪装成午夜/23:59。
 """
 
+from datetime import date
+
+from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
 
 
 def _create_task(
@@ -38,6 +42,20 @@ def test_due_time_without_due_date_rejected(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "只有时刻", "due_time": "23:59:00"})
     assert response.status_code == 400
     assert "日期" in response.json()["detail"]
+
+
+def test_date_only_ddl_persisted_without_fabricated_time(client: TestClient) -> None:
+    task = _create_task(client, due_date="2026-10-15")
+
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT due_date, due_time FROM tasks WHERE id = :task_id"),
+            {"task_id": task["id"]},
+        ).one()
+
+    assert row.due_date == date(2026, 10, 15)
+    assert row.due_time is None
 
 
 def test_task_create_list_progress(client: TestClient) -> None:
