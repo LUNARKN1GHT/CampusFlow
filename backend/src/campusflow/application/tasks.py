@@ -6,14 +6,27 @@
 所有按 ID 的操作校验对象归属当前空间（W006）。
 """
 
-from datetime import date, time
+from dataclasses import replace
+from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 
 from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.scope import require_in_workspace
-from campusflow.domain.dates import validate_due
+from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
+
+
+def _apply_overdue(repos: Repositories, workspace_id: int, tasks: list[TaskData]) -> list[TaskData]:
+    workspace = repos.workspaces.get(workspace_id)
+    if workspace is None:
+        return tasks
+    now = datetime.now(ZoneInfo(workspace.timezone))
+    return [
+        replace(task, overdue=is_overdue(task.due_date, task.due_time, task.progress, now))
+        for task in tasks
+    ]
 
 
 def list_tasks(
@@ -26,9 +39,10 @@ def list_tasks(
 ) -> list[TaskData]:
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
-    return repos.tasks.list(
+    tasks = repos.tasks.list(
         workspace_id, course_id=course_id, progress=progress, semester_id=semester_id
     )
+    return _apply_overdue(repos, workspace_id, tasks)
 
 
 def _require_task_in_workspace(repos: Repositories, workspace_id: int, task_id: int) -> TaskData:
@@ -47,7 +61,8 @@ def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_
 
 
 def get_task(repos: Repositories, workspace_id: int, task_id: int) -> TaskData:
-    return _require_task_in_workspace(repos, workspace_id, task_id)
+    task = _require_task_in_workspace(repos, workspace_id, task_id)
+    return _apply_overdue(repos, workspace_id, [task])[0]
 
 
 def create_task(
@@ -86,7 +101,7 @@ def create_task(
         remaining_minutes,
     )
     repos.uow.commit()
-    return task
+    return _apply_overdue(repos, workspace_id, [task])[0]
 
 
 def update_task(
@@ -127,7 +142,7 @@ def update_task(
         remaining_minutes=remaining_minutes,
     )
     repos.uow.commit()
-    return updated
+    return _apply_overdue(repos, workspace_id, [updated])[0]
 
 
 def set_progress(
@@ -136,7 +151,7 @@ def set_progress(
     _require_task_in_workspace(repos, workspace_id, task_id)
     task = repos.tasks.set_progress(task_id, progress, reason)
     repos.uow.commit()
-    return task
+    return _apply_overdue(repos, workspace_id, [task])[0]
 
 
 def list_progress_changes(repos: Repositories, workspace_id: int, task_id: int):

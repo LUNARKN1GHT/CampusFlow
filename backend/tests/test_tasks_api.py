@@ -3,7 +3,7 @@
 重点覆盖验收要求：只有日期的 DDL 保持日期精度，不伪装成午夜/23:59。
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
@@ -146,6 +146,32 @@ def test_progress_history_survives_cancel_and_reopen(client: TestClient) -> None
 def test_task_requires_course_exists(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "挂到幽灵课", "course_id": 999})
     assert response.status_code == 404
+
+
+def test_overdue_flag_does_not_override_progress(client: TestClient) -> None:
+    yesterday = (date.today() - timedelta(days=2)).isoformat()
+    tomorrow = (date.today() + timedelta(days=2)).isoformat()
+
+    overdue_task = _create_task(client, "昨天的作业", due_date=yesterday)
+    assert overdue_task["overdue"] is True
+
+    future_task = _create_task(client, "明天的作业", due_date=tomorrow)
+    assert future_task["overdue"] is False
+
+    # 进行中与受阻只被标记，进度字段不被改写
+    blocked = client.patch(
+        f"/api/v1/tasks/{overdue_task['id']}/progress", json={"progress": "blocked"}
+    ).json()
+    assert blocked["progress"] == "blocked"
+    fetched = client.get(f"/api/v1/tasks/{overdue_task['id']}").json()
+    assert fetched["overdue"] is True
+    assert fetched["progress"] == "blocked"
+
+    # 完成后不再逾期
+    done = client.patch(
+        f"/api/v1/tasks/{overdue_task['id']}/progress", json={"progress": "done"}
+    ).json()
+    assert done["overdue"] is False
 
 
 def test_personal_target_independent_from_formal_due(client: TestClient) -> None:
