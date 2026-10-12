@@ -164,6 +164,8 @@ class MaterialVersion(Base):
     note: Mapped[str | None] = mapped_column(String(500))
     # 原文件在私有存储中的键（D002 生成）；粘贴文本同样落成 .txt 文件
     storage_key: Mapped[str | None] = mapped_column(String(300))
+    # 原文件指纹（SHA-256 十六进制），用于完全相同文件的重复导入检测（D006）
+    checksum: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
