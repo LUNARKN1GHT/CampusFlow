@@ -148,6 +148,70 @@ def test_task_requires_course_exists(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_task_filters_by_due_range_and_keeps_undated_last(client: TestClient) -> None:
+    undated = _create_task(client, "没有日期的任务", due_date=None)
+    early = _create_task(client, "早的任务", due_date="2026-10-10")
+    middle = _create_task(client, "中间的任务", due_date="2026-10-15")
+    late = _create_task(client, "晚的任务", due_date="2026-10-20")
+
+    within = client.get(
+        "/api/v1/tasks", params={"due_from": "2026-10-12", "due_to": "2026-10-18"}
+    ).json()
+    assert [t["id"] for t in within] == [middle["id"]]
+
+    open_ended = client.get("/api/v1/tasks", params={"due_from": "2026-10-15"}).json()
+    assert [t["id"] for t in open_ended] == [middle["id"], late["id"]]
+
+    # 日期缺失项不参与区间筛选，但在未筛选时排在最后，位置明确
+    unfiltered = client.get("/api/v1/tasks").json()
+    assert [t["id"] for t in unfiltered] == [
+        early["id"],
+        middle["id"],
+        late["id"],
+        undated["id"],
+    ]
+
+    reversed_range = client.get(
+        "/api/v1/tasks", params={"due_from": "2026-10-18", "due_to": "2026-10-12"}
+    )
+    assert reversed_range.status_code == 400
+
+
+def test_semester_filter_separates_history_and_course_less_tasks(client: TestClient) -> None:
+    def create_semester(name: str, start: str, end: str) -> int:
+        return client.post(
+            "/api/v1/semesters", json={"name": name, "start_date": start, "end_date": end}
+        ).json()["id"]
+
+    current = create_semester("2026 秋", "2026-09-01", "2027-01-31")
+    history = create_semester("2025 秋", "2025-09-01", "2026-01-31")
+    current_course = client.post(
+        "/api/v1/courses", json={"semester_id": current, "name": "数据结构"}
+    ).json()["id"]
+    history_course = client.post(
+        "/api/v1/courses", json={"semester_id": history, "name": "程序设计"}
+    ).json()["id"]
+
+    current_task = _create_task(client, "本学期作业", extra={"course_id": current_course})
+    history_task = _create_task(client, "上学期作业", extra={"course_id": history_course})
+    course_less = _create_task(client, "没有课程的任务")
+
+    filtered = client.get("/api/v1/tasks", params={"semester_id": current}).json()
+    assert [t["id"] for t in filtered] == [current_task["id"]]
+    assert history_task["id"] not in [t["id"] for t in filtered]
+
+    # 未关联课程的任务不属于任何学期：筛选学期时不混入，未筛选时仍可见
+    assert course_less["id"] not in [t["id"] for t in filtered]
+    all_ids = [t["id"] for t in client.get("/api/v1/tasks").json()]
+    assert {current_task["id"], history_task["id"], course_less["id"]} <= set(all_ids)
+
+    combined = client.get(
+        "/api/v1/tasks",
+        params={"semester_id": current, "due_from": "2026-10-01", "due_to": "2026-10-31"},
+    ).json()
+    assert [t["id"] for t in combined] == [current_task["id"]]
+
+
 def test_overdue_flag_does_not_override_progress(client: TestClient) -> None:
     yesterday = (date.today() - timedelta(days=2)).isoformat()
     tomorrow = (date.today() + timedelta(days=2)).isoformat()

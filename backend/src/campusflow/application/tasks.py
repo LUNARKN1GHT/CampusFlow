@@ -36,11 +36,20 @@ def list_tasks(
     course_id: int | None = None,
     progress: TaskProgress | None = None,
     semester_id: int | None = None,
+    due_from: date | None = None,
+    due_to: date | None = None,
 ) -> list[TaskData]:
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
+    if due_from is not None and due_to is not None and due_from > due_to:
+        raise DomainError("截止区间起点不能晚于终点")
     tasks = repos.tasks.list(
-        workspace_id, course_id=course_id, progress=progress, semester_id=semester_id
+        workspace_id,
+        course_id=course_id,
+        progress=progress,
+        semester_id=semester_id,
+        due_from=due_from,
+        due_to=due_to,
     )
     return _apply_overdue(repos, workspace_id, tasks)
 

@@ -1,6 +1,7 @@
 """任务 HTTP 路由。"""
 
 from dataclasses import replace
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -30,11 +31,21 @@ def list_tasks(
     course_id: Annotated[int | None, Query()] = None,
     progress: Annotated[TaskProgress | None, Query()] = None,
     semester_id: Annotated[int | None, Query()] = None,
+    due_from: Annotated[
+        date | None, Query(description="截止日期区间起点（含）；未关联课程的任务不属于任何学期")
+    ] = None,
+    due_to: Annotated[date | None, Query(description="截止日期区间终点（含）")] = None,
 ) -> list[TaskOut]:
     return [
         TaskOut.model_validate(t)
         for t in use_cases.list_tasks(
-            repos, workspace.id, course_id=course_id, progress=progress, semester_id=semester_id
+            repos,
+            workspace.id,
+            course_id=course_id,
+            progress=progress,
+            semester_id=semester_id,
+            due_from=due_from,
+            due_to=due_to,
         )
     ]
 
