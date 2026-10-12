@@ -3,6 +3,7 @@
 验收：完全重复可提示已有资料；不同版本或不同空间不被静默合并。
 """
 
+import pytest
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -13,6 +14,26 @@ from campusflow.infrastructure.db.models import Material, MaterialVersion, Works
 PDF_A = "%PDF-1.4 内容甲".encode()
 PDF_A_COPY = "%PDF-1.4 内容甲".encode()  # 与 A 完全相同的字节
 PDF_B = "%PDF-1.4 内容乙".encode()  # 不同内容
+
+
+class RecordingQueue:
+    """测试队列：只记录投递，不连接真实 Redis（CI 无 Redis 服务）。"""
+
+    def __init__(self) -> None:
+        self.enqueued: list[int] = []
+
+    def enqueue_parse(self, job_id: int) -> str:
+        self.enqueued.append(job_id)
+        return f"fake-{job_id}"
+
+
+@pytest.fixture(autouse=True)
+def local_queue(client: TestClient):
+    """上传会把解析作业投递到队列；测试用替身，不依赖外部 Redis（J002）。"""
+    original = client.app.state.job_queue
+    client.app.state.job_queue = RecordingQueue()
+    yield
+    client.app.state.job_queue = original
 
 
 def _upload(client: TestClient, name: str, content: bytes, **params) -> dict:
