@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
 class SemesterCreate(BaseModel):
@@ -65,6 +65,9 @@ class TaskCreate(BaseModel):
     description: str | None = None
     due_date: date | None = None
     due_time: time | None = None
+    target_date: date | None = None
+    due_source: DueSourceType = DueSourceType.USER
+    due_note: str | None = Field(default=None, max_length=500)
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = Field(default=None, gt=0)
     remaining_minutes: int | None = Field(default=None, ge=0)
@@ -76,13 +79,16 @@ class TaskUpdate(BaseModel):
     description: str | None = None
     due_date: date | None = None
     due_time: time | None = None
+    target_date: date | None = None
+    due_source: DueSourceType | None = None
+    due_note: str | None = Field(default=None, max_length=500)
     priority: TaskPriority | None = None
     estimated_minutes: int | None = Field(default=None, gt=0)
     remaining_minutes: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "TaskUpdate":
-        for field in ("title", "priority"):
+        for field in ("title", "priority", "due_source"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} 不能为 null")
         return self
@@ -101,10 +107,14 @@ class TaskOut(BaseModel):
     description: str | None
     due_date: date | None
     due_time: time | None
+    target_date: date | None
+    due_source: DueSourceType
+    due_note: str | None
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
+    overdue: bool
     created_at: datetime
     updated_at: datetime
 
