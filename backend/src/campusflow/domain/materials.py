@@ -1,4 +1,4 @@
-"""资料领域规则（D001、D004、J007）。"""
+"""资料领域规则（D001、D004、J007、D009）。"""
 
 import re
 
@@ -10,7 +10,45 @@ MAX_PASTED_TEXT_CHARS = 200_000
 DELETED_MATERIAL_REASON = "资料已删除，本作业结果不再写回"
 SUPERSEDED_VERSION_REASON = "资料已有更新的版本，本作业结果不再写回"
 
+# 任务来源的三种状态（D009）。资料删除后任务必须留在"来源已失效"这一档，
+# 而不是与从未有过来源的普通任务混在一起：用户在任务页要能看出这条引用
+# 已经不可用，不能让它悄悄变成"看起来一直就是手工建的"。
+SOURCE_STATE_AVAILABLE = "available"
+SOURCE_STATE_INVALIDATED = "invalidated"
+SOURCE_STATE_NONE = "none"
+
+# 失效说明长度上限，与 tasks.source_invalidated_note 列宽一致
+MAX_SOURCE_NOTE_LENGTH = 300
+
 _BLANK_LINE = re.compile(r"\n\s*\n")
+
+
+def source_state(source_material_id: int | None, invalidated_at: object | None) -> str:
+    """任务来源的当前状态（D009）。
+
+    还有来源资料 → available；来源资料已删除并留过痕 → invalidated；
+    两者都没有 → none（手工创建的任务，本来就没有来源）。
+    """
+    if source_material_id is not None:
+        return SOURCE_STATE_AVAILABLE
+    if invalidated_at is not None:
+        return SOURCE_STATE_INVALIDATED
+    return SOURCE_STATE_NONE
+
+
+def invalidated_source_note(material_title: str) -> str:
+    """来源资料被删除时写进任务的失效说明（D009）。
+
+    带上原资料标题，用户才知道这条引用原来指向什么；标题过长时截断，
+    说明本身不写原文内容，只写"哪份资料、怎么了"。
+    """
+    title = material_title.strip() or "未命名资料"
+    prefix = "来源资料《"
+    suffix = "》已删除，引用不可用"
+    room = MAX_SOURCE_NOTE_LENGTH - len(prefix) - len(suffix)
+    if len(title) > room:
+        title = title[: max(room - 1, 1)] + "…"
+    return f"{prefix}{title}{suffix}"
 
 
 def next_version_no(existing: list[int]) -> int:
