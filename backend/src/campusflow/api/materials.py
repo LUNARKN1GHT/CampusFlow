@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
@@ -37,11 +37,6 @@ def get_text_parser() -> DocumentParser:
 
 
 TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
-
-
-def get_job_queue(request: Request) -> JobQueue | None:
-    """队列不可用时返回 None：建档仍可完成，投递补偿由 J004 处理。"""
-    return getattr(request.app.state, "job_queue", None)
 
 
 JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
@@ -172,12 +167,14 @@ def list_materials(
 
 
 class DeleteImpactOut(BaseModel):
-    """删除影响预览（D008）：执行删除前必须持有其中 confirm_token。"""
+    """删除影响预览（D008/D009）：执行删除前必须持有其中 confirm_token。"""
 
     material: MaterialOut
     version_count: int
     chunk_count: int
     linked_task_ids: list[int]
+    # 还在处理中、会被这次删除一并清掉的作业数（D009）：不为 0 时界面应提示
+    unfinished_job_count: int
     confirm_token: str
     backup_note: str
 
@@ -198,6 +195,7 @@ def delete_impact(
         version_count=impact.version_count,
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
+        unfinished_job_count=impact.unfinished_job_count,
         confirm_token=impact.confirm_token,
         backup_note=(
             f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"

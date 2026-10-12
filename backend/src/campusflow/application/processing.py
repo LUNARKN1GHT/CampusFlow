@@ -3,14 +3,63 @@
 Worker 调用本用例完成解析：读取原文件 → 按来源类型选解析器 →
 片段落库 → 更新作业状态与资料状态。任何一步失败记录到作业，
 不产生半成品。
+
+写入结果前必须重新核对目标（J007）：解析可能耗时较久，期间资料可能已被
+删除、版本可能已被新版本取代。两种情况下都不得写回，否则会复活已删除的
+资料，或让新版本收到旧版本的结果。
 """
 
+import logging
+
 from campusflow.application.ports.parsers import DocumentParser
-from campusflow.application.ports.repositories import Repositories, SourceChunkData
+from campusflow.application.ports.repositories import (
+    ProcessingJobData,
+    Repositories,
+    SourceChunkData,
+)
 from campusflow.application.ports.storage import FileStorage
 from campusflow.domain.errors import DomainError, PermanentError
 from campusflow.domain.jobs import is_retryable
+from campusflow.domain.materials import (
+    DELETED_MATERIAL_REASON,
+    SUPERSEDED_VERSION_REASON,
+    is_superseded,
+)
 from campusflow.domain.states import JobStatus, MaterialSourceType, MaterialStatus
+
+logger = logging.getLogger(__name__)
+
+
+def blocked_write_reason(repos: Repositories, job: ProcessingJobData) -> str | None:
+    """结果写入前的目标核对（J007），可写入返回 None，否则返回阻止原因。
+
+    读的是数据库里最新已提交的状态，而不是本事务早先加载的对象：解析可能
+    耗时较久，期间资料可能已被删除（连同版本与作业一起删掉），也可能已经
+    上传了更新的版本。索引与候选结果阶段同样应在写入前调用本函数。
+    """
+    if not repos.materials.exists(job.material_id):
+        return DELETED_MATERIAL_REASON
+
+    version_numbers = repos.materials.version_numbers_by_id(job.material_id)
+    version_no = version_numbers.get(job.version_id)
+    if version_no is None:
+        return DELETED_MATERIAL_REASON  # 版本随资料删除，作业已无有效目标
+    if is_superseded(version_no, max(version_numbers.values())):
+        return SUPERSEDED_VERSION_REASON
+    return None
+
+
+def _abandon_write(repos: Repositories, job_id: int, reason: str) -> None:
+    """放弃本次结果写入并留痕（J007）。
+
+    作业记为不可重试的终态失败并写明原因；资料当前状态一律不动——
+    已删除的资料不能因为迟到的作业复活，旧版本的结果也不能覆盖新版本的状态。
+    """
+    logger.warning("作业 %s 结果不写回：%s", job_id, reason)
+    repos.jobs.record_attempt(
+        job_id, status=JobStatus.FAILED, scope=None, error_reason=reason, retryable=False
+    )
+    repos.uow.commit()
 
 
 class ParserRegistry:
@@ -58,6 +107,13 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
     if job is None:
         return []
 
+    # 解析前先核对一次目标（J007）：资料已被删除、或版本已被新版本取代的作业
+    # 不必再花时间与费用解析（视觉识别是付费调用），直接作废并写明原因
+    blocked = blocked_write_reason(repos, job)
+    if blocked is not None:
+        _abandon_write(repos, job_id, blocked)
+        return []
+
     versions = repos.materials.list_versions(job.material_id)
     version = next((v for v in versions if v.id == job.version_id), None)
     if version is None or version.storage_key is None:
@@ -84,6 +140,12 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
         content = storage.read(version.storage_key)
         parser = _PARSER_REGISTRY.for_type(material.source_type)
         outcome = parser.parse(content, _mime_for(material.source_type, version.storage_key))
+        # 写入前重新核对目标（J007）：解析可能耗时较久，期间资料可能已被删除，
+        # 或已经上传了更新的版本。两种情况都不写回任何片段与状态。
+        blocked = blocked_write_reason(repos, job)
+        if blocked is not None:
+            _abandon_write(repos, job_id, blocked)
+            return []
         chunks = repos.materials.add_chunks(fragments_to_chunks(outcome, version.id))
 
         if not outcome.failures:
