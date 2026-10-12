@@ -211,8 +211,14 @@ class ProcessingJob(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
-    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id"), index=True)
-    version_id: Mapped[int] = mapped_column(ForeignKey("material_versions.id"), index=True)
+    # 作业随资料/版本删除（J007）：资料删除后作业已无有效目标，
+    # 保留悬挂的作业行既无意义，也会让"资料删除"这一步被外键卡住
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materials.id", ondelete="CASCADE"), index=True
+    )
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
     stage: Mapped[str] = mapped_column(String(20))  # JobStage
     status: Mapped[str] = mapped_column(String(20), default="pending")  # JobStatus
     # 覆盖范围说明（如"第 1-3 页完成，第 4 页失败"），不含原文全文
@@ -240,7 +246,10 @@ class ProcessingJobAttempt(Base):
     __table_args__ = (UniqueConstraint("job_id", "attempt_no", name="uq_job_attempts_no"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    job_id: Mapped[int] = mapped_column(ForeignKey("processing_jobs.id"), index=True)
+    # 尝试历史随作业删除（J007）：作业都不在了，留痕也无从查询
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("processing_jobs.id", ondelete="CASCADE"), index=True
+    )
     attempt_no: Mapped[int] = mapped_column(Integer)
     stage: Mapped[str] = mapped_column(String(20))  # JobStage
     status: Mapped[str] = mapped_column(String(20))  # JobStatus（终态）

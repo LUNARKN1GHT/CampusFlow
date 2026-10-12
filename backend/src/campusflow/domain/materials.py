@@ -1,9 +1,14 @@
-"""资料领域规则（D001、D004）。"""
+"""资料领域规则（D001、D004、J007）。"""
 
 import re
 
 # 粘贴文本上限：20 万字符，超出返回明确错误（D004 验收）
 MAX_PASTED_TEXT_CHARS = 200_000
+
+# 结果不再写回的原因（J007）：晚到的作业既不能复活已删除的资料，
+# 也不能把旧版本的结果写进新版本
+DELETED_MATERIAL_REASON = "资料已删除，本作业结果不再写回"
+SUPERSEDED_VERSION_REASON = "资料已有更新的版本，本作业结果不再写回"
 
 _BLANK_LINE = re.compile(r"\n\s*\n")
 
@@ -11,6 +16,15 @@ _BLANK_LINE = re.compile(r"\n\s*\n")
 def next_version_no(existing: list[int]) -> int:
     """下一版本号：已有版本最大号 + 1，无版本时从 1 开始。"""
     return max(existing, default=0) + 1
+
+
+def is_superseded(version_no: int, latest_version_no: int) -> bool:
+    """该版本是否已被更新的版本取代（J007）。
+
+    版本号更大的版本一经建立，旧版本的作业就是"迟到了"：它的结果属于旧内容，
+    不得写回资料的当前状态，否则新版本会收到旧版本的结果。
+    """
+    return version_no < latest_version_no
 
 
 def validate_pasted_text(content: str) -> str | None:

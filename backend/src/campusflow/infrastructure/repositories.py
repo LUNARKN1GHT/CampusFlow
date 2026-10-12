@@ -47,6 +47,17 @@ from campusflow.infrastructure.db.models import (
 )
 
 
+def _row_missing(session: Session, model: type, row_id: int) -> bool:
+    """这一行是否已不在数据库里（J007）。
+
+    会话缓存里的对象不知道自己已被别的会话删除：直接修改它会打出 0 行的
+    UPDATE，psycopg 能如实报告影响行数，SQLAlchemy 随即抛 StaleDataError。
+    所以改写之前先用一次标量查询确认真相，确认真相之后再决定是否碰 ORM 对象——
+    资料删除后晚到的作业，一行都不能写回去。
+    """
+    return session.scalar(select(model.id).where(model.id == row_id)) is None
+
+
 class SqlAlchemyUnitOfWork:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -204,6 +215,19 @@ class SqlAlchemyMaterialRepository:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
 
+    def exists(self, material_id: int) -> bool:
+        """直接查库判断资料是否存在（J007）：绕过会话缓存，读到最新已提交状态。"""
+        return not _row_missing(self._session, Material, material_id)
+
+    def version_numbers_by_id(self, material_id: int) -> dict[int, int]:
+        """直接查库取版本号（J007）：只取标量列，不受已加载实体影响。"""
+        rows = self._session.execute(
+            select(MaterialVersion.id, MaterialVersion.version_no).where(
+                MaterialVersion.material_id == material_id
+            )
+        )
+        return {row.id: row.version_no for row in rows}
+
     def list(
         self,
         workspace_id: int,
@@ -317,6 +341,9 @@ class SqlAlchemyMaterialRepository:
         return _material_to_data(row)
 
     def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None:
+        # 资料可能已被删除（J007）：晚到的作业不能把它的状态写回来
+        if _row_missing(self._session, Material, material_id):
+            return None
         row = self._session.get(Material, material_id)
         if row is None:
             return None
@@ -850,6 +877,10 @@ class SqlAlchemyJobRepository:
         from campusflow.domain.jobs import TERMINAL_JOB_STATUSES, sanitize_error_reason
         from campusflow.domain.states import JobStatus
 
+        # 作业随资料删除（J007）：晚到的 Worker 来记录结果时作业可能已经没了，
+        # 此时什么都不写（尝试历史同样随作业删除，写进去只会撞外键）
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
         row = self._session.get(ProcessingJob, job_id)
         if row is None:
             return None
@@ -903,6 +934,8 @@ class SqlAlchemyJobRepository:
         from campusflow.domain.jobs import can_retry
         from campusflow.domain.states import JobStatus
 
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None  # 作业已随资料删除（J007），没有可重投的目标
         row = self._session.get(ProcessingJob, job_id)
         # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
         # 成功，反复重投只会白烧资源（J005/J006）
@@ -919,6 +952,9 @@ class SqlAlchemyJobRepository:
         return _job_to_data(row)
 
     def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
+        # 投递前资料可能刚被删除（J007）：作业没了就不必再登记投递
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
         row = self._session.get(ProcessingJob, job_id)
         if row is None:
             return None
