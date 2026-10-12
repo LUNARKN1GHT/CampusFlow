@@ -7,12 +7,14 @@ from fastapi.responses import JSONResponse
 
 from campusflow.api import auth as auth_api
 from campusflow.api import courses as courses_api
+from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api.health import router as health_router
 from campusflow.application.dispatch import dispatch_pending_jobs
+from campusflow.application.jobs import reclaim_stale_jobs
 from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.infrastructure.db.engine import create_db_engine
@@ -44,12 +46,32 @@ def compensate_pending_deliveries(app: FastAPI) -> int:
         return 0
 
 
+def reclaim_timed_out_jobs(app: FastAPI) -> int:
+    """超时回收扫描（J005）：把长期停在"处理中"的作业标记为可重试失败。
+
+    与投递补偿一样尽力而为：异常只记录日志，不影响服务启动。
+    """
+    settings: Settings = app.state.settings
+    try:
+        with app.state.session_factory() as session:
+            reclaimed = reclaim_stale_jobs(
+                build_repositories(session), timeout_seconds=settings.job_timeout_seconds
+            )
+        if reclaimed:
+            logger.info("超时回收：%s 个作业已标记为可重试失败", len(reclaimed))
+        return len(reclaimed)
+    except Exception:  # 回收失败不能阻塞启动，作业下次启动再回收
+        logger.warning("超时回收扫描失败，作业保留处理中状态", exc_info=True)
+        return 0
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         compensate_pending_deliveries(application)
+        reclaim_timed_out_jobs(application)
         yield
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
@@ -69,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         schedule_api.router,
         settings_api.router,
         materials_api.router,
+        jobs_api.router,
     ):
         app.include_router(
             router,

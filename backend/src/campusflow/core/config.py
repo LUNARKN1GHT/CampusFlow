@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     backup_retention_days: int = 30
     # 启动时扫描并重投待投递作业（J004 补偿）；关闭时只保留手动重投入口
     dispatch_on_startup: bool = True
+    # 作业超时（秒，J005）：领取后超过这个时长仍是"处理中"就回收为可重试失败
+    job_timeout_seconds: int = 900
     # 智谱视觉模型密钥（环境变量 ZHIPU_API_KEY；未配置时不得调用真实模型）
     zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
