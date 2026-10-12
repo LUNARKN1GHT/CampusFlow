@@ -96,6 +96,35 @@ def test_task_progress_missing_task(client: TestClient) -> None:
     assert response.status_code == 404
 
 
+def test_progress_history_survives_cancel_and_reopen(client: TestClient) -> None:
+    task = _create_task(client)
+
+    client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "in_progress", "reason": "开始做了"},
+    )
+    client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "cancelled", "reason": "教师取消该作业"},
+    )
+    reopened = client.patch(
+        f"/api/v1/tasks/{task['id']}/progress",
+        json={"progress": "not_started", "reason": "教师恢复该作业"},
+    ).json()
+    assert reopened["progress"] == "not_started"
+
+    history = client.get(f"/api/v1/tasks/{task['id']}/progress-history").json()
+    # 取消与重新打开只追加历史，不删除既有变更记录
+    assert [item["to_progress"] for item in history] == [
+        "not_started",
+        "cancelled",
+        "in_progress",
+    ]
+    assert history[1]["reason"] == "教师取消该作业"
+    # 当前进度与最新一条历史一致
+    assert history[0]["to_progress"] == reopened["progress"]
+
+
 def test_task_requires_course_exists(client: TestClient) -> None:
     response = client.post("/api/v1/tasks", json={"title": "挂到幽灵课", "course_id": 999})
     assert response.status_code == 404
