@@ -109,6 +109,8 @@ def _task_to_data(row: Task) -> TaskData:
         workspace_id=row.workspace_id,
         course_id=row.course_id,
         source_material_id=row.source_material_id,
+        source_invalidated_at=row.source_invalidated_at,
+        source_invalidated_note=row.source_invalidated_note,
         title=row.title,
         description=row.description,
         due_date=row.due_date,
@@ -680,12 +682,18 @@ class SqlAlchemyTaskRepository:
         stmt = select(Task).where(Task.source_material_id == material_id).order_by(Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 
-    def unlink_source_material(self, material_id: int) -> int:
+    def unlink_source_material(
+        self, material_id: int, *, invalidated_at: datetime, note: str
+    ) -> int:
         rows = list(
             self._session.scalars(select(Task).where(Task.source_material_id == material_id))
         )
         for row in rows:
             row.source_material_id = None
+            # 留痕（D009）：任务留下"来源曾是这份资料、现在已被删除"的记录，
+            # 否则它与手工建的任务在界面上完全一样
+            row.source_invalidated_at = invalidated_at
+            row.source_invalidated_note = note
         self._session.flush()
         return len(rows)
 
@@ -926,6 +934,14 @@ class SqlAlchemyJobRepository:
                 ProcessingJob.started_at.is_not(None),
                 ProcessingJob.started_at <= threshold,
             )
+            .order_by(ProcessingJob.id)
+        )
+        return [_job_to_data(row) for row in rows]
+
+    def list_by_material(self, material_id: int) -> list[ProcessingJobData]:
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(ProcessingJob.material_id == material_id)
             .order_by(ProcessingJob.id)
         )
         return [_job_to_data(row) for row in rows]

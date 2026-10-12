@@ -73,6 +73,10 @@ class Task(Base):
     source_material_id: Mapped[int | None] = mapped_column(
         ForeignKey("materials.id", ondelete="SET NULL"), index=True
     )
+    # 来源失效留痕（D009）：保留任务时，光把 source_material_id 置空会让它
+    # 与手工建的任务分不出来。这两列记住"曾经有来源、来源已被删除"。
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，
