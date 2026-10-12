@@ -105,6 +105,7 @@ class TaskOut(BaseModel):
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
+    overdue: bool
     created_at: datetime
     updated_at: datetime
 

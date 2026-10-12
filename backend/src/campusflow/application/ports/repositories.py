@@ -65,6 +65,8 @@ class TaskData:
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # 读取时按工作空间时区派生，不落库
+    overdue: bool = False
 
 
 @dataclass
