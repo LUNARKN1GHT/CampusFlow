@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
 class UnitOfWork(Protocol):
@@ -59,12 +59,17 @@ class TaskData:
     description: str | None
     due_date: date | None
     due_time: time | None
+    target_date: date | None
+    due_source: DueSourceType
+    due_note: str | None
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # 读取时按工作空间时区派生，不落库
+    overdue: bool = False
 
 
 @dataclass
@@ -181,6 +186,9 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -195,6 +203,9 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,

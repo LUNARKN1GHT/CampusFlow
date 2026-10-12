@@ -17,7 +17,7 @@ from campusflow.application.ports.repositories import (
     TaskProgressChangeData,
     WorkspaceData,
 )
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.models import (
     AvailabilitySlot,
     Course,
@@ -84,6 +84,9 @@ def _task_to_data(row: Task) -> TaskData:
         description=row.description,
         due_date=row.due_date,
         due_time=row.due_time,
+        target_date=row.target_date,
+        due_source=DueSourceType(row.due_source),
+        due_note=row.due_note,
         progress=TaskProgress(row.progress),
         priority=TaskPriority(row.priority),
         estimated_minutes=row.estimated_minutes,
@@ -320,6 +323,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -331,6 +337,9 @@ class SqlAlchemyTaskRepository:
             description=description,
             due_date=due_date,
             due_time=due_time,
+            target_date=target_date,
+            due_source=due_source,
+            due_note=due_note,
             priority=priority,
             estimated_minutes=estimated_minutes,
             remaining_minutes=remaining_minutes,
@@ -348,6 +357,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -360,6 +372,9 @@ class SqlAlchemyTaskRepository:
         row.description = description
         row.due_date = due_date
         row.due_time = due_time
+        row.target_date = target_date
+        row.due_source = due_source
+        row.due_note = due_note
         row.priority = priority
         row.estimated_minutes = estimated_minutes
         row.remaining_minutes = remaining_minutes
