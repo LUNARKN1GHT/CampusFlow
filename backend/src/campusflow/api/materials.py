@@ -167,12 +167,14 @@ def list_materials(
 
 
 class DeleteImpactOut(BaseModel):
-    """删除影响预览（D008）：执行删除前必须持有其中 confirm_token。"""
+    """删除影响预览（D008/D009）：执行删除前必须持有其中 confirm_token。"""
 
     material: MaterialOut
     version_count: int
     chunk_count: int
     linked_task_ids: list[int]
+    # 还在处理中、会被这次删除一并清掉的作业数（D009）：不为 0 时界面应提示
+    unfinished_job_count: int
     confirm_token: str
     backup_note: str
 
@@ -193,6 +195,7 @@ def delete_impact(
         version_count=impact.version_count,
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
+        unfinished_job_count=impact.unfinished_job_count,
         confirm_token=impact.confirm_token,
         backup_note=(
             f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"
