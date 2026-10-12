@@ -6,12 +6,13 @@
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from campusflow.application.ports.queue import JobQueue
 
+from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
@@ -22,8 +23,10 @@ from campusflow.application.ports.repositories import (
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.jobs import is_terminal
 from campusflow.domain.materials import (
     deletion_confirmation_token,
+    invalidated_source_note,
     next_version_no,
     validate_pasted_text,
 )
@@ -299,12 +302,12 @@ def import_uploaded_files(
             repos.uow.rollback()
             storage.delete(storage_key)
             raise
-        # HTTP 立即返回 job_id，不等待解析完成（J002 验收）；投递失败不回滚建档
-        if queue is not None:
-            queue.enqueue_parse(job.id)
         results.append(
             UploadFileResult(filename=filename, material=material, error=None, job_id=job.id)
         )
+    # 提交与投递分离（J003）：待投递记录随建档事务一起落库后才尝试投递；
+    # 队列不可用时不抛异常，记录留待补偿扫描，HTTP 仍返回 job_id（J002 验收）
+    dispatch_pending_jobs(repos, queue, job_ids=[r.job_id for r in results if r.job_id is not None])
     return results
 
 
@@ -327,12 +330,13 @@ def set_material_archived(
 
 @dataclass
 class DeleteImpact:
-    """资料删除影响预览（D008）：将失效的版本、片段与关联个人任务。"""
+    """资料删除影响预览（D008/D009）：将失效的版本、片段、关联任务与未完成作业。"""
 
     material: MaterialData
     version_count: int
     chunk_count: int
     linked_task_ids: list[int]
+    unfinished_job_count: int
     confirm_token: str
 
 
@@ -341,6 +345,11 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     versions = repos.materials.list_versions(material_id)
     chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
     linked_tasks = repos.tasks.list_by_source_material(material_id)
+    # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
+    # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
+    unfinished_jobs = [
+        job for job in repos.jobs.list_by_material(material_id) if not is_terminal(job.status)
+    ]
     token = deletion_confirmation_token(
         material_id,
         [v.id for v in versions],
@@ -352,6 +361,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         version_count=len(versions),
         chunk_count=chunk_count,
         linked_task_ids=[t.id for t in linked_tasks],
+        unfinished_job_count=len(unfinished_jobs),
         confirm_token=token,
     )
 
@@ -365,10 +375,15 @@ def delete_material(
     confirm_token: str,
     keep_tasks: bool,
 ) -> DeleteImpact:
-    """确认后删除资料（D008）。
+    """确认后删除资料（D008/D009）。
 
     确认指纹必须匹配当前影响内容，变化后旧确认失效；
-    keep_tasks=True 时保留个人任务并解除来源关联，False 时一并删除。
+    keep_tasks=True 时保留个人任务并标记"来源已失效"，False 时一并删除。
+
+    派生内容随资料一起消失：原文件由存储层清理，版本、片段、处理作业与
+    尝试历史由数据库外键级联（D001 的 CASCADE、J007 的作业级联）。
+    将来新增的派生表（例如 M3 的向量索引、R 系列的候选结果）必须同样
+    挂在 materials / material_versions 下并声明 CASCADE，才能被这里一起清掉。
     """
     impact = preview_delete_impact(repos, workspace_id, material_id)
     if impact.confirm_token != confirm_token:
@@ -376,7 +391,11 @@ def delete_material(
 
     versions = repos.materials.list_versions(material_id)
     if keep_tasks:
-        repos.tasks.unlink_source_material(material_id)
+        repos.tasks.unlink_source_material(
+            material_id,
+            invalidated_at=datetime.now(UTC),
+            note=invalidated_source_note(impact.material.title),
+        )
     else:
         for task in repos.tasks.list_by_source_material(material_id):
             repos.tasks.delete(task.id)
