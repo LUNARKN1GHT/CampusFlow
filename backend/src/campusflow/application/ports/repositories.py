@@ -283,7 +283,9 @@ class JobRepository(Protocol):
         """
         ...
 
-    def list_undelivered(self, *, limit: int = 100) -> list[ProcessingJobData]:
+    def list_undelivered(
+        self, *, limit: int = 100, workspace_id: int | None = None
+    ) -> list[ProcessingJobData]:
         """列出尚未成功投递的作业（按创建顺序），供补偿扫描重投（J004）。"""
         ...
 

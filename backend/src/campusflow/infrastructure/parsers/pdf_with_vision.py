@@ -13,6 +13,7 @@ from campusflow.application.ports.parsers import (
     ParseOutcome,
     ParserLocator,
 )
+from campusflow.domain.jobs import is_retryable
 from campusflow.infrastructure.llm.errors import VisionRecognitionError
 from campusflow.infrastructure.parsers.pdf_render import render_pdf_page
 
@@ -45,6 +46,7 @@ class PdfWithVisionFallbackParser:
                     locator=fragment.locator,
                     text=fragment.text,
                     confidence=fragment.confidence,
+                    table_group=fragment.table_group,
                 )
             )
             seq += 1
@@ -64,6 +66,7 @@ class PdfWithVisionFallbackParser:
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page),
                         reason=f"扫描页识别失败：{exc}",
+                        retryable=is_retryable(exc),
                     )
                 )
                 continue
@@ -86,6 +89,7 @@ class PdfWithVisionFallbackParser:
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page),
                         reason=f"扫描页部分区域不可读：{vision_failure.reason}",
+                        retryable=vision_failure.retryable,
                     )
                 )
 

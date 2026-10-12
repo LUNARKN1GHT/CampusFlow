@@ -48,6 +48,7 @@ def dispatch_pending_jobs(
     *,
     job_ids: list[int] | None = None,
     limit: int = DEFAULT_DISPATCH_LIMIT,
+    workspace_id: int | None = None,
 ) -> DispatchResult:
     """投递作业。
 
@@ -58,7 +59,9 @@ def dispatch_pending_jobs(
         return DispatchResult(delivered=0, failed=0)
 
     if job_ids is None:
-        targets = [job.id for job in repos.jobs.list_undelivered(limit=limit)]
+        targets = [
+            job.id for job in repos.jobs.list_undelivered(limit=limit, workspace_id=workspace_id)
+        ]
     else:
         targets = job_ids
     delivered = failed = 0

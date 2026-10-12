@@ -133,7 +133,7 @@ def redeliver_pending_jobs(
     """手动重投所有待投递作业（队列曾不可用时的补救入口）。
 
     启动补偿（CAMPUSFLOW_DISPATCH_ON_STARTUP）被关闭时，这里是唯一的重投入口。
-    MVP 只有一个默认空间，待投递记录都属于当前空间，无需再按空间过滤。
+    只重投当前空间的作业，不能因为同一部署是单用户界面就省略空间边界。
     """
-    outcome = dispatch_pending_jobs(repos, queue)
+    outcome = dispatch_pending_jobs(repos, queue, workspace_id=workspace.id)
     return RedeliverOut(delivered=outcome.delivered, failed=outcome.failed)

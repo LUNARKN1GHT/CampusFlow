@@ -42,7 +42,7 @@ def compensate_pending_deliveries(app: FastAPI) -> int:
             logger.info("待投递补偿：成功 %s 条，失败 %s 条", outcome.delivered, outcome.failed)
         return outcome.delivered
     except Exception:  # 补偿失败绝不阻塞启动
-        logger.warning("待投递补偿扫描失败，保留记录等待下次重投", exc_info=True)
+        logger.warning("dispatch_failed: 待投递补偿扫描失败，保留记录等待下次重投")
         return 0
 
 
@@ -61,7 +61,7 @@ def reclaim_timed_out_jobs(app: FastAPI) -> int:
             logger.info("超时回收：%s 个作业已标记为可重试失败", len(reclaimed))
         return len(reclaimed)
     except Exception:  # 回收失败不能阻塞启动，作业下次启动再回收
-        logger.warning("超时回收扫描失败，作业保留处理中状态", exc_info=True)
+        logger.warning("reclaim_failed: 超时回收扫描失败，作业保留处理中状态")
         return 0
 
 

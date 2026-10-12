@@ -982,13 +982,17 @@ class SqlAlchemyJobRepository:
         self._session.flush()
         return _job_to_data(row)
 
-    def list_undelivered(self, *, limit: int = 100) -> list[ProcessingJobData]:
-        rows = self._session.scalars(
-            select(ProcessingJob)
-            .where(ProcessingJob.enqueued_at.is_(None))
-            .order_by(ProcessingJob.id)
-            .limit(limit)
+    def list_undelivered(
+        self, *, limit: int = 100, workspace_id: int | None = None
+    ) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStatus
+
+        query = select(ProcessingJob).where(
+            ProcessingJob.enqueued_at.is_(None), ProcessingJob.status == JobStatus.PENDING
         )
+        if workspace_id is not None:
+            query = query.where(ProcessingJob.workspace_id == workspace_id)
+        rows = self._session.scalars(query.order_by(ProcessingJob.id).limit(limit))
         return [_job_to_data(row) for row in rows]
 
 

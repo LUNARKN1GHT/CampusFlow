@@ -1,7 +1,7 @@
-# Worker 入口（待实现）
+# Worker 入口
 
-资料解析与索引接入时增加独立 RQ Worker 入口，与 API 共享同一个 Python 包和应用层用例，不拆成独立微服务。
+RQ Worker 与 API 共用应用层解析用例，消息只传作业编号。当前接入文本、PDF、扫描页回退、图片识别和表格关联；事项提取与向量索引仍待后续任务。
 
-任务消息只传作业 ID。业务状态持久化到 PostgreSQL，读取资料版本后执行解析、提取、分块和索引。需实现超时、有限重试、幂等、取消／删除后的失效检查以及投递失败补偿。
+Linux 从 backend 运行 `uv run --locked python -m campusflow.workers.main`；Windows 使用 Docker。诊断入口为 `python -m campusflow.workers.diagnostics`，只读状态并省略敏感数据。
 
-不能把 FastAPI 进程内后台任务当作可恢复的持久作业队列。当前尚未实现 Worker，也没有可运行的 Worker 命令。
+启动配置、共享存储、部分失败与安全重试步骤见 [资料处理运行手册](../../../../docs/MATERIAL_PROCESSING.md)。业务状态以 PostgreSQL 为准，不以 RQ 成功日志代替完整资料验收。

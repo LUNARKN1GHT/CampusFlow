@@ -340,6 +340,18 @@ def test_unknown_job_returns_404(client: TestClient, shared_storage) -> None:
     assert response.json() == {"detail": "作业不存在"}
 
 
+def test_redeliver_cannot_dispatch_another_workspace(client: TestClient, shared_storage, queue):
+    client.get("/api/v1/settings")
+    foreign_id = _create_foreign_job()
+    response = client.post("/api/v1/jobs/redeliver")
+    assert response.status_code == 200
+    assert response.json() == {"delivered": 0, "failed": 0}
+    assert queue.enqueued == []
+    with _new_session() as session:
+        job = build_repositories(session).jobs.get(foreign_id)
+        assert job.enqueued_at is None
+
+
 def _material_id_of(job_id: int) -> int:
     session = _new_session()
     try:
