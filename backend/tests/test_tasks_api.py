@@ -166,9 +166,7 @@ def test_remaining_minutes_rules_on_complete_cancel_reopen(client: TestClient) -
     task = _create_task(client, extra={"estimated_minutes": 90})
 
     client.patch(f"/api/v1/tasks/{task['id']}", json={"remaining_minutes": 30})
-    done = client.patch(
-        f"/api/v1/tasks/{task['id']}/progress", json={"progress": "done"}
-    ).json()
+    done = client.patch(f"/api/v1/tasks/{task['id']}/progress", json={"progress": "done"}).json()
     assert done["remaining_minutes"] == 0
 
     reopened = client.patch(
