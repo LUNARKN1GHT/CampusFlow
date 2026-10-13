@@ -1,0 +1,25 @@
+# 合成示例：并修与建议先学
+# 场景：真实预修表中只有强制先修（预修），并修与建议先学无真实样本，必须合成。
+# CS922 与 CS923 为并修（可同时修读，不构成先后顺序约束）；
+# CS924 建议先学 CS922（软约束，不满足时不阻塞排序，仅提示）。
+_meta:
+  origin: synthetic
+  generated_by: manual
+  needs_human_review: false
+  scenario: 并修与建议先学建模
+courses:
+  - {code: CS921, name: 合成基础数学, credits: 4.0}
+  - {code: CS922, name: 合成电路基础, credits: 3.0}
+  - {code: CS923, name: 合成电路实验, credits: 1.0}
+  - {code: CS924, name: 合成系统设计, credits: 3.0}
+relations:
+  - {course: CS922, prereq: CS921, kind: 强制先修}
+  - {course: CS923, coreq: CS922, kind: 并修}
+  - {course: CS924, prereq: CS922, kind: 强制先修}
+  - {course: CS924, recommended: CS923, kind: 建议先学}
+expected:
+  sortable: true
+  one_valid_order: [CS921, CS922, CS923, CS924]
+  behavior: >-
+    强制先修参与拓扑排序；并修不引入先后约束，展示为同修提示；
+    建议先学不满足时（如 CS924 排在 CS923 前）不阻塞，仅在结果中标注建议未满足
