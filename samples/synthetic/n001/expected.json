@@ -1,0 +1,125 @@
+{
+  "issue": "N001",
+  "description": "Word 与公开网页导入的人工预期：覆盖段落、表格、公开通知三种正常路径，以及无法访问、需要登录两种预期失败场景。全部为合成内容，不含真实资料。",
+  "samples": [
+    {
+      "sample_id": "CF-DOC-001",
+      "file": "samples/synthetic/n001/word-notice-paragraph.docx",
+      "document": {
+        "is_synthetic": true,
+        "applies_to": {
+          "term": "2026-fall",
+          "section": "CS2026-A",
+          "timezone": "Asia/Shanghai"
+        }
+      },
+      "questions": [
+        {
+          "id": "word-paragraph-ddl",
+          "question": "数据库原理作业四的截止时间、提交方式和适用对象是什么？",
+          "expected_answer": {
+            "title": "作业四（索引设计实验报告）",
+            "deadline": "2026-11-15T18:00:00+08:00",
+            "submission": "课程平台“作业四”入口提交 PDF，命名“学号-姓名-作业四.pdf”",
+            "section": "CS2026-A"
+          },
+          "evidence": [
+            {"location": "第 6 段", "label": "提交方式"},
+            {"location": "第 7 段", "label": "截止时间"},
+            {"location": "第 8 段", "label": "适用对象"}
+          ],
+          "failure_if": [
+            "截止时间被改写为日期精度或改换时区",
+            "引用未定位到对应段落",
+            "把其他教学班的要求混入答案"
+          ]
+        }
+      ]
+    },
+    {
+      "sample_id": "CF-DOC-002",
+      "file": "samples/synthetic/n001/word-notice-table.docx",
+      "document": {
+        "is_synthetic": true,
+        "applies_to": {
+          "term": "2026-fall",
+          "section": "CS2026-B",
+          "timezone": "Asia/Shanghai"
+        }
+      },
+      "questions": [
+        {
+          "id": "word-table-exam",
+          "question": "操作系统的期末考试时间和考场是什么？",
+          "expected_answer": {
+            "subject": "操作系统",
+            "time": "2026-12-22 14:00-16:00",
+            "room": "教三 302",
+            "note": "闭卷",
+            "section": "CS2026-B"
+          },
+          "evidence": [
+            {"location": "表格第 3 行", "label": "操作系统所在行"}
+          ],
+          "failure_if": [
+            "表格行列定位错误",
+            "与数据结构（第 2 行）或计算机网络（第 4 行）混淆"
+          ]
+        }
+      ]
+    },
+    {
+      "sample_id": "CF-WEB-001",
+      "file": "samples/synthetic/n001/public-notice.html",
+      "document": {
+        "is_synthetic": true,
+        "applies_to": {
+          "term": "2026-fall",
+          "audience": "全体本科在校生",
+          "timezone": "Asia/Shanghai"
+        }
+      },
+      "questions": [
+        {
+          "id": "web-exam-week",
+          "question": "2026 年秋季学期期末考试周的起止日期是什么？",
+          "expected_answer": {
+            "start": "2026-12-19",
+            "end": "2026-12-27",
+            "publisher": "教务处",
+            "published": "2026-11-20"
+          },
+          "evidence": [
+            {"location": "正文第 2 段", "label": "考试周日期"},
+            {"location": "页眉 meta 行", "label": "发布单位与时间"}
+          ],
+          "failure_if": [
+            "起止日期提取错误",
+            "引用未定位到正文第 2 段",
+            "把发布时间当成考试时间"
+          ]
+        }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "web-inaccessible",
+      "description": "公开网页无法访问（连接失败或返回 404）。",
+      "expected_behavior": "导入失败并展示原因与重试入口；不生成正文片段；失败状态不得显示为成功。",
+      "failure_if": [
+        "把导入失败标为完成或部分成功",
+        "生成不存在的正文或引用"
+      ]
+    },
+    {
+      "id": "web-requires-login",
+      "description": "页面实际需要登录（访问时重定向到登录页）。",
+      "expected_behavior": "标记为需要登录，允许改用上传文件或粘贴原文继续导入；不抓取登录后的内容。",
+      "failure_if": [
+        "绕过登录抓取受限内容",
+        "把登录页本身当作正文保存"
+      ]
+    }
+  ]
+}

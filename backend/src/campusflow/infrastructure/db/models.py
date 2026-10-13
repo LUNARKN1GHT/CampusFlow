@@ -20,6 +20,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
@@ -181,6 +182,7 @@ class MaterialVersion(Base):
     storage_key: Mapped[str | None] = mapped_column(String(300))
     # 原文件指纹（SHA-256 十六进制），用于完全相同文件的重复导入检测（D006）
     checksum: Mapped[str | None] = mapped_column(String(64), index=True)
+    source_metadata: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
