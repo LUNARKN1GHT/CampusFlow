@@ -70,14 +70,19 @@ class ParserRegistry:
         text_parser: DocumentParser,
         pdf_parser: DocumentParser,
         vision_parser: DocumentParser,
+        word_parser: DocumentParser | None = None,
     ) -> None:
         self._parsers = {
             MaterialSourceType.TEXT: text_parser,
             MaterialSourceType.PDF: pdf_parser,
             MaterialSourceType.IMAGE: vision_parser,
         }
+        if word_parser is not None:
+            self._parsers[MaterialSourceType.WORD] = word_parser
 
     def for_type(self, source_type: MaterialSourceType) -> DocumentParser:
+        if source_type not in self._parsers:
+            raise PermanentError("当前 Worker 尚未配置该资料类型的解析器")
         return self._parsers[source_type]
 
 
@@ -194,6 +199,8 @@ def _mime_for(source_type: MaterialSourceType, storage_key: str) -> str:
         return "application/pdf"
     if source_type == MaterialSourceType.TEXT:
         return "text/plain"
+    if source_type == MaterialSourceType.WORD:
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     return "image/jpeg" if extension in ("jpg", "jpeg") else "image/png"
 
 

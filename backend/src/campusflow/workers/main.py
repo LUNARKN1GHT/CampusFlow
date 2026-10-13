@@ -20,6 +20,7 @@ from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.pdf_with_vision import PdfWithVisionFallbackParser
 from campusflow.infrastructure.parsers.table_aware import TableAwareParser
 from campusflow.infrastructure.parsers.text import TextDocumentParser
+from campusflow.infrastructure.parsers.word import WordDocumentParser
 from campusflow.infrastructure.queue.rq_queue import QUEUE_NAME
 from campusflow.workers.safe_worker import SafeWorker
 
@@ -39,6 +40,7 @@ def build_parser_registry(settings: Settings, *, demo: bool = False) -> ParserRe
         text_parser=TextDocumentParser(),
         pdf_parser=TableAwareParser(PdfWithVisionFallbackParser(PdfDocumentParser(), vision)),
         vision_parser=TableAwareParser(vision),
+        word_parser=WordDocumentParser(),
     )
 
 

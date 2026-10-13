@@ -272,6 +272,7 @@ def read_original_file(
         "png": "image/png",
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
     return Response(
         content=content, media_type=media_types.get(extension, "application/octet-stream")
