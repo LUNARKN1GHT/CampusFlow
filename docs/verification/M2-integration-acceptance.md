@@ -3,7 +3,7 @@
 关联任务：#343。父组：E20 #8、E21 #9、E22 #10。验证日期：2026-10-13。
 
 本记录覆盖 M2 的 PDF、图片、粘贴文本私有导入、来源定位、可恢复作业与删除生命周期。
-本分支已通过本机及 Linux + PostgreSQL 17 集成验证；父组 PR、非作者评审与里程碑确认是后续合并门槛。
+本分支已通过本机及 Linux + PostgreSQL 17 集成验证；本记录用于父组 PR 与里程碑确认，最终合并与关闭状态以 GitHub 为准。
 不以本记录自动关闭父 Issue，不把 M6 的 Word/网页成果带入 M2。
 
 ## 整合基线与发现的缺陷
@@ -86,5 +86,9 @@ CI 浏览器任务已加入 Redis 7 并启用同一流程；[PR #344 的 Linux �
 - PDF 文字页定位到页；视觉解析提供有效区域时保留坐标，不伪造文字页内坐标。
 - 备份生命周期按 [数据保留说明](../data-retention.md) 处理；未配置生产备份服务。
 - 核对、RAG 问答、排期、Word/网页导入及多人部署均不属于本次 M2 交付。
-- #343 先通过 PR 合入 #9；父分支按 E20 → E21 → E22 进入 develop，逐项核对最新 CI 与评审。
-  父组集成验收与组长里程碑确认完成后，再关闭 #8/#9/#10 和 M2；发布 v0.2.0 另走 main PR。
+- #343 已通过 [#344](https://github.com/LUNARKN1GHT/CampusFlow/pull/344) 合入 #9。父分支集成 PR 为
+  [#345](https://github.com/LUNARKN1GHT/CampusFlow/pull/345)、[#346](https://github.com/LUNARKN1GHT/CampusFlow/pull/346)、
+  [#347](https://github.com/LUNARKN1GHT/CampusFlow/pull/347)，逐项核对最新 CI 与最终成果可达性。
+- 组长在本次对话明确授权本批非作者评审例外，在检查通过后合并并完成 M2；该授权只覆盖
+  #344—#347，不伪造独立批准，也不绕过平台保护。完整整合与门槛核对后关闭父组和 M2。
+  发布 v0.2.0 另走 main PR。

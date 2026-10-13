@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组评审与里程碑确认待完成；问答、核对和排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；问答、核对和排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
