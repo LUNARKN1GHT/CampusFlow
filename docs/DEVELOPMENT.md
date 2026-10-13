@@ -54,6 +54,8 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 
 ## 资料后台与诊断
 
+扩展导入：DOCX 已接通校验与 Worker 正文解析。N005 新增网页快照迁移，启动前执行 `uv run --locked alembic upgrade head`；受保护接口为 `POST /api/v1/materials/web`。请求字段、失败处理和原文读取见 [网页快照说明](verification/N005-web-snapshot.md)。
+
 资料处理后端与 RQ Worker 已在本整合分支接入。Windows 使用 Docker 运行 Linux
 Worker；API 与 Worker 共用数据库、Redis 和私有文件目录。完整启动命令、三种输入
 验证、只读诊断和安全重试步骤见 [资料处理运行手册](MATERIAL_PROCESSING.md)。

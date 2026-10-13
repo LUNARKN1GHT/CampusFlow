@@ -12,6 +12,8 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 ## 开发与架构入口
 
+网页方面，N004 已提供安全抓取，N005 已接通受保护的快照保存和来源记录；正文提取由 N006 接入。见 [网页快照说明](docs/verification/N005-web-snapshot.md)。
+
 扩展导入正在分任务推进：N002 已接入普通 DOCX 上传校验，N003 已接通正文/表格解析和版本定位。说明见 [Word 校验](docs/verification/N002-word-validation.md) 与 [Word 解析](docs/verification/N003-word-parsing.md)；资料页面仍待接入。
 
 - [技术选型、目录分层与架构图](docs/ARCHITECTURE.md)

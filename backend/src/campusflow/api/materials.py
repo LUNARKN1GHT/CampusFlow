@@ -14,8 +14,11 @@ from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
+from campusflow.application.ports.web_fetch import WebFetcher
+from campusflow.application.web_materials import import_requested_webpage
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
 from campusflow.infrastructure.parsers.text import TextDocumentParser
+from campusflow.infrastructure.web_fetch import PublicWebFetcher
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
@@ -232,6 +235,7 @@ class MaterialVersionOut(BaseModel):
     version_no: int
     note: str | None
     created_at: datetime
+    source_metadata: dict[str, str | None]
 
 
 @router.get("/{material_id}/versions", response_model=list[MaterialVersionOut])
@@ -274,8 +278,78 @@ def read_original_file(
         "jpeg": "image/jpeg",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
+    headers = {"X-Content-Type-Options": "nosniff"}
+    if extension == "html":
+        # 原网页是不可信内容，不能在应用同源下作为可执行 HTML 打开。
+        headers.update(
+            {
+                "Content-Disposition": 'attachment; filename="snapshot.html"',
+                "Content-Security-Policy": "sandbox; default-src 'none'",
+            }
+        )
     return Response(
-        content=content, media_type=media_types.get(extension, "application/octet-stream")
+        content=content,
+        media_type=media_types.get(extension, "application/octet-stream"),
+        headers=headers,
+    )
+
+
+def get_web_fetcher() -> WebFetcher:
+    return PublicWebFetcher()
+
+
+class WebImportIn(BaseModel):
+    url: str = Field(min_length=1, max_length=500)
+    title: str = Field(min_length=1, max_length=300)
+    publisher: str | None = Field(default=None, max_length=200)
+    published_at: datetime | None = None
+    published_text: str | None = Field(default=None, max_length=200)
+    semester_id: int | None = None
+    course_id: int | None = None
+    class_name: str | None = Field(default=None, max_length=100)
+
+    @field_validator("published_at")
+    @classmethod
+    def require_offset(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError("发布时间须包含时区；仅有日期时请填写 published_text")
+        return value
+
+
+class WebImportOut(BaseModel):
+    material: MaterialOut
+    version: MaterialVersionOut
+    job_id: int
+
+
+@router.post("/web", response_model=WebImportOut, status_code=201)
+def import_web(
+    payload: WebImportIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+    queue: JobQueueDep,
+    fetcher: Annotated[WebFetcher, Depends(get_web_fetcher)],
+) -> WebImportOut:
+    material, version, job_id = import_requested_webpage(
+        repos,
+        storage,
+        fetcher,
+        workspace.id,
+        requested_url=payload.url,
+        title=payload.title,
+        publisher=payload.publisher,
+        published_at=payload.published_at,
+        published_text=payload.published_text,
+        semester_id=payload.semester_id,
+        course_id=payload.course_id,
+        class_name=payload.class_name,
+        queue=queue,
+    )
+    return WebImportOut(
+        material=MaterialOut.model_validate(material),
+        version=MaterialVersionOut.model_validate(version),
+        job_id=job_id,
     )
 
 
