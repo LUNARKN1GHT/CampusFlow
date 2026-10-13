@@ -78,31 +78,21 @@ async function loadSource(): Promise<void> {
   }
 }
 
-async function loadChunks(): Promise<void> {
-  if (versionNo.value === null) return
+async function loadAll(): Promise<void> {
   loading.value = true
   error.value = ''
-  try {
-    chunks.value = await materialsApi.chunks(props.material.id, versionNo.value)
-    selected.value = chunks.value[0] ?? null
-  } catch (caught) {
-    error.value = errorMessage(caught)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadVersions(): Promise<void> {
-  loading.value = true
-  error.value = ''
+  releaseObjectUrl()
   try {
     versions.value = await materialsApi.versions(props.material.id)
-    const latest = versions.value.reduce<number | null>(
+    versionNo.value = versions.value.reduce<number | null>(
       (max, item) => (max === null || item.version_no > max ? item.version_no : max),
       null,
     )
-    versionNo.value = latest
-    await loadChunks()
+    chunks.value = versionNo.value === null
+      ? []
+      : await materialsApi.chunks(props.material.id, versionNo.value)
+    selected.value = chunks.value[0] ?? null
+    loading.value = false
     await loadSource()
   } catch (caught) {
     error.value = errorMessage(caught)
@@ -110,16 +100,12 @@ async function loadVersions(): Promise<void> {
   }
 }
 
-watch(versionNo, async (next, previous) => {
-  if (next !== previous && previous !== undefined) {
-    await loadChunks()
-    await loadSource()
-  }
-})
+// 面板切换到另一份资料时重新加载，避免沿用上一份的版本与片段。
+watch(() => props.material.id, loadAll)
 
 onBeforeUnmount(releaseObjectUrl)
 
-void loadVersions()
+void loadAll()
 </script>
 
 <template>
@@ -160,7 +146,8 @@ void loadVersions()
           <div v-if="sourceError" class="status-banner failed" role="alert">
             <div>
               <strong>引用已失效，不再可验证</strong>
-              <p>{{ sourceError }}该引用不再参与问答回答，仅作为历史记录保留。</p>
+              <p>{{ sourceError }}</p>
+              <p>该引用不再参与问答回答，仅作为历史记录保留。</p>
             </div>
           </div>
           <template v-else>
