@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前基础持久化后端已合并，MVP 开发中。已有 Vue 前端环境页、FastAPI 健康检查、PostgreSQL 迁移和学期／课程／手动任务／固定日程／可用时间 API；业务前端、身份与空间授权、资料处理、问答和排期尚未实现。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面、问答、核对和排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
@@ -131,6 +131,7 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 - M6：Word／公开网页、版本差异与合并；M7：依赖任务、局部重排、提醒和导出，完成第二阶段；M8：课程路径；M9：外部日历与第三阶段验收。
 - 已合并的 PR #1 以有证据的叶子任务补录；功能缺口、测试复验和里程碑验收单独保持开放。后续探索不设交付 Milestone。
 - 叶子 Issue 以半天至两天为认领参考，包含交付物、验收、依据与前置任务；超过两天继续拆 Sub-issue。父 Issue 聚合进度，不重复统计工作量。
+- 分支统一按 `issue/#编号` 命名，没有对应 Issue 先建 Issue；分支按 Issue 层级分层合并：叶子任务分支先合并进所属父 Issue 的集成分支，全部子任务验收齐全后父集成分支再合并进 `develop`；无父 Issue 的独立任务直接对 `develop`。评审细则见 CONTRIBUTING.md。
 - 分类使用 `type:*`、`area:*`、`layer:*`、`priority:*`、`size:*` 与必要状态标签。版本 tag 使用 `vMAJOR.MINOR.PATCH`，候选使用 `-rc.N`，仅在目标提交合并且对应验收通过后创建，不移动已发布 tag。
 
 ## 验收与后续推进
@@ -143,15 +144,17 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- N002 在原上传入口加入普通 DOCX 的格式、大小和结构校验；用户决定 Word 使用 python-docx、网页正文使用 Beautiful Soup，按 N003/N006 引入。旧 DOC/宏文档不转换执行，提示另存为 DOCX。各任务实际能力以 docs/verification/N002-word-validation.md 及后续验收记录为准。
+
 - 单仓库、前后端分离、模块化单体。后端限定 Python 3.12，使用 FastAPI、Pydantic 和 uv；前端使用 Vue 3、TypeScript、Vite 和 npm。
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。
 - 前端位于 `frontend/src/`：页面放 `views`，共享组件放 `components`，HTTP 调用放 `api`；路由和跨页面状态按需引入。
-- 已接入 PostgreSQL 17、SQLAlchemy 2、psycopg 3、Alembic；Compose 启用 pgvector 扩展并提供 Redis 7，向量检索和后台作业尚未实现。耗时解析后续接入 RQ 与独立 Python Worker，在实际功能接入时增加依赖与运行配置。
+- 已接入 PostgreSQL 17、SQLAlchemy 2、psycopg 3、Alembic；Compose 启用 pgvector 扩展并提供 Redis 7，向量检索尚未实现；耗时解析已接入 RQ 与独立 Linux Worker，Windows 通过 Docker 运行。启动和诊断见 docs/MATERIAL_PROCESSING.md。
 - 文件保存在后端私有存储，解析采用 pypdf 与可替换 OCR／多模态适配器；模型供应商和具体模型待样本评估，不将模型输出直接视为事实或执行授权。
 - API 统一前缀 `/api/v1`，当前包括健康检查及学期、课程、任务、固定日程、可用时间接口。健康检查只表示进程存活；业务草案、数据库就绪与外部执行结果不得用健康状态代替。
 - 日常安装使用 `uv sync --locked` 与 `npm ci`，依赖变更同步锁文件。后端运行 pytest 和 Ruff 检查；前端运行包含类型检查的 `npm run build`。命令详见开发文档。
-- 开发服务默认仅绑定本机。引入真实资料或共享部署前实现身份与工作空间访问控制；当前没有生产部署和认证实现。
+- 开发服务默认仅绑定本机。当前本机单用户登录使用进程内随机会话并保护业务接口，服务重启后会话失效；这不等同于生产身份系统。对象授权已接入；共享部署前仍需默认凭据替换和生产会话存储。
 - 技术边界变更同步维护架构、开发文档及本文件；对外工程状态更新 README。
 
 ## 团队情况

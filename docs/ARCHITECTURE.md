@@ -1,6 +1,6 @@
 # CampusFlow 技术方案与项目架构
 
-本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前已合并工程骨架、健康检查、PostgreSQL 迁移和学期／课程／手动任务／固定日程／可用时间后端；业务前端、访问控制、资料处理、模型调用、排期和队列处理尚待实现。** 已合并实现的独立复验与后续任务见 [开发路线](planning/ROADMAP.md)，不以代码存在代替验收通过。
+本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前已实现工程骨架、本机单用户会话、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程／可用时间／学习偏好的前后端闭环；本整合分支已接入跨工作空间授权、资料上传/解析/定位及 RQ Worker；事项核对、问答与排期尚待实现。** 已合并实现的独立复验与后续任务见 [开发路线](planning/ROADMAP.md)，不以代码存在代替验收通过。
 
 ## 1. 总体决策
 
@@ -37,7 +37,7 @@ Python 版本写在 `backend/.python-version`，前端建议 Node 24（见 `.nvm
 
 ## 2. 系统架构图
 
-实线表示代码已接入的调用链，虚线表示待实现组件及连接；不表示所有链路已完成运行复验。浏览器当前仅接通健康检查，业务接口可由 API 客户端或 Swagger 调用。
+下图保留基础管理链路示意；资料后端的实际启动与装配以 [资料处理运行手册](MATERIAL_PROCESSING.md) 为准。实线表示基础调用链，虚线表示完整资料到事实的后续链路；不表示所有链路已完成阶段验收。浏览器已通过统一 API 客户端接通手动管理业务，并由 Playwright 在真实 PostgreSQL 上覆盖登录、创建、更新、刷新、错误重试和退出保护流程。
 
 ```mermaid
 flowchart TB
@@ -45,6 +45,7 @@ flowchart TB
     Web --> Proxy[Vite 开发代理 /api]
     Proxy --> API[FastAPI 路由 /api/v1]
     API --> Health[进程健康检查]
+    API --> Ready[数据库就绪检查]
 
     API --> UseCases[应用层：课程、任务、固定日程]
     UseCases --> Domain[领域层：日期、状态与时间范围]
@@ -61,7 +62,7 @@ flowchart TB
 
 开发前端通过 Vite 将 `/api` 转发到 `127.0.0.1:8000`，无需开放通配 CORS。生产目标由同一个域名提供前端静态文件和 `/api`，由反向代理替代 Vite。API、Worker、数据库和文件存储不直接暴露给浏览器。
 
-当前健康接口仅表示 API 进程存活；数据库 readiness 检查尚待 W011 实现，不用 liveness 返回值宣称数据库或模型可用。
+健康接口 `/api/v1/health` 仅表示 API 进程存活；就绪接口 `/api/v1/ready` 以短超时连接检查数据库连通，不可达时返回 503 且不泄露连接信息或口令。两者都不宣称模型等尚未接入的能力可用。
 
 ## 3. 文件分层
 
@@ -85,7 +86,7 @@ CampusFlow/
 │   │   ├── application/         # 课程、任务、日程用例及仓储端口
 │   │   ├── domain/              # 日期、状态和时间范围业务规则
 │   │   ├── infrastructure/      # 数据库与仓储；其余适配器待实现
-│   │   └── workers/             # 预留：后台作业入口
+│   │   └── workers/             # 后台入口、安全日志与只读诊断
 │   ├── migrations/             # Alembic 环境及初始六表迁移
 │   └── tests/                  # 接口及后续领域、集成测试
 ├── frontend/
@@ -122,7 +123,7 @@ flowchart LR
 ```
 
 - `api` 只处理 HTTP 校验、依赖注入、调用用例与响应转换，不直接查库或调用模型。
-- 当前 `api/deps.py` 的默认工作空间初始化仍直接查询 ORM；W005 跟踪移至应用接口和基础设施实现，W006 补齐对象授权。
+- 默认工作空间初始化已移至应用用例；对象读取、关联与作业手动补投都校验工作空间范围（W005/W006）。
 - `application` 协调流程、事务与授权确认，依赖接口；按 `materials`、`qa`、`tasks`、`planning` 等业务组织文件。
 - `domain` 不导入 FastAPI、ORM、供应商 SDK 或运行配置；日期与冲突规则可以脱离服务器独立测试。
 - `infrastructure` 实现接口，SQLAlchemy 模型只在该层使用，不直接返回给前端。
@@ -133,7 +134,7 @@ flowchart LR
 
 ## 4. 关键业务链路设计
 
-### 资料到可查询事实（待实现）
+### 资料到可查询事实（解析已接入，提取与索引待实现）
 
 ```mermaid
 sequenceDiagram
@@ -188,7 +189,7 @@ sequenceDiagram
 
 当前业务错误通过 `DomainError` 和 `NotFoundError` 映射为可读消息及 HTTP 400／404，参数校验使用 422。后续完善统一稳定错误码与请求 ID；模型密钥只在后端配置，日志避免原始资料全文和个人信息。
 
-当前未实现认证，开发服务默认仅监听本机。W004–W006 在资料导入前补齐身份校验与工作空间访问控制；“单用户”不等于可以把资料公开访问。
+当前实现仅限本机单用户会话：登录成功后颁发 HttpOnly Cookie，退出或服务重启使会话失效，业务路由要求有效会话。共享部署、多人账户和跨工作空间对象授权仍需 W004–W006 后续验收；“单用户”不等于可以把资料公开访问。
 
 ## 6. 实施顺序与完成条件
 
@@ -207,3 +208,7 @@ sequenceDiagram
 - [uv 项目管理](https://docs.astral.sh/uv/guides/projects/)：环境和依赖管理；[锁定与同步](https://docs.astral.sh/uv/concepts/projects/sync/)：团队安装使用 `--locked`。
 - [SQLAlchemy ORM](https://docs.sqlalchemy.org/en/20/orm/quickstart.html)、[Alembic](https://alembic.sqlalchemy.org/en/latest/)、[pgvector](https://github.com/pgvector/pgvector)：关系数据、迁移和向量存储。
 - [RQ](https://python-rq.org/)：Python 作业队列；[pypdf 文本提取](https://pypdf.readthedocs.io/en/stable/user/extract-text.html)：解析能力及 OCR 边界。
+
+## 资料处理运行补充（J009）
+
+Windows 使用 Docker 运行现有 Linux RQ Worker，API 保持本机启动。两端共享同一数据库、Redis 库号和私有原文件目录。解析器注册表组合 PDF 文本解析、扫描页视觉回退与表格关联；数据库迁移分叉通过合并迁移汇合。只读诊断不调用模型，不修改任务，日志及 RQ 失败记录不保存原始异常堆栈。详见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
