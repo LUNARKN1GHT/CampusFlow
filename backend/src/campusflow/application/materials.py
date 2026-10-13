@@ -6,8 +6,14 @@
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from campusflow.application.ports.queue import JobQueue
+
+from campusflow.application.dispatch import dispatch_pending_jobs
+from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
     NewSourceChunk,
@@ -17,10 +23,11 @@ from campusflow.application.ports.repositories import (
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.jobs import is_terminal
 from campusflow.domain.materials import (
     deletion_confirmation_token,
+    invalidated_source_note,
     next_version_no,
-    split_paragraphs,
     validate_pasted_text,
 )
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
@@ -64,6 +71,32 @@ def _require_associations(
                 raise DomainError("课程不属于指定学期，请检查适用范围")
 
 
+def fragments_to_chunks(outcome: ParseOutcome, version_id: int) -> list[NewSourceChunk]:
+    """把解析器输出映射为待持久化的来源片段。
+
+    位置信息在此与原文版本绑定（D011 验收：位置与原文版本绑定）；
+    片段顺序即解析器输出顺序。
+    """
+    chunks: list[NewSourceChunk] = []
+    for fragment in outcome.fragments:
+        locator_type, locator_value = fragment.locator.as_chunk_locator()
+        chunks.append(
+            NewSourceChunk(
+                version_id=version_id,
+                seq=fragment.seq,
+                locator_type=locator_type,
+                locator_value=locator_value,
+                text=fragment.text,
+                page=fragment.locator.page,
+                paragraph=fragment.locator.paragraph,
+                bbox=fragment.locator.bbox,
+                confidence=fragment.confidence,
+                table_group=fragment.table_group,
+            )
+        )
+    return chunks
+
+
 def import_pasted_text(
     repos: Repositories,
     storage: FileStorage,
@@ -76,11 +109,12 @@ def import_pasted_text(
     semester_id: int | None,
     course_id: int | None,
     class_name: str | None,
+    text_parser: DocumentParser,
 ) -> tuple[MaterialData, list[SourceChunkData]]:
     """粘贴文本导入：保存为稳定原文版本并关联来源与课程范围（D004）。
 
-    返回（资料, 段落片段列表）。片段的段落号由 split_paragraphs 固定规则生成，
-    重复读取保持稳定。
+    返回（资料, 段落片段列表）。段落切分通过 DocumentParser 协议完成（D011），
+    段落号规则固定，重复读取保持稳定。
     """
     error = validate_pasted_text(content)
     if error:
@@ -107,16 +141,10 @@ def import_pasted_text(
             storage_key,
         )
         chunks = repos.materials.add_chunks(
-            [
-                NewSourceChunk(
-                    version_id=version.id,
-                    seq=index,
-                    locator_type="paragraph",
-                    locator_value=str(index + 1),
-                    text=paragraph,
-                )
-                for index, paragraph in enumerate(split_paragraphs(content))
-            ]
+            fragments_to_chunks(
+                text_parser.parse(content.encode("utf-8"), "text/plain"),
+                version.id,
+            )
         )
         # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
         # 不留下无法被资料版本引用的孤立文件。
@@ -199,6 +227,7 @@ class UploadFileResult:
     material: MaterialData | None
     error: str | None
     duplicate_of: MaterialData | None = None
+    job_id: int | None = None  # 解析作业 ID（D006 重复命中时无作业）
 
 
 def import_uploaded_files(
@@ -214,6 +243,7 @@ def import_uploaded_files(
     class_name: str | None,
     max_bytes: int,
     allow_duplicate: bool = False,
+    queue: "JobQueue | None" = None,
 ) -> list[UploadFileResult]:
     """PDF/图片上传导入（D003、D006）。
 
@@ -266,12 +296,19 @@ def import_uploaded_files(
                 storage_key,
                 checksum,
             )
+            version = repos.materials.list_versions(material.id)[-1]
+            job = repos.jobs.create(workspace_id, material.id, version.id, "parse")
             repos.uow.commit()
         except Exception:
             repos.uow.rollback()
             storage.delete(storage_key)
             raise
-        results.append(UploadFileResult(filename=filename, material=material, error=None))
+        results.append(
+            UploadFileResult(filename=filename, material=material, error=None, job_id=job.id)
+        )
+    # 提交与投递分离（J003）：待投递记录随建档事务一起落库后才尝试投递；
+    # 队列不可用时不抛异常，记录留待补偿扫描，HTTP 仍返回 job_id（J002 验收）
+    dispatch_pending_jobs(repos, queue, job_ids=[r.job_id for r in results if r.job_id is not None])
     return results
 
 
@@ -294,12 +331,13 @@ def set_material_archived(
 
 @dataclass
 class DeleteImpact:
-    """资料删除影响预览（D008）：将失效的版本、片段与关联个人任务。"""
+    """资料删除影响预览（D008/D009）：将失效的版本、片段、关联任务与未完成作业。"""
 
     material: MaterialData
     version_count: int
     chunk_count: int
     linked_task_ids: list[int]
+    unfinished_job_count: int
     confirm_token: str
 
 
@@ -308,6 +346,11 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     versions = repos.materials.list_versions(material_id)
     chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
     linked_tasks = repos.tasks.list_by_source_material(material_id)
+    # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
+    # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
+    unfinished_jobs = [
+        job for job in repos.jobs.list_by_material(material_id) if not is_terminal(job.status)
+    ]
     token = deletion_confirmation_token(
         material_id,
         [v.id for v in versions],
@@ -319,6 +362,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         version_count=len(versions),
         chunk_count=chunk_count,
         linked_task_ids=[t.id for t in linked_tasks],
+        unfinished_job_count=len(unfinished_jobs),
         confirm_token=token,
     )
 
@@ -332,10 +376,15 @@ def delete_material(
     confirm_token: str,
     keep_tasks: bool,
 ) -> DeleteImpact:
-    """确认后删除资料（D008）。
+    """确认后删除资料（D008/D009）。
 
     确认指纹必须匹配当前影响内容，变化后旧确认失效；
-    keep_tasks=True 时保留个人任务并解除来源关联，False 时一并删除。
+    keep_tasks=True 时保留个人任务并标记"来源已失效"，False 时一并删除。
+
+    派生内容随资料一起消失：原文件由存储层清理，版本、片段、处理作业与
+    尝试历史由数据库外键级联（D001 的 CASCADE、J007 的作业级联）。
+    将来新增的派生表（例如 M3 的向量索引、R 系列的候选结果）必须同样
+    挂在 materials / material_versions 下并声明 CASCADE，才能被这里一起清掉。
     """
     impact = preview_delete_impact(repos, workspace_id, material_id)
     if impact.confirm_token != confirm_token:
@@ -343,7 +392,11 @@ def delete_material(
 
     versions = repos.materials.list_versions(material_id)
     if keep_tasks:
-        repos.tasks.unlink_source_material(material_id)
+        repos.tasks.unlink_source_material(
+            material_id,
+            invalidated_at=datetime.now(UTC),
+            note=invalidated_source_note(impact.material.title),
+        )
     else:
         for task in repos.tasks.list_by_source_material(material_id):
             repos.tasks.delete(task.id)
@@ -355,3 +408,41 @@ def delete_material(
         if version.storage_key:
             storage.delete(version.storage_key)
     return impact
+
+
+def list_material_versions(repos: Repositories, workspace_id: int, material_id: int) -> list:
+    """版本列表（D018）：先校验空间归属。"""
+    get_material(repos, workspace_id, material_id)
+    return repos.materials.list_versions(material_id)
+
+
+def list_version_chunks(
+    repos: Repositories, workspace_id: int, material_id: int, version_no: int
+) -> list[SourceChunkData]:
+    """指定版本的片段与定位信息（D018）。"""
+    get_material(repos, workspace_id, material_id)
+    version = next(
+        (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
+        None,
+    )
+    if version is None:
+        raise NotFoundError("版本不存在")
+    return repos.materials.list_chunks(version.id)
+
+
+def read_original_file(
+    repos: Repositories, storage: FileStorage, workspace_id: int, material_id: int, version_no: int
+) -> tuple[bytes, str]:
+    """授权读取原文（D018）：空间归属校验贯穿文件内容访问；
+    文件缺失时返回明确的"已不可用"状态，不伪造内容。"""
+    get_material(repos, workspace_id, material_id)
+    version = next(
+        (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
+        None,
+    )
+    if version is None or version.storage_key is None:
+        raise NotFoundError("来源已不可用")
+    try:
+        return storage.read(version.storage_key), version.storage_key
+    except FileNotFoundError as exc:
+        raise NotFoundError("来源已不可用") from exc

@@ -5,9 +5,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 
-router = APIRouter(tags=["system"])
+from campusflow.core.config import DB_CONNECT_TIMEOUT_SECONDS
 
-DB_CONNECT_TIMEOUT_SECONDS = 3
+router = APIRouter(tags=["system"])
 
 
 class HealthResponse(BaseModel):

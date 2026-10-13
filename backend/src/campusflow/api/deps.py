@@ -11,9 +11,11 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from campusflow.application import workspaces as workspace_use_cases
+from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.infrastructure.repositories import (
     SqlAlchemyCourseRepository,
+    SqlAlchemyJobRepository,
     SqlAlchemyMaterialRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemySemesterRepository,
@@ -37,6 +39,7 @@ def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repos
         tasks=SqlAlchemyTaskRepository(session),
         schedule=SqlAlchemyScheduleRepository(session),
         materials=SqlAlchemyMaterialRepository(session),
+        jobs=SqlAlchemyJobRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
 
@@ -46,3 +49,8 @@ def get_current_workspace(
 ) -> WorkspaceData:
     """当前会话的工作空间（MVP 单用户：默认空间，不存在时创建）。"""
     return workspace_use_cases.get_or_create_default_workspace(repos)
+
+
+def get_job_queue(request: Request) -> JobQueue | None:
+    """作业队列；不可用时返回 None，调用方按"投递失败"处理（J003/J004）。"""
+    return getattr(request.app.state, "job_queue", None)

@@ -8,11 +8,14 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
+from campusflow.application.ports.parsers import DocumentParser
+from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
+from campusflow.infrastructure.parsers.text import TextDocumentParser
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
@@ -27,6 +30,16 @@ def get_file_storage(request: Request) -> FileStorage:
 
 
 Storage = Annotated[FileStorage, Depends(get_file_storage)]
+
+
+def get_text_parser() -> DocumentParser:
+    return TextDocumentParser()
+
+
+TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
+
+
+JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
 
 
 class TextImportIn(BaseModel):
@@ -72,6 +85,11 @@ class SourceChunkOut(BaseModel):
     locator_type: str
     locator_value: str
     text: str
+    page: int | None
+    paragraph: int | None
+    bbox: tuple[float, float, float, float] | None
+    confidence: float | None
+    table_group: str | None
 
 
 class TextImportOut(BaseModel):
@@ -100,7 +118,11 @@ class MaterialMetadataUpdate(BaseModel):
 
 @router.post("/text", response_model=TextImportOut, status_code=201)
 def import_text(
-    payload: TextImportIn, workspace: CurrentWorkspace, repos: Repos, storage: Storage
+    payload: TextImportIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+    text_parser: TextParser,
 ) -> TextImportOut:
     material, chunks = use_cases.import_pasted_text(
         repos,
@@ -113,6 +135,7 @@ def import_text(
         semester_id=payload.semester_id,
         course_id=payload.course_id,
         class_name=payload.class_name,
+        text_parser=text_parser,
     )
     return TextImportOut(
         material=MaterialOut.model_validate(material),
@@ -145,12 +168,14 @@ def list_materials(
 
 
 class DeleteImpactOut(BaseModel):
-    """删除影响预览（D008）：执行删除前必须持有其中 confirm_token。"""
+    """删除影响预览（D008/D009）：执行删除前必须持有其中 confirm_token。"""
 
     material: MaterialOut
     version_count: int
     chunk_count: int
     linked_task_ids: list[int]
+    # 还在处理中、会被这次删除一并清掉的作业数（D009）：不为 0 时界面应提示
+    unfinished_job_count: int
     confirm_token: str
     backup_note: str
 
@@ -171,6 +196,7 @@ def delete_impact(
         version_count=impact.version_count,
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
+        unfinished_job_count=impact.unfinished_job_count,
         confirm_token=impact.confirm_token,
         backup_note=(
             f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"
@@ -196,6 +222,60 @@ def delete_material(
         keep_tasks=payload.keep_tasks,
     )
     return Response(status_code=204)
+
+
+class MaterialVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    material_id: int
+    version_no: int
+    note: str | None
+    created_at: datetime
+
+
+@router.get("/{material_id}/versions", response_model=list[MaterialVersionOut])
+def list_versions(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[MaterialVersionOut]:
+    return [
+        MaterialVersionOut.model_validate(v)
+        for v in use_cases.list_material_versions(repos, workspace.id, material_id)
+    ]
+
+
+@router.get("/{material_id}/versions/{version_no}/chunks", response_model=list[SourceChunkOut])
+def list_chunks(
+    material_id: int, version_no: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[SourceChunkOut]:
+    return [
+        SourceChunkOut.model_validate(c)
+        for c in use_cases.list_version_chunks(repos, workspace.id, material_id, version_no)
+    ]
+
+
+@router.get("/{material_id}/versions/{version_no}/file")
+def read_original_file(
+    material_id: int,
+    version_no: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+) -> Response:
+    content, storage_key = use_cases.read_original_file(
+        repos, storage, workspace.id, material_id, version_no
+    )
+    extension = storage_key.rsplit(".", 1)[-1]
+    media_types = {
+        "txt": "text/plain; charset=utf-8",
+        "pdf": "application/pdf",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+    }
+    return Response(
+        content=content, media_type=media_types.get(extension, "application/octet-stream")
+    )
 
 
 @router.get("/{material_id}", response_model=MaterialOut)
@@ -245,6 +325,7 @@ class UploadItemOut(BaseModel):
     material: MaterialOut | None
     error: str | None
     duplicate_of: MaterialOut | None = None
+    job_id: int | None = None
 
 
 class UploadOut(BaseModel):
@@ -263,6 +344,7 @@ def upload_files(
     class_name: Annotated[str | None, Query()] = None,
     publisher: Annotated[str | None, Query()] = None,
     allow_duplicate: Annotated[bool, Query()] = False,
+    queue: JobQueueDep = None,
 ) -> UploadOut:
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
@@ -282,6 +364,7 @@ def upload_files(
         class_name=class_name,
         max_bytes=settings.upload_max_bytes,
         allow_duplicate=allow_duplicate,
+        queue=queue,
     )
     return UploadOut(
         results=[
@@ -292,6 +375,7 @@ def upload_files(
                 duplicate_of=(
                     MaterialOut.model_validate(r.duplicate_of) if r.duplicate_of else None
                 ),
+                job_id=r.job_id,
             )
             for r in results
         ]

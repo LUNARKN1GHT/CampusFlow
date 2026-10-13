@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,9 @@ from campusflow.application.ports.repositories import (
     MaterialData,
     MaterialVersionData,
     NewSourceChunk,
+    ProcessingJobAttemptData,
     ProcessingJobData,
+    Repositories,
     SemesterData,
     SourceChunkData,
     TaskData,
@@ -23,6 +25,7 @@ from campusflow.application.ports.repositories import (
     WorkspaceData,
 )
 from campusflow.domain.states import (
+    DueSourceType,
     EventRecurrence,
     MaterialSourceType,
     MaterialStatus,
@@ -36,12 +39,24 @@ from campusflow.infrastructure.db.models import (
     Material,
     MaterialVersion,
     ProcessingJob,
+    ProcessingJobAttempt,
     Semester,
     SourceChunk,
     Task,
     TaskProgressChange,
     Workspace,
 )
+
+
+def _row_missing(session: Session, model: type, row_id: int) -> bool:
+    """这一行是否已不在数据库里（J007）。
+
+    会话缓存里的对象不知道自己已被别的会话删除：直接修改它会打出 0 行的
+    UPDATE，psycopg 能如实报告影响行数，SQLAlchemy 随即抛 StaleDataError。
+    所以改写之前先用一次标量查询确认真相，确认真相之后再决定是否碰 ORM 对象——
+    资料删除后晚到的作业，一行都不能写回去。
+    """
+    return session.scalar(select(model.id).where(model.id == row_id)) is None
 
 
 class SqlAlchemyUnitOfWork:
@@ -72,6 +87,7 @@ def _workspace_to_data(row: Workspace) -> WorkspaceData:
         name=row.name,
         timezone=row.timezone,
         daily_capacity_minutes=row.daily_capacity_minutes,
+        weekly_capacity_minutes=row.weekly_capacity_minutes,
         break_minutes=row.break_minutes,
         buffer_minutes=row.buffer_minutes,
     )
@@ -95,10 +111,15 @@ def _task_to_data(row: Task) -> TaskData:
         workspace_id=row.workspace_id,
         course_id=row.course_id,
         source_material_id=row.source_material_id,
+        source_invalidated_at=row.source_invalidated_at,
+        source_invalidated_note=row.source_invalidated_note,
         title=row.title,
         description=row.description,
         due_date=row.due_date,
         due_time=row.due_time,
+        target_date=row.target_date,
+        due_source=DueSourceType(row.due_source),
+        due_note=row.due_note,
         progress=TaskProgress(row.progress),
         priority=TaskPriority(row.priority),
         estimated_minutes=row.estimated_minutes,
@@ -176,6 +197,9 @@ def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
 
 
 def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
+    bbox = None
+    if row.bbox_x0 is not None:
+        bbox = (row.bbox_x0, row.bbox_y0, row.bbox_x1, row.bbox_y1)
     return SourceChunkData(
         id=row.id,
         version_id=row.version_id,
@@ -183,6 +207,11 @@ def _chunk_to_data(row: SourceChunk) -> SourceChunkData:
         locator_type=row.locator_type,
         locator_value=row.locator_value,
         text=row.text,
+        page=row.page,
+        paragraph=row.paragraph,
+        bbox=bbox,
+        confidence=row.confidence,
+        table_group=row.table_group,
     )
 
 
@@ -193,6 +222,19 @@ class SqlAlchemyMaterialRepository:
     def get(self, material_id: int) -> MaterialData | None:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
+
+    def exists(self, material_id: int) -> bool:
+        """直接查库判断资料是否存在（J007）：绕过会话缓存，读到最新已提交状态。"""
+        return not _row_missing(self._session, Material, material_id)
+
+    def version_numbers_by_id(self, material_id: int) -> dict[int, int]:
+        """直接查库取版本号（J007）：只取标量列，不受已加载实体影响。"""
+        rows = self._session.execute(
+            select(MaterialVersion.id, MaterialVersion.version_no).where(
+                MaterialVersion.material_id == material_id
+            )
+        )
+        return {row.id: row.version_no for row in rows}
 
     def list(
         self,
@@ -306,6 +348,17 @@ class SqlAlchemyMaterialRepository:
         self._session.flush()
         return _material_to_data(row)
 
+    def set_status(self, material_id: int, status: MaterialStatus) -> MaterialData | None:
+        # 资料可能已被删除（J007）：晚到的作业不能把它的状态写回来
+        if _row_missing(self._session, Material, material_id):
+            return None
+        row = self._session.get(Material, material_id)
+        if row is None:
+            return None
+        row.status = status
+        self._session.flush()
+        return _material_to_data(row)
+
     def delete(self, material_id: int) -> bool:
         row = self._session.get(Material, material_id)
         if row is None:
@@ -335,19 +388,38 @@ class SqlAlchemyMaterialRepository:
         return [_material_version_to_data(row) for row in self._session.scalars(stmt)]
 
     def add_chunks(self, chunks: list[NewSourceChunk]) -> list[SourceChunkData]:
-        rows = [
-            SourceChunk(
-                version_id=chunk.version_id,
-                seq=chunk.seq,
-                locator_type=chunk.locator_type,
-                locator_value=chunk.locator_value,
-                text=chunk.text,
+        """幂等写入：依赖 uq_source_chunks_version_seq 唯一约束 +
+        ON CONFLICT DO NOTHING，重试重复提交不产生重复片段，
+        冲突时返回已存在的行（D017 验收）。"""
+        if not chunks:
+            return []
+        stmt = (
+            pg_insert(SourceChunk)
+            .values(
+                [
+                    {
+                        "version_id": chunk.version_id,
+                        "seq": chunk.seq,
+                        "locator_type": chunk.locator_type,
+                        "locator_value": chunk.locator_value,
+                        "text": chunk.text,
+                        "page": chunk.page,
+                        "paragraph": chunk.paragraph,
+                        "bbox_x0": chunk.bbox[0] if chunk.bbox else None,
+                        "bbox_y0": chunk.bbox[1] if chunk.bbox else None,
+                        "bbox_x1": chunk.bbox[2] if chunk.bbox else None,
+                        "bbox_y1": chunk.bbox[3] if chunk.bbox else None,
+                        "confidence": chunk.confidence,
+                        "table_group": chunk.table_group,
+                    }
+                    for chunk in chunks
+                ]
             )
-            for chunk in chunks
-        ]
-        self._session.add_all(rows)
+            .on_conflict_do_nothing(constraint="uq_source_chunks_version_seq")
+        )
+        self._session.execute(stmt)
         self._session.flush()
-        return [_chunk_to_data(row) for row in rows]
+        return self.list_chunks(chunks[0].version_id)
 
     def list_chunks(self, version_id: int) -> list[SourceChunkData]:
         stmt = (
@@ -433,12 +505,14 @@ class SqlAlchemyWorkspaceRepository:
         daily_capacity_minutes: int,
         break_minutes: int,
         buffer_minutes: int,
+        weekly_capacity_minutes: int,
     ) -> WorkspaceData | None:
         row = self._session.get(Workspace, workspace_id)
         if row is None:
             return None
         row.timezone = timezone
         row.daily_capacity_minutes = daily_capacity_minutes
+        row.weekly_capacity_minutes = weekly_capacity_minutes
         row.break_minutes = break_minutes
         row.buffer_minutes = buffer_minutes
         self._session.flush()
@@ -513,12 +587,24 @@ class SqlAlchemyTaskRepository:
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]:
         stmt = select(Task).where(Task.workspace_id == workspace_id)
+        if semester_id is not None:
+            # 按课程学期筛选：未关联课程的任务不属于任何学期，只在未筛选学期时返回
+            stmt = stmt.join(Course, Task.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         if course_id is not None:
             stmt = stmt.where(Task.course_id == course_id)
         if progress is not None:
             stmt = stmt.where(Task.progress == progress)
+        if due_from is not None:
+            stmt = stmt.where(Task.due_date >= due_from)
+        if due_to is not None:
+            stmt = stmt.where(Task.due_date <= due_to)
         stmt = stmt.order_by(Task.due_date.nulls_last(), Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 
@@ -534,6 +620,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -545,6 +634,9 @@ class SqlAlchemyTaskRepository:
             description=description,
             due_date=due_date,
             due_time=due_time,
+            target_date=target_date,
+            due_source=due_source,
+            due_note=due_note,
             priority=priority,
             estimated_minutes=estimated_minutes,
             remaining_minutes=remaining_minutes,
@@ -562,6 +654,9 @@ class SqlAlchemyTaskRepository:
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
@@ -574,6 +669,9 @@ class SqlAlchemyTaskRepository:
         row.description = description
         row.due_date = due_date
         row.due_time = due_time
+        row.target_date = target_date
+        row.due_source = due_source
+        row.due_note = due_note
         row.priority = priority
         row.estimated_minutes = estimated_minutes
         row.remaining_minutes = remaining_minutes
@@ -617,12 +715,18 @@ class SqlAlchemyTaskRepository:
         stmt = select(Task).where(Task.source_material_id == material_id).order_by(Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 
-    def unlink_source_material(self, material_id: int) -> int:
+    def unlink_source_material(
+        self, material_id: int, *, invalidated_at: datetime, note: str
+    ) -> int:
         rows = list(
             self._session.scalars(select(Task).where(Task.source_material_id == material_id))
         )
         for row in rows:
             row.source_material_id = None
+            # 留痕（D009）：任务留下"来源曾是这份资料、现在已被删除"的记录，
+            # 否则它与手工建的任务在界面上完全一样
+            row.source_invalidated_at = invalidated_at
+            row.source_invalidated_note = note
         self._session.flush()
         return len(rows)
 
@@ -639,12 +743,18 @@ class SqlAlchemyScheduleRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]:
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]:
         stmt = (
             select(FixedEvent)
             .where(FixedEvent.workspace_id == workspace_id)
             .order_by(FixedEvent.starts_at)
         )
+        if semester_id is not None:
+            stmt = stmt.join(Course, FixedEvent.course_id == Course.id).where(
+                Course.workspace_id == workspace_id, Course.semester_id == semester_id
+            )
         return [_fixed_event_to_data(row) for row in self._session.scalars(stmt)]
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None:
@@ -750,8 +860,26 @@ def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
         scope=row.scope,
         error_reason=row.error_reason,
         attempts=row.attempts,
+        enqueued_at=row.enqueued_at,
+        delivery_attempts=row.delivery_attempts,
+        started_at=row.started_at,
+        retryable=row.retryable,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _attempt_to_data(row: ProcessingJobAttempt) -> ProcessingJobAttemptData:
+    return ProcessingJobAttemptData(
+        id=row.id,
+        job_id=row.job_id,
+        attempt_no=row.attempt_no,
+        stage=row.stage,
+        status=row.status,
+        scope=row.scope,
+        error_reason=row.error_reason,
+        retryable=row.retryable,
+        created_at=row.created_at,
     )
 
 
@@ -773,17 +901,147 @@ class SqlAlchemyJobRepository:
         row = self._session.get(ProcessingJob, job_id)
         return _job_to_data(row) if row is not None else None
 
-    def record_attempt(
-        self, job_id: int, *, status: str, scope: str | None, error_reason: str | None
-    ) -> ProcessingJobData | None:
-        from campusflow.domain.jobs import sanitize_error_reason
+    def claim(self, job_id: int) -> bool:
+        from campusflow.domain.states import JobStatus
 
+        result = self._session.execute(
+            update(ProcessingJob)
+            .where(ProcessingJob.id == job_id, ProcessingJob.status == JobStatus.PENDING)
+            .values(status=JobStatus.RUNNING, started_at=func.now(), updated_at=func.now())
+        )
+        self._session.flush()
+        return bool(result.rowcount)
+
+    def record_attempt(
+        self,
+        job_id: int,
+        *,
+        status: str,
+        scope: str | None,
+        error_reason: str | None,
+        retryable: bool | None = None,
+    ) -> ProcessingJobData | None:
+        from campusflow.domain.jobs import TERMINAL_JOB_STATUSES, sanitize_error_reason
+        from campusflow.domain.states import JobStatus
+
+        # 作业随资料删除（J007）：晚到的 Worker 来记录结果时作业可能已经没了，
+        # 此时什么都不写（尝试历史同样随作业删除，写进去只会撞外键）
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
         row = self._session.get(ProcessingJob, job_id)
         if row is None:
             return None
         row.status = status
         row.scope = scope
         row.error_reason = sanitize_error_reason(error_reason)
+        # 可重试性只对"没完全成功"有意义（J005）：失败要区分临时与永久，
+        # 部分成功但失败范围是临时的也允许只补那些阶段；完成则无需重投
+        row.retryable = bool(retryable) if status in (JobStatus.FAILED, JobStatus.PARTIAL) else None
         row.attempts = row.attempts + 1
+        # 尝试历史只在终态落一条（J005）：中间状态来回切换不写历史
+        if status in TERMINAL_JOB_STATUSES:
+            self._session.add(
+                ProcessingJobAttempt(
+                    job_id=job_id,
+                    attempt_no=row.attempts,
+                    stage=row.stage,
+                    status=status,
+                    scope=scope,
+                    error_reason=sanitize_error_reason(error_reason),
+                    retryable=bool(retryable),
+                )
+            )
         self._session.flush()
         return _job_to_data(row)
+
+    def list_attempts(self, job_id: int) -> list[ProcessingJobAttemptData]:
+        rows = self._session.scalars(
+            select(ProcessingJobAttempt)
+            .where(ProcessingJobAttempt.job_id == job_id)
+            .order_by(ProcessingJobAttempt.attempt_no)
+        )
+        return [_attempt_to_data(row) for row in rows]
+
+    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStatus
+
+        threshold = datetime.now(UTC) - timedelta(seconds=timeout_seconds)
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(
+                ProcessingJob.status == JobStatus.RUNNING,
+                ProcessingJob.started_at.is_not(None),
+                ProcessingJob.started_at <= threshold,
+            )
+            .order_by(ProcessingJob.id)
+        )
+        return [_job_to_data(row) for row in rows]
+
+    def list_by_material(self, material_id: int) -> list[ProcessingJobData]:
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(ProcessingJob.material_id == material_id)
+            .order_by(ProcessingJob.id)
+        )
+        return [_job_to_data(row) for row in rows]
+
+    def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
+        from campusflow.domain.jobs import can_retry
+        from campusflow.domain.states import JobStatus
+
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None  # 作业已随资料删除（J007），没有可重投的目标
+        row = self._session.get(ProcessingJob, job_id)
+        # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
+        # 成功，反复重投只会白烧资源（J005/J006）
+        if row is None or not can_retry(row.status, row.retryable):
+            return None
+        row.status = JobStatus.PENDING
+        row.scope = None
+        row.error_reason = None
+        row.retryable = None
+        row.started_at = None
+        # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
+        row.enqueued_at = None
+        self._session.flush()
+        return _job_to_data(row)
+
+    def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
+        # 投递前资料可能刚被删除（J007）：作业没了就不必再登记投递
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
+        row = self._session.get(ProcessingJob, job_id)
+        if row is None:
+            return None
+        row.delivery_attempts = row.delivery_attempts + 1
+        if delivered:
+            row.enqueued_at = datetime.now(UTC)
+        self._session.flush()
+        return _job_to_data(row)
+
+    def list_undelivered(
+        self, *, limit: int = 100, workspace_id: int | None = None
+    ) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStatus
+
+        query = select(ProcessingJob).where(
+            ProcessingJob.enqueued_at.is_(None), ProcessingJob.status == JobStatus.PENDING
+        )
+        if workspace_id is not None:
+            query = query.where(ProcessingJob.workspace_id == workspace_id)
+        rows = self._session.scalars(query.order_by(ProcessingJob.id).limit(limit))
+        return [_job_to_data(row) for row in rows]
+
+
+def build_repositories(session: Session) -> Repositories:
+    """装配全部仓储与工作单元（API 装配、Worker、投递补偿共用）。"""
+    return Repositories(
+        workspaces=SqlAlchemyWorkspaceRepository(session),
+        semesters=SqlAlchemySemesterRepository(session),
+        courses=SqlAlchemyCourseRepository(session),
+        tasks=SqlAlchemyTaskRepository(session),
+        schedule=SqlAlchemyScheduleRepository(session),
+        materials=SqlAlchemyMaterialRepository(session),
+        jobs=SqlAlchemyJobRepository(session),
+        uow=SqlAlchemyUnitOfWork(session),
+    )
