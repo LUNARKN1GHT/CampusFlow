@@ -176,6 +176,8 @@ sequenceDiagram
 
 ## 5. 数据与接口边界
 
+X001 已实现 ExtractedItem → ExtractedField → CandidateFieldEvidence 的分表关系。纯领域模型与校验位于 domain/candidates.py；应用用例先校验来源及空间，基础设施仓储承担持久化。API 与 Worker 使用同一个仓储装配入口。候选按来源版本级联清理，删除确认包含候选集合，模型输出不能直接变成已确认正式事项。具体契约见 [X001 说明](verification/X001-candidate-evidence.md)。
+
 目标数据分组如下，具体字段和迁移在功能实现时确定：
 
 | 分组 | 对象 | 约束重点 |

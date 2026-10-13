@@ -144,6 +144,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- X001 按用户选择将候选、字段和证据分表保存，四种出处为 document/user/inferred/suggestion；新候选固定 pending，不混用任务执行进度。保存入口校验空间、版本与原文摘录，删除影响预览纳入候选集合。文字提取将沿用用户已选择的智谱服务，与视觉模型分开配置；X002 及后续提取尚待实现。见 docs/verification/X001-candidate-evidence.md 与 docs/planning/X-IMPLEMENTATION.md。
+
 - N003 已将 python-docx 接入 Worker，正文段落与表格单元定位绑定原文版本，不伪造页码；图片、修订与正文外内容明确报告未覆盖。见 docs/verification/N003-word-parsing.md。
 - N004 提供标准库公开网页抓取组件，只有显式调用才联网；逐跳校验公网地址并固定连接地址，限制正文大小与总等待时间。N005 已通过受登录/空间保护的资料导入入口保存不可变原文快照和来源信息，抓取时间不得冒充发布时间。HTML 原文只作为受保护附件下载。N006 使用 Beautiful Soup 提取正文与表格，网页位置按清洗前的原始元素编号并绑定版本；不执行脚本、登录或加载嵌入资源。正文外的已知导航/广告被过滤，未识别媒体或空正文明确报告。见 docs/verification/N005-web-snapshot.md 与 docs/verification/N006-web-parsing.md。
 
