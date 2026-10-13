@@ -20,7 +20,6 @@ import MaterialSource from '../components/MaterialSource.vue'
 const POLL_INTERVAL_MS = 3000
 // 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
 const POLL_MAX_MS = 10 * 60 * 1000
-const JOB_STORAGE_KEY = 'campusflow.library.jobByMaterial'
 
 const materials = ref<Material[]>([])
 const semesters = ref<Semester[]>([])
@@ -44,9 +43,10 @@ const fileInput = ref<HTMLInputElement | null>(null)
 
 const filters = reactive({ semesterId: '', courseId: '', sourceType: '', status: '', includeArchived: false })
 
-/** 资料 → 最近一次解析作业的映射。上传接口只返回一次 job_id，刷新后需要它才能查询范围与重试，因此本地留存。 */
+/** 资料 → 最近一次解析作业的映射。作业从受授权后端恢复，刷新或更换浏览器后仍可查询范围与重试。 */
 const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
+const jobErrors = reactive<Record<number, string>>({})
 const retryingId = ref<number | null>(null)
 const sourceMaterial = ref<Material | null>(null)
 const lifecycleMaterial = ref<Material | null>(null)
@@ -95,25 +95,6 @@ function currentFilters(): MaterialFilters {
   }
 }
 
-function loadJobMap() {
-  try {
-    const raw = window.localStorage.getItem(JOB_STORAGE_KEY)
-    if (raw) Object.entries(JSON.parse(raw) as Record<string, number>).forEach(([id, jobId]) => {
-      jobByMaterial[Number(id)] = jobId
-    })
-  } catch {
-    // 本地映射损坏时忽略，重试入口会在重新上传后恢复。
-  }
-}
-
-function persistJobMap() {
-  try {
-    window.localStorage.setItem(JOB_STORAGE_KEY, JSON.stringify(jobByMaterial))
-  } catch {
-    // 隐私模式下无法写入时不影响本次会话内的查询与重试。
-  }
-}
-
 function scopeText(material: Material): string {
   const parts: string[] = []
   const semester = material.semester_id ? semesterMap.value.get(material.semester_id) : undefined
@@ -128,14 +109,17 @@ function formatDateTime(value: string): string {
 }
 
 async function ensureJob(material: Material) {
-  const jobId = jobByMaterial[material.id]
-  if (!jobId) return
-  const cached = jobs[jobId]
-  if (cached && cached.is_terminal && cached.status !== 'partial') return
   try {
-    jobs[jobId] = await jobsApi.get(jobId)
-  } catch {
-    // 作业查询失败不阻断列表；下一次轮询或重试会再拉取。
+    const latest = (await jobsApi.forMaterial(material.id)).find((job) => job.stage === 'parse')
+    delete jobErrors[material.id]
+    if (latest) {
+      jobByMaterial[material.id] = latest.id
+      jobs[latest.id] = latest
+    } else {
+      delete jobByMaterial[material.id]
+    }
+  } catch (caught) {
+    jobErrors[material.id] = `处理详情读取失败：${errorMessage(caught)}。请刷新重试。`
   }
 }
 
@@ -172,7 +156,7 @@ async function refresh() {
 
 function syncPolling() {
   // 有未完成的作业，或有资料处于“处理中”时保持轮询；同步导入（无作业）不轮询。
-  const active = materials.value.some((material) => hasActiveJob(material) || material.status === 'processing')
+  const active = materials.value.some((material) => hasActiveJob(material) || material.status === 'processing' || (material.status === 'pending' && material.source_type !== 'text'))
   if (!active) {
     stopPolling()
     return
@@ -205,7 +189,7 @@ async function retry(material: Material) {
   error.value = ''
   try {
     if (!jobId) {
-      error.value = '这份资料的上传作业不在本次会话记录里，暂时无法重试；可重新导入同一文件。'
+      error.value = '暂未读取到处理作业，请刷新后重试。'
       return
     }
     jobs[jobId] = await jobsApi.retry(jobId)
@@ -231,7 +215,7 @@ async function onArchiveChanged() {
 
 async function onMaterialDeleted(id: number) {
   delete jobByMaterial[id]
-  persistJobMap()
+  delete jobErrors[id]
   if (sourceMaterial.value?.id === id) sourceMaterial.value = null
   // 保持生命周期面板打开，让用户看到“删除完成”的结果；列表在后台同步移除该资料。
   await refresh()
@@ -263,7 +247,6 @@ async function submitUpload() {
         jobByMaterial[item.material.id] = item.job_id
       }
     })
-    persistJobMap()
     selectedFiles.value = []
     if (fileInput.value) fileInput.value.value = ''
     await refresh()
@@ -311,7 +294,6 @@ function switchImportMode(mode: 'text' | 'files') {
 }
 
 onMounted(async () => {
-  loadJobMap()
   await load()
 })
 
@@ -352,8 +334,8 @@ onBeforeUnmount(stopPolling)
             <label>课程<select v-model="textForm.course_id"><option value="">未关联课程</option><option v-for="course in textCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
             <label>教学班<input v-model.trim="textForm.class_name" maxlength="100" placeholder="可选" /></label>
           </div>
-          <label>发布日期<input v-model="textForm.published_at" type="date" /></label>
-          <p class="form-help">只填日期时按工作空间时区解释为当地零点，不会自动补全时刻。适用范围应与资料实际所属学期、课程一致。</p>
+          <label>发布时间（完整时间与时区，可选）<input v-model="textForm.published_at" placeholder="例如：2026-10-13T10:30:00+08:00" /></label>
+          <p class="form-help">只在来源给出完整时刻时填写；只有日期时保留在正文，不补造零点。适用范围应与资料实际所属学期、课程一致。</p>
           <p v-if="importError" class="form-error" role="alert">{{ importError }}</p>
           <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
           <button type="submit" :disabled="importing">{{ importing ? '正在导入…' : '导入文本' }}</button>
@@ -383,10 +365,10 @@ onBeforeUnmount(stopPolling)
       </section>
 
       <section class="panel filter-bar" aria-label="资料筛选">
-        <label>学期<select v-model="filters.semesterId" @change="filters.courseId = ''"><option value="">全部学期</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
-        <label>课程<select v-model="filters.courseId"><option value="">全部课程</option><option v-for="course in filteredCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
-        <label>来源<select v-model="filters.sourceType"><option value="">全部来源</option><option v-for="(label, value) in sourceTypeLabels" :key="value" :value="value">{{ label }}</option></select></label>
-        <label>状态<select v-model="filters.status"><option value="">全部状态</option><option v-for="(label, value) in statusLabels" :key="value" :value="value">{{ label }}</option></select></label>
+        <label>学期<select v-model="filters.semesterId" @change="filters.courseId = ''; load()"><option value="">全部学期</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
+        <label>课程<select v-model="filters.courseId" @change="load"><option value="">全部课程</option><option v-for="course in filteredCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
+        <label>来源<select v-model="filters.sourceType" @change="load"><option value="">全部来源</option><option v-for="(label, value) in sourceTypeLabels" :key="value" :value="value">{{ label }}</option></select></label>
+        <label>状态<select v-model="filters.status" @change="load"><option value="">全部状态</option><option v-for="(label, value) in statusLabels" :key="value" :value="value">{{ label }}</option></select></label>
         <label class="switch-field"><input v-model="filters.includeArchived" type="checkbox" @change="load" />包含已归档</label>
         <span class="count-badge">{{ visibleMaterials.length }} 份</span>
       </section>
@@ -408,15 +390,17 @@ onBeforeUnmount(stopPolling)
               </div>
               <p>{{ sourceTypeLabels[material.source_type] }} · {{ scopeText(material) }} · 导入于 {{ formatDateTime(material.imported_at) }}</p>
               <p v-if="material.publisher">发布方：{{ material.publisher }}{{ material.published_at ? ` · ${material.published_at.slice(0, 10)}` : '' }}</p>
+              <p v-if="jobErrors[material.id]" class="form-error" role="alert">{{ jobErrors[material.id] }}</p>
 
               <div v-if="material.status === 'partial'" class="coverage-box">
                 <strong>部分成功 · 未覆盖范围</strong>
-                <p>{{ jobFor(material)?.scope ?? '正在获取未覆盖范围…' }}</p>
+                <p>{{ jobFor(material)?.scope ?? jobErrors[material.id] ?? '未返回覆盖范围，请刷新查询处理详情。' }}</p>
+                <p v-if="jobFor(material)?.error_reason">{{ jobFor(material)?.error_reason }}</p>
                 <p class="form-help">缺失内容不会被当作“没有要求”；重试只补齐未识别的范围。</p>
               </div>
               <div v-else-if="material.status === 'failed'" class="coverage-box failed">
                 <strong>处理失败</strong>
-                <p>{{ jobFor(material)?.error_reason ?? '正在获取失败原因…' }}</p>
+                <p>{{ jobFor(material)?.error_reason ?? jobErrors[material.id] ?? '未返回失败原因，请刷新查询处理详情。' }}</p>
               </div>
             </div>
             <div class="material-actions">
@@ -428,7 +412,7 @@ onBeforeUnmount(stopPolling)
                 :disabled="retryingId === material.id"
                 @click="retry(material)"
               >{{ retryingId === material.id ? '正在重试…' : '重试处理' }}</button>
-              <span v-else-if="material.status === 'failed'" class="muted small">不可重试</span>
+              <span v-else-if="material.status === 'failed' && jobFor(material)" class="muted small">不可重试</span>
               <button type="button" class="text-button" @click="sourceMaterial = material">查看原文</button>
               <button type="button" class="text-button" @click="lifecycleMaterial = material">归档 / 删除</button>
             </div>
@@ -439,6 +423,7 @@ onBeforeUnmount(stopPolling)
 
       <MaterialSource
         v-if="sourceMaterial"
+        :key="sourceMaterial.id"
         :material="sourceMaterial"
         :scope="scopeText(sourceMaterial)"
         @close="sourceMaterial = null"
@@ -446,6 +431,7 @@ onBeforeUnmount(stopPolling)
 
       <MaterialLifecycle
         v-if="lifecycleMaterial"
+        :key="lifecycleMaterial.id"
         :material="lifecycleMaterial"
         @close="lifecycleMaterial = null"
         @archive-changed="onArchiveChanged"

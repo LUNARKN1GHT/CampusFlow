@@ -38,6 +38,24 @@ def list_job_attempts(
     return repos.jobs.list_attempts(job_id)
 
 
+def list_material_jobs(
+    repos: Repositories, workspace_id: int, material_id: int
+) -> list[ProcessingJobData]:
+    material = repos.materials.get(material_id)
+    if material is None:
+        raise NotFoundError("资料不存在")
+    require_in_workspace(material.workspace_id, workspace_id, "资料不存在")
+    return sorted(
+        (
+            job
+            for job in repos.jobs.list_by_material(material_id)
+            if job.workspace_id == workspace_id
+        ),
+        key=lambda job: (job.version_id, job.created_at, job.id),
+        reverse=True,
+    )
+
+
 def reclaim_stale_jobs(
     repos: Repositories, *, timeout_seconds: int = DEFAULT_JOB_TIMEOUT_SECONDS
 ) -> list[ProcessingJobData]:
