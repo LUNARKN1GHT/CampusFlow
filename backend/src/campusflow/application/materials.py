@@ -274,9 +274,10 @@ def import_uploaded_files(
                 )
                 continue
 
-        source_type = (
-            MaterialSourceType.PDF if validation.extension == "pdf" else MaterialSourceType.IMAGE
-        )
+        source_type = {
+            "pdf": MaterialSourceType.PDF,
+            "docx": MaterialSourceType.WORD,
+        }.get(validation.extension, MaterialSourceType.IMAGE)
         storage_key = storage.save(content, validation.extension)
         try:
             material = repos.materials.create(

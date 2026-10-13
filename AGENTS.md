@@ -144,6 +144,14 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- N003 已将 python-docx 接入 Worker，正文段落与表格单元定位绑定原文版本，不伪造页码；图片、修订与正文外内容明确报告未覆盖。见 docs/verification/N003-word-parsing.md。
+- N004 提供标准库公开网页抓取组件，只有显式调用才联网；逐跳校验公网地址并固定连接地址，限制正文大小与总等待时间。N005 已通过受登录/空间保护的资料导入入口保存不可变原文快照和来源信息，抓取时间不得冒充发布时间。HTML 原文只作为受保护附件下载。N006 使用 Beautiful Soup 提取正文与表格，网页位置按清洗前的原始元素编号并绑定版本；不执行脚本、登录或加载嵌入资源。正文外的已知导航/广告被过滤，未识别媒体或空正文明确报告。见 docs/verification/N005-web-snapshot.md 与 docs/verification/N006-web-parsing.md。
+
+- 学期归档仅切换标记，不删除或改写关联课程、任务、进度、日程；默认任务／课程／日程列表保留历史，按学期查询规则一致且可恢复。资料模块接入后沿用非删除语义；具体契约见 docs/semester-archive.md。
+- 固定日程无偏移输入、日期范围查询与每周重复按工作空间时区解释；带偏移输入保留时间点。DST 缺失／歧义时刻明确报错，时区变更不改写已存日程或日期精度 DDL。
+
+- N002 在原上传入口加入普通 DOCX 的格式、大小和结构校验；用户决定 Word 使用 python-docx、网页正文使用 Beautiful Soup，按 N003/N006 引入。旧 DOC/宏文档不转换执行，提示另存为 DOCX。各任务实际能力以 docs/verification/N002-word-validation.md 及后续验收记录为准。
+
 - 单仓库、前后端分离、模块化单体。后端限定 Python 3.12，使用 FastAPI、Pydantic 和 uv；前端使用 Vue 3、TypeScript、Vite 和 npm。
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。
