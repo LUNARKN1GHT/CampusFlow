@@ -14,6 +14,7 @@ import type {
   Semester,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import MaterialLifecycle from '../components/MaterialLifecycle.vue'
 import MaterialSource from '../components/MaterialSource.vue'
 
 const POLL_INTERVAL_MS = 3000
@@ -48,6 +49,7 @@ const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
 const retryingId = ref<number | null>(null)
 const sourceMaterial = ref<Material | null>(null)
+const lifecycleMaterial = ref<Material | null>(null)
 
 const pollPaused = ref(false)
 let pollTimer: number | null = null
@@ -213,6 +215,26 @@ async function retry(material: Material) {
   } finally {
     retryingId.value = null
   }
+}
+
+async function onArchiveChanged() {
+  await refresh()
+  const id = lifecycleMaterial.value?.id
+  if (id !== undefined) {
+    try {
+      lifecycleMaterial.value = await materialsApi.get(id)
+    } catch {
+      // 归档后若不在当前筛选内，保留原对象供面板展示结果。
+    }
+  }
+}
+
+async function onMaterialDeleted(id: number) {
+  delete jobByMaterial[id]
+  persistJobMap()
+  lifecycleMaterial.value = null
+  if (sourceMaterial.value?.id === id) sourceMaterial.value = null
+  await refresh()
 }
 
 function onFilesChosen(event: Event) {
@@ -408,6 +430,7 @@ onBeforeUnmount(stopPolling)
               >{{ retryingId === material.id ? '正在重试…' : '重试处理' }}</button>
               <span v-else-if="material.status === 'failed'" class="muted small">不可重试</span>
               <button type="button" class="text-button" @click="sourceMaterial = material">查看原文</button>
+              <button type="button" class="text-button" @click="lifecycleMaterial = material">归档 / 删除</button>
             </div>
           </article>
         </div>
@@ -419,6 +442,14 @@ onBeforeUnmount(stopPolling)
         :material="sourceMaterial"
         :scope="scopeText(sourceMaterial)"
         @close="sourceMaterial = null"
+      />
+
+      <MaterialLifecycle
+        v-if="lifecycleMaterial"
+        :material="lifecycleMaterial"
+        @close="lifecycleMaterial = null"
+        @archive-changed="onArchiveChanged"
+        @deleted="onMaterialDeleted"
       />
     </template>
   </main>
