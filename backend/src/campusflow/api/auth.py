@@ -40,8 +40,12 @@ def require_session(
 @router.post("/login", response_model=SessionOut)
 def login(payload: LoginInput, request: Request, response: Response) -> SessionOut:
     settings = request.app.state.settings
-    username_matches = secrets.compare_digest(payload.username, settings.local_username)
-    password_matches = secrets.compare_digest(payload.password, settings.local_password)
+    username_matches = secrets.compare_digest(
+        payload.username.encode("utf-8"), settings.local_username.encode("utf-8")
+    )
+    password_matches = secrets.compare_digest(
+        payload.password.encode("utf-8"), settings.local_password.encode("utf-8")
+    )
     if not (username_matches and password_matches):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
 
