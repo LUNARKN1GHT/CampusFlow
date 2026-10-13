@@ -8,11 +8,12 @@ const { state, logout } = useAuth()
 const availableItems = [
   { label: '总览', to: '/' },
   { label: '课程', to: '/courses' },
+  { label: '资料库', to: '/library' },
   { label: '任务与计划', to: '/tasks' },
   { label: '设置', to: '/settings' },
 ]
 
-const futureItems = ['资料库', '待核对', '智能问答']
+const futureItems = ['待核对', '智能问答']
 
 async function signOut() {
   await logout()
@@ -30,7 +31,7 @@ async function signOut() {
 
       <nav aria-label="主要导航">
         <p class="nav-label">当前阶段</p>
-        <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to">
+        <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to" active-class="" exact-active-class="router-link-active">
           {{ item.label }}
         </RouterLink>
         <p class="nav-label nav-label-spaced">后续阶段</p>

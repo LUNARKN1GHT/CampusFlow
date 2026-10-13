@@ -59,7 +59,7 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 资料处理后端与 RQ Worker 已在本整合分支接入。Windows 使用 Docker 运行 Linux
 Worker；API 与 Worker 共用数据库、Redis 和私有文件目录。完整启动命令、三种输入
 验证、只读诊断和安全重试步骤见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
-资料库页面 D019—D021 尚待联调，此处先通过已授权的 API 验证。
+资料库页面 D019—D021 已接入导入、原文定位、归档与确认删除；真实队列浏览器回归见 [M2 集成验收](verification/M2-integration-acceptance.md)。
 
 ```powershell
 # 仓库根目录，先按手册填写 backend/.env 并升级数据库
@@ -94,7 +94,7 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
-当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 分别跟踪纯领域测试脱离数据库和测试目标保护，目前这些改进尚未合并。
+当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 已接入：纯领域测试不触发数据库，测试库名必须以 `_test` 结尾。
 
 ## 验证
 
@@ -120,7 +120,7 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## 当前限制
 
-- 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；暂无生产身份系统、资料页面闭环、核对、RAG 和排期实现。
+- 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。

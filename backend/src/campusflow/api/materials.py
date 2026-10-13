@@ -61,6 +61,13 @@ class TextImportIn(BaseModel):
             return None
         return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
 
+    @field_validator("published_at", mode="before")
+    @classmethod
+    def reject_date_only(cls, value):
+        if isinstance(value, str) and len(value.strip()) == 10:
+            raise ValueError("发布时间缺少时刻，请将原始日期保留在正文，不补造零点")
+        return value
+
 
 class MaterialOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -117,6 +124,11 @@ class MaterialMetadataUpdate(BaseModel):
         if value is None:
             return None
         return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
+
+    @field_validator("published_at", mode="before")
+    @classmethod
+    def reject_date_only(cls, value):
+        return TextImportIn.reject_date_only(value)
 
 
 @router.post("/text", response_model=TextImportOut, status_code=201)

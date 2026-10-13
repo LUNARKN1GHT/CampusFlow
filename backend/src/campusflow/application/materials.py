@@ -146,6 +146,7 @@ def import_pasted_text(
                 version.id,
             )
         )
+        material = repos.materials.set_status(material.id, MaterialStatus.DONE) or material
         # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
         # 不留下无法被资料版本引用的孤立文件。
         repos.uow.commit()
