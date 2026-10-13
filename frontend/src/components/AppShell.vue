@@ -31,7 +31,7 @@ async function signOut() {
 
       <nav aria-label="主要导航">
         <p class="nav-label">当前阶段</p>
-        <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to">
+        <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to" active-class="" exact-active-class="router-link-active">
           {{ item.label }}
         </RouterLink>
         <p class="nav-label nav-label-spaced">后续阶段</p>

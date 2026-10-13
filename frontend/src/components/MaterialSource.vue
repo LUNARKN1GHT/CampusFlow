@@ -17,6 +17,21 @@ const error = ref('')
 const sourceError = ref('')
 const loadingSource = ref(false)
 const objectUrl = ref<string | null>(null)
+const originalText = ref('')
+const textSegments = computed(() => {
+  const text = originalText.value
+  let cursor = 0
+  for (const chunk of chunks.value) {
+    const index = text.indexOf(chunk.text, cursor)
+    if (index < 0) continue
+    if (chunk.id === selected.value?.id) return {
+      before: text.slice(0, index), match: chunk.text, after: text.slice(index + chunk.text.length),
+    }
+    cursor = index + chunk.text.length
+  }
+  return { before: text, match: '', after: '' }
+})
+let disposed = false
 
 const sourceTypeLabels: Record<string, string> = {
   pdf: 'PDF 页', image: '截图区域', text: '文本段落', word: 'Word', web: '网页',
@@ -64,12 +79,15 @@ function releaseObjectUrl() {
 async function loadSource(): Promise<void> {
   releaseObjectUrl()
   sourceError.value = ''
-  if (props.material.source_type !== 'pdf' && props.material.source_type !== 'image') return
+  originalText.value = ''
+  if (!['pdf', 'image', 'text'].includes(props.material.source_type)) return
   if (versionNo.value === null) return
   loadingSource.value = true
   try {
     const blob = await materialsApi.fileBlob(props.material.id, versionNo.value)
-    objectUrl.value = URL.createObjectURL(blob)
+    if (disposed) return
+    if (props.material.source_type === 'text') originalText.value = await blob.text()
+    else objectUrl.value = URL.createObjectURL(blob)
   } catch (caught) {
     // 原文件不可用时只显示失效原因，不渲染原文，也不声称引用仍可验证。
     sourceError.value = errorMessage(caught)
@@ -103,7 +121,7 @@ async function loadAll(): Promise<void> {
 // 面板切换到另一份资料时重新加载，避免沿用上一份的版本与片段。
 watch(() => props.material.id, loadAll)
 
-onBeforeUnmount(releaseObjectUrl)
+onBeforeUnmount(() => { disposed = true; releaseObjectUrl() })
 
 void loadAll()
 </script>
@@ -145,16 +163,16 @@ void loadAll()
         <div class="source-viewer" :data-source-type="material.source_type">
           <div v-if="sourceError" class="status-banner failed" role="alert">
             <div>
-              <strong>引用已失效，不再可验证</strong>
+              <strong>原文件暂不可读取，引用目前无法验证</strong>
               <p>{{ sourceError }}</p>
-              <p>该引用不再参与问答回答，仅作为历史记录保留。</p>
+              <p>请检查连接或来源是否仍可用，再重新打开原文。</p>
             </div>
           </div>
           <template v-else>
             <p v-if="loadingSource" class="muted">正在读取原文件…</p>
 
             <div v-else-if="material.source_type === 'text'" class="text-source">
-              <p v-for="chunk in chunks" :key="chunk.id" :class="{ highlight: selected?.id === chunk.id }">{{ chunk.text }}</p>
+              <pre style="white-space: pre-wrap; font: inherit">{{ textSegments.before }}<mark v-if="textSegments.match" class="highlight">{{ textSegments.match }}</mark>{{ textSegments.after }}</pre>
             </div>
 
             <div v-else-if="material.source_type === 'image'" class="image-stage" :class="{ 'is-loading': loadingSource }">
@@ -177,8 +195,8 @@ void loadAll()
           <aside class="locator-detail" aria-label="引用详情">
             <div class="status-banner" :class="sourceError ? 'failed' : 'success'">
               <div>
-                <strong>{{ sourceError ? '不再可验证' : '引用位置可验证' }}</strong>
-                <p>{{ sourceError ? '来源不可用，仅显示定位信息。' : '高亮区域对应所选片段。' }}</p>
+                <strong>{{ sourceError ? '目前无法验证' : loadingSource ? '正在核对原文件' : '引用位置可验证' }}</strong>
+                <p>{{ sourceError ? '原文件未读取，仅显示历史定位信息。' : '定位信息对应所选片段。' }}</p>
               </div>
             </div>
             <div class="locator-row"><span>引用标识</span><strong>{{ citationLabel }}</strong></div>

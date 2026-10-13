@@ -11,7 +11,7 @@ Worker 调用本用例完成解析：读取原文件 → 按来源类型选解�
 
 import logging
 
-from campusflow.application.ports.parsers import DocumentParser
+from campusflow.application.ports.parsers import DocumentParser, ParseFailure
 from campusflow.application.ports.repositories import (
     ProcessingJobData,
     Repositories,
@@ -81,13 +81,22 @@ class ParserRegistry:
         return self._parsers[source_type]
 
 
-def _scope_summary(fragment_count: int, failures: list) -> str:
+def _scope_summary(fragment_count: int, failures: list[ParseFailure]) -> str:
     """覆盖范围说明：只含数量与失败范围，不含原文全文（J001 隐私规则）。"""
     scope = f"完成 {fragment_count} 个片段"
     if failures:
-        locations = "、".join(
-            f"第 {f.locator.page} 页" if f.locator.page else f.locator.kind for f in failures
-        )
+        labels = []
+        for failure in failures:
+            locator = failure.locator
+            location = f"第 {locator.page} 页" if locator.page else ""
+            if locator.paragraph:
+                location += f"第 {locator.paragraph} 段"
+            if locator.bbox:
+                location += f"区域 {locator.bbox}（归一化）"
+            labels.append(location or "位置未提供")
+        locations = "、".join(labels)
+        if len(locations) > 430:
+            locations = locations[:430] + f"…（共 {len(failures)} 个未识别范围）"
         scope += f"；未识别范围：{locations}"
     return scope
 
@@ -158,7 +167,7 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
         # 全页失败时把失败原因写进作业，便于状态查询与诊断（J005）
         error_reason = (
             "；".join(dict.fromkeys(f.reason for f in outcome.failures))
-            if status == JobStatus.FAILED
+            if outcome.failures
             else None
         )
         # 分阶段失败重试（J005）：只要有失败范围是临时故障，就允许重试补齐；

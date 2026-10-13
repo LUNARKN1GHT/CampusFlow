@@ -179,7 +179,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .text-source p { margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fafbf8; font-size: 14px; }
 .text-source p.highlight { border-color: var(--accent); background: #fdf1dc; }
 .image-stage { position: relative; display: inline-block; max-width: 100%; }
-.image-stage img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; }
+.image-stage img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
 .bbox-highlight { position: absolute; border: 2px solid var(--accent); border-radius: 4px; background: rgba(207,140,49,.22); pointer-events: none; }
 .pdf-stage iframe { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
 .locator-detail { display: grid; gap: 8px; align-self: start; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fafbf8; }

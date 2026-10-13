@@ -48,9 +48,9 @@ def test_list_filters_by_semester_course_type_status(client: TestClient) -> None
     assert empty == []
 
     by_status = client.get("/api/v1/materials", params={"status": "pending"}).json()
-    assert len(by_status) == 2
+    assert by_status == []
     done = client.get("/api/v1/materials", params={"status": "done"}).json()
-    assert done == []
+    assert len(done) == 2
 
 
 def test_metadata_revision_keeps_original_version_untouched(client: TestClient) -> None:

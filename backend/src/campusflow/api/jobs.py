@@ -8,7 +8,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
 
 from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
@@ -86,6 +86,13 @@ def _to_out(job: ProcessingJobData) -> JobOut:
         created_at=job.created_at,
         updated_at=job.updated_at,
     )
+
+
+@router.get("", response_model=list[JobOut])
+def list_material_jobs(
+    material_id: Annotated[int, Query(gt=0)], workspace: CurrentWorkspace, repos: Repos
+) -> list[JobOut]:
+    return [_to_out(job) for job in use_cases.list_material_jobs(repos, workspace.id, material_id)]
 
 
 @router.get("/{job_id}", response_model=JobOut)

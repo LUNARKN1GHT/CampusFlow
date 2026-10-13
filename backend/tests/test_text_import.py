@@ -36,7 +36,8 @@ def test_import_pasted_text_creates_stable_version(client: TestClient) -> None:
     material = body["material"]
     assert material["title"] == "作业三通知"
     assert material["source_type"] == "text"
-    assert material["status"] == "pending"
+    assert material["status"] == "done"
+    assert client.get(f"/api/v1/materials/{material['id']}").json()["status"] == "done"
     # 发布时间与导入时间分开（D001 语义在导入路径上保持）
     assert material["published_at"] is not None
     assert material["imported_at"] is not None
@@ -202,3 +203,31 @@ def test_semester_course_mismatch_rejected(client: TestClient) -> None:
         },
     )
     assert ok.status_code == 201
+
+
+def test_date_only_publication_is_not_fabricated_as_midnight(client):
+    rejected = client.post(
+        "/api/v1/materials/text",
+        json={
+            "title": "只有发布日期",
+            "content": "2026-10-13 发布",
+            "published_at": "2026-10-13",
+        },
+    )
+    assert rejected.status_code == 422
+    result = client.post(
+        "/api/v1/materials/text",
+        json={
+            "title": "保留原始日期",
+            "content": "2026-10-13 发布",
+        },
+    ).json()
+    assert result["material"]["published_at"] is None
+    assert result["chunks"][0]["text"] == "2026-10-13 发布"
+    update = client.patch(
+        f"/api/v1/materials/{result['material']['id']}",
+        json={
+            "published_at": "2026-10-13",
+        },
+    )
+    assert update.status_code == 422
