@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-LocatorKind = Literal["page", "paragraph", "region"]
+LocatorKind = Literal["page", "paragraph", "region", "table_cell", "document"]
 
 
 @dataclass(frozen=True)
@@ -21,9 +21,21 @@ class ParserLocator:
     paragraph: int | None = None  # 段落号，从 1 开始
     page: int | None = None  # 页码，从 1 开始
     bbox: tuple[float, float, float, float] | None = None  # (x0, y0, x1, y1) 归一化
+    table: int | None = None
+    row: int | None = None
+    column: int | None = None
 
     def as_chunk_locator(self) -> tuple[str, str]:
         """转换为 source_chunks 的 (locator_type, locator_value)。"""
+        if self.kind == "document":
+            return "document", "body"
+        if self.kind == "table_cell":
+            if any(value is None or value < 1 for value in (self.table, self.row, self.column)):
+                raise ValueError("表格定位缺少有效的表格、行或列号")
+            value = f"t{self.table}:r{self.row}:c{self.column}"
+            if self.paragraph is not None:
+                value += f":p{self.paragraph}"
+            return "table_cell", value
         if self.kind == "paragraph":
             if self.paragraph is None:
                 raise ValueError("段落定位缺少段落号")

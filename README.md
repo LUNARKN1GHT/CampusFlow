@@ -12,7 +12,7 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 ## 开发与架构入口
 
-扩展导入正在分任务推进：N002 已接入普通 DOCX 的上传校验，正文解析由 N003 接入。说明见 [Word 校验](docs/verification/N002-word-validation.md)，不将格式校验等同于完整 Word 导入。
+扩展导入正在分任务推进：N002 已接入普通 DOCX 上传校验，N003 已接通正文/表格解析和版本定位。说明见 [Word 校验](docs/verification/N002-word-validation.md) 与 [Word 解析](docs/verification/N003-word-parsing.md)；资料页面仍待接入。
 
 - [技术选型、目录分层与架构图](docs/ARCHITECTURE.md)
 - [本地启动与验证命令](docs/DEVELOPMENT.md)
