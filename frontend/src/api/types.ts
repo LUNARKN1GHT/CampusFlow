@@ -17,6 +17,7 @@ export type Course = {
 
 export type TaskProgress = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high'
+export type DueSourceType = 'user' | 'document' | 'inferred'
 
 export type Task = {
   id: number
@@ -25,6 +26,10 @@ export type Task = {
   description: string | null
   due_date: string | null
   due_time: string | null
+  target_date: string | null
+  due_source: DueSourceType
+  due_note: string | null
+  overdue: boolean
   progress: TaskProgress
   priority: TaskPriority
   estimated_minutes: number | null
@@ -74,7 +79,7 @@ export type AvailabilitySlot = {
 
 export type SemesterInput = Pick<Semester, 'name' | 'start_date' | 'end_date'>
 export type CourseInput = Omit<Course, 'id'>
-export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_date' | 'due_time' | 'priority' | 'estimated_minutes' | 'remaining_minutes'>
+export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_date' | 'due_time' | 'target_date' | 'due_source' | 'due_note' | 'priority' | 'estimated_minutes' | 'remaining_minutes'>
 export type FixedEventInput = Omit<FixedEvent, 'id'>
 export type AvailabilitySlotInput = Omit<AvailabilitySlot, 'id'>
 
