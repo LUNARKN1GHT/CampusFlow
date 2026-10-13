@@ -25,9 +25,14 @@ Repos = Annotated[Repositories, Depends(get_repositories)]
 
 
 @router.get("/fixed-events", response_model=list[FixedEventOut])
-def list_fixed_events(workspace: CurrentWorkspace, repos: Repos) -> list[FixedEventOut]:
+def list_fixed_events(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query()] = None,
+) -> list[FixedEventOut]:
     return [
-        FixedEventOut.model_validate(e) for e in use_cases.list_fixed_events(repos, workspace.id)
+        FixedEventOut.model_validate(e)
+        for e in use_cases.list_fixed_events(repos, workspace.id, semester_id=semester_id)
     ]
 
 
@@ -37,11 +42,12 @@ def list_fixed_event_occurrences(
     repos: Repos,
     start_date: Annotated[date, Query()],
     end_date: Annotated[date, Query()],
+    semester_id: Annotated[int | None, Query()] = None,
 ) -> list[FixedEventOccurrenceOut]:
     return [
         FixedEventOccurrenceOut.model_validate(occurrence)
         for occurrence in use_cases.list_fixed_event_occurrences(
-            repos, workspace.id, start_date, end_date
+            repos, workspace.id, start_date, end_date, semester_id=semester_id
         )
     ]
 
