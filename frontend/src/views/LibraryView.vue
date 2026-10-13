@@ -16,6 +16,8 @@ import type {
 import ApiFeedback from '../components/ApiFeedback.vue'
 
 const POLL_INTERVAL_MS = 3000
+// 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
+const POLL_MAX_MS = 10 * 60 * 1000
 const JOB_STORAGE_KEY = 'campusflow.library.jobByMaterial'
 
 const materials = ref<Material[]>([])
@@ -45,7 +47,9 @@ const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
 const retryingId = ref<number | null>(null)
 
+const pollPaused = ref(false)
 let pollTimer: number | null = null
+let pollStartedAt: number | null = null
 
 const sourceTypeLabels: Record<MaterialSourceType, string> = {
   pdf: 'PDF', image: '图片', text: '粘贴文本', word: 'Word', web: '网页',
@@ -53,8 +57,6 @@ const sourceTypeLabels: Record<MaterialSourceType, string> = {
 const statusLabels: Record<MaterialStatus, string> = {
   pending: '待处理', processing: '处理中', done: '完成', partial: '部分成功', failed: '失败',
 }
-const activeStatuses: MaterialStatus[] = ['pending', 'processing']
-
 const semesterMap = computed(() => new Map(semesters.value.map((item) => [item.id, item])))
 const courseMap = computed(() => new Map(courses.value.map((item) => [item.id, item])))
 const filteredCourses = computed(() => filters.semesterId
@@ -71,6 +73,12 @@ const visibleMaterials = computed(() => materials.value)
 function jobFor(material: Material): ProcessingJob | null {
   const jobId = jobByMaterial[material.id]
   return jobId ? jobs[jobId] ?? null : null
+}
+
+/** 仅当存在尚未进入终态的处理作业时才算“处理中”，避免对同步导入的资料无限轮询。 */
+function hasActiveJob(material: Material): boolean {
+  const jobId = jobByMaterial[material.id]
+  return jobId ? !(jobs[jobId]?.is_terminal ?? false) : false
 }
 
 function currentFilters(): MaterialFilters {
@@ -159,9 +167,16 @@ async function refresh() {
 }
 
 function syncPolling() {
-  const active = materials.value.some((material) => activeStatuses.includes(material.status))
+  // 有未完成的作业，或有资料处于“处理中”时保持轮询；同步导入（无作业）不轮询。
+  const active = materials.value.some((material) => hasActiveJob(material) || material.status === 'processing')
   if (!active) {
     stopPolling()
+    return
+  }
+  if (pollStartedAt === null) pollStartedAt = Date.now()
+  if (Date.now() - pollStartedAt > POLL_MAX_MS) {
+    stopPolling()
+    pollPaused.value = true
     return
   }
   if (pollTimer === null) pollTimer = window.setInterval(refresh, POLL_INTERVAL_MS)
@@ -172,6 +187,12 @@ function stopPolling() {
     window.clearInterval(pollTimer)
     pollTimer = null
   }
+  pollStartedAt = null
+}
+
+async function manualRefresh() {
+  pollPaused.value = false
+  await refresh()
 }
 
 async function retry(material: Material) {
@@ -347,6 +368,11 @@ onBeforeUnmount(stopPolling)
       </section>
 
       <section class="panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">资料列表</p><h2>处理状态</h2></div>
+          <button type="button" class="text-button" @click="manualRefresh">刷新</button>
+        </div>
+        <p v-if="pollPaused" class="inline-notice" role="status">自动刷新已暂停，请手动刷新查看最新处理状态。</p>
         <p v-if="loading" class="muted">正在加载资料…</p>
         <div v-else-if="visibleMaterials.length" class="material-list">
           <article v-for="material in visibleMaterials" :key="material.id" class="material-row">
@@ -370,7 +396,7 @@ onBeforeUnmount(stopPolling)
               </div>
             </div>
             <div class="material-actions">
-              <button v-if="activeStatuses.includes(material.status)" type="button" class="text-button" disabled>处理中…</button>
+              <button v-if="hasActiveJob(material)" type="button" class="text-button" disabled>处理中…</button>
               <button
                 v-else-if="jobFor(material)?.retryable"
                 type="button"
