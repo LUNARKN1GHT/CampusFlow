@@ -21,17 +21,33 @@ def update_settings(
     daily_capacity_minutes: int,
     break_minutes: int,
     buffer_minutes: int,
+    weekly_capacity_minutes: int | None = None,
 ) -> WorkspaceData:
+    current = get_settings(repos, workspace_id)
     try:
         ZoneInfo(timezone)
-    except ZoneInfoNotFoundError as exc:
+    except (ZoneInfoNotFoundError, ValueError) as exc:
         raise DomainError("时区无效，请使用 IANA 时区名称") from exc
+    weekly_capacity = (
+        current.weekly_capacity_minutes
+        if weekly_capacity_minutes is None
+        else weekly_capacity_minutes
+    )
+    for value, maximum in (
+        (daily_capacity_minutes, 1440),
+        (weekly_capacity, 10080),
+        (break_minutes, 240),
+        (buffer_minutes, 1440),
+    ):
+        if not 0 <= value <= maximum:
+            raise DomainError("学习容量、休息和缓冲必须在允许范围内")
     workspace = repos.workspaces.update_settings(
         workspace_id,
         timezone=timezone,
         daily_capacity_minutes=daily_capacity_minutes,
         break_minutes=break_minutes,
         buffer_minutes=buffer_minutes,
+        weekly_capacity_minutes=weekly_capacity,
     )
     if workspace is None:
         raise NotFoundError("工作空间不存在")

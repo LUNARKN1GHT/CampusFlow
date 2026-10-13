@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查仍只表示进程存活。Compose 同时提供 pgvector 扩展和 Redis，向量检索与 RQ Worker 尚未接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，RQ Worker 已在资料整合分支接入；向量检索尚未实现。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -44,12 +44,27 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 先启动上述数据库，再执行迁移和后端启动命令。需要自定义时复制 `backend/.env.example` 为同目录 `.env`；支持应用名称、业务库、测试库与 Redis 地址配置，具体名称见样例。环境变量优先于 `.env`，不要把 `.env` 提交到仓库。
 
 - 健康检查：<http://127.0.0.1:8000/api/v1/health>
+- 就绪检查：<http://127.0.0.1:8000/api/v1/ready>
 - Swagger UI：<http://127.0.0.1:8000/docs>
 - OpenAPI：<http://127.0.0.1:8000/openapi.json>
 
 业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
 
-健康检查成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。数据库就绪检查尚待实现，健康接口成功不证明业务库可用。
+健康检查 `/api/v1/health` 成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。就绪检查 `/api/v1/ready` 以短超时连接数据库并执行 `SELECT 1`，数据库不可达时返回 503 且不包含连接信息或口令。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。
+
+## 资料后台与诊断
+
+资料处理后端与 RQ Worker 已在本整合分支接入。Windows 使用 Docker 运行 Linux
+Worker；API 与 Worker 共用数据库、Redis 和私有文件目录。完整启动命令、三种输入
+验证、只读诊断和安全重试步骤见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
+资料库页面 D019—D021 已接入导入、原文定位、归档与确认删除；真实队列浏览器回归见 [M2 集成验收](verification/M2-integration-acceptance.md)。
+
+```powershell
+# 仓库根目录，先按手册填写 backend/.env 并升级数据库
+docker compose -f infra/docker-compose.worker.yml up --build -d
+# backend/ 目录，输出不包含密钥、正文或连接口令
+uv run --locked python -m campusflow.workers.diagnostics
+```
 
 ## 启动前端
 
@@ -77,7 +92,7 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
-当前测试夹具在每个用例前清空六张业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 分别跟踪纯领域测试脱离数据库和测试目标保护，目前这些改进尚未合并。
+当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 已接入：纯领域测试不触发数据库，测试库名必须以 `_test` 结尾。
 
 ## 验证
 
@@ -103,7 +118,7 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## 当前限制
 
-- 手动管理前后端与本机单用户会话已实现；暂无生产身份系统、跨工作空间对象授权、Worker 命令、上传、核对、RAG 和排期实现。Redis 和 vector 扩展配置不等于相关业务已实现。
+- 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。

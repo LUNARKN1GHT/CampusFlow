@@ -1,6 +1,6 @@
 """固定日程与可用时间的领域规则。"""
 
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 
 from campusflow.domain.states import EventRecurrence
 
@@ -12,7 +12,9 @@ def validate_fixed_event(
     repeat_until: date | None,
 ) -> str | None:
     """校验固定日程，合法返回 None，否则返回中文错误信息。"""
-    if ends_at <= starts_at:
+    if starts_at.tzinfo is None or ends_at.tzinfo is None:
+        return "日程时间必须先按工作空间时区转换"
+    if ends_at.astimezone(UTC) <= starts_at.astimezone(UTC):
         return "结束时间必须晚于开始时间"
     if recurrence == EventRecurrence.WEEKLY and repeat_until is None:
         return "每周重复的日程必须提供重复截止日期"
@@ -22,9 +24,13 @@ def validate_fixed_event(
 
 
 def validate_availability_slot(day_of_week: int, start_time: time, end_time: time) -> str | None:
-    """校验可用时间段，合法返回 None，否则返回中文错误信息。"""
+    """校验可用时间段，合法返回 None，否则返回中文错误信息。
+
+    可用时段按星期几重复，不跨越午夜；跨日时段由用户拆分为两天分别录入，
+    避免一个时段同时属于两天而导致容量重复累加。
+    """
     if not 0 <= day_of_week <= 6:
         return "星期取值必须在 0（周一）到 6（周日）之间"
     if end_time <= start_time:
-        return "结束时间必须晚于开始时间"
+        return "结束时间必须晚于开始时间；跨日时段请拆分为两天分别录入"
     return None

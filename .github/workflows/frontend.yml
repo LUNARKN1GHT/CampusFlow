@@ -58,7 +58,20 @@ jobs:
           --health-timeout 3s
           --health-retries 12
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
     env:
+      CAMPUSFLOW_M2_E2E: "1"
+      CAMPUSFLOW_REDIS_URL: redis://127.0.0.1:6379/15
+      CAMPUSFLOW_STORAGE_DIR: /tmp/campusflow-m2-storage
       CAMPUSFLOW_DATABASE_URL: postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_test
       CAMPUSFLOW_TEST_DATABASE_URL: postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_test
 

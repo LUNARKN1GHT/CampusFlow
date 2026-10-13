@@ -10,3 +10,4 @@ CF-TXT-003,B012 同名课程 A 班样本,synthetic,大学物理 A 班独立通�
 CF-TXT-004,B012 同名课程 B 班样本,synthetic,大学物理 B 班独立通知,project-internal,课程教学班范围隔离验收,not-applicable-synthetic,samples/synthetic/b012/same-course-section-b.txt,随验收集版本保留,active,quality-owner,2026-09-29,不得与 CF-TXT-003 合并
 CF-TXT-005,B012 来源冲突 v1 样本,synthetic,同一课程教学班的第一份截止通知,project-internal,来源冲突与版本核对验收,not-applicable-synthetic,samples/synthetic/b012/conflict-notice-v1.txt,随验收集版本保留,active,quality-owner,2026-09-29,与 CF-TXT-006 冲突
 CF-TXT-006,B012 来源冲突 v2 样本,synthetic,导入更晚但无替代声明的冲突通知,project-internal,来源冲突与版本核对验收,not-applicable-synthetic,samples/synthetic/b012/conflict-notice-v2.txt,随验收集版本保留,active,quality-owner,2026-09-29,与 CF-TXT-005 冲突且不得自动覆盖
+CF-IMG-005,D013 表格截图样本,synthetic,Pillow 构造的作业安排表格（3 行 4 列）,project-internal,表格识别与行列定位评测,not-applicable-synthetic,samples/synthetic/d013/table-screenshot.png,随验收集版本保留,active,quality-owner,2026-10-09,人工预期见 samples/synthetic/d013/expected.json
