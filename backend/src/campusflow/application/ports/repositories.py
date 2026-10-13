@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Protocol
 
@@ -154,6 +154,7 @@ class MaterialVersionData:
     storage_key: str | None
     checksum: str | None
     created_at: datetime
+    source_metadata: dict[str, str | None] = field(default_factory=dict)
 
 
 @dataclass
@@ -488,6 +489,8 @@ class MaterialRepository(Protocol):
         note: str | None,
         storage_key: str | None,
         checksum: str | None = None,
+        *,
+        source_metadata: dict[str, str | None] | None = None,
     ) -> MaterialVersionData: ...
 
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
