@@ -14,6 +14,8 @@ import type {
   Semester,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import MaterialLifecycle from '../components/MaterialLifecycle.vue'
+import MaterialSource from '../components/MaterialSource.vue'
 
 const POLL_INTERVAL_MS = 3000
 // 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
@@ -46,6 +48,8 @@ const filters = reactive({ semesterId: '', courseId: '', sourceType: '', status:
 const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
 const retryingId = ref<number | null>(null)
+const sourceMaterial = ref<Material | null>(null)
+const lifecycleMaterial = ref<Material | null>(null)
 
 const pollPaused = ref(false)
 let pollTimer: number | null = null
@@ -211,6 +215,26 @@ async function retry(material: Material) {
   } finally {
     retryingId.value = null
   }
+}
+
+async function onArchiveChanged() {
+  await refresh()
+  const id = lifecycleMaterial.value?.id
+  if (id !== undefined) {
+    try {
+      lifecycleMaterial.value = await materialsApi.get(id)
+    } catch {
+      // 归档后若不在当前筛选内，保留原对象供面板展示结果。
+    }
+  }
+}
+
+async function onMaterialDeleted(id: number) {
+  delete jobByMaterial[id]
+  persistJobMap()
+  if (sourceMaterial.value?.id === id) sourceMaterial.value = null
+  // 保持生命周期面板打开，让用户看到“删除完成”的结果；列表在后台同步移除该资料。
+  await refresh()
 }
 
 function onFilesChosen(event: Event) {
@@ -405,11 +429,28 @@ onBeforeUnmount(stopPolling)
                 @click="retry(material)"
               >{{ retryingId === material.id ? '正在重试…' : '重试处理' }}</button>
               <span v-else-if="material.status === 'failed'" class="muted small">不可重试</span>
+              <button type="button" class="text-button" @click="sourceMaterial = material">查看原文</button>
+              <button type="button" class="text-button" @click="lifecycleMaterial = material">归档 / 删除</button>
             </div>
           </article>
         </div>
         <div v-else class="compact-empty">{{ materials.length ? '没有符合当前筛选的资料。' : '还没有资料，先导入一份课程通知或大纲。' }}</div>
       </section>
+
+      <MaterialSource
+        v-if="sourceMaterial"
+        :material="sourceMaterial"
+        :scope="scopeText(sourceMaterial)"
+        @close="sourceMaterial = null"
+      />
+
+      <MaterialLifecycle
+        v-if="lifecycleMaterial"
+        :material="lifecycleMaterial"
+        @close="lifecycleMaterial = null"
+        @archive-changed="onArchiveChanged"
+        @deleted="onMaterialDeleted"
+      />
     </template>
   </main>
 </template>
