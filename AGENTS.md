@@ -144,6 +144,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- N002 在原上传入口加入普通 DOCX 的格式、大小和结构校验；用户决定 Word 使用 python-docx、网页正文使用 Beautiful Soup，按 N003/N006 引入。旧 DOC/宏文档不转换执行，提示另存为 DOCX。各任务实际能力以 docs/verification/N002-word-validation.md 及后续验收记录为准。
+
 - 单仓库、前后端分离、模块化单体。后端限定 Python 3.12，使用 FastAPI、Pydantic 和 uv；前端使用 Vue 3、TypeScript、Vite 和 npm。
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。
