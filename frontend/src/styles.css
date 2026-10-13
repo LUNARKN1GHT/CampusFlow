@@ -156,6 +156,43 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .availability-grid small { color: var(--muted); }
 
 .small { font-size: 12px; }
+.lifecycle-panel { margin-top: 22px; }
+.lifecycle-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px; align-items: start; }
+.lifecycle-actions { display: flex; gap: 8px; margin-top: 8px; }
+.summary-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.summary-chip { display: grid; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fafbf8; text-align: center; }
+.summary-chip strong { font-size: 22px; }
+.summary-chip span { color: var(--muted); font-size: 11px; }
+.delete-preview { margin-top: 14px; }
+.stack-field { display: grid; gap: 6px; margin-top: 10px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.stack-field select { padding: 10px 11px; border: 1px solid #bdc9c1; border-radius: 9px; color: var(--ink); background: white; }
+.source-panel { margin-top: 22px; }
+.source-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.6fr); gap: 22px; align-items: start; }
+.source-fragments { min-width: 0; }
+.chunk-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; max-height: 520px; overflow-y: auto; }
+.chunk-item { display: grid; gap: 3px; width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: #fff; text-align: left; cursor: pointer; }
+.chunk-item.is-active { border-color: var(--brand); background: #f2f8f4; }
+.chunk-locator { color: var(--brand); font-size: 11px; font-weight: 800; }
+.chunk-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); font-size: 12px; }
+.source-viewer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, .55fr); gap: 18px; align-items: start; }
+.text-source { display: grid; gap: 8px; max-height: 520px; overflow-y: auto; }
+.text-source p { margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fafbf8; font-size: 14px; }
+.text-source p.highlight { border-color: var(--accent); background: #fdf1dc; }
+.image-stage { position: relative; display: inline-block; max-width: 100%; }
+.image-stage img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.bbox-highlight { position: absolute; border: 2px solid var(--accent); border-radius: 4px; background: rgba(207,140,49,.22); pointer-events: none; }
+.pdf-stage iframe { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.locator-detail { display: grid; gap: 8px; align-self: start; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fafbf8; }
+.locator-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.locator-row:last-child { border-bottom: 0; }
+.locator-row span { color: var(--muted); }
+.locator-row strong { text-align: right; word-break: break-word; }
+.status-banner { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.status-banner strong { font-size: 13px; }
+.status-banner p { margin: 3px 0 0; font-size: 12px; }
+.status-banner.success { color: var(--brand); background: var(--brand-soft); }
+.status-banner.failed { color: #814835; background: #fff4ef; }
+.status-banner.failed p { color: #814835; }
 .segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: #f4f6f1; }
 .segmented-item { padding: 7px 14px; border-radius: 999px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 700; }
 .segmented-item.is-active { color: #fff; background: var(--brand); }
@@ -200,4 +237,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .material-row { grid-template-columns: 1fr; }
   .material-actions { justify-content: flex-start; }
   .upload-results li { flex-wrap: wrap; }
+  .source-layout, .source-viewer, .lifecycle-layout { grid-template-columns: 1fr; }
+  .summary-row { grid-template-columns: 1fr; }
 }

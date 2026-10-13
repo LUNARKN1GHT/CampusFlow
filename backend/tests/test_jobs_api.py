@@ -358,3 +358,67 @@ def _material_id_of(job_id: int) -> int:
         return build_repositories(session).jobs.get(job_id).material_id
     finally:
         session.close()
+
+
+def test_material_jobs_survive_browser_state_loss(client, shared_storage, queue):
+    uploaded = _upload(client)
+    material_id = uploaded["material"]["id"]
+    response = client.get("/api/v1/jobs", params={"material_id": material_id})
+    assert response.status_code == 200
+    assert [job["id"] for job in response.json()] == [uploaded["job_id"]]
+    assert response.json()[0]["material_id"] == material_id
+    assert response.json()[0]["status"] == "pending"
+    _use_vision_parser(StagedVisionParser())
+    parse_version_job(uploaded["job_id"])
+    partial = client.get("/api/v1/jobs", params={"material_id": material_id}).json()[0]
+    assert partial["status"] == "partial"
+    assert partial["retryable"] is True
+    assert "2" in partial["scope"]
+
+
+def test_material_jobs_check_ownership_and_deletion(client, shared_storage, queue):
+    foreign_id = _create_foreign_job()
+    with _new_session() as session:
+        material_id = session.get(ProcessingJob, foreign_id).material_id
+    forbidden = client.get("/api/v1/jobs", params={"material_id": material_id})
+    missing = client.get("/api/v1/jobs", params={"material_id": 999999})
+    assert forbidden.status_code == missing.status_code == 404
+    assert forbidden.json() == missing.json()
+    uploaded = _upload(client)
+    own_id = uploaded["material"]["id"]
+    impact = client.get(f"/api/v1/materials/{own_id}/delete-impact").json()
+    assert (
+        client.post(
+            f"/api/v1/materials/{own_id}/delete",
+            json={
+                "confirm_token": impact["confirm_token"],
+                "keep_tasks": True,
+            },
+        ).status_code
+        == 204
+    )
+    assert client.get("/api/v1/jobs", params={"material_id": own_id}).status_code == 404
+
+
+def test_text_has_no_background_jobs(client):
+    result = client.post(
+        "/api/v1/materials/text", json={"title": "同步文本", "content": "段落"}
+    ).json()
+    response = client.get("/api/v1/jobs", params={"material_id": result["material"]["id"]})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_partial_scope_preserves_region_and_limits_database_length():
+    from campusflow.application.processing import _scope_summary
+
+    failure = ParseFailure(
+        locator=ParserLocator(kind="region", bbox=(0.1, 0.5, 0.9, 0.8)),
+        reason="未识别",
+    )
+    scope = _scope_summary(1, [failure])
+    assert "(0.1, 0.5, 0.9, 0.8)" in scope
+    assert "归一化" in scope
+    many = _scope_summary(1, [failure] * 1000)
+    assert len(many) <= 500
+    assert "1000 个未识别范围" in many

@@ -22,6 +22,9 @@ export type DueSourceType = 'user' | 'document' | 'inferred'
 export type Task = {
   id: number
   course_id: number | null
+  source_state: 'available' | 'invalidated' | 'none'
+  source_invalidated_at: string | null
+  source_invalidated_note: string | null
   title: string
   description: string | null
   due_date: string | null

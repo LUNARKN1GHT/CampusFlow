@@ -75,6 +75,7 @@ export const materialsApi = {
 }
 
 export const jobsApi = {
+  forMaterial: (id: number) => apiRequest<ProcessingJob[]>(`/jobs?material_id=${id}`),
   get: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}`),
   attempts: (id: number) => apiRequest<JobAttempt[]>(`/jobs/${id}/attempts`),
   retry: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}/retry`, { method: 'POST' }),
