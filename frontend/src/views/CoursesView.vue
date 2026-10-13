@@ -136,6 +136,11 @@ async function saveCourse() {
 }
 
 watch(selectedId, loadCourses)
+watch(showHistory, (visible) => {
+  if (!visible && selectedSemester.value?.archived) {
+    selectedId.value = semesters.value.find((semester) => !semester.archived)?.id ?? null
+  }
+})
 
 onMounted(load)
 </script>
@@ -147,6 +152,7 @@ onMounted(load)
         <p class="eyebrow">学期与课程</p>
         <h1>课程</h1>
         <p class="intro">先确定正在查看的学期，再管理其中的课程与教学班。</p>
+        <p class="form-help">归档只隐藏进行中学期入口，不删除课程、任务或日程；勾选“显示历史学期”可查看和恢复。</p>
       </div>
       <label class="switch-field"><input v-model="showHistory" type="checkbox" /> 显示历史学期</label>
     </div>
@@ -192,6 +198,7 @@ onMounted(load)
     </div>
 
     <section class="panel courses-placeholder">
+      <p v-if="selectedSemester?.archived" class="form-help">正在查看已归档学期：记录仍保留并可维护，恢复不会重置任务进度或截止日期。</p>
       <div class="section-heading">
         <div><p class="eyebrow">所选学期</p><h2>{{ selectedSemester?.name ?? '请先选择学期' }}</h2></div>
         <button v-if="selectedSemester" type="button" @click="editCourse()">添加课程</button>

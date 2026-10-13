@@ -49,13 +49,14 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
   return new ApiError(`请求未完成（HTTP ${response.status}）。`, response.status, 'http')
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function performRequest(
+  path: string,
+  init: RequestInit,
+  headers: Headers,
+  timeoutMs: number,
+): Promise<Response> {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 8000)
-  const headers = new Headers(init.headers)
-  headers.set('Accept', 'application/json')
-  if (init.body !== undefined) headers.set('Content-Type', 'application/json')
-
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(`${API_PREFIX}${path}`, {
       ...init,
@@ -65,12 +66,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
       signal: controller.signal,
     })
     if (!response.ok) throw await toApiError(response, !path.startsWith('/auth/'))
-    if (response.status === 204) return undefined as T
-    try {
-      return await response.json() as T
-    } catch {
-      throw new ApiError('服务返回了无法识别的数据。', response.status, 'invalid-response')
-    }
+    return response
   } catch (error) {
     if (error instanceof ApiError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') {
@@ -80,6 +76,30 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   } finally {
     window.clearTimeout(timeout)
   }
+}
+
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  headers.set('Accept', 'application/json')
+  // FormData 由浏览器自行设置 multipart 边界，不能强制覆盖为 JSON。
+  if (init.body !== undefined && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  const response = await performRequest(path, init, headers, 8000)
+  if (response.status === 204) return undefined as T
+  try {
+    return await response.json() as T
+  } catch {
+    throw new ApiError('服务返回了无法识别的数据。', response.status, 'invalid-response')
+  }
+}
+
+/** 读取二进制原文（PDF、图片）。原文缺失时抛出 ApiError，供调用方区分"已失效"。 */
+export async function apiRequestBlob(path: string, timeoutMs = 20000): Promise<Blob> {
+  const headers = new Headers({ Accept: '*/*' })
+  const response = await performRequest(path, {}, headers, timeoutMs)
+  return response.blob()
 }
 
 export function errorMessage(error: unknown): string {

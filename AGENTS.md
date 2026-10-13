@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权、资料处理、问答和排期尚未实现。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面、问答、核对和排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
@@ -148,11 +148,11 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。
 - 前端位于 `frontend/src/`：页面放 `views`，共享组件放 `components`，HTTP 调用放 `api`；路由和跨页面状态按需引入。
-- 已接入 PostgreSQL 17、SQLAlchemy 2、psycopg 3、Alembic；Compose 启用 pgvector 扩展并提供 Redis 7，向量检索和后台作业尚未实现。耗时解析后续接入 RQ 与独立 Python Worker，在实际功能接入时增加依赖与运行配置。
+- 已接入 PostgreSQL 17、SQLAlchemy 2、psycopg 3、Alembic；Compose 启用 pgvector 扩展并提供 Redis 7，向量检索尚未实现；耗时解析已接入 RQ 与独立 Linux Worker，Windows 通过 Docker 运行。启动和诊断见 docs/MATERIAL_PROCESSING.md。
 - 文件保存在后端私有存储，解析采用 pypdf 与可替换 OCR／多模态适配器；模型供应商和具体模型待样本评估，不将模型输出直接视为事实或执行授权。
 - API 统一前缀 `/api/v1`，当前包括健康检查及学期、课程、任务、固定日程、可用时间接口。健康检查只表示进程存活；业务草案、数据库就绪与外部执行结果不得用健康状态代替。
 - 日常安装使用 `uv sync --locked` 与 `npm ci`，依赖变更同步锁文件。后端运行 pytest 和 Ruff 检查；前端运行包含类型检查的 `npm run build`。命令详见开发文档。
-- 开发服务默认仅绑定本机。当前本机单用户登录使用进程内随机会话并保护业务接口，服务重启后会话失效；这不等同于生产身份系统。引入真实资料或共享部署前仍需完成工作空间对象授权、默认凭据替换和生产会话存储。
+- 开发服务默认仅绑定本机。当前本机单用户登录使用进程内随机会话并保护业务接口，服务重启后会话失效；这不等同于生产身份系统。对象授权已接入；共享部署前仍需默认凭据替换和生产会话存储。
 - 技术边界变更同步维护架构、开发文档及本文件；对外工程状态更新 README。
 
 ## 团队情况

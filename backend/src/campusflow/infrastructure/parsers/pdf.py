@@ -50,7 +50,19 @@ class PdfDocumentParser:
         seq = 0
         for index, page in enumerate(reader.pages):
             page_no = index + 1  # 页码从 1 开始
-            text = (page.extract_text() or "").strip()
+            try:
+                text = (page.extract_text() or "").strip()
+            except Exception as exc:
+                # 单页提取异常不废掉整份文件（J005 分阶段处理）：该页记为可重试
+                # 失败，其余页面照常产出，重试时已完成页不会重复写入
+                failures.append(
+                    ParseFailure(
+                        locator=ParserLocator(kind="page", page=page_no),
+                        reason=f"第 {page_no} 页提取失败：{exc}",
+                        retryable=True,
+                    )
+                )
+                continue
             if not text:
                 failures.append(
                     ParseFailure(

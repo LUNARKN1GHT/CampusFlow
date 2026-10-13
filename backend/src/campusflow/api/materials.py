@@ -5,12 +5,13 @@ from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
 from campusflow.application.ports.parsers import DocumentParser
+from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
@@ -36,6 +37,9 @@ def get_text_parser() -> DocumentParser:
 
 
 TextParser = Annotated[DocumentParser, Depends(get_text_parser)]
+
+
+JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
 
 
 class TextImportIn(BaseModel):
@@ -163,6 +167,63 @@ def list_materials(
     ]
 
 
+class DeleteImpactOut(BaseModel):
+    """删除影响预览（D008/D009）：执行删除前必须持有其中 confirm_token。"""
+
+    material: MaterialOut
+    version_count: int
+    chunk_count: int
+    linked_task_ids: list[int]
+    # 还在处理中、会被这次删除一并清掉的作业数（D009）：不为 0 时界面应提示
+    unfinished_job_count: int
+    confirm_token: str
+    backup_note: str
+
+
+class DeleteConfirmIn(BaseModel):
+    confirm_token: str = Field(min_length=1)
+    keep_tasks: bool = True
+
+
+@router.get("/{material_id}/delete-impact", response_model=DeleteImpactOut)
+def delete_impact(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos, request: Request
+) -> DeleteImpactOut:
+    impact = use_cases.preview_delete_impact(repos, workspace.id, material_id)
+    days = request.app.state.settings.backup_retention_days
+    return DeleteImpactOut(
+        material=MaterialOut.model_validate(impact.material),
+        version_count=impact.version_count,
+        chunk_count=impact.chunk_count,
+        linked_task_ids=impact.linked_task_ids,
+        unfinished_job_count=impact.unfinished_job_count,
+        confirm_token=impact.confirm_token,
+        backup_note=(
+            f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"
+            f"随备份轮换清除，且恢复流程不会复活已删除资料（见 docs/data-retention.md）。"
+        ),
+    )
+
+
+@router.post("/{material_id}/delete", status_code=204)
+def delete_material(
+    material_id: int,
+    payload: DeleteConfirmIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+) -> Response:
+    use_cases.delete_material(
+        repos,
+        storage,
+        workspace.id,
+        material_id,
+        confirm_token=payload.confirm_token,
+        keep_tasks=payload.keep_tasks,
+    )
+    return Response(status_code=204)
+
+
 class MaterialVersionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -222,6 +283,20 @@ def get_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) ->
     return MaterialOut.model_validate(use_cases.get_material(repos, workspace.id, material_id))
 
 
+@router.post("/{material_id}/archive", response_model=MaterialOut)
+def archive_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    return MaterialOut.model_validate(
+        use_cases.set_material_archived(repos, workspace.id, material_id, archived=True)
+    )
+
+
+@router.post("/{material_id}/restore", response_model=MaterialOut)
+def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    return MaterialOut.model_validate(
+        use_cases.set_material_archived(repos, workspace.id, material_id, archived=False)
+    )
+
+
 @router.patch("/{material_id}", response_model=MaterialOut)
 def update_material(
     material_id: int, payload: MaterialMetadataUpdate, workspace: CurrentWorkspace, repos: Repos
@@ -241,3 +316,67 @@ def update_material(
         class_name=merged.class_name,
     )
     return MaterialOut.model_validate(material)
+
+
+class UploadItemOut(BaseModel):
+    """单个文件的上传结果：成功带资料，失败带可读原因，完全重复带已有资料提示（D003/D006）。"""
+
+    filename: str
+    material: MaterialOut | None
+    error: str | None
+    duplicate_of: MaterialOut | None = None
+    job_id: int | None = None
+
+
+class UploadOut(BaseModel):
+    results: list[UploadItemOut]
+
+
+@router.post("/upload", response_model=UploadOut, status_code=201)
+def upload_files(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    storage: Storage,
+    request: Request,
+    files: Annotated[list[UploadFile], File()],
+    semester_id: Annotated[int | None, Query()] = None,
+    course_id: Annotated[int | None, Query()] = None,
+    class_name: Annotated[str | None, Query()] = None,
+    publisher: Annotated[str | None, Query()] = None,
+    allow_duplicate: Annotated[bool, Query()] = False,
+    queue: JobQueueDep = None,
+) -> UploadOut:
+    settings = request.app.state.settings
+    if len(files) > settings.upload_max_files:
+        from campusflow.domain.errors import DomainError
+
+        raise DomainError(f"一次最多上传 {settings.upload_max_files} 个文件")
+
+    results = use_cases.import_uploaded_files(
+        repos,
+        storage,
+        workspace.id,
+        files=[(f.filename or "未命名", f.file.read()) for f in files],
+        publisher=publisher,
+        published_at=None,
+        semester_id=semester_id,
+        course_id=course_id,
+        class_name=class_name,
+        max_bytes=settings.upload_max_bytes,
+        allow_duplicate=allow_duplicate,
+        queue=queue,
+    )
+    return UploadOut(
+        results=[
+            UploadItemOut(
+                filename=r.filename,
+                material=MaterialOut.model_validate(r.material) if r.material else None,
+                error=r.error,
+                duplicate_of=(
+                    MaterialOut.model_validate(r.duplicate_of) if r.duplicate_of else None
+                ),
+                job_id=r.job_id,
+            )
+            for r in results
+        ]
+    )

@@ -4,8 +4,15 @@
 全部在同一事务内提交；任何一步失败整体回滚，不产生半成品资料。
 """
 
-from datetime import datetime
+import hashlib
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from campusflow.application.ports.queue import JobQueue
+
+from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
@@ -16,11 +23,15 @@ from campusflow.application.ports.repositories import (
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.jobs import is_terminal
 from campusflow.domain.materials import (
+    deletion_confirmation_token,
+    invalidated_source_note,
     next_version_no,
     validate_pasted_text,
 )
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
+from campusflow.domain.upload import validate_upload
 
 
 def _require_semester_in_workspace(
@@ -206,6 +217,197 @@ def update_material_metadata(
     )
     repos.uow.commit()
     return updated
+
+
+@dataclass
+class UploadFileResult:
+    """单个文件的上传结果：成功带资料，失败带可读原因，完全重复带已有资料提示。"""
+
+    filename: str
+    material: MaterialData | None
+    error: str | None
+    duplicate_of: MaterialData | None = None
+    job_id: int | None = None  # 解析作业 ID（D006 重复命中时无作业）
+
+
+def import_uploaded_files(
+    repos: Repositories,
+    storage: FileStorage,
+    workspace_id: int,
+    *,
+    files: list[tuple[str, bytes]],
+    publisher: str | None,
+    published_at: datetime | None,
+    semester_id: int | None,
+    course_id: int | None,
+    class_name: str | None,
+    max_bytes: int,
+    allow_duplicate: bool = False,
+    queue: "JobQueue | None" = None,
+) -> list[UploadFileResult]:
+    """PDF/图片上传导入（D003、D006）。
+
+    逐文件校验（格式、真实类型、大小）后保存并建档；校验失败的文件不保存、
+    不产生记录；建档失败时删除已存文件，不留下孤立文件。
+    完全相同文件（同空间同指纹）默认不重复建档，返回已有资料供复用；
+    传 allow_duplicate=True 才允许重复建档。不同内容或不同空间不会被合并。
+    解析与片段生成由后续处理作业完成（本任务只管导入）。
+    """
+    _require_associations(repos, workspace_id, semester_id, course_id)
+    results: list[UploadFileResult] = []
+    for filename, content in files:
+        validation, error = validate_upload(filename, content, max_bytes)
+        if error:
+            results.append(UploadFileResult(filename=filename, material=None, error=error))
+            continue
+
+        checksum = hashlib.sha256(content).hexdigest()
+        if not allow_duplicate:
+            existing = repos.materials.find_material_by_checksum(workspace_id, checksum)
+            if existing is not None:
+                # 完全重复：提示已有资料供复用，不静默新建（D006 验收）
+                results.append(
+                    UploadFileResult(
+                        filename=filename, material=None, error=None, duplicate_of=existing
+                    )
+                )
+                continue
+
+        source_type = (
+            MaterialSourceType.PDF if validation.extension == "pdf" else MaterialSourceType.IMAGE
+        )
+        storage_key = storage.save(content, validation.extension)
+        try:
+            material = repos.materials.create(
+                workspace_id,
+                semester_id=semester_id,
+                course_id=course_id,
+                class_name=class_name,
+                title=filename,
+                publisher=publisher,
+                published_at=published_at,
+                source_type=source_type,
+                source_url=None,
+            )
+            repos.materials.create_version(
+                material.id,
+                next_version_no(repos.materials.list_version_numbers(material.id)),
+                "文件上传",
+                storage_key,
+                checksum,
+            )
+            version = repos.materials.list_versions(material.id)[-1]
+            job = repos.jobs.create(workspace_id, material.id, version.id, "parse")
+            repos.uow.commit()
+        except Exception:
+            repos.uow.rollback()
+            storage.delete(storage_key)
+            raise
+        results.append(
+            UploadFileResult(filename=filename, material=material, error=None, job_id=job.id)
+        )
+    # 提交与投递分离（J003）：待投递记录随建档事务一起落库后才尝试投递；
+    # 队列不可用时不抛异常，记录留待补偿扫描，HTTP 仍返回 job_id（J002 验收）
+    dispatch_pending_jobs(repos, queue, job_ids=[r.job_id for r in results if r.job_id is not None])
+    return results
+
+
+def set_material_archived(
+    repos: Repositories, workspace_id: int, material_id: int, *, archived: bool
+) -> MaterialData:
+    """归档/恢复资料（D007）。
+
+    归档保留原文与历史（版本、片段不动），默认列表与检索排除；
+    恢复后资料与引用回到有效范围。归档不删除任何正式任务或片段。
+    """
+    current = repos.materials.get(material_id)
+    if current is None:
+        raise NotFoundError("资料不存在")
+    require_in_workspace(current.workspace_id, workspace_id, "资料不存在")
+    updated = repos.materials.set_archived(material_id, archived)
+    repos.uow.commit()
+    return updated
+
+
+@dataclass
+class DeleteImpact:
+    """资料删除影响预览（D008/D009）：将失效的版本、片段、关联任务与未完成作业。"""
+
+    material: MaterialData
+    version_count: int
+    chunk_count: int
+    linked_task_ids: list[int]
+    unfinished_job_count: int
+    confirm_token: str
+
+
+def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
+    material = get_material(repos, workspace_id, material_id)
+    versions = repos.materials.list_versions(material_id)
+    chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
+    linked_tasks = repos.tasks.list_by_source_material(material_id)
+    # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
+    # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
+    unfinished_jobs = [
+        job for job in repos.jobs.list_by_material(material_id) if not is_terminal(job.status)
+    ]
+    token = deletion_confirmation_token(
+        material_id,
+        [v.id for v in versions],
+        chunk_count,
+        [t.id for t in linked_tasks],
+    )
+    return DeleteImpact(
+        material=material,
+        version_count=len(versions),
+        chunk_count=chunk_count,
+        linked_task_ids=[t.id for t in linked_tasks],
+        unfinished_job_count=len(unfinished_jobs),
+        confirm_token=token,
+    )
+
+
+def delete_material(
+    repos: Repositories,
+    storage: FileStorage,
+    workspace_id: int,
+    material_id: int,
+    *,
+    confirm_token: str,
+    keep_tasks: bool,
+) -> DeleteImpact:
+    """确认后删除资料（D008/D009）。
+
+    确认指纹必须匹配当前影响内容，变化后旧确认失效；
+    keep_tasks=True 时保留个人任务并标记"来源已失效"，False 时一并删除。
+
+    派生内容随资料一起消失：原文件由存储层清理，版本、片段、处理作业与
+    尝试历史由数据库外键级联（D001 的 CASCADE、J007 的作业级联）。
+    将来新增的派生表（例如 M3 的向量索引、R 系列的候选结果）必须同样
+    挂在 materials / material_versions 下并声明 CASCADE，才能被这里一起清掉。
+    """
+    impact = preview_delete_impact(repos, workspace_id, material_id)
+    if impact.confirm_token != confirm_token:
+        raise DomainError("影响内容已变化，请重新预览确认")
+
+    versions = repos.materials.list_versions(material_id)
+    if keep_tasks:
+        repos.tasks.unlink_source_material(
+            material_id,
+            invalidated_at=datetime.now(UTC),
+            note=invalidated_source_note(impact.material.title),
+        )
+    else:
+        for task in repos.tasks.list_by_source_material(material_id):
+            repos.tasks.delete(task.id)
+
+    repos.materials.delete(material_id)
+    repos.uow.commit()
+    # 数据库删除成功后清理原文件
+    for version in versions:
+        if version.storage_key:
+            storage.delete(version.storage_key)
+    return impact
 
 
 def list_material_versions(repos: Repositories, workspace_id: int, material_id: int) -> list:

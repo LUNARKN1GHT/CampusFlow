@@ -51,10 +51,15 @@ class ParsedFragment:
 
 @dataclass(frozen=True)
 class ParseFailure:
-    """部分失败：某一页/某个区域无法识别，附原因。错误必须有范围（D011 验收）。"""
+    """部分失败：某一页/某个区域无法识别，附原因。错误必须有范围（D011 验收）。
+
+    retryable 表示该范围的失败属于临时故障（J005）：重试这一阶段可能成功，
+    例如某页提取时上游连接中断；空白页、加密文件这类永久失败为 False。
+    """
 
     locator: ParserLocator
     reason: str
+    retryable: bool = False
 
 
 @dataclass(frozen=True)

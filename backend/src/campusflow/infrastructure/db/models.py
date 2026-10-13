@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.base import Base
 
 
@@ -33,6 +33,7 @@ class Workspace(Base):
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
     daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
+    weekly_capacity_minutes: Mapped[int] = mapped_column(Integer, default=1680)
     break_minutes: Mapped[int] = mapped_column(Integer, default=15)
     buffer_minutes: Mapped[int] = mapped_column(Integer, default=30)
     # 默认空间标记：数据库部分唯一索引保证并发初始化不会创建多个默认空间
@@ -69,6 +70,14 @@ class Task(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    # 来源资料（核对转任务时由 R 系列写入）；删除资料时可选择保留任务并置空
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
+    # 来源失效留痕（D009）：保留任务时，光把 source_material_id 置空会让它
+    # 与手工建的任务分不出来。这两列记住"曾经有来源、来源已被删除"。
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，
@@ -79,6 +88,11 @@ class Task(Base):
     priority: Mapped[str] = mapped_column(String(20), default=TaskPriority.MEDIUM)
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
     remaining_minutes: Mapped[int | None] = mapped_column(Integer)
+    # 个人安排目标：与课程正式 DDL 相互独立，修改互不影响
+    target_date: Mapped[date | None] = mapped_column(Date)
+    # 正式截止的来源类型与说明；修改截止本身不自动清空既有说明
+    due_source: Mapped[str] = mapped_column(String(20), default=DueSourceType.USER)
+    due_note: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -165,6 +179,8 @@ class MaterialVersion(Base):
     note: Mapped[str | None] = mapped_column(String(500))
     # 原文件在私有存储中的键（D002 生成）；粘贴文本同样落成 .txt 文件
     storage_key: Mapped[str | None] = mapped_column(String(300))
+    # 原文件指纹（SHA-256 十六进制），用于完全相同文件的重复导入检测（D006）
+    checksum: Mapped[str | None] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -197,4 +213,59 @@ class SourceChunk(Base):
     # 跨页表格分组键（D016）：同一表格各分部共享；非表格片段为 NULL
     table_group: Mapped[str | None] = mapped_column(String(64))
     text: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProcessingJob(Base):
+    """后台处理作业（J001）：阶段、覆盖范围、错误原因、尝试次数。"""
+
+    __tablename__ = "processing_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    # 作业随资料/版本删除（J007）：资料删除后作业已无有效目标，
+    # 保留悬挂的作业行既无意义，也会让"资料删除"这一步被外键卡住
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materials.id", ondelete="CASCADE"), index=True
+    )
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    stage: Mapped[str] = mapped_column(String(20))  # JobStage
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # JobStatus
+    # 覆盖范围说明（如"第 1-3 页完成，第 4 页失败"），不含原文全文
+    scope: Mapped[str | None] = mapped_column(String(500))
+    error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # Outbox（J003）：提交与投递分离的待投递记录。
+    # enqueued_at 为空表示尚未成功投递，可由补偿扫描重投；投递成功后才写入时间。
+    enqueued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    delivery_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    # 领取时间（J005）：用于识别长期停在 running 的超时作业
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # 最近一次失败是否可重试（J005）：区分临时故障与永久失败
+    retryable: Mapped[bool | None] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProcessingJobAttempt(Base):
+    """作业尝试历史（J005）：每次终态尝试各留一条，保留成功阶段与失败原因。"""
+
+    __tablename__ = "processing_job_attempts"
+    __table_args__ = (UniqueConstraint("job_id", "attempt_no", name="uq_job_attempts_no"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # 尝试历史随作业删除（J007）：作业都不在了，留痕也无从查询
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("processing_jobs.id", ondelete="CASCADE"), index=True
+    )
+    attempt_no: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(20))  # JobStage
+    status: Mapped[str] = mapped_column(String(20))  # JobStatus（终态）
+    scope: Mapped[str | None] = mapped_column(String(500))  # 覆盖范围，不含原文全文
+    error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
