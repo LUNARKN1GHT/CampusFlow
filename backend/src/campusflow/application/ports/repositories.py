@@ -3,11 +3,13 @@
 应用层只依赖本文件定义的接口；具体实现位于 infrastructure/repositories.py。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Protocol
 
-from campusflow.domain.states import EventRecurrence, TaskPriority, TaskProgress
+from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
 class UnitOfWork(Protocol):
@@ -24,6 +26,17 @@ class SemesterData:
     start_date: date
     end_date: date
     archived: bool
+
+
+@dataclass
+class WorkspaceData:
+    id: int
+    name: str
+    timezone: str
+    daily_capacity_minutes: int
+    break_minutes: int
+    buffer_minutes: int
+    weekly_capacity_minutes: int = 1680
 
 
 @dataclass
@@ -46,11 +59,29 @@ class TaskData:
     description: str | None
     due_date: date | None
     due_time: time | None
+    target_date: date | None
+    due_source: DueSourceType
+    due_note: str | None
     progress: TaskProgress
     priority: TaskPriority
     estimated_minutes: int | None
+    remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # 读取时按工作空间时区派生，不落库
+    overdue: bool = False
+
+
+@dataclass
+class TaskProgressChangeData:
+    id: int
+    task_id: int
+    from_progress: TaskProgress
+    to_progress: TaskProgress
+    reason: str | None
+    previous_remaining_minutes: int | None
+    new_remaining_minutes: int | None
+    changed_at: datetime
 
 
 @dataclass
@@ -87,6 +118,25 @@ class SemesterRepository(Protocol):
     def set_archived(self, semester_id: int, archived: bool) -> SemesterData | None: ...
 
 
+class WorkspaceRepository(Protocol):
+    def get(self, workspace_id: int) -> WorkspaceData | None: ...
+
+    def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
+        """返回默认空间，不存在时创建；并发调用也必须最多创建一个。"""
+        ...
+
+    def update_settings(
+        self,
+        workspace_id: int,
+        *,
+        timezone: str,
+        daily_capacity_minutes: int,
+        break_minutes: int,
+        buffer_minutes: int,
+        weekly_capacity_minutes: int,
+    ) -> WorkspaceData | None: ...
+
+
 class CourseRepository(Protocol):
     def list(self, workspace_id: int, semester_id: int | None = None) -> list[CourseData]: ...
 
@@ -121,6 +171,9 @@ class TaskRepository(Protocol):
         *,
         course_id: int | None = None,
         progress: TaskProgress | None = None,
+        semester_id: int | None = None,
+        due_from: date | None = None,
+        due_to: date | None = None,
     ) -> list[TaskData]: ...
 
     def get(self, task_id: int) -> TaskData | None: ...
@@ -133,8 +186,12 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData: ...
 
     def update(
@@ -146,15 +203,25 @@ class TaskRepository(Protocol):
         description: str | None,
         due_date: date | None,
         due_time: time | None,
+        target_date: date | None,
+        due_source: DueSourceType,
+        due_note: str | None,
         priority: TaskPriority,
         estimated_minutes: int | None,
+        remaining_minutes: int | None,
     ) -> TaskData | None: ...
 
-    def set_progress(self, task_id: int, progress: TaskProgress) -> TaskData | None: ...
+    def set_progress(
+        self, task_id: int, progress: TaskProgress, reason: str | None
+    ) -> TaskData | None: ...
+
+    def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
 
 class ScheduleRepository(Protocol):
-    def list_fixed_events(self, workspace_id: int) -> list[FixedEventData]: ...
+    def list_fixed_events(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[FixedEventData]: ...
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 
@@ -198,6 +265,7 @@ class ScheduleRepository(Protocol):
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
+    workspaces: WorkspaceRepository
     semesters: SemesterRepository
     courses: CourseRepository
     tasks: TaskRepository
