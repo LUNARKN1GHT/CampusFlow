@@ -8,17 +8,18 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 - **我应该先做什么？** 理清课程和任务的前置关系，形成可解释的执行顺序。
 - **接下来怎么安排？** 根据个人时间、任务依赖和截止日期制定计划，发现冲突并跟进变化。
 
-> **项目状态：基础持久化后端已合并，MVP 开发中。** 已建立 Vue 前端环境页、FastAPI 健康检查、PostgreSQL 迁移，以及学期、课程、手动任务、固定日程和可用时间 API。业务前端、身份与空间授权、资料导入、核对、问答和学习计划仍待实现；已合并代码的独立复验另列任务，不代表 MVP 已通过验收。
+> **项目状态：手动管理闭环已实现，资料后端正在整合，MVP 开发中。** 当前提供本机登录、工作空间授权及学期／课程／任务／日程管理；本分支汇总了资料上传、解析、定位、后台作业和删除处理。资料页面 D019—D021 仍待联调，集中核对、问答与学习计划尚待实现。代码存在或单项测试通过不代表整个 MVP 验收通过。
 
 ## 开发与架构入口
 
 - [技术选型、目录分层与架构图](docs/ARCHITECTURE.md)
 - [本地启动与验证命令](docs/DEVELOPMENT.md)
+- [资料处理、Docker Worker 与只读诊断](docs/MATERIAL_PROCESSING.md)
 - [贡献指南](CONTRIBUTING.md)
 - [Milestone、Issue 拆分与版本标签规则](docs/planning/ROADMAP.md)
 - [开发任务索引](docs/planning/ISSUES.md)
 
-工程采用前后端分离的模块化单体：Vue 3 + TypeScript + Vite，Python 3.12 + FastAPI。已接入 PostgreSQL、SQLAlchemy 和 Alembic，Compose 配置包含 pgvector 和 Redis；向量检索、RQ 与独立 Python Worker 尚待资料处理功能接入。
+工程采用前后端分离的模块化单体：Vue 3 + TypeScript + Vite，Python 3.12 + FastAPI。已接入 PostgreSQL、SQLAlchemy、Alembic，以及 RQ／Redis 独立资料 Worker；Windows 使用 Docker 运行 Worker。pgvector 扩展已配置，向量检索仍待实现。
 
 当前最小调用链：
 
@@ -27,6 +28,7 @@ flowchart LR
     Browser[浏览器 / Vue] --> Proxy[Vite /api 代理]
     Proxy --> API[Python FastAPI]
     API --> Health[GET /api/v1/health]
+    API --> Ready[GET /api/v1/ready]
     Client[API 客户端 / Swagger] --> Business[学期、课程、任务、日程 API]
     Business --> UseCases[应用用例与仓储]
     UseCases --> DB[(PostgreSQL)]

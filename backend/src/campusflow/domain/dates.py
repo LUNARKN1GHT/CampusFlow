@@ -4,7 +4,9 @@
 `2026-10-15` 自动补成 `00:00` 或 `23:59` 的确定时刻，只能按"当天内完成"处理。
 """
 
-from datetime import date, time
+from datetime import date, datetime, time
+
+from campusflow.domain.states import TaskProgress
 
 
 def validate_due(due_date: date | None, due_time: time | None) -> str | None:
@@ -12,3 +14,24 @@ def validate_due(due_date: date | None, due_time: time | None) -> str | None:
     if due_time is not None and due_date is None:
         return "设定截止时刻时必须同时提供截止日期"
     return None
+
+
+def is_overdue(
+    due_date: date | None,
+    due_time: time | None,
+    progress: TaskProgress,
+    now: datetime,
+) -> bool:
+    """按截止精度与执行进度派生逾期标记；now 为工作空间时区的当前时刻。
+
+    逾期是独立于进度的派生标记，不改写进行中或受阻状态；
+    已完成或已取消的任务不再逾期。只有日期的 DDL 在当天内不算逾期，
+    不为它伪造午夜或 23:59 的确定时刻。
+    """
+    if progress in (TaskProgress.DONE, TaskProgress.CANCELLED):
+        return False
+    if due_date is None:
+        return False
+    if due_time is None:
+        return now.date() > due_date
+    return now > datetime.combine(due_date, due_time, tzinfo=now.tzinfo)

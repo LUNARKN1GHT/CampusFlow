@@ -18,6 +18,8 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+playwright-report/
+test-results/
 
 # Runtime data and local tools
 data/
