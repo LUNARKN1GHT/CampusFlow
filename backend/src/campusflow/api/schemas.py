@@ -103,6 +103,11 @@ class TaskOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     course_id: int | None
+    # 来源状态（D009）：available 还有来源资料 / invalidated 来源已被删除 /
+    # none 本来就没有来源。前端据此显示"引用已不可用"，不再自己推断。
+    source_state: str
+    source_invalidated_at: datetime | None
+    source_invalidated_note: str | None
     title: str
     description: str | None
     due_date: date | None

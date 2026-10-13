@@ -45,3 +45,41 @@ class EventRecurrence(StrEnum):
 
     NONE = "none"
     WEEKLY = "weekly"
+
+
+class MaterialSourceType(StrEnum):
+    """资料来源类型（README §4.2）。Word/网页导入在 M6 扩展。"""
+
+    PDF = "pdf"
+    IMAGE = "image"
+    TEXT = "text"
+    WORD = "word"
+    WEB = "web"
+
+
+class MaterialStatus(StrEnum):
+    """资料处理状态：解析进度与核对状态相互独立。"""
+
+    PENDING = "pending"  # 待处理
+    PROCESSING = "processing"  # 处理中
+    DONE = "done"  # 完成
+    PARTIAL = "partial"  # 部分成功
+    FAILED = "failed"  # 失败
+
+
+class JobStage(StrEnum):
+    """后台处理作业的阶段。"""
+
+    PARSE = "parse"  # 解析原文
+    EXTRACT = "extract"  # 提取事项
+    EMBED = "embed"  # 向量化
+
+
+class JobStatus(StrEnum):
+    """后台处理作业的状态（J001）。完成与部分成功区分。"""
+
+    PENDING = "pending"  # 待处理
+    RUNNING = "running"  # 处理中
+    DONE = "done"  # 完成
+    PARTIAL = "partial"  # 部分成功
+    FAILED = "failed"  # 失败

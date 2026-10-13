@@ -35,6 +35,11 @@ TABLES = ", ".join(
         "task_progress_changes",
         "fixed_events",
         "availability_slots",
+        "materials",
+        "material_versions",
+        "processing_jobs",
+        "processing_job_attempts",
+        "source_chunks",
     )
 )
 
