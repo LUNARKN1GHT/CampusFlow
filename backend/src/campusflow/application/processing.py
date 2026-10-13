@@ -70,14 +70,22 @@ class ParserRegistry:
         text_parser: DocumentParser,
         pdf_parser: DocumentParser,
         vision_parser: DocumentParser,
+        word_parser: DocumentParser | None = None,
+        web_parser: DocumentParser | None = None,
     ) -> None:
         self._parsers = {
             MaterialSourceType.TEXT: text_parser,
             MaterialSourceType.PDF: pdf_parser,
             MaterialSourceType.IMAGE: vision_parser,
         }
+        if word_parser is not None:
+            self._parsers[MaterialSourceType.WORD] = word_parser
+        if web_parser is not None:
+            self._parsers[MaterialSourceType.WEB] = web_parser
 
     def for_type(self, source_type: MaterialSourceType) -> DocumentParser:
+        if source_type not in self._parsers:
+            raise PermanentError("当前 Worker 尚未配置该资料类型的解析器")
         return self._parsers[source_type]
 
 
@@ -148,7 +156,10 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
     try:
         content = storage.read(version.storage_key)
         parser = _PARSER_REGISTRY.for_type(material.source_type)
-        outcome = parser.parse(content, _mime_for(material.source_type, version.storage_key))
+        mime_type = _mime_for(material.source_type, version.storage_key)
+        if material.source_type == MaterialSourceType.WEB:
+            mime_type = version.source_metadata.get("content_type") or mime_type
+        outcome = parser.parse(content, mime_type)
         # 写入前重新核对目标（J007）：解析可能耗时较久，期间资料可能已被删除，
         # 或已经上传了更新的版本。两种情况都不写回任何片段与状态。
         blocked = blocked_write_reason(repos, job)
@@ -203,6 +214,10 @@ def _mime_for(source_type: MaterialSourceType, storage_key: str) -> str:
         return "application/pdf"
     if source_type == MaterialSourceType.TEXT:
         return "text/plain"
+    if source_type == MaterialSourceType.WORD:
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    if source_type == MaterialSourceType.WEB:
+        return "text/plain" if extension == "txt" else "text/html"
     return "image/jpeg" if extension in ("jpg", "jpeg") else "image/png"
 
 

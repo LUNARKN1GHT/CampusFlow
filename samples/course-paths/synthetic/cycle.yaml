@@ -1,0 +1,21 @@
+# 合成反例：强制先修成环
+# 场景：A 要求先修 B，B 要求先修 C，C 要求先修 A，依赖图成环。
+# 预期行为：拓扑排序必须阻塞，展示环路径 CS901 -> CS902 -> CS903 -> CS901，
+# 不得输出伪造的完整顺序。
+_meta:
+  origin: synthetic
+  generated_by: manual
+  needs_human_review: false
+  scenario: 依赖成环阻塞
+courses:
+  - {code: CS901, name: 合成课程甲, credits: 3.0}
+  - {code: CS902, name: 合成课程乙, credits: 3.0}
+  - {code: CS903, name: 合成课程丙, credits: 3.0}
+relations:
+  - {course: CS901, prereq: CS902, kind: 强制先修}
+  - {course: CS902, prereq: CS903, kind: 强制先修}
+  - {course: CS903, prereq: CS901, kind: 强制先修}
+expected:
+  sortable: false
+  cycle: [CS901, CS902, CS903, CS901]
+  behavior: 阻塞拓扑排序，展示环路径与涉及课程，提示来源相互矛盾需人工处理

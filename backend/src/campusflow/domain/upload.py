@@ -6,6 +6,8 @@
 
 from dataclasses import dataclass
 
+from campusflow.domain.word import DOCX_MIME, validate_docx
+
 # 允许的上传类型：扩展名 → (MIME 类型, 魔数前缀)
 _UPLOAD_RULES = {
     "pdf": ("application/pdf", b"%PDF"),
@@ -36,8 +38,13 @@ def validate_upload(
     if "." not in filename:
         return None, "文件名缺少扩展名"
     extension = filename.rsplit(".", 1)[-1].strip().lower()
+    if extension in {"doc", "docm", "dot", "dotx", "dotm"}:
+        return None, "暂不支持此 Word 格式，请另存为普通 .docx 后上传"
+    if extension == "docx":
+        error = validate_docx(content)
+        return (None, error) if error else (UploadValidation("docx", DOCX_MIME), None)
     if extension not in _UPLOAD_RULES:
-        allowed = "、".join(sorted(_UPLOAD_RULES))
+        allowed = "、".join(sorted([*_UPLOAD_RULES, "docx"]))
         return None, f"不支持的文件类型 .{extension}（允许：{allowed}）"
 
     mime_type, magic = _UPLOAD_RULES[extension]

@@ -193,6 +193,7 @@ def _material_version_to_data(row: MaterialVersion) -> MaterialVersionData:
         storage_key=row.storage_key,
         checksum=row.checksum,
         created_at=row.created_at,
+        source_metadata=dict(row.source_metadata),
     )
 
 
@@ -328,6 +329,8 @@ class SqlAlchemyMaterialRepository:
         note: str | None,
         storage_key: str | None,
         checksum: str | None = None,
+        *,
+        source_metadata: dict[str, str | None] | None = None,
     ) -> MaterialVersionData:
         row = MaterialVersion(
             material_id=material_id,
@@ -335,6 +338,7 @@ class SqlAlchemyMaterialRepository:
             note=note,
             storage_key=storage_key,
             checksum=checksum,
+            source_metadata=dict(source_metadata or {}),
         )
         self._session.add(row)
         self._session.flush()
