@@ -32,6 +32,14 @@ class TaskPriority(StrEnum):
     HIGH = "high"
 
 
+class DueSourceType(StrEnum):
+    """正式截止时间的来源类型；个人目标日期不需要来源。"""
+
+    USER = "user"  # 用户补充
+    DOCUMENT = "document"  # 原文规定
+    INFERRED = "inferred"  # 系统推断
+
+
 class EventRecurrence(StrEnum):
     """固定日程的重复规则，MVP 只支持不重复与每周重复。"""
 
