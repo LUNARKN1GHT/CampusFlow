@@ -1,0 +1,20 @@
+# 与现有 db/redis 独立启动，避免切换工作目录时重建已有数据库容器。
+# 从仓库根目录：docker compose -f infra/docker-compose.worker.yml up --build -d
+name: campusflow-worker
+services:
+  worker:
+    build:
+      context: ../backend
+    env_file:
+      - path: ../backend/.env
+        required: false
+    environment:
+      CAMPUSFLOW_DATABASE_URL: ${CAMPUSFLOW_WORKER_DATABASE_URL:-postgresql+psycopg://campusflow:campusflow@host.docker.internal:5432/campusflow}
+      CAMPUSFLOW_REDIS_URL: ${CAMPUSFLOW_WORKER_REDIS_URL:-redis://host.docker.internal:6379/0}
+      CAMPUSFLOW_STORAGE_DIR: /app/data/materials
+    volumes:
+      - ${CAMPUSFLOW_HOST_STORAGE_DIR:-../backend/data/materials}:/app/data/materials
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    init: true
+    restart: unless-stopped
