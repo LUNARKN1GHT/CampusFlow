@@ -12,6 +12,8 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 ## 开发与架构入口
 
+N004 已提供公开网页安全抓取的底层组件，包含地址、跳转、大小和超时检查；尚未接入网页导入页面与正文解析。范围和使用方法见 [N004 说明](docs/verification/N004-public-web-fetch.md)。
+
 - [技术选型、目录分层与架构图](docs/ARCHITECTURE.md)
 - [本地启动与验证命令](docs/DEVELOPMENT.md)
 - [贡献指南](CONTRIBUTING.md)
