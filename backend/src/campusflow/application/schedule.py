@@ -1,22 +1,25 @@
 """固定日程与可用时间用例。
 
 update_fixed_event 接收"合并后的最终值"（由 API 层把补丁与当前值合并后传入）。
+所有按 ID 的操作校验对象归属当前空间（W006）。
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import (
     AvailabilitySlotData,
     FixedEventData,
     Repositories,
 )
+from campusflow.application.scope import require_in_workspace
+from campusflow.application.settings import get_settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.schedule import validate_availability_slot, validate_fixed_event
 from campusflow.domain.states import EventRecurrence
-
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+from campusflow.domain.timezones import in_workspace_timezone
 
 
 @dataclass
@@ -29,53 +32,85 @@ class FixedEventOccurrence:
     location: str | None
 
 
-def list_fixed_events(repos: Repositories, workspace_id: int) -> list[FixedEventData]:
-    return repos.schedule.list_fixed_events(workspace_id)
+def list_fixed_events(
+    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
+) -> list[FixedEventData]:
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    return repos.schedule.list_fixed_events(workspace_id, semester_id=semester_id)
 
 
 def list_fixed_event_occurrences(
-    repos: Repositories, workspace_id: int, start_date: date, end_date: date
+    repos: Repositories,
+    workspace_id: int,
+    start_date: date,
+    end_date: date,
+    *,
+    semester_id: int | None = None,
 ) -> list[FixedEventOccurrence]:
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
-    range_start = datetime.combine(start_date, time.min, tzinfo=LOCAL_TZ)
-    range_end = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=LOCAL_TZ)
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    range_start = datetime.combine(start_date, time.min, tzinfo=timezone).astimezone(UTC)
+    range_end = datetime.combine(
+        end_date + timedelta(days=1), time.min, tzinfo=timezone
+    ).astimezone(UTC)
     occurrences: list[FixedEventOccurrence] = []
 
-    for event in repos.schedule.list_fixed_events(workspace_id):
-        first_start = event.starts_at.astimezone(LOCAL_TZ)
-        duration = event.ends_at - event.starts_at
+    for event in list_fixed_events(repos, workspace_id, semester_id=semester_id):
+        first_start = event.starts_at.astimezone(timezone)
+        duration = event.ends_at.astimezone(UTC) - event.starts_at.astimezone(UTC)
         starts = [first_start]
         if event.recurrence == EventRecurrence.WEEKLY and event.repeat_until is not None:
             starts = []
             current = first_start
-            while current.date() <= event.repeat_until and current < range_end:
-                if current + duration > range_start:
-                    starts.append(current)
+            while current.date() <= event.repeat_until and current.astimezone(UTC) < range_end:
+                # 只转换查询范围内的实例；未来 DST 缺失／重复时间明确报错，不静默挪动。
+                if current.astimezone(UTC) + duration > range_start:
+                    starts.append(
+                        first_start
+                        if current == first_start
+                        else in_workspace_timezone(current.replace(tzinfo=None), timezone)
+                    )
                 current += timedelta(days=7)
 
         for occurrence_start in starts:
-            occurrence_end = occurrence_start + duration
-            if occurrence_start < range_end and occurrence_end > range_start:
+            occurrence_end = occurrence_start.astimezone(UTC) + duration
+            if occurrence_start.astimezone(UTC) < range_end and occurrence_end > range_start:
                 occurrences.append(
                     FixedEventOccurrence(
                         source_event_id=event.id,
                         course_id=event.course_id,
                         title=event.title,
                         starts_at=occurrence_start,
-                        ends_at=occurrence_end,
+                        ends_at=occurrence_end.astimezone(timezone),
                         location=event.location,
                     )
                 )
 
-    return sorted(occurrences, key=lambda occurrence: occurrence.starts_at)
+    return sorted(occurrences, key=lambda occurrence: occurrence.starts_at.astimezone(UTC))
 
 
-def get_fixed_event(repos: Repositories, event_id: int) -> FixedEventData:
+def get_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> FixedEventData:
+    event = _require_event_in_workspace(repos, workspace_id, event_id)
+    return event
+
+
+def _require_event_in_workspace(
+    repos: Repositories, workspace_id: int, event_id: int
+) -> FixedEventData:
     event = repos.schedule.get_fixed_event(event_id)
     if event is None:
         raise NotFoundError("日程不存在")
+    require_in_workspace(event.workspace_id, workspace_id, "日程不存在")
     return event
+
+
+def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
+    course = repos.courses.get(course_id)
+    if course is None:
+        raise NotFoundError("课程不存在")
+    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
 
 
 def create_fixed_event(
@@ -90,11 +125,14 @@ def create_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    starts_at = in_workspace_timezone(starts_at, timezone)
+    ends_at = in_workspace_timezone(ends_at, timezone)
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
-    if course_id is not None and repos.courses.get(course_id) is None:
-        raise NotFoundError("课程不存在")
+    if course_id is not None:
+        _require_course_in_workspace(repos, workspace_id, course_id)
     event = repos.schedule.create_fixed_event(
         workspace_id, course_id, title, starts_at, ends_at, location, recurrence, repeat_until
     )
@@ -104,6 +142,7 @@ def create_fixed_event(
 
 def update_fixed_event(
     repos: Repositories,
+    workspace_id: int,
     event_id: int,
     *,
     course_id: int | None,
@@ -114,13 +153,15 @@ def update_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
-    if repos.schedule.get_fixed_event(event_id) is None:
-        raise NotFoundError("日程不存在")
+    _require_event_in_workspace(repos, workspace_id, event_id)
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    starts_at = in_workspace_timezone(starts_at, timezone)
+    ends_at = in_workspace_timezone(ends_at, timezone)
     error = validate_fixed_event(starts_at, ends_at, recurrence, repeat_until)
     if error:
         raise DomainError(error)
-    if course_id is not None and repos.courses.get(course_id) is None:
-        raise NotFoundError("课程不存在")
+    if course_id is not None:
+        _require_course_in_workspace(repos, workspace_id, course_id)
     updated = repos.schedule.update_fixed_event(
         event_id,
         course_id=course_id,
@@ -135,9 +176,9 @@ def update_fixed_event(
     return updated
 
 
-def delete_fixed_event(repos: Repositories, event_id: int) -> None:
-    if not repos.schedule.delete_fixed_event(event_id):
-        raise NotFoundError("日程不存在")
+def delete_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> None:
+    _require_event_in_workspace(repos, workspace_id, event_id)
+    repos.schedule.delete_fixed_event(event_id)
     repos.uow.commit()
 
 
@@ -166,7 +207,11 @@ def create_availability_slot(
     return slot
 
 
-def delete_availability_slot(repos: Repositories, slot_id: int) -> None:
-    if not repos.schedule.delete_availability_slot(slot_id):
+def delete_availability_slot(repos: Repositories, workspace_id: int, slot_id: int) -> None:
+    slot = next(
+        (s for s in repos.schedule.list_availability_slots(workspace_id) if s.id == slot_id), None
+    )
+    if slot is None:
         raise NotFoundError("可用时间段不存在")
+    repos.schedule.delete_availability_slot(slot_id)
     repos.uow.commit()
