@@ -3,7 +3,7 @@
 关联任务：#343。父组：E20 #8、E21 #9、E22 #10。验证日期：2026-10-13。
 
 本记录覆盖 M2 的 PDF、图片、粘贴文本私有导入、来源定位、可恢复作业与删除生命周期。
-本分支已通过本机集成验证；父组 PR、非作者评审与里程碑确认是后续合并门槛。
+本分支已通过本机及 Linux + PostgreSQL 17 集成验证；父组 PR、非作者评审与里程碑确认是后续合并门槛。
 不以本记录自动关闭父 Issue，不把 M6 的 Word/网页成果带入 M2。
 
 ## 整合基线与发现的缺陷
@@ -74,12 +74,13 @@ RQ `SafeWorker` 并消费真实 Redis 队列；数据库写入、API、文件读
 视觉识别使用确定性替身，明确覆盖 done/partial/failed，不调用外部模型。辅助程序只接受
 显式 `_test` 数据库及非零 Redis 库号；新任务关联仅对 `M2 text …` 合成资料开放。
 
-CI 浏览器任务已加入 Redis 7 并启用同一流程，在 Linux + PostgreSQL 17 上复验。
+CI 浏览器任务已加入 Redis 7 并启用同一流程；[PR #344 的 Linux 复验](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/38367874381)
+实际执行 4 项浏览器流程全部通过，日志已确认未跳过 M2。PostgreSQL/Ruff 与前端构建亦通过。
 检查名称保留 `Manual management browser flow`，避免破坏已有分支保护引用。
 
 ## 边界与后续合并
 
-- 本次真实队列本机运行在 POSIX macOS；Linux Worker 由最新 CI 复核。
+- 本次真实队列本机运行在 POSIX macOS；Linux RQ Worker 已在上述 PostgreSQL 17 CI 中复验通过。
 - 视觉替身只证明处理链路与失败呈现，不证明真实 OCR 准确率。已有真实模型的授权合成样本
   评测见 [D013](../evaluation/d013-vision-adapter.md)，其模型局限继续保留，不扩大到任意学校资料。
 - PDF 文字页定位到页；视觉解析提供有效区域时保留坐标，不伪造文字页内坐标。
