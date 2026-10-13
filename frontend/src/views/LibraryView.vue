@@ -14,6 +14,7 @@ import type {
   Semester,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import MaterialSource from '../components/MaterialSource.vue'
 
 const POLL_INTERVAL_MS = 3000
 // 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
@@ -46,6 +47,7 @@ const filters = reactive({ semesterId: '', courseId: '', sourceType: '', status:
 const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
 const retryingId = ref<number | null>(null)
+const sourceMaterial = ref<Material | null>(null)
 
 const pollPaused = ref(false)
 let pollTimer: number | null = null
@@ -405,11 +407,19 @@ onBeforeUnmount(stopPolling)
                 @click="retry(material)"
               >{{ retryingId === material.id ? '正在重试…' : '重试处理' }}</button>
               <span v-else-if="material.status === 'failed'" class="muted small">不可重试</span>
+              <button type="button" class="text-button" @click="sourceMaterial = material">查看原文</button>
             </div>
           </article>
         </div>
         <div v-else class="compact-empty">{{ materials.length ? '没有符合当前筛选的资料。' : '还没有资料，先导入一份课程通知或大纲。' }}</div>
       </section>
+
+      <MaterialSource
+        v-if="sourceMaterial"
+        :material="sourceMaterial"
+        :scope="scopeText(sourceMaterial)"
+        @close="sourceMaterial = null"
+      />
     </template>
   </main>
 </template>
