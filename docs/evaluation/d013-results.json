@@ -1,0 +1,157 @@
+{
+  "model": "glm-4v-flash",
+  "note": "模型输出仅用于评测记录，不作为事实（AGENTS 规则）",
+  "samples": [
+    {
+      "sample_id": "CF-IMG-001",
+      "expected_state": "completed",
+      "extracted": {
+        "title": "算法设计课程通知(合成)",
+        "task": "阅读第 5 章并提交动态规划练习。",
+        "deadline": "2026年10月12日21:00(北京时间)",
+        "section": "ALG2026-A",
+        "declared_page_count": "共1页",
+        "unreadable_parts": "合成样本:无真实人员或学校信息"
+      },
+      "fact_checks": {
+        "task": true,
+        "deadline": false,
+        "section": true
+      },
+      "facts_hit": 2,
+      "facts_total": 3,
+      "token_usage": {
+        "completion_tokens": 95,
+        "prompt_tokens": 2632,
+        "total_tokens": 2727
+      }
+    },
+    {
+      "sample_id": "CF-IMG-002",
+      "expected_state": "partially_completed",
+      "extracted": {
+        "title": "数据库系统实验通知(合成)",
+        "task": "实验二:事务隔离级别",
+        "deadline": "2026年10月16日18:00",
+        "section": "DB2026-A",
+        "declared_page_count": "共2页",
+        "unreadable_parts": "红框区域为故意失焦的未覆盖范围"
+      },
+      "fact_checks": {
+        "task": false,
+        "deadline": false,
+        "section": true
+      },
+      "facts_hit": 1,
+      "facts_total": 3,
+      "token_usage": {
+        "completion_tokens": 88,
+        "prompt_tokens": 2632,
+        "total_tokens": 2720
+      }
+    },
+    {
+      "sample_id": "CF-IMG-003",
+      "expected_state": "partially_completed",
+      "extracted": {
+        "title": "课程实验手册",
+        "task": "(合成节选)",
+        "deadline": null,
+        "section": "NET2026-A",
+        "declared_page_count": 3,
+        "unreadable_parts": {
+          "missing_pages": [
+            {
+              "page_number": 1,
+              "content": "实验目标与提交要求"
+            },
+            {
+              "page_number": 3,
+              "content": "截止时间与评分规则"
+            }
+          ],
+          "warning": "不得据此推断截止时间或完整提交要求"
+        }
+      },
+      "fact_checks": {
+        "section": true,
+        "provided_page": true,
+        "declared_page_count": true
+      },
+      "facts_hit": 3,
+      "facts_total": 3,
+      "token_usage": {
+        "completion_tokens": 129,
+        "prompt_tokens": 2632,
+        "total_tokens": 2761
+      }
+    },
+    {
+      "sample_id": "CF-IMG-004",
+      "expected_state": "partially_completed",
+      "extracted": {
+        "title": "算法设计课程群（合成截图）",
+        "task": "本周练习",
+        "deadline": "周五晚上",
+        "section": "ALG2026-A 班",
+        "declared_page_count": null,
+        "unreadable_parts": "截图中部分内容被遮挡"
+      },
+      "fact_checks": {
+        "section": true,
+        "deadline_status": false
+      },
+      "facts_hit": 1,
+      "facts_total": 2,
+      "token_usage": {
+        "completion_tokens": 74,
+        "prompt_tokens": 1557,
+        "total_tokens": 1631
+      }
+    },
+    {
+      "sample_id": "CF-IMG-005",
+      "expected_state": "completed",
+      "extracted": {
+        "title": "数据结构作业安排",
+        "task": [
+          {
+            "name": "链表与栈练习",
+            "type": "作业一"
+          },
+          {
+            "name": "二叉树遍历实验",
+            "type": "作业二"
+          }
+        ],
+        "deadline": [
+          {
+            "time": "2026年10月20日18:00",
+            "type": "作业一"
+          },
+          {
+            "time": "2026年10月27日18:00",
+            "type": "作业二"
+          }
+        ],
+        "section": "DS2026-A",
+        "declared_page_count": "共1页",
+        "unreadable_parts": "合成样本：无真实人员或学校信息"
+      },
+      "fact_checks": {
+        "section": true,
+        "row1_task": true,
+        "row1_deadline": false,
+        "row2_task": true,
+        "row2_deadline": false
+      },
+      "facts_hit": 3,
+      "facts_total": 5,
+      "token_usage": {
+        "completion_tokens": 173,
+        "prompt_tokens": 1428,
+        "total_tokens": 1601
+      }
+    }
+  ]
+}

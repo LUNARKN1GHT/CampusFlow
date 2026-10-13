@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import type { Course, Semester, Task, TaskInput, TaskPriority, TaskProgress, TaskProgressChange } from '../api/types'
+import type { Course, DueSourceType, Semester, Task, TaskInput, TaskPriority, TaskProgress, TaskProgressChange } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 
@@ -24,6 +24,7 @@ const progressForm = reactive({ progress: 'in_progress' as TaskProgress, reason:
 const filters = reactive({ semesterId: '', courseId: '', progress: '' })
 const form = reactive({
   title: '', description: '', course_id: '', due_date: '', due_time: '',
+  target_date: '', due_source: 'user' as DueSourceType, due_note: '',
   priority: 'medium' as TaskPriority, estimated_minutes: '', remaining_minutes: '',
 })
 
@@ -45,6 +46,7 @@ const progressLabels: Record<TaskProgress, string> = {
   not_started: '未开始', in_progress: '进行中', blocked: '受阻', done: '已完成', cancelled: '已取消',
 }
 const priorityLabels: Record<TaskPriority, string> = { low: '低', medium: '中', high: '高' }
+const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
 async function load() {
   loading.value = true
@@ -67,6 +69,7 @@ function openEditor(task?: Task) {
   Object.assign(form, {
     title: task?.title ?? '', description: task?.description ?? '', course_id: task?.course_id?.toString() ?? '',
     due_date: task?.due_date ?? '', due_time: task?.due_time?.slice(0, 5) ?? '', priority: task?.priority ?? 'medium',
+    target_date: task?.target_date ?? '', due_source: task?.due_source ?? 'user', due_note: task?.due_note ?? '',
     estimated_minutes: task?.estimated_minutes?.toString() ?? '', remaining_minutes: task?.remaining_minutes?.toString() ?? '',
   })
 }
@@ -77,7 +80,10 @@ function payload(): TaskInput {
     description: form.description || null,
     course_id: form.course_id ? Number(form.course_id) : null,
     due_date: form.due_date || null,
-    due_time: form.due_time || null,
+    due_time: form.due_date ? form.due_time || null : null,
+    target_date: form.target_date || null,
+    due_source: form.due_source,
+    due_note: form.due_note || null,
     priority: form.priority,
     estimated_minutes: form.estimated_minutes ? Number(form.estimated_minutes) : null,
     remaining_minutes: form.remaining_minutes ? Number(form.remaining_minutes) : null,
@@ -151,7 +157,7 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading page-heading-row">
-      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p></div>
+      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p><p class="form-help">全部学期包含归档记录，归档不会隐藏待办。可按学期查看当前或历史任务；未关联课程的任务仅在全部学期中显示。</p></div>
       <button type="button" @click="openEditor()">添加任务</button>
     </div>
 
@@ -170,8 +176,11 @@ onMounted(load)
           <article v-for="task in visibleTasks" :key="task.id" class="task-row">
             <div class="priority-marker" :data-priority="task.priority"></div>
             <div class="task-main">
-              <div class="task-title-line"><h3>{{ task.title }}</h3><span class="status-pill">{{ progressLabels[task.progress] }}</span></div>
+              <div class="task-title-line"><h3>{{ task.title }}</h3><span class="status-pill">{{ progressLabels[task.progress] }}</span><span v-if="task.overdue" class="status-pill overdue-pill">已逾期</span></div>
               <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ dueText(task) }}</p>
+              <p v-if="task.target_date">个人目标：{{ task.target_date }}（不改变正式 DDL）</p>
+              <p>截止来源：{{ dueSourceLabels[task.due_source] }}{{ task.due_note ? ` · ${task.due_note}` : '' }}</p>
+              <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>
             </div>
             <div class="task-meta"><span>优先级 {{ priorityLabels[task.priority] }}</span><strong>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong></div>
             <div class="task-actions"><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
@@ -186,6 +195,9 @@ onMounted(load)
           <div class="form-grid"><label>任务标题<input v-model.trim="form.title" required maxlength="300" /></label><label>关联课程<select v-model="form.course_id"><option value="">不关联课程</option><option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label></div>
           <label>说明<textarea v-model.trim="form.description" rows="3"></textarea></label>
           <div class="form-grid form-grid-3"><label>正式 DDL 日期<input v-model="form.due_date" type="date" /></label><label>DDL 时刻（可留空）<input v-model="form.due_time" type="time" :disabled="!form.due_date" /></label><label>优先级<select v-model="form.priority"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label></div>
+          <div class="form-grid"><label>个人目标日期<input v-model="form.target_date" type="date" /></label><label>截止来源<select v-model="form.due_source" aria-label="截止来源"><option v-for="(label, value) in dueSourceLabels" :key="value" :value="value">{{ label }}</option></select></label></div>
+          <label>截止来源说明<input v-model.trim="form.due_note" maxlength="500" placeholder="例如：用户补充，或课程大纲第 3 页；尚未核对时请注明" /></label>
+          <p class="form-help">个人目标是自己的安排，调整目标不会修改正式 DDL。来源类型与说明由你录入，不代表系统已核验原文。</p>
           <div class="form-grid"><label>原始预计分钟<input v-model="form.estimated_minutes" type="number" min="1" /></label><label>当前剩余分钟<input v-model="form.remaining_minutes" type="number" min="0" /></label></div>
           <p class="form-help">只填写日期时会按原精度显示，不会补成 00:00 或 23:59。</p>
           <p v-if="formError" class="form-error" role="alert">{{ formError }}</p>
