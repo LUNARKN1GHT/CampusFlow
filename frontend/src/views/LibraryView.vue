@@ -232,8 +232,8 @@ async function onArchiveChanged() {
 async function onMaterialDeleted(id: number) {
   delete jobByMaterial[id]
   persistJobMap()
-  lifecycleMaterial.value = null
   if (sourceMaterial.value?.id === id) sourceMaterial.value = null
+  // 保持生命周期面板打开，让用户看到“删除完成”的结果；列表在后台同步移除该资料。
   await refresh()
 }
 

@@ -104,7 +104,9 @@ function staleDelete() {
         <h3 class="subheading">删除影响预览</h3>
         <p class="form-help">删除会覆盖原文件、解析结果与派生内容。确认只执行下列展示范围；内容变化后需重新预览。</p>
         <p v-if="previewError" class="form-error" role="alert">{{ previewError }}</p>
-        <button v-if="!impact" type="button" class="danger-button" :disabled="previewing" @click="previewDelete">
+        <p v-if="deletingError" class="form-error" role="alert">删除未完成：{{ deletingError }}。资料仍可访问，可重新预览后再删除。</p>
+        <p v-if="deleteResult" class="success-message" role="status">{{ deleteResult }}</p>
+        <button v-if="!impact && !deleteResult" type="button" class="danger-button" :disabled="previewing" @click="previewDelete">
           {{ previewing ? '正在预览…' : '预览删除影响' }}
         </button>
 
@@ -124,9 +126,6 @@ function staleDelete() {
             </select>
           </label>
           <p class="form-help">{{ impact.backup_note }}</p>
-
-          <p v-if="deletingError" class="form-error" role="alert">删除未完成：{{ deletingError }}资料仍可访问，可重新预览后再删除。</p>
-          <p v-if="deleteResult" class="success-message" role="status">{{ deleteResult }}</p>
 
           <div v-if="!deleteResult" class="lifecycle-actions">
             <button type="button" class="text-button" @click="staleDelete">取消</button>
