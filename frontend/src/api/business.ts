@@ -37,7 +37,7 @@ export const coursesApi = {
 }
 
 export const tasksApi = {
-  list: (filters: { courseId?: number; progress?: TaskProgress } = {}) => apiRequest<Task[]>(`/tasks${queryString({ course_id: filters.courseId, progress: filters.progress })}`),
+  list: (filters: { semesterId?: number; courseId?: number; progress?: TaskProgress } = {}) => apiRequest<Task[]>(`/tasks${queryString({ semester_id: filters.semesterId, course_id: filters.courseId, progress: filters.progress })}`),
   get: (id: number) => apiRequest<Task>(`/tasks/${id}`),
   create: (input: TaskInput) => apiRequest<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: number, input: Partial<TaskInput>) => apiRequest<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
@@ -46,8 +46,8 @@ export const tasksApi = {
 }
 
 export const scheduleApi = {
-  listEvents: () => apiRequest<FixedEvent[]>('/fixed-events'),
-  listOccurrences: (startDate: string, endDate: string) => apiRequest<FixedEventOccurrence[]>(`/fixed-events/occurrences${queryString({ start_date: startDate, end_date: endDate })}`),
+  listEvents: (semesterId?: number) => apiRequest<FixedEvent[]>(`/fixed-events${queryString({ semester_id: semesterId })}`),
+  listOccurrences: (startDate: string, endDate: string, semesterId?: number) => apiRequest<FixedEventOccurrence[]>(`/fixed-events/occurrences${queryString({ start_date: startDate, end_date: endDate, semester_id: semesterId })}`),
   createEvent: (input: FixedEventInput) => apiRequest<FixedEvent>('/fixed-events', { method: 'POST', body: JSON.stringify(input) }),
   updateEvent: (id: number, input: Partial<FixedEventInput>) => apiRequest<FixedEvent>(`/fixed-events/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteEvent: (id: number) => apiRequest<void>(`/fixed-events/${id}`, { method: 'DELETE' }),

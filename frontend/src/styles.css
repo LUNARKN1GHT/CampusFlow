@@ -117,6 +117,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .task-title-line h3 { margin: 0; font-size: 16px; }
 .task-main p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
 .status-pill { padding: 2px 7px; border-radius: 999px; color: var(--brand); background: var(--brand-soft); font-size: 10px; font-weight: 800; }
+.overdue-pill { color: #a83225; background: #fff0ec; }
 .task-meta { min-width: 108px; display: grid; text-align: right; }
 .task-meta span { color: var(--muted); font-size: 11px; }
 .task-meta strong { font-size: 16px; }
@@ -154,6 +155,28 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .availability-grid article span { display: grid; }
 .availability-grid small { color: var(--muted); }
 
+.small { font-size: 12px; }
+.segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: #f4f6f1; }
+.segmented-item { padding: 7px 14px; border-radius: 999px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 700; }
+.segmented-item.is-active { color: #fff; background: var(--brand); }
+.upload-results { display: grid; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.upload-results li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fafbf8; }
+.material-list { display: grid; }
+.material-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.material-row:first-child { padding-top: 0; }
+.material-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.material-main p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.material-actions { display: flex; align-items: center; gap: 6px; }
+.coverage-box { margin-top: 12px; padding: 12px 14px; border: 1px solid #e6cfa4; border-left: 4px solid var(--accent); border-radius: 10px; background: #fffaf0; }
+.coverage-box p { margin: 4px 0 0; color: #6f5730; font-size: 13px; }
+.coverage-box.failed { border-color: #e7b9aa; border-left-color: var(--danger); background: #fff4ef; }
+.coverage-box.failed p { color: #814835; }
+.status-pill[data-status="pending"], .status-pill[data-status="processing"] { color: #2f5b78; background: #e7f0f6; }
+.status-pill[data-status="partial"] { color: #8a5a12; background: #fdf1dc; }
+.status-pill[data-status="failed"], .failed-pill { color: #a83225; background: #fff0ec; }
+.archived-pill { color: #5c5a52; background: #ecebe4; }
+.duplicate-pill { color: #7a5a1e; background: #fbf0d9; }
+
 @media (max-width: 760px) {
   .app-frame { display: block; }
   .sidebar { position: static; width: 100%; height: auto; padding: 18px; }
@@ -174,4 +197,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .task-meta, .task-actions { grid-column: 2; text-align: left; }
   .progress-layout { grid-template-columns: 1fr; }
   .schedule-actions { flex-wrap: wrap; }
+  .material-row { grid-template-columns: 1fr; }
+  .material-actions { justify-content: flex-start; }
+  .upload-results li { flex-wrap: wrap; }
 }
