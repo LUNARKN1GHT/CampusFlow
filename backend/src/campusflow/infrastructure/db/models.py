@@ -330,3 +330,30 @@ class CandidateFieldEvidence(Base):
         ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
     )
     quote: Mapped[str] = mapped_column(String(6000))
+
+
+class CandidateFieldRevision(Base):
+    """R002：字段修正按追加保存，不改写原始提取与证据。"""
+
+    __tablename__ = "candidate_field_revisions"
+    __table_args__ = (
+        CheckConstraint(
+            "previous_origin IN ('document', 'user', 'inferred', 'suggestion')",
+            name="ck_revision_previous_origin",
+        ),
+        CheckConstraint(
+            "new_origin IN ('document', 'user', 'inferred', 'suggestion')",
+            name="ck_revision_new_origin",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_fields.id", ondelete="CASCADE"), index=True
+    )
+    previous_value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    new_value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    previous_origin: Mapped[str] = mapped_column(String(20))
+    new_origin: Mapped[str] = mapped_column(String(20))
+    operator: Mapped[str] = mapped_column(String(100))
+    note: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
