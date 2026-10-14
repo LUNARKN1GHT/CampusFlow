@@ -188,6 +188,8 @@ R002 在 domain/candidates.py 增加 FieldRevision 与 effective_fields：字段
 
 R003 在 domain/candidates.py 定义合法转换、按类型的必需字段与 require_confirmed_for_conversion：确认前检查叠加修正后的生效取值，缺少必需字段默认拒绝、可显式确认并记录原因；被忽略或已失效的候选不参与正式约束。application/candidates.py 的 set_candidate_review_status 更新状态并写入 candidate_review_changes 留痕（方向、操作者、原因、时间），与 task_progress_changes 对齐。见 [R003 说明](verification/R003-review-transitions.md)。
 
+R004 在 domain/candidate_conversion.py 定义任务候选到正式任务的字段映射与截止解析：只有日期的写法不补时刻，相对或无效写法只保留原文到 due_note，日期来源按字段出处映射。application/conversion.py 的 convert_candidate_to_task 要求候选已确认，在一个事务里创建任务并写入 source_material_id 与唯一的 source_candidate_id，重复调用返回既有任务。见 [R004 说明](verification/R004-task-conversion.md)。
+
 目标数据分组如下，具体字段和迁移在功能实现时确定：
 
 | 分组 | 对象 | 约束重点 |
