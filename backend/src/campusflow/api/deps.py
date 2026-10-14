@@ -13,16 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from campusflow.application import workspaces as workspace_use_cases
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
-from campusflow.infrastructure.repositories import (
-    SqlAlchemyCourseRepository,
-    SqlAlchemyJobRepository,
-    SqlAlchemyMaterialRepository,
-    SqlAlchemyScheduleRepository,
-    SqlAlchemySemesterRepository,
-    SqlAlchemyTaskRepository,
-    SqlAlchemyUnitOfWork,
-    SqlAlchemyWorkspaceRepository,
-)
+from campusflow.infrastructure.repositories import build_repositories
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -32,16 +23,7 @@ def get_session(request: Request) -> Iterator[Session]:
 
 
 def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repositories:
-    return Repositories(
-        workspaces=SqlAlchemyWorkspaceRepository(session),
-        semesters=SqlAlchemySemesterRepository(session),
-        courses=SqlAlchemyCourseRepository(session),
-        tasks=SqlAlchemyTaskRepository(session),
-        schedule=SqlAlchemyScheduleRepository(session),
-        materials=SqlAlchemyMaterialRepository(session),
-        jobs=SqlAlchemyJobRepository(session),
-        uow=SqlAlchemyUnitOfWork(session),
-    )
+    return build_repositories(session)
 
 
 def get_current_workspace(

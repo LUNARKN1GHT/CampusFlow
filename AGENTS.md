@@ -144,6 +144,12 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- X004 已提供固定活动候选提取入口，保留起止、地点、参加条件及证据。用户选择 AI 提取后由代码保守检查：提交/完成截止不能充当活动，混合描述拒绝并提示核对；缺开始或结束不猜测，显式保存仍 pending。尚未接 API/队列及正式日程创建。见 docs/verification/X004-event-extraction.md。
+
+- X001 按用户选择将候选、字段和证据分表保存，四种出处为 document/user/inferred/suggestion；新候选固定 pending，不混用任务执行进度。保存入口校验空间、版本与原文摘录，删除影响预览纳入候选集合。X002 已提供统一文字生成接口、智谱适配器和严格候选校验；用户选定 glm-4-flash-250414，与视觉模型分开配置。先授权再调用，非法字段、引用及截断输出拒绝接受；尚未接入自动提取流程，X003–X008 和真实样本评测仍待完成。见 docs/verification/X001-candidate-evidence.md、docs/verification/X002-generation-contract.md 与 docs/planning/X-IMPLEMENTATION.md。
+
+- X003 已实现任务原文字段提取、缺失字段提示、耗时建议与日期完整性检查。用户选择代码识别常见日期，复杂写法待核对；缺年份/时刻不补当前年或午夜，相对日期只保留提示不换算。入口只返回草稿，调用方显式保存后仍待核对；未接自动流程，真实效果留 X010 评测。契约与证据见 docs/verification/X003-progress.md。
+
 - N003 已将 python-docx 接入 Worker，正文段落与表格单元定位绑定原文版本，不伪造页码；图片、修订与正文外内容明确报告未覆盖。见 docs/verification/N003-word-parsing.md。
 - N004 提供标准库公开网页抓取组件，只有显式调用才联网；逐跳校验公网地址并固定连接地址，限制正文大小与总等待时间。N005 已通过受登录/空间保护的资料导入入口保存不可变原文快照和来源信息，抓取时间不得冒充发布时间。HTML 原文只作为受保护附件下载。N006 使用 Beautiful Soup 提取正文与表格，网页位置按清洗前的原始元素编号并绑定版本；不执行脚本、登录或加载嵌入资源。正文外的已知导航/广告被过滤，未识别媒体或空正文明确报告。见 docs/verification/N005-web-snapshot.md 与 docs/verification/N006-web-parsing.md。
 

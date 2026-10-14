@@ -90,6 +90,7 @@ def deletion_confirmation_token(
     version_ids: list[int],
     chunk_count: int,
     linked_task_ids: list[int],
+    candidate_ids: list[int] | None = None,
 ) -> str:
     """删除确认指纹：影响内容的稳定哈希（D008）。
 
@@ -105,6 +106,7 @@ def deletion_confirmation_token(
             "version_ids": sorted(version_ids),
             "chunk_count": chunk_count,
             "linked_task_ids": sorted(linked_task_ids),
+            "candidate_ids": sorted(candidate_ids or []),
         },
         sort_keys=True,
     )

@@ -31,8 +31,12 @@ class Settings(BaseSettings):
     dispatch_on_startup: bool = True
     # 作业超时（秒，J005）：领取后超过这个时长仍是"处理中"就回收为可重试失败
     job_timeout_seconds: int = 900
-    # 智谱视觉模型密钥（环境变量 ZHIPU_API_KEY；未配置时不得调用真实模型）
+    # 智谱文字/视觉模型共用密钥（ZHIPU_API_KEY；未配置时不得调用真实模型）
     zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
+    # X002：用户选择的文字模型，与视觉模型独立配置。
+    text_model: str = "glm-4-flash-250414"
+    text_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
+    text_max_tokens: int = Field(default=4096, ge=1, le=8192)
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

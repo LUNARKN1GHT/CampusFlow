@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Protocol
 
+from campusflow.application.ports.candidates import CandidateRepository
 from campusflow.domain.states import (
     DueSourceType,
     EventRecurrence,
@@ -567,4 +568,5 @@ class Repositories:
     schedule: ScheduleRepository
     materials: MaterialRepository
     jobs: JobRepository
+    candidates: CandidateRepository
     uow: UnitOfWork
