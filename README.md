@@ -20,6 +20,8 @@ X003 已提供任务标题、提交方式、产出物及截止原文的候选提
 
 X004 已提供固定活动候选提取：起止、地点、参加条件保留原文，缺失时间进入待核对；代码保守拦截提交截止被误当活动的结果。尚未接入自动流程和正式日程创建，见 [X004 说明](docs/verification/X004-event-extraction.md)。
 
+X005 已提供课程规则候选提取：保留完整规定，再单列条件、适用范围和生效信息；代码拒绝删掉条件或例外的短摘录，缺失信息仍待核对。尚未接入正式规则确认和自动流程，见 [X005 说明](docs/verification/X005-rule-extraction.md)。
+
 网页方面，N004 已提供安全抓取，N005 已接通受保护的快照保存和来源记录；N006 已接通 Worker 正文/表格提取与原始位置绑定。仅处理已保存内容，不执行网页脚本或登录。见 [网页快照说明](docs/verification/N005-web-snapshot.md) 和 [网页解析说明](docs/verification/N006-web-parsing.md)；导入与引用查看页面仍待接入。
 
 扩展导入正在分任务推进：N002 已接入普通 DOCX 上传校验，N003 已接通正文/表格解析和版本定位。说明见 [Word 校验](docs/verification/N002-word-validation.md) 与 [Word 解析](docs/verification/N003-word-parsing.md)；资料页面仍待接入。

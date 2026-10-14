@@ -186,6 +186,8 @@ X002 在 application/ports/generation.py 定义 TextGenerator，仅交换受控�
 
 X003 的 application/task_extraction.py 定义任务专用字段并复用 X002 授权与生成边界；domain/deadline_completeness.py 仅检查截止原文完整性，不依赖模型或系统时间，不生成可排期日期。缺失及建议原因由代码补充，模型不能覆盖。调用方显式使用 X001 保存草稿，仍保持 pending；日期换算及核对交互由后续模块负责，见 [X003 说明](verification/X003-progress.md)。
 
+X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候选；domain/rule_extraction.py 校验完整片段及限定语句边界，不依赖模型或数据库。条件/范围/生效信息保留独立证据，未知不推定无条件。调用方显式使用 X001 保存 pending 候选，正式确认由 R 系列处理。见 [X005 说明](verification/X005-rule-extraction.md)。
+
 目标数据分组如下，具体字段和迁移在功能实现时确定：
 
 | 分组 | 对象 | 约束重点 |
