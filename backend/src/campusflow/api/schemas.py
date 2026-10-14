@@ -1,9 +1,11 @@
 """API 输入输出 schema。"""
 
 from datetime import date, datetime, time
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from campusflow.domain.candidates import FieldOrigin
 from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
@@ -197,3 +199,51 @@ class AvailabilitySlotOut(BaseModel):
     day_of_week: int
     start_time: time
     end_time: time
+
+
+class SourceCitationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    chunk_id: int
+    quote: str
+    locator_type: str
+    locator_value: str
+
+
+class SourceFieldOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str
+    value: Any
+    origin: FieldOrigin
+    note: str | None
+    verifiable: bool
+    citations: list[SourceCitationOut]
+
+
+class SourceCorrectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    field_name: str
+    previous_value: Any
+    new_value: Any
+    new_origin: FieldOrigin
+    operator: str
+    note: str | None
+    changed_at: datetime
+
+
+class SourceDetailOut(BaseModel):
+    """R007：任务或日程的来源详情。"""
+
+    model_config = ConfigDict(from_attributes=True)
+    object_type: str
+    object_id: int
+    source_type: str
+    source_state: str
+    source_note: str | None
+    material_id: int | None
+    material_title: str | None
+    version_no: int | None
+    candidate_id: int | None
+    due_source: str | None
+    due_note: str | None
+    fields: list[SourceFieldOut]
+    corrections: list[SourceCorrectionOut]

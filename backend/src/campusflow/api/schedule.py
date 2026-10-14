@@ -14,8 +14,10 @@ from campusflow.api.schemas import (
     FixedEventOccurrenceOut,
     FixedEventOut,
     FixedEventUpdate,
+    SourceDetailOut,
 )
 from campusflow.application import schedule as use_cases
+from campusflow.application import source_detail as source_use_cases
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 
 router = APIRouter(tags=["schedule"])
@@ -89,6 +91,15 @@ def update_fixed_event(
         repeat_until=merged.repeat_until,
     )
     return FixedEventOut.model_validate(event)
+
+
+@router.get("/fixed-events/{event_id}/source", response_model=SourceDetailOut)
+def get_fixed_event_source(
+    event_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> SourceDetailOut:
+    return SourceDetailOut.model_validate(
+        source_use_cases.event_source_detail(repos, workspace.id, event_id)
+    )
 
 
 @router.delete("/fixed-events/{event_id}", status_code=204)
