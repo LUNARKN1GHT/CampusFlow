@@ -176,6 +176,8 @@ sequenceDiagram
 
 ## 5. 数据与接口边界
 
+X007 的 domain/course_matching.py 负责严格名称/班级比较；application/course_matching.py 授权空间、学期、资料版本和证据，附加带原文的课程匹配建议。输出不修改 scope 或正式事项，复用 X001 字段/证据保存为 pending；候选快照不代替确认时的重新授权和范围核验。见 [X007 说明](verification/X007-course-matching.md)。
+
 X001 已实现 ExtractedItem → ExtractedField → CandidateFieldEvidence 的分表关系。纯领域模型与校验位于 domain/candidates.py；应用用例先校验来源及空间，基础设施仓储承担持久化。API 与 Worker 使用同一个仓储装配入口。候选按来源版本级联清理，删除确认包含候选集合，模型输出不能直接变成已确认正式事项。具体契约见 [X001 说明](verification/X001-candidate-evidence.md)。
 
 X004 在 application/event_extraction.py 定义活动字段并复用 X002 的授权与生成入口；domain/event_extraction.py 对活动描述及被引用原文语句做保守检查，拒绝提交截止或混合要求，缺失起止自动补核对原因。该入口只返回草稿，显式使用 X001 保存后仍 pending；不创建 FixedEvent，不换算日期。边界见 [X004 说明](verification/X004-event-extraction.md)。
