@@ -90,6 +90,8 @@ X003 复用 X002 装配出的 TextGenerator，应用调用 `task_extraction.extr
 
 X004 复用现有文字模型配置，通过 `event_extraction.extract_event_drafts` 显式取得活动候选；调用方可用 `candidates.save_candidates` 保存待核对数据。无新增安装包或迁移，没有自动提取按钮。专项测试：`uv run --locked pytest tests/test_event_extraction.py -q`；错误处理与契约见 [X004 说明](verification/X004-event-extraction.md)。
 
+X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_drafts` 得到待核对规则，按需显式保存。无新增依赖、迁移和自动入口。专项测试：`uv run --locked pytest tests/test_rule_extraction.py -q`；完整原文及条件字段契约见 [X005 说明](verification/X005-rule-extraction.md)。
+
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
 
 X006 的 `relative_dates.resolve_task_deadline` 为 X003 草稿附加日期换算结果，不额外调用模型。需显式提供当前版本内的依据片段及来源时区，输出再按需调用 `save_candidates` 保存。无新增配置或依赖；专项测试为 `uv run --locked pytest tests/test_relative_dates.py -q`，输入和限制见 [X006 说明](verification/X006-relative-dates.md)。
