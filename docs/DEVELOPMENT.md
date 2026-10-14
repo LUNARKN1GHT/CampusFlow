@@ -84,6 +84,8 @@ npm run dev
 
 ## 数据库迁移
 
+X001 新增候选、字段和证据表，更新代码后先运行 `uv run --locked alembic upgrade head`。该基础供后续自动提取与核对使用，尚未开放候选写入 HTTP 接口。来源、删除边界和验证命令见 [X001 说明](verification/X001-candidate-evidence.md)。
+
 表结构由 Alembic 迁移管理，在 `backend/` 目录执行：
 
 ```bash
