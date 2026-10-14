@@ -5,7 +5,7 @@ from dataclasses import asdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from campusflow.application.ports.candidates import CandidateData
+from campusflow.application.ports.candidates import CandidateData, FieldRevisionRecord
 from campusflow.domain.candidates import (
     CandidateDraft,
     CandidateField,
@@ -13,11 +13,14 @@ from campusflow.domain.candidates import (
     CandidateScope,
     FieldEvidence,
     FieldOrigin,
+    FieldRevision,
     ReviewReason,
 )
+from campusflow.domain.errors import NotFoundError
 from campusflow.domain.states import ReviewStatus
 from campusflow.infrastructure.db.models import (
     CandidateFieldEvidence,
+    CandidateFieldRevision,
     ExtractedField,
     ExtractedItem,
     MaterialVersion,
@@ -45,6 +48,29 @@ class SqlAlchemyCandidateRepository:
                 evidence_by_field[item.field_id].append(
                     FieldEvidence(item.source_chunk_id, item.quote)
                 )
+        revision_rows = self._session.scalars(
+            select(CandidateFieldRevision)
+            .join(ExtractedField, ExtractedField.id == CandidateFieldRevision.field_id)
+            .where(ExtractedField.candidate_id == row.id)
+            .order_by(CandidateFieldRevision.id)
+        ).all()
+        name_by_field = {field.id: field.name for field in fields}
+        revisions = tuple(
+            FieldRevisionRecord(
+                revision.id,
+                FieldRevision(
+                    field_name=name_by_field[revision.field_id],
+                    previous_value=revision.previous_value,
+                    new_value=revision.new_value,
+                    previous_origin=FieldOrigin(revision.previous_origin),
+                    new_origin=FieldOrigin(revision.new_origin),
+                    operator=revision.operator,
+                    note=revision.note,
+                ),
+                revision.created_at,
+            )
+            for revision in revision_rows
+        )
         draft = CandidateDraft(
             kind=CandidateKind(row.kind),
             scope=CandidateScope(row.semester_id, row.course_id, row.class_name),
@@ -68,6 +94,7 @@ class SqlAlchemyCandidateRepository:
             draft,
             ReviewStatus(row.review_status),
             row.created_at,
+            revisions,
         )
 
     def create(self, workspace_id: int, version_id: int, draft: CandidateDraft) -> CandidateData:
@@ -136,3 +163,30 @@ class SqlAlchemyCandidateRepository:
                 .order_by(ExtractedItem.id)
             )
         )
+
+    def add_field_revision(
+        self, workspace_id: int, candidate_id: int, revision: FieldRevision
+    ) -> FieldRevisionRecord:
+        field_row = self._session.scalar(
+            select(ExtractedField)
+            .join(ExtractedItem, ExtractedItem.id == ExtractedField.candidate_id)
+            .where(
+                ExtractedItem.workspace_id == workspace_id,
+                ExtractedItem.id == candidate_id,
+                ExtractedField.name == revision.field_name,
+            )
+        )
+        if field_row is None:
+            raise NotFoundError("候选字段不存在")
+        row = CandidateFieldRevision(
+            field_id=field_row.id,
+            previous_value=revision.previous_value,
+            new_value=revision.new_value,
+            previous_origin=revision.previous_origin.value,
+            new_origin=revision.new_origin.value,
+            operator=revision.operator,
+            note=revision.note,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return FieldRevisionRecord(row.id, revision, row.created_at)

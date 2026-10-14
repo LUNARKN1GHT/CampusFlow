@@ -3,7 +3,15 @@
 from campusflow.application.materials import _require_associations, get_material
 from campusflow.application.ports.candidates import CandidateData
 from campusflow.application.ports.repositories import Repositories
-from campusflow.domain.candidates import CandidateDraft, validate_candidate
+from campusflow.domain.candidates import (
+    CandidateDraft,
+    FieldOrigin,
+    FieldRevision,
+    JsonValue,
+    apply_revisions,
+    validate_candidate,
+    validate_field_revision,
+)
 from campusflow.domain.errors import DomainError, NotFoundError
 
 
@@ -64,3 +72,39 @@ def get_candidate(repos: Repositories, workspace_id: int, candidate_id: int) -> 
     if candidate is None:
         raise NotFoundError("候选事项不存在")
     return candidate
+
+
+def revise_candidate_field(
+    repos: Repositories,
+    workspace_id: int,
+    candidate_id: int,
+    field_name: str,
+    *,
+    value: JsonValue,
+    origin: FieldOrigin,
+    operator: str,
+    note: str | None = None,
+) -> CandidateData:
+    """追加一条字段修正，保留原始提取与证据，返回叠加修正后的候选。"""
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    field = next((item for item in candidate.draft.fields if item.name == field_name), None)
+    if field is None:
+        raise DomainError("候选事项中没有这个字段")
+    current = apply_revisions(field, candidate.field_revisions(field_name))
+    revision = FieldRevision(
+        field_name=field_name,
+        previous_value=current.value,
+        new_value=value,
+        previous_origin=current.origin,
+        new_origin=origin,
+        operator=operator,
+        note=note,
+    )
+    validate_field_revision(current, revision)
+    try:
+        repos.candidates.add_field_revision(workspace_id, candidate_id, revision)
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return get_candidate(repos, workspace_id, candidate_id)
