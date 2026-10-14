@@ -12,6 +12,8 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 ## 开发与架构入口
 
+X007 已提供选定学期内的课程/教学班严格匹配：同名多班或无法匹配时保留原文和人工选项，唯一候选也不自动绑定。核对页面及自动处理入口仍待接入，见 [X007 说明](docs/verification/X007-course-matching.md)。
+
 X006 已提供有依据的相对日期换算：明确发布日期支持“下周三”等表达，适用校历支持教学周；保留原文、计算依据和日期精度，缺依据或含歧义仍待核对。尚未接入自动处理和核对页面，见 [X006 说明](docs/verification/X006-relative-dates.md)。
 
 X001 已建立候选事项、逐字段出处和原文证据的分表存储，新增候选保持待核对，资料删除预览包含候选数量。X002 已提供智谱文字模型接口与严格输出检查，默认型号由用户选定为 glm-4-flash-250414；无效字段、引用和截断输出会被拒绝。自动提取、核对交互及真实模型效果评测仍待后续任务接入。见 [X001 说明](docs/verification/X001-candidate-evidence.md)、[X002 说明](docs/verification/X002-generation-contract.md) 和 [X 系列实施路线](docs/planning/X-IMPLEMENTATION.md)。
