@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from campusflow.domain.errors import DomainError
+from campusflow.domain.states import ReviewStatus
 
 type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 
@@ -198,3 +199,71 @@ def effective_fields(
     for revision in revisions:
         by_name.setdefault(revision.field_name, []).append(revision)
     return tuple(apply_revisions(field, by_name.get(field.name, ())) for field in fields)
+
+
+# R003：按类型定义的必需字段，与提取 spec 的 allow_missing=False 保持一致。
+REQUIRED_FIELDS: dict[CandidateKind, tuple[str, ...]] = {
+    CandidateKind.TASK: ("title",),
+    CandidateKind.EVENT: ("title", "activity_text"),
+    CandidateKind.RULE: (),
+}
+
+_REVIEW_LABELS = {
+    ReviewStatus.PENDING: "待核对",
+    ReviewStatus.CONFIRMED: "已确认",
+    ReviewStatus.IGNORED: "已忽略",
+    ReviewStatus.SUPERSEDED: "已失效",
+}
+
+# 用户可以撤销核对决定退回待核对；已失效只允许重新打开，不再直接跳转。
+REVIEW_TRANSITIONS: dict[ReviewStatus, frozenset[ReviewStatus]] = {
+    ReviewStatus.PENDING: frozenset(
+        {ReviewStatus.CONFIRMED, ReviewStatus.IGNORED, ReviewStatus.SUPERSEDED}
+    ),
+    ReviewStatus.CONFIRMED: frozenset({ReviewStatus.PENDING, ReviewStatus.SUPERSEDED}),
+    ReviewStatus.IGNORED: frozenset({ReviewStatus.PENDING}),
+    ReviewStatus.SUPERSEDED: frozenset({ReviewStatus.PENDING}),
+}
+
+
+@dataclass(frozen=True)
+class ReviewChange:
+    """R003：一次候选核对状态变更，保存转换方向、操作者与原因。"""
+
+    from_status: ReviewStatus
+    to_status: ReviewStatus
+    operator: str
+    reason: str | None = None
+
+
+def validate_review_change(change: ReviewChange) -> None:
+    if not isinstance(change.from_status, ReviewStatus) or not isinstance(
+        change.to_status, ReviewStatus
+    ):
+        raise DomainError("核对状态无效")
+    if change.to_status is change.from_status:
+        raise DomainError(f"候选已经处于{_REVIEW_LABELS[change.from_status]}状态")
+    if change.to_status not in REVIEW_TRANSITIONS[change.from_status]:
+        raise DomainError(
+            f"不允许从{_REVIEW_LABELS[change.from_status]}转换为{_REVIEW_LABELS[change.to_status]}"
+        )
+    _text(change.operator, 100, "操作者", required=True)
+    _text(change.reason, 500, "变更原因")
+
+
+def missing_required_fields(
+    kind: CandidateKind, fields: Sequence[CandidateField]
+) -> tuple[str, ...]:
+    """按候选类型列出仍然缺失的必需字段名，供确认前提示。"""
+    present = {field.name: field for field in fields}
+    return tuple(
+        name
+        for name in REQUIRED_FIELDS.get(kind, ())
+        if (field := present.get(name)) is None or field.value is None
+    )
+
+
+def require_confirmed_for_conversion(status: ReviewStatus) -> None:
+    """被忽略或已失效的候选不参与正式约束，只有已确认项可以转换。"""
+    if status is not ReviewStatus.CONFIRMED:
+        raise DomainError("只有已确认的候选事项可以转换为正式事项")

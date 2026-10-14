@@ -357,3 +357,28 @@ class CandidateFieldRevision(Base):
     operator: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(String(1000))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CandidateReviewChange(Base):
+    """R003：候选核对状态变更留痕，保存转换方向、操作者与原因。"""
+
+    __tablename__ = "candidate_review_changes"
+    __table_args__ = (
+        CheckConstraint(
+            "from_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_review_change_from_status",
+        ),
+        CheckConstraint(
+            "to_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_review_change_to_status",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    from_status: Mapped[str] = mapped_column(String(20))
+    to_status: Mapped[str] = mapped_column(String(20))
+    operator: Mapped[str] = mapped_column(String(100))
+    reason: Mapped[str | None] = mapped_column(String(500))
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -8,11 +8,15 @@ from campusflow.domain.candidates import (
     FieldOrigin,
     FieldRevision,
     JsonValue,
+    ReviewChange,
     apply_revisions,
+    missing_required_fields,
     validate_candidate,
     validate_field_revision,
+    validate_review_change,
 )
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.states import ReviewStatus
 
 
 def save_candidates(
@@ -103,6 +107,45 @@ def revise_candidate_field(
     validate_field_revision(current, revision)
     try:
         repos.candidates.add_field_revision(workspace_id, candidate_id, revision)
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return get_candidate(repos, workspace_id, candidate_id)
+
+
+def _require_confirmation_ready(
+    candidate: CandidateData, acknowledge_missing: bool, reason: str | None
+) -> None:
+    missing = missing_required_fields(candidate.draft.kind, candidate.effective_draft().fields)
+    if not missing:
+        return
+    if not acknowledge_missing:
+        raise DomainError(
+            "缺少必须字段：" + "、".join(missing) + "；请先补充字段，或显式确认后继续"
+        )
+    if reason is None or not reason.strip():
+        raise DomainError("缺少必须字段时显式确认必须填写原因")
+
+
+def set_candidate_review_status(
+    repos: Repositories,
+    workspace_id: int,
+    candidate_id: int,
+    status: ReviewStatus,
+    *,
+    operator: str,
+    reason: str | None = None,
+    acknowledge_missing: bool = False,
+) -> CandidateData:
+    """按合法转换更新候选核对状态并留痕；确认前检查必须字段。"""
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    change = ReviewChange(candidate.review_status, status, operator, reason)
+    validate_review_change(change)
+    if status is ReviewStatus.CONFIRMED:
+        _require_confirmation_ready(candidate, acknowledge_missing, reason)
+    try:
+        repos.candidates.set_review_status(workspace_id, candidate_id, change)
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()

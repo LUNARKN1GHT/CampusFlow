@@ -5,7 +5,11 @@ from dataclasses import asdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from campusflow.application.ports.candidates import CandidateData, FieldRevisionRecord
+from campusflow.application.ports.candidates import (
+    CandidateData,
+    FieldRevisionRecord,
+    ReviewChangeRecord,
+)
 from campusflow.domain.candidates import (
     CandidateDraft,
     CandidateField,
@@ -14,6 +18,7 @@ from campusflow.domain.candidates import (
     FieldEvidence,
     FieldOrigin,
     FieldRevision,
+    ReviewChange,
     ReviewReason,
 )
 from campusflow.domain.errors import NotFoundError
@@ -21,6 +26,7 @@ from campusflow.domain.states import ReviewStatus
 from campusflow.infrastructure.db.models import (
     CandidateFieldEvidence,
     CandidateFieldRevision,
+    CandidateReviewChange,
     ExtractedField,
     ExtractedItem,
     MaterialVersion,
@@ -71,6 +77,24 @@ class SqlAlchemyCandidateRepository:
             )
             for revision in revision_rows
         )
+        change_rows = self._session.scalars(
+            select(CandidateReviewChange)
+            .where(CandidateReviewChange.candidate_id == row.id)
+            .order_by(CandidateReviewChange.id)
+        ).all()
+        review_changes = tuple(
+            ReviewChangeRecord(
+                change.id,
+                ReviewChange(
+                    from_status=ReviewStatus(change.from_status),
+                    to_status=ReviewStatus(change.to_status),
+                    operator=change.operator,
+                    reason=change.reason,
+                ),
+                change.changed_at,
+            )
+            for change in change_rows
+        )
         draft = CandidateDraft(
             kind=CandidateKind(row.kind),
             scope=CandidateScope(row.semester_id, row.course_id, row.class_name),
@@ -94,7 +118,8 @@ class SqlAlchemyCandidateRepository:
             draft,
             ReviewStatus(row.review_status),
             row.created_at,
-            revisions,
+            revisions=revisions,
+            review_changes=review_changes,
         )
 
     def create(self, workspace_id: int, version_id: int, draft: CandidateDraft) -> CandidateData:
@@ -190,3 +215,25 @@ class SqlAlchemyCandidateRepository:
         self._session.add(row)
         self._session.flush()
         return FieldRevisionRecord(row.id, revision, row.created_at)
+
+    def set_review_status(
+        self, workspace_id: int, candidate_id: int, change: ReviewChange
+    ) -> ReviewChangeRecord:
+        row = self._session.scalar(
+            select(ExtractedItem).where(
+                ExtractedItem.id == candidate_id, ExtractedItem.workspace_id == workspace_id
+            )
+        )
+        if row is None:
+            raise NotFoundError("候选事项不存在")
+        row.review_status = change.to_status.value
+        record = CandidateReviewChange(
+            candidate_id=row.id,
+            from_status=change.from_status.value,
+            to_status=change.to_status.value,
+            operator=change.operator,
+            reason=change.reason,
+        )
+        self._session.add(record)
+        self._session.flush()
+        return ReviewChangeRecord(record.id, change, record.changed_at)
