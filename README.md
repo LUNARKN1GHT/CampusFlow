@@ -14,6 +14,8 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 X001 已建立候选事项、逐字段出处和原文证据的分表存储，新增候选保持待核对，资料删除预览包含候选数量。X002 已提供智谱文字模型接口与严格输出检查，默认型号由用户选定为 glm-4-flash-250414；无效字段、引用和截断输出会被拒绝。自动提取、核对交互及真实模型效果评测仍待后续任务接入。见 [X001 说明](docs/verification/X001-candidate-evidence.md)、[X002 说明](docs/verification/X002-generation-contract.md) 和 [X 系列实施路线](docs/planning/X-IMPLEMENTATION.md)。
 
+X003 已提供任务标题、提交方式、产出物及截止原文的候选提取入口；耗时明确为建议，缺少年份、时刻或提交方式会保留待核对标记，复杂日期不自动转换。自动触发、核对页面与真实效果评测仍待后续接入，见 [X003 说明](docs/verification/X003-progress.md)。
+
 X004 已提供固定活动候选提取：起止、地点、参加条件保留原文，缺失时间进入待核对；代码保守拦截提交截止被误当活动的结果。尚未接入自动流程和正式日程创建，见 [X004 说明](docs/verification/X004-event-extraction.md)。
 
 网页方面，N004 已提供安全抓取，N005 已接通受保护的快照保存和来源记录；N006 已接通 Worker 正文/表格提取与原始位置绑定。仅处理已保存内容，不执行网页脚本或登录。见 [网页快照说明](docs/verification/N005-web-snapshot.md) 和 [网页解析说明](docs/verification/N006-web-parsing.md)；导入与引用查看页面仍待接入。
