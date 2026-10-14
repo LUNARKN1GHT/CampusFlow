@@ -155,6 +155,7 @@ def _fixed_event_to_data(row: FixedEvent) -> FixedEventData:
         location=row.location,
         recurrence=EventRecurrence(row.recurrence),
         repeat_until=row.repeat_until,
+        source_candidate_id=row.source_candidate_id,
     )
 
 
@@ -780,6 +781,12 @@ class SqlAlchemyScheduleRepository:
         row = self._session.get(FixedEvent, event_id)
         return _fixed_event_to_data(row) if row is not None else None
 
+    def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
+        row = self._session.scalar(
+            select(FixedEvent).where(FixedEvent.source_candidate_id == candidate_id)
+        )
+        return _fixed_event_to_data(row) if row is not None else None
+
     def create_fixed_event(
         self,
         workspace_id: int,
@@ -790,6 +797,8 @@ class SqlAlchemyScheduleRepository:
         location: str | None,
         recurrence: EventRecurrence,
         repeat_until: date | None,
+        *,
+        source_candidate_id: int | None = None,
     ) -> FixedEventData:
         row = FixedEvent(
             workspace_id=workspace_id,
@@ -800,6 +809,7 @@ class SqlAlchemyScheduleRepository:
             location=location,
             recurrence=recurrence,
             repeat_until=repeat_until,
+            source_candidate_id=source_candidate_id,
         )
         self._session.add(row)
         self._session.flush()

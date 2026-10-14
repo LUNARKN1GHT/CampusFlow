@@ -131,6 +131,11 @@ class FixedEvent(Base):
     location: Mapped[str | None] = mapped_column(String(200))
     recurrence: Mapped[str] = mapped_column(String(20), default=EventRecurrence.NONE)
     repeat_until: Mapped[date | None] = mapped_column(Date)
+    # R005：核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程；
+    # 候选随资料删除后置空，不伪造来源。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
 
 
 class AvailabilitySlot(Base):

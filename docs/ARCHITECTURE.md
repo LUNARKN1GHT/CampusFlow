@@ -190,6 +190,8 @@ R003 在 domain/candidates.py 定义合法转换、按类型的必需字段与 r
 
 R004 在 domain/candidate_conversion.py 定义任务候选到正式任务的字段映射与截止解析：只有日期的写法不补时刻，相对或无效写法只保留原文到 due_note，日期来源按字段出处映射。application/conversion.py 的 convert_candidate_to_task 要求候选已确认，在一个事务里创建任务并写入 source_material_id 与唯一的 source_candidate_id，重复调用返回既有任务。见 [R004 说明](verification/R004-task-conversion.md)。
 
+R005 在 domain/event_conversion.py 定义日程候选到固定日程的起止解析：必须能解析出日期与时刻，只有日期或相对写法一律拒绝，不按全天或常见时长补造。application/conversion.py 的 convert_candidate_to_event 按工作空间时区换算后复用 validate_fixed_event 校验区间，写入唯一的 source_candidate_id，重复调用返回既有日程。见 [R005 说明](verification/R005-event-conversion.md)。
+
 目标数据分组如下，具体字段和迁移在功能实现时确定：
 
 | 分组 | 对象 | 约束重点 |

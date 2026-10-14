@@ -118,6 +118,8 @@ class FixedEventData:
     location: str | None
     recurrence: EventRecurrence
     repeat_until: date | None
+    # R005：由核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程
+    source_candidate_id: int | None = None
 
 
 @dataclass
@@ -534,6 +536,10 @@ class ScheduleRepository(Protocol):
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 
+    def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
+        """按来源候选查已转换的固定日程（R005 幂等）。"""
+        ...
+
     def create_fixed_event(
         self,
         workspace_id: int,
@@ -544,6 +550,8 @@ class ScheduleRepository(Protocol):
         location: str | None,
         recurrence: EventRecurrence,
         repeat_until: date | None,
+        *,
+        source_candidate_id: int | None = None,
     ) -> FixedEventData: ...
 
     def update_fixed_event(

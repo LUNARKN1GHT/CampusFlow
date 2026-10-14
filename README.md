@@ -24,6 +24,8 @@ R003 已提供候选确认、忽略与失效的状态转换：按类型检查必
 
 R004 已提供已确认任务候选转换为正式任务：在一个事务里关联候选、任务与来源资料，重复转换返回既有任务；只有日期的截止不补时刻，相对写法只保留原文备注。日程转换、规则候选与核对界面仍待后续任务，见 [R004 说明](docs/verification/R004-task-conversion.md)。
 
+R005 已提供已确认日程候选转换为固定日程：起止必须能解析出日期与时刻，否则拒绝建项；时间按工作空间时区换算并校验区间，重复转换返回既有日程。规则候选与核对界面仍待后续任务，见 [R005 说明](docs/verification/R005-event-conversion.md)。
+
 网页方面，N004 已提供安全抓取，N005 已接通受保护的快照保存和来源记录；N006 已接通 Worker 正文/表格提取与原始位置绑定。仅处理已保存内容，不执行网页脚本或登录。见 [网页快照说明](docs/verification/N005-web-snapshot.md) 和 [网页解析说明](docs/verification/N006-web-parsing.md)；导入与引用查看页面仍待接入。
 
 扩展导入正在分任务推进：N002 已接入普通 DOCX 上传校验，N003 已接通正文/表格解析和版本定位。说明见 [Word 校验](docs/verification/N002-word-validation.md) 与 [Word 解析](docs/verification/N003-word-parsing.md)；资料页面仍待接入。
