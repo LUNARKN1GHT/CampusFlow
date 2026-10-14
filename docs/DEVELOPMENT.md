@@ -96,6 +96,8 @@ X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`C
 
 X007 的 `course_matching.match_candidate_course` 接受所选学期及带证据的课程/班级原文字段，返回待核对匹配建议，不修改候选 scope。调用方按需显式使用 `save_candidates` 保存；无新增依赖或配置。专项测试：`uv run --locked pytest tests/test_course_matching.py -q`；契约见 [X007 说明](verification/X007-course-matching.md)。
 
+X006 的 `relative_dates.resolve_task_deadline` 为 X003 草稿附加日期换算结果，不额外调用模型。需显式提供当前版本内的依据片段及来源时区，输出再按需调用 `save_candidates` 保存。无新增配置或依赖；专项测试为 `uv run --locked pytest tests/test_relative_dates.py -q`，输入和限制见 [X006 说明](verification/X006-relative-dates.md)。
+
 表结构由 Alembic 迁移管理，在 `backend/` 目录执行：
 
 ```bash
