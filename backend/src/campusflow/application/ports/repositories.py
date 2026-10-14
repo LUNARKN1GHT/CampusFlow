@@ -79,6 +79,8 @@ class TaskData:
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # R004：由候选核对转换而来的任务保留候选关联，用于幂等与来源详情
+    source_candidate_id: int | None = None
     # 读取时按工作空间时区派生，不落库
     overdue: bool = False
 
@@ -385,6 +387,9 @@ class TaskRepository(Protocol):
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
     ) -> TaskData: ...
 
     def update(
@@ -410,6 +415,10 @@ class TaskRepository(Protocol):
 
     def list_by_source_material(self, material_id: int) -> list[TaskData]: ...
 
+    def get_by_source_candidate(self, candidate_id: int) -> TaskData | None:
+        """按来源候选查已转换的任务（R004 幂等）。"""
+        ...
+
     def unlink_source_material(
         self, material_id: int, *, invalidated_at: datetime, note: str
     ) -> int:
@@ -427,6 +436,10 @@ class TaskRepository(Protocol):
 
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
+
+    def get_version(self, version_id: int) -> MaterialVersionData | None:
+        """按版本编号取版本，供来源关联使用（R004）。"""
+        ...
 
     def exists(self, material_id: int) -> bool:
         """资料是否仍然存在（J007）。

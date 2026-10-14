@@ -127,6 +127,7 @@ def _task_to_data(row: Task) -> TaskData:
         remaining_minutes=row.remaining_minutes,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        source_candidate_id=row.source_candidate_id,
     )
 
 
@@ -224,6 +225,10 @@ class SqlAlchemyMaterialRepository:
     def get(self, material_id: int) -> MaterialData | None:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
+
+    def get_version(self, version_id: int) -> MaterialVersionData | None:
+        row = self._session.get(MaterialVersion, version_id)
+        return _material_version_to_data(row) if row is not None else None
 
     def exists(self, material_id: int) -> bool:
         """直接查库判断资料是否存在（J007）：绕过会话缓存，读到最新已提交状态。"""
@@ -631,10 +636,15 @@ class SqlAlchemyTaskRepository:
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
     ) -> TaskData:
         row = Task(
             workspace_id=workspace_id,
             course_id=course_id,
+            source_material_id=source_material_id,
+            source_candidate_id=source_candidate_id,
             title=title,
             description=description,
             due_date=due_date,
@@ -719,6 +729,10 @@ class SqlAlchemyTaskRepository:
     def list_by_source_material(self, material_id: int) -> list[TaskData]:
         stmt = select(Task).where(Task.source_material_id == material_id).order_by(Task.id)
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_by_source_candidate(self, candidate_id: int) -> TaskData | None:
+        row = self._session.scalar(select(Task).where(Task.source_candidate_id == candidate_id))
+        return _task_to_data(row) if row is not None else None
 
     def unlink_source_material(
         self, material_id: int, *, invalidated_at: datetime, note: str

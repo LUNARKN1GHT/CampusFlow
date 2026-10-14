@@ -80,6 +80,11 @@ class Task(Base):
     # 与手工建的任务分不出来。这两列记住"曾经有来源、来源已被删除"。
     source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
+    # R004：核对转换而来时指向来源候选，唯一约束保证一个候选只建一个任务；
+    # 候选随资料删除后置空，来源失效由上面的两列标记。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，

@@ -94,6 +94,8 @@ R002 追加字段修正记录表；更新代码后需运行 `uv run --locked ale
 
 R003 追加核对状态变更记录表；同样需先 `uv run --locked alembic upgrade head`。状态转换与确认前必须字段检查在应用层 `candidates.set_candidate_review_status`，仍不开放候选 HTTP 接口。专项测试：`uv run --locked pytest tests/test_candidate_review.py -q`；转换集合与确认规则见 [R003 说明](verification/R003-review-transitions.md)。
 
+R004 给 `tasks` 增加来源候选关联列；更新代码后需运行 `uv run --locked alembic upgrade head`。应用层 `conversion.convert_candidate_to_task` 把已确认的任务候选转为正式任务，幂等且只解析代码可识别的日期写法。专项测试：`uv run --locked pytest tests/test_candidate_conversion.py -q`；映射与日期精度见 [R004 说明](verification/R004-task-conversion.md)。
+
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
 
 表结构由 Alembic 迁移管理，在 `backend/` 目录执行：
