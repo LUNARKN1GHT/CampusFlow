@@ -340,6 +340,7 @@ class DeleteImpact:
     chunk_count: int
     linked_task_ids: list[int]
     unfinished_job_count: int
+    candidate_count: int
     confirm_token: str
 
 
@@ -348,6 +349,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     versions = repos.materials.list_versions(material_id)
     chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
     linked_tasks = repos.tasks.list_by_source_material(material_id)
+    candidate_ids = repos.candidates.ids_by_material(workspace_id, material_id)
     # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
     # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
     unfinished_jobs = [
@@ -358,6 +360,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         [v.id for v in versions],
         chunk_count,
         [t.id for t in linked_tasks],
+        candidate_ids=candidate_ids,
     )
     return DeleteImpact(
         material=material,
@@ -365,6 +368,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         chunk_count=chunk_count,
         linked_task_ids=[t.id for t in linked_tasks],
         unfinished_job_count=len(unfinished_jobs),
+        candidate_count=len(candidate_ids),
         confirm_token=token,
     )
 

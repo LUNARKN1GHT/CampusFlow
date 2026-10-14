@@ -10,6 +10,7 @@ from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -271,3 +272,61 @@ class ProcessingJobAttempt(Base):
     error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
     retryable: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExtractedItem(Base):
+    """X001：候选事项仅保存核对状态，不保存任务执行进度。"""
+
+    __tablename__ = "extracted_items"
+    __table_args__ = (
+        CheckConstraint("kind IN ('task', 'event', 'rule')", name="ck_candidate_kind"),
+        CheckConstraint(
+            "review_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_candidate_review_status",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    source_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    review_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending"
+    )
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    review_reasons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExtractedField(Base):
+    __tablename__ = "extracted_fields"
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "name", name="uq_candidate_field_name"),
+        CheckConstraint(
+            "origin IN ('document', 'user', 'inferred', 'suggestion')", name="ck_field_origin"
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(64))
+    value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    origin: Mapped[str] = mapped_column(String(20))
+    explanation: Mapped[str | None] = mapped_column(String(1000))
+    missing_reason: Mapped[str | None] = mapped_column(String(500))
+
+
+class CandidateFieldEvidence(Base):
+    __tablename__ = "candidate_field_evidence"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_fields.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    quote: Mapped[str] = mapped_column(String(6000))

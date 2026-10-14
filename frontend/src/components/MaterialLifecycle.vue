@@ -115,6 +115,7 @@ function staleDelete() {
             <div class="summary-chip"><strong>{{ impact.version_count }}</strong><span>个版本将删除</span></div>
             <div class="summary-chip"><strong>{{ impact.chunk_count }}</strong><span>个片段将失效</span></div>
             <div class="summary-chip"><strong>{{ impact.linked_task_ids.length }}</strong><span>个关联任务受影响</span></div>
+            <div class="summary-chip"><strong>{{ impact.candidate_count }}</strong><span>个候选事项将删除</span></div>
           </div>
           <p v-if="impact.unfinished_job_count" class="inline-notice" role="status">
             还有 {{ impact.unfinished_job_count }} 个未完成的处理作业会随资料一并清理。
