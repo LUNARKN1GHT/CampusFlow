@@ -8,12 +8,14 @@ from fastapi import APIRouter, Depends, Query
 
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.api.schemas import (
+    SourceDetailOut,
     TaskCreate,
     TaskOut,
     TaskProgressChangeOut,
     TaskProgressPatch,
     TaskUpdate,
 )
+from campusflow.application import source_detail as source_use_cases
 from campusflow.application import tasks as use_cases
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.domain.states import TaskProgress
@@ -120,3 +122,10 @@ def list_task_progress_history(
         TaskProgressChangeOut.model_validate(change)
         for change in use_cases.list_progress_changes(repos, workspace.id, task_id)
     ]
+
+
+@router.get("/tasks/{task_id}/source", response_model=SourceDetailOut)
+def get_task_source(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> SourceDetailOut:
+    return SourceDetailOut.model_validate(
+        source_use_cases.task_source_detail(repos, workspace.id, task_id)
+    )

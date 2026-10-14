@@ -136,6 +136,10 @@ class FixedEvent(Base):
     source_candidate_id: Mapped[int | None] = mapped_column(
         ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
     )
+    # R007：来源失效留痕（对齐任务的 D009）。候选删除后只靠置空无法与手工日程区分，
+    # 因此记住"曾经有来源、来源已被删除"。
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
 
 
 class AvailabilitySlot(Base):

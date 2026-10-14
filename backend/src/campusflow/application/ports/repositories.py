@@ -120,6 +120,16 @@ class FixedEventData:
     repeat_until: date | None
     # R005：由核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程
     source_candidate_id: int | None = None
+    # R007：来源失效留痕（对齐任务的 D009）
+    source_invalidated_at: datetime | None = None
+    source_invalidated_note: str | None = None
+
+    @property
+    def source_state(self) -> str:
+        """来源状态（R007）：还有来源候选 / 来源已失效 / 本来就没有来源。"""
+        from campusflow.domain.materials import source_state
+
+        return source_state(self.source_candidate_id, self.source_invalidated_at)
 
 
 @dataclass
@@ -538,6 +548,16 @@ class ScheduleRepository(Protocol):
 
     def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
         """按来源候选查已转换的固定日程（R005 幂等）。"""
+        ...
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        """列出由这些候选转换来的固定日程编号（R007）。"""
+        ...
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        """来源候选被删除时解除日程关联并留下失效痕迹（R007）。返回解除数量。"""
         ...
 
     def create_fixed_event(

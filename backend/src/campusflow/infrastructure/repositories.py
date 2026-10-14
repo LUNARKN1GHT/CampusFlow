@@ -156,6 +156,8 @@ def _fixed_event_to_data(row: FixedEvent) -> FixedEventData:
         recurrence=EventRecurrence(row.recurrence),
         repeat_until=row.repeat_until,
         source_candidate_id=row.source_candidate_id,
+        source_invalidated_at=row.source_invalidated_at,
+        source_invalidated_note=row.source_invalidated_note,
     )
 
 
@@ -786,6 +788,36 @@ class SqlAlchemyScheduleRepository:
             select(FixedEvent).where(FixedEvent.source_candidate_id == candidate_id)
         )
         return _fixed_event_to_data(row) if row is not None else None
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        if not candidate_ids:
+            return []
+        return list(
+            self._session.scalars(
+                select(FixedEvent.id)
+                .where(FixedEvent.source_candidate_id.in_(candidate_ids))
+                .order_by(FixedEvent.id)
+            )
+        )
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        if not candidate_ids:
+            return 0
+        rows = list(
+            self._session.scalars(
+                select(FixedEvent).where(FixedEvent.source_candidate_id.in_(candidate_ids))
+            )
+        )
+        for row in rows:
+            row.source_candidate_id = None
+            # 留痕（R007/D009）：日程留下"来源曾是这份资料、现在已被删除"的记录，
+            # 否则它与手工录入的日程在界面上完全一样
+            row.source_invalidated_at = invalidated_at
+            row.source_invalidated_note = note
+        self._session.flush()
+        return len(rows)
 
     def create_fixed_event(
         self,
