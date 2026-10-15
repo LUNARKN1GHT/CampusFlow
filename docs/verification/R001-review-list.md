@@ -54,7 +54,7 @@
 ## 实现要点
 
 - **两套状态互不混用**：应用入口 `application.candidates.list_review_candidates` / `review_counts` 的 `statuses` 参数类型固定为 `ReviewStatus`，路由的 `status` 查询参数同样是 `list[ReviewStatus]`。传入任务进度值（`not_started`、`in_progress`、`blocked`、`completed`、`cancelled`）会被请求校验拒绝（422），不会退化成「无条件返回全部」；列表响应里也没有进度字段。默认值集中在 `DEFAULT_REVIEW_STATUSES = (ReviewStatus.PENDING,)`。
-- **列表只给最小字段**：仓储 `SqlCandidateRepository.list_for_review` 返回 `CandidateSummaryData`，标题从 `extracted_fields` 里单独取 `name == "title"` 的一条批量查出（非字符串值视为空），不加载字段全表、证据与修正记录；逐字段取值、出处与可定位引用仍由 R007 的 `GET /api/v1/tasks/{id}/source` 等详情接口读取。
+- **列表只给最小字段**：仓储 `SqlAlchemyCandidateRepository.list_for_review` 返回 `CandidateSummaryData`，标题从 `extracted_fields` 里单独取 `name == "title"` 的一条批量查出（非字符串值视为空），不加载字段全表、证据与修正记录；逐字段取值、出处与可定位引用仍由 R007 的 `GET /api/v1/tasks/{id}/source` 等详情接口读取。
 - **原因在应用层按代码过滤**：缺失原因存在 `extracted_items.review_reasons` 的 JSONB 列里，代码取值随 X 系列提取任务继续增加（现有如 `missing_year`、`missing_time`、`invalid_date`、`relative_date`、`deadline_needs_review`，以及各提取入口按缺失字段生成的 `missing_<field>`）。因此在 SQL 里硬编码已知代码会漏掉后续新增原因，端口约定由调用方在应用层过滤：列表按 `reason` 精确匹配代码，计数按候选去重后的代码集合累加。新增代码无需改本接口即可出现在筛选与计数中。
 - **未覆盖范围可从列表进入**：每条列表项都带 `source_material_id` 与 `version_no`（来源版本经 `MaterialVersion` 关联查出），界面可据此跳到该资料该版本的原文片段列表（如 `GET /api/v1/materials/{id}/versions/{version_no}/chunks`）查看解析未覆盖范围与原文定位；`review_reasons` 同时给出该条候选需要核对的具体缺失点。
 
