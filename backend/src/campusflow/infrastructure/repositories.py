@@ -331,7 +331,7 @@ class SqlAlchemyMaterialRepository:
         storage_key: str | None,
         checksum: str | None = None,
         *,
-        source_metadata: dict[str, str | None] | None = None,
+        source_metadata: dict[str, object] | None = None,
     ) -> MaterialVersionData:
         row = MaterialVersion(
             material_id=material_id,
@@ -344,6 +344,16 @@ class SqlAlchemyMaterialRepository:
         self._session.add(row)
         self._session.flush()
         return _material_version_to_data(row)
+
+    def merge_version_metadata(self, version_id: int, values: dict[str, object]) -> None:
+        row = self._session.get(MaterialVersion, version_id)
+        if row is None:
+            return
+        # JSONB 列必须整体赋值：原地修改不会被 SQLAlchemy 视为变更
+        merged = dict(row.source_metadata or {})
+        merged.update(values)
+        row.source_metadata = merged
+        self._session.flush()
 
     def set_archived(self, material_id: int, archived: bool) -> MaterialData | None:
         row = self._session.get(Material, material_id)

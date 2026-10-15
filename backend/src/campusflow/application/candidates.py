@@ -3,6 +3,7 @@
 from campusflow.application.materials import _require_associations, get_material
 from campusflow.application.ports.candidates import CandidateData
 from campusflow.application.ports.repositories import Repositories
+from campusflow.application.source_uncertainty import refresh_conflict_reasons, scope_key
 from campusflow.domain.candidates import CandidateDraft, validate_candidate
 from campusflow.domain.errors import DomainError, NotFoundError
 
@@ -51,7 +52,16 @@ def save_candidates(
                 if evidence.quote not in source.text:
                     raise DomainError("证据摘录无法在对应原文片段中找到")
     try:
-        result = [repos.candidates.create(workspace_id, version.id, draft) for draft in drafts]
+        created = [repos.candidates.create(workspace_id, version.id, draft) for draft in drafts]
+        # X008：保存后重算同一适用范围内的取值冲突。先入库再比对，才能发现跨来源
+        # 的不一致，并把冲突原因同时挂到新旧两侧——冲突证据并列保留，不删任何一侧。
+        refresh_conflict_reasons(repos, workspace_id, [scope_key(d.scope) for d in drafts])
+        # 刷新可能给本批候选补上了冲突原因，重新读取以返回最新内容
+        result = [
+            item
+            for item in (repos.candidates.get(workspace_id, c.id) for c in created)
+            if item is not None
+        ]
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()

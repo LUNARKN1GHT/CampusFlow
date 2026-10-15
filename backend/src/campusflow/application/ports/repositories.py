@@ -155,7 +155,8 @@ class MaterialVersionData:
     storage_key: str | None
     checksum: str | None
     created_at: datetime
-    source_metadata: dict[str, str | None] = field(default_factory=dict)
+    # 版本元数据：网页快照存文本字段，解析覆盖范围（X008）存结构化对象。
+    source_metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -491,8 +492,12 @@ class MaterialRepository(Protocol):
         storage_key: str | None,
         checksum: str | None = None,
         *,
-        source_metadata: dict[str, str | None] | None = None,
+        source_metadata: dict[str, object] | None = None,
     ) -> MaterialVersionData: ...
+
+    def merge_version_metadata(self, version_id: int, values: dict[str, object]) -> None:
+        """在版本元数据上合并若干键，保留其他键（X008 写入解析覆盖范围）。"""
+        ...
 
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
         """按文件指纹在当前空间查找已有资料（重复导入检测，D006）。"""
