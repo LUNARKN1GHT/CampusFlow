@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from campusflow.application.ports.candidates import (
     CandidateData,
+    CandidateSummaryData,
     FieldRevisionRecord,
     ReviewChangeRecord,
 )
@@ -188,6 +189,71 @@ class SqlAlchemyCandidateRepository:
                 .order_by(ExtractedItem.id)
             )
         )
+
+    def list_for_review(
+        self,
+        workspace_id: int,
+        *,
+        review_statuses: tuple[ReviewStatus, ...] | None = None,
+        kinds: tuple[str, ...] | None = None,
+        course_id: int | None = None,
+        semester_id: int | None = None,
+        material_id: int | None = None,
+    ) -> list[CandidateSummaryData]:
+        stmt = (
+            select(ExtractedItem, MaterialVersion.material_id, MaterialVersion.version_no)
+            .join(MaterialVersion, MaterialVersion.id == ExtractedItem.source_version_id)
+            .where(ExtractedItem.workspace_id == workspace_id)
+        )
+        if review_statuses is not None:
+            stmt = stmt.where(
+                ExtractedItem.review_status.in_([status.value for status in review_statuses])
+            )
+        if kinds is not None:
+            stmt = stmt.where(ExtractedItem.kind.in_(list(kinds)))
+        if course_id is not None:
+            stmt = stmt.where(ExtractedItem.course_id == course_id)
+        if semester_id is not None:
+            stmt = stmt.where(ExtractedItem.semester_id == semester_id)
+        if material_id is not None:
+            stmt = stmt.where(MaterialVersion.material_id == material_id)
+        stmt = stmt.order_by(ExtractedItem.id)
+        rows = self._session.execute(stmt).all()
+        if not rows:
+            return []
+        title_by_candidate = {
+            row.candidate_id: row.value
+            for row in self._session.execute(
+                select(ExtractedField.candidate_id, ExtractedField.value).where(
+                    ExtractedField.candidate_id.in_([item[0].id for item in rows]),
+                    ExtractedField.name == "title",
+                )
+            ).all()
+        }
+        summaries = []
+        for item, item_material_id, item_version_no in rows:
+            title = title_by_candidate.get(item.id)
+            summaries.append(
+                CandidateSummaryData(
+                    id=item.id,
+                    workspace_id=item.workspace_id,
+                    kind=item.kind,
+                    review_status=ReviewStatus(item.review_status),
+                    title=title if isinstance(title, str) else None,
+                    course_id=item.course_id,
+                    semester_id=item.semester_id,
+                    class_name=item.class_name,
+                    source_version_id=item.source_version_id,
+                    source_material_id=item_material_id,
+                    version_no=item_version_no,
+                    review_reasons=tuple(
+                        (reason["code"], reason["message"], reason.get("field"))
+                        for reason in item.review_reasons
+                    ),
+                    created_at=item.created_at,
+                )
+            )
+        return summaries
 
     def add_field_revision(
         self, workspace_id: int, candidate_id: int, revision: FieldRevision

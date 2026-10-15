@@ -1,7 +1,9 @@
-"""候选保存边界：核对空间、适用范围、真实片段与摘录后，原子保存待核对结果。"""
+"""候选保存与核对列表边界：核对空间、适用范围、真实片段与摘录后原子保存，并按核对状态和缺失原因列出。"""
+
+from dataclasses import dataclass
 
 from campusflow.application.materials import _require_associations, get_material
-from campusflow.application.ports.candidates import CandidateData
+from campusflow.application.ports.candidates import CandidateData, CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories
 from campusflow.domain.candidates import (
     CandidateDraft,
@@ -151,3 +153,93 @@ def set_candidate_review_status(
         repos.uow.rollback()
         raise
     return get_candidate(repos, workspace_id, candidate_id)
+
+
+DEFAULT_REVIEW_STATUSES = (ReviewStatus.PENDING,)
+
+
+def _require_review_filters_in_workspace(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    course_id: int | None,
+    semester_id: int | None,
+    material_id: int | None,
+) -> None:
+    _require_associations(repos, workspace_id, semester_id, course_id)
+    if material_id is not None:
+        get_material(repos, workspace_id, material_id)
+
+
+def list_review_candidates(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    statuses: tuple[ReviewStatus, ...] = DEFAULT_REVIEW_STATUSES,
+    kinds: tuple[str, ...] | None = None,
+    course_id: int | None = None,
+    semester_id: int | None = None,
+    material_id: int | None = None,
+    reason_code: str | None = None,
+) -> list[CandidateSummaryData]:
+    """R001：按核对状态、类型、适用范围与缺失原因列出候选。
+
+    核对状态与任务执行进度是两套独立状态，这里只接受 ReviewStatus；
+    默认只看待核对，已确认／已忽略／已失效需显式指定。
+    """
+    _require_review_filters_in_workspace(
+        repos, workspace_id, course_id=course_id, semester_id=semester_id, material_id=material_id
+    )
+    summaries = repos.candidates.list_for_review(
+        workspace_id,
+        review_statuses=statuses,
+        kinds=kinds,
+        course_id=course_id,
+        semester_id=semester_id,
+        material_id=material_id,
+    )
+    if reason_code is not None:
+        summaries = [
+            item
+            for item in summaries
+            if any(code == reason_code for code, _, _ in item.review_reasons)
+        ]
+    return summaries
+
+
+@dataclass(frozen=True)
+class ReviewCounts:
+    """待核对列表计数：按核对状态与缺失原因分别统计，供界面显示。"""
+
+    total: int
+    by_status: dict[str, int]
+    by_reason: dict[str, int]
+
+
+def review_counts(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    kinds: tuple[str, ...] | None = None,
+    course_id: int | None = None,
+    semester_id: int | None = None,
+    material_id: int | None = None,
+) -> ReviewCounts:
+    """统计全部核对状态下的候选数量，覆盖范围与列表一致（不含原因筛选）。"""
+    _require_review_filters_in_workspace(
+        repos, workspace_id, course_id=course_id, semester_id=semester_id, material_id=material_id
+    )
+    summaries = repos.candidates.list_for_review(
+        workspace_id,
+        kinds=kinds,
+        course_id=course_id,
+        semester_id=semester_id,
+        material_id=material_id,
+    )
+    by_status: dict[str, int] = {}
+    by_reason: dict[str, int] = {}
+    for item in summaries:
+        by_status[item.review_status.value] = by_status.get(item.review_status.value, 0) + 1
+        for code in {reason_code for reason_code, _, _ in item.review_reasons}:
+            by_reason[code] = by_reason.get(code, 0) + 1
+    return ReviewCounts(len(summaries), by_status, by_reason)
