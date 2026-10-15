@@ -77,14 +77,14 @@ def strict_json(text: str):
     return json.loads(text, object_pairs_hook=pairs, parse_constant=invalid)
 
 
-def post(api_key: str, endpoint: str, payload: dict) -> dict:
+def post(api_key: str, endpoint: str, payload: dict, timeout: int = 30) -> dict:
     request = urllib.request.Request(
         API_ROOT + endpoint,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=30) as response:
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout) as response:
             body = response.read(1024 * 1024 + 1)
         if len(body) > 1024 * 1024:
             raise RunStopped("response_too_large")
@@ -103,13 +103,28 @@ def post(api_key: str, endpoint: str, payload: dict) -> dict:
 
 
 class Client:
-    def __init__(self, api_key: str, path: Path, budget: Decimal, transport=post):
+    def __init__(self, api_key: str, path: Path, budget: Decimal, transport=post, *, resume=False):
         self.api_key = api_key
         self.path = path
         self.transport = transport
         self.budget = budget
-        self.ledger = {"budget_cny": str(budget), "calls": []}
-        save(path, self.ledger)
+        if resume:
+            self.ledger = prep.load_json(path)
+            if Decimal(self.ledger["budget_cny"]) != budget:
+                raise RunStopped("budget_changed")
+            for sequence, call in enumerate(self.ledger["calls"], start=1):
+                expected = RESERVE if call["model_requested"] in EMBEDDERS else Decimal(0)
+                if (
+                    call["sequence"] != sequence
+                    or call["model_requested"] not in (*EMBEDDERS, *GENERATORS)
+                    or Decimal(call["reserved_cny"]) != expected
+                ):
+                    raise RunStopped("invalid_saved_ledger")
+        else:
+            if path.exists():
+                raise RunStopped("billing_already_exists")
+            self.ledger = {"budget_cny": str(budget), "calls": []}
+            save(path, self.ledger)
 
     def request(self, endpoint: str, payload: dict, purpose: str) -> dict:
         model = payload.get("model")
@@ -277,7 +292,7 @@ def parse_answer(raw: dict) -> tuple[str, dict | None]:
         return text, None
 
 
-def execute(asset: dict, client: Client, destination: Path, repeats: int) -> dict:
+def execute(asset: dict, client: Client, destination: Path, repeats: int, *, resume=False) -> dict:
     report = {
         "mode": "real_api_pending_human_review",
         "sample_set_version": asset["version"],
@@ -289,6 +304,20 @@ def execute(asset: dict, client: Client, destination: Path, repeats: int) -> dic
         "caveat": "未经人工语义复核；没有引用支持率或模型选型结论。费用为用量乘单价估算。",
     }
     output = destination / "results.json"
+    if resume:
+        report = prep.load_json(output)
+        if report["sample_set_version"] != asset["version"] or report["repeats"] != repeats:
+            raise RunStopped("saved_samples_changed")
+        for run in report["runs"]:
+            if run["status"] == "started":
+                run["status"] = "interrupted"
+        report["status"] = "running"
+        report.pop("stop_reason", None)
+    done = {
+        (r["config_id"], r["case_id"], r["repeat"])
+        for r in report["runs"]
+        if r["status"] in ("completed", "invalid_answer")
+    }
     save(output, report)
     documents = [
         doc for doc in asset["corpus"] if any(prep.eligible(doc, c) for c in asset["cases"])
@@ -296,20 +325,46 @@ def execute(asset: dict, client: Client, destination: Path, repeats: int) -> dic
     try:
         for embedder in EMBEDDERS:
             vectors = {}
+            vector_path = destination / (embedder + "-vectors.json")
+            if resume and vector_path.exists():
+                cached = prep.load_json(vector_path)
+                if cached["model"] != embedder:
+                    raise RunStopped("saved_vector_model_changed")
+                vectors = cached["vectors"]
+                for vector in vectors.values():
+                    if (
+                        not isinstance(vector, list)
+                        or len(vector) != 1024
+                        or any(type(x) not in (float, int) or not math.isfinite(x) for x in vector)
+                        or not math.isfinite(sum(x * x for x in vector))
+                        or not any(vector)
+                    ):
+                        raise RunStopped("invalid_saved_vector")
             for doc in documents:
+                if doc["id"] in vectors:
+                    continue
                 vectors[doc["id"]] = client.embed(embedder, doc["text"], "index:" + doc["id"])
                 save(
                     destination / (embedder + "-vectors.json"),
                     {"model": embedder, "vectors": vectors},
                 )
             for generator in GENERATORS:
+                config_id = embedder + "+" + generator
+                if all(
+                    (config_id, c["id"], r + 1) in done
+                    for c in asset["cases"]
+                    for r in range(repeats)
+                ):
+                    continue
                 # 每组先预热；预热也进入预算账本，但不混入样本时延。
                 client.embed(embedder, "校园合成样本预热", "warmup")
                 client.request("chat/completions", answer_payload(generator, "预热", []), "warmup")
                 for repeat in range(repeats):
                     for case in asset["cases"]:
+                        if (config_id, case["id"], repeat + 1) in done:
+                            continue
                         run = {
-                            "config_id": embedder + "+" + generator,
+                            "config_id": config_id,
                             "case_id": case["id"],
                             "scenario": case["scenario"],
                             "input_type": case["input_type"],
@@ -317,6 +372,12 @@ def execute(asset: dict, client: Client, destination: Path, repeats: int) -> dic
                             "status": "started",
                             "human_review": "pending",
                             "reviewer": "",
+                            "attempt": 1
+                            + sum(
+                                (old["config_id"], old["case_id"], old["repeat"])
+                                == (config_id, case["id"], repeat + 1)
+                                for old in report["runs"]
+                            ),
                         }
                         report["runs"].append(run)
                         save(output, report)
@@ -355,7 +416,9 @@ def execute(asset: dict, client: Client, destination: Path, repeats: int) -> dic
         if report["runs"] and report["runs"][-1]["status"] == "started":
             report["runs"][-1]["status"] = "failed"
     finally:
-        report["unattempted_samples"] = report["planned_samples"] - len(report["runs"])
+        report["unattempted_samples"] = report["planned_samples"] - len(
+            {(r["config_id"], r["case_id"], r["repeat"]) for r in report["runs"]}
+        )
         save(output, report)
     return report
 
@@ -411,13 +474,15 @@ def main() -> int:
     parser.add_argument("--execute", action="store_true", help="显式开启已授权的真实调用")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--env-file", type=Path)
+    parser.add_argument("--resume", action="store_true", help="显式继承原目录账本并补未完成题")
+    parser.add_argument("--timeout", type=int, choices=(30, 60), default=30)
     args = parser.parse_args()
     print("4 combinations; 9 cases x 2 repeats; budget <= 1 CNY; synthetic data only")
     if not args.execute:
         print("Dry run only. No model calls.")
         return 0
-    if args.output_dir is None or args.output_dir.exists():
-        parser.error("真实运行必须指定新的输出目录，不自动续跑已调用记录")
+    if args.output_dir is None or (args.output_dir.exists() != args.resume):
+        parser.error("初次运行使用新目录；继续原目录必须显式 --resume")
     key = os.environ.get("ZHIPU_API_KEY", "")
     if not key and args.env_file:
         from dotenv import dotenv_values
@@ -428,39 +493,78 @@ def main() -> int:
         return 2
     asset = prep.load_json(prep.DEFAULT_CASES)
     prep.validate_cases(asset)
-    args.output_dir.mkdir(parents=True)
-    save(
-        args.output_dir / "manifest.json",
-        {
-            "commit_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=prep.ROOT)
-            .decode()
-            .strip(),
-            "cases_sha256": hashlib.sha256(prep.DEFAULT_CASES.read_bytes()).hexdigest(),
-            "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-            "preparation_script_sha256": hashlib.sha256(
-                Path(prep.__file__).read_bytes()
-            ).hexdigest(),
-            "budget_cny": "1",
-            "embedding_cny_per_million_tokens": "0.5",
-            "generation_cny_per_million_tokens": "0",
-            "price_verified_on": "2026-10-15",
-            "dimensions": 1024,
-            "repeats": 2,
-            "retry_count": 0,
-            "price_sources": [
-                "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2",
-                "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3",
-                "https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414",
-                "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash",
-            ],
-        },
-    )
-    prep.write_annotation_review(asset, args.output_dir / "annotation-review.csv")
-    client = Client(key, args.output_dir / "billing.json", Decimal("1"))
-    report = execute(asset, client, args.output_dir, repeats=2)
-    write_review(asset, report, args.output_dir / "answer-review.csv")
-    print(report["status"], report.get("stop_reason", ""))
-    return 0 if report["status"] == "completed_pending_review" else 1
+    if not args.resume:
+        args.output_dir.mkdir(parents=True)
+    manifest = {
+        "commit_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=prep.ROOT)
+        .decode()
+        .strip(),
+        "cases_sha256": hashlib.sha256(prep.DEFAULT_CASES.read_bytes()).hexdigest(),
+        "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "preparation_script_sha256": hashlib.sha256(Path(prep.__file__).read_bytes()).hexdigest(),
+        "budget_cny": "1",
+        "embedding_cny_per_million_tokens": "0.5",
+        "generation_cny_per_million_tokens": "0",
+        "price_verified_on": "2026-10-15",
+        "dimensions": 1024,
+        "repeats": 2,
+        "retry_count": 0,
+        "price_sources": [
+            "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2",
+            "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3",
+            "https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414",
+            "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash",
+        ],
+    }
+    lock = args.output_dir / ".active"
+    try:
+        with lock.open("x", encoding="utf-8") as stream:
+            stream.write(str(os.getpid()))
+    except FileExistsError:
+        print("Existing run lock; verify no process is active before continuing.")
+        return 2
+    try:
+        run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+        if args.resume:
+            original = prep.load_json(args.output_dir / "manifest.json")
+            for field in (
+                "cases_sha256",
+                "budget_cny",
+                "dimensions",
+                "repeats",
+                "embedding_cny_per_million_tokens",
+                "generation_cny_per_million_tokens",
+            ):
+                if original[field] != manifest[field]:
+                    raise RunStopped("resume_configuration_changed")
+            save(
+                args.output_dir / (run_id + "-before-results.json"),
+                prep.load_json(args.output_dir / "results.json"),
+            )
+        else:
+            save(args.output_dir / "manifest.json", manifest)
+            prep.write_annotation_review(asset, args.output_dir / "annotation-review.csv")
+        save(
+            args.output_dir / (run_id + "-execution.json"),
+            {**manifest, "timeout_seconds": args.timeout, "resume": args.resume},
+        )
+        client = Client(
+            key,
+            args.output_dir / "billing.json",
+            Decimal("1"),
+            lambda key, endpoint, payload: post(key, endpoint, payload, args.timeout),
+            resume=args.resume,
+        )
+        report = execute(asset, client, args.output_dir, repeats=2, resume=args.resume)
+        review_name = run_id + "-answer-review.csv" if args.resume else "answer-review.csv"
+        write_review(asset, report, args.output_dir / review_name)
+        print(report["status"], report.get("stop_reason", ""))
+        return 0 if report["status"] == "completed_pending_review" else 1
+    except RunStopped as exc:
+        print(str(exc))
+        return 2
+    finally:
+        lock.unlink()
 
 
 if __name__ == "__main__":

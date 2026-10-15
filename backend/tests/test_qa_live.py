@@ -194,3 +194,75 @@ def test_transient_windows_file_lock_only_retries_local_replace(live, tmp_path, 
     live.save(tmp_path / "result.json", {"status": "saved"})
     assert len(calls) == 2
     assert json.loads((tmp_path / "result.json").read_text()) == {"status": "saved"}
+
+
+def test_resume_preserves_failed_attempt_budget_and_skips_completed(live, tmp_path):
+    asset = live.prep.load_json(live.prep.DEFAULT_CASES)
+    count = 0
+
+    def first_transport(key, endpoint, payload):
+        nonlocal count
+        count += 1
+        if count == 13:
+            raise live.RunStopped("network_failure_or_timeout")
+        return response(endpoint)
+
+    billing = tmp_path / "bill.json"
+    first = live.Client("key", billing, Decimal(1), first_transport)
+    stopped = live.execute(asset, first, tmp_path, repeats=1)
+    assert [r["status"] for r in stopped["runs"]] == ["completed", "failed"]
+    old_calls = json.loads(billing.read_text(encoding="utf-8"))["calls"]
+    resumed_calls = []
+
+    def second_transport(key, endpoint, payload):
+        resumed_calls.append(payload)
+        return response(endpoint)
+
+    client = live.Client("key", billing, Decimal(1), second_transport, resume=True)
+    result = live.execute(asset, client, tmp_path, repeats=1, resume=True)
+    assert result["status"] == "completed_pending_review"
+    assert result["unattempted_samples"] == 0 and len(result["runs"]) == 37
+    assert client.ledger["calls"][: len(old_calls)] == old_calls
+    assert client.ledger["calls"][13]["sequence"] == 14
+    assert result["runs"][1]["status"] == "failed"
+    repeats = [
+        r
+        for r in result["runs"]
+        if r["case_id"] == "deadline-b" and r["config_id"] == "embedding-2+glm-4-flash-250414"
+    ]
+    assert len(repeats) == 2 and repeats[-1]["attempt"] == 2
+    # 第一组首题已完成，继续运行不得再把它发送给同一回答模型。
+    sent = [
+        json.loads(p["messages"][1]["content"])["question"]
+        for p in resumed_calls
+        if p["model"] == "glm-4-flash-250414"
+    ]
+    # 第二个检索模型仍会正常测试该题，只有一次。
+    assert sent.count(asset["cases"][0]["question"]) == 1
+
+
+def test_resume_does_not_reset_reserved_budget(live, tmp_path):
+    path = tmp_path / "bill.json"
+    client = live.Client("key", path, live.RESERVE, lambda *args: response("embeddings"))
+    client.embed("embedding-2", "样本", "query")
+    resumed = live.Client(
+        "key", path, live.RESERVE, lambda *args: pytest.fail("no new call"), resume=True
+    )
+    with pytest.raises(live.RunStopped, match="budget_limit"):
+        resumed.embed("embedding-3", "样本", "query")
+    with pytest.raises(live.RunStopped, match="billing_already_exists"):
+        live.Client("key", path, Decimal(1))
+    with pytest.raises(live.RunStopped, match="budget_changed"):
+        live.Client("key", path, Decimal(1), resume=True)
+
+
+def test_completed_resume_makes_no_more_api_calls(live, tmp_path):
+    asset = live.prep.load_json(live.prep.DEFAULT_CASES)
+    path = tmp_path / "bill.json"
+    client = live.Client("key", path, Decimal(1), lambda key, ep, payload: response(ep))
+    live.execute(asset, client, tmp_path, repeats=1)
+    client = live.Client(
+        "key", path, Decimal(1), lambda *args: pytest.fail("no new call"), resume=True
+    )
+    report = live.execute(asset, client, tmp_path, repeats=1, resume=True)
+    assert len(report["runs"]) == 36
