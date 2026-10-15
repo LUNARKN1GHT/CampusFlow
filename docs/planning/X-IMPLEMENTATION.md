@@ -16,6 +16,8 @@ X006 已随 PR #368 合入 develop，采用用户选择的代码计算，已实�
 
 X008 按用户选择，把解析未覆盖范围结构化存入资料版本已有的元数据字段（不新增列）并转成候选级"来源不完整"原因，被截断的来源不视为已确认；同一适用范围内同一字段的多个不一致取值并列保留，两侧都标注冲突原因，不按版本新旧择一，见 [X008 说明](../verification/X008-uncertainty.md)。本项从 develop `e224d04` 创建 `issue/#115`，目标为 develop。下一项 X010；审核及关闭以 GitHub 为准。
 
+X010 按用户选择先用假模型跑：样本清单 `samples/evaluation/extraction-cases.json` 覆盖四类困难样本共 9 个来源样本，记录表 `docs/quality/extraction-evaluation-records.csv` 按 B017 口径给出三个配置的原始分子分母，证明解析成功率相同而提取准确性可分辨；结构性失败按未命中计入、不剔除，分母为 0 留空记 not_applicable，见 [X010 说明](../verification/X010-extraction-evaluation.md)。本项未用真实模型跑分、未提出阈值，`config_id` 均带 `fake-` 前缀。X001–X010 中属于金嘉睿的九项至此各有可审阅成果；X009 #116 仍由队友负责，收尾以 GitHub 的审核与关闭状态为准。
+
 2026-10-14：X004 采用用户选定的“AI 提取＋代码保守检查”，已实现固定活动原文、缺失起止与证据校验，见 [X004 说明](../verification/X004-event-extraction.md)。X003 已随 PR #359 合入父分支 issue/#11，本分支同步后已并入其代码；前置 X001–X003 均已合并。下一项为 X005，任务合并与关闭仍以 GitHub 为准。
 
 | 顺序 | 任务 | 可审阅成果与验收重点 |
