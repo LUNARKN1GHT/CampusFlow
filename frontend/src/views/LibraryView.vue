@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -49,7 +50,10 @@ const jobs = reactive<Record<number, ProcessingJob>>({})
 const jobErrors = reactive<Record<number, string>>({})
 const retryingId = ref<number | null>(null)
 const sourceMaterial = ref<Material | null>(null)
+const sourceVersionNo = ref<number | null>(null)
+const sourceChunkId = ref<number | null>(null)
 const lifecycleMaterial = ref<Material | null>(null)
+const route = useRoute()
 
 const pollPaused = ref(false)
 let pollTimer: number | null = null
@@ -221,6 +225,31 @@ async function onMaterialDeleted(id: number) {
   await refresh()
 }
 
+function openSource(material: Material) {
+  sourceVersionNo.value = null
+  sourceChunkId.value = null
+  sourceMaterial.value = material
+}
+
+function queryNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/** 核对界面的「定位原文」带上引用所属版本与片段，避免把旧版本的摘录定位到最新版本上。 */
+async function openReferencedSource() {
+  const materialId = queryNumber(route.query.material)
+  if (materialId === null) return
+  try {
+    sourceMaterial.value = await materialsApi.get(materialId)
+  } catch {
+    // 资料已删除或不属于本空间时跳过定位，列表仍可正常查看。
+    return
+  }
+  sourceVersionNo.value = queryNumber(route.query.version)
+  sourceChunkId.value = queryNumber(route.query.chunk)
+}
+
 function onFilesChosen(event: Event) {
   const input = event.target as HTMLInputElement
   selectedFiles.value = Array.from(input.files ?? [])
@@ -295,6 +324,7 @@ function switchImportMode(mode: 'text' | 'files') {
 
 onMounted(async () => {
   await load()
+  await openReferencedSource()
 })
 
 onBeforeUnmount(stopPolling)
@@ -413,7 +443,7 @@ onBeforeUnmount(stopPolling)
                 @click="retry(material)"
               >{{ retryingId === material.id ? '正在重试…' : '重试处理' }}</button>
               <span v-else-if="material.status === 'failed' && jobFor(material)" class="muted small">不可重试</span>
-              <button type="button" class="text-button" @click="sourceMaterial = material">查看原文</button>
+              <button type="button" class="text-button" @click="openSource(material)">查看原文</button>
               <button type="button" class="text-button" @click="lifecycleMaterial = material">归档 / 删除</button>
             </div>
           </article>
@@ -423,9 +453,11 @@ onBeforeUnmount(stopPolling)
 
       <MaterialSource
         v-if="sourceMaterial"
-        :key="sourceMaterial.id"
+        :key="`${sourceMaterial.id}-${sourceVersionNo ?? 'latest'}-${sourceChunkId ?? 'first'}`"
         :material="sourceMaterial"
         :scope="scopeText(sourceMaterial)"
+        :initial-version-no="sourceVersionNo"
+        :initial-chunk-id="sourceChunkId"
         @close="sourceMaterial = null"
       />
 
