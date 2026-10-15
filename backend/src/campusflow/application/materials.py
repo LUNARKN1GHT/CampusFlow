@@ -344,6 +344,8 @@ class DeleteImpact:
     confirm_token: str
     # R007：由本资料候选转换来的固定日程，删除后会保留并标记来源已失效
     linked_fixed_event_ids: list[int] = field(default_factory=list)
+    # R006：由本资料候选转换来的课程规则，同样保留并标记来源已失效
+    linked_rule_ids: list[int] = field(default_factory=list)
 
 
 def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
@@ -353,6 +355,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     linked_tasks = repos.tasks.list_by_source_material(material_id)
     candidate_ids = repos.candidates.ids_by_material(workspace_id, material_id)
     linked_event_ids = repos.schedule.list_ids_by_source_candidates(candidate_ids)
+    linked_rule_ids = repos.rules.list_ids_by_source_candidates(candidate_ids)
     # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
     # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
     unfinished_jobs = [
@@ -365,6 +368,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         [t.id for t in linked_tasks],
         candidate_ids=candidate_ids,
         linked_fixed_event_ids=linked_event_ids,
+        linked_rule_ids=linked_rule_ids,
     )
     return DeleteImpact(
         material=material,
@@ -375,6 +379,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         candidate_count=len(candidate_ids),
         confirm_token=token,
         linked_fixed_event_ids=linked_event_ids,
+        linked_rule_ids=linked_rule_ids,
     )
 
 
@@ -415,6 +420,12 @@ def delete_material(
     # R007：日程没有"随资料删除"的选项，始终保留并标记来源已失效；
     # 必须在删除资料前处理，候选级联删除后就不再有来源关联可查。
     repos.schedule.invalidate_source_candidates(
+        repos.candidates.ids_by_material(workspace_id, material_id),
+        invalidated_at=datetime.now(UTC),
+        note=invalidated_source_note(impact.material.title),
+    )
+    # R006：课程规则与日程同样处理，保留规则并留下"来源已失效"的痕迹
+    repos.rules.invalidate_source_candidates(
         repos.candidates.ids_by_material(workspace_id, material_id),
         invalidated_at=datetime.now(UTC),
         note=invalidated_source_note(impact.material.title),

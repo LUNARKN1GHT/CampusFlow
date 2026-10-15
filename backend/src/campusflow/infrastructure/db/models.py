@@ -152,6 +152,42 @@ class AvailabilitySlot(Base):
     end_time: Mapped[time] = mapped_column(Time)
 
 
+class CourseRule(Base):
+    """R006：由已确认规则候选转换而来的课程规则。
+
+    条件、适用范围与生效声明只保存原文文本，不解析日期、不换算相对写法；
+    缺少年份或依据不足时保留待核对，不把猜测当成已确认约束。
+    """
+
+    __tablename__ = "course_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    rule_text: Mapped[str] = mapped_column(String)
+    conditions_text: Mapped[str | None] = mapped_column(String)
+    scope_text: Mapped[str | None] = mapped_column(String)
+    effective_text: Mapped[str | None] = mapped_column(String)
+    # 来源资料（核对转规则时写入）；删除资料时置空并留下失效留痕
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
+    # 核对转换而来时指向来源候选，唯一约束保证一个候选只建一条规则；
+    # 候选随资料删除后置空，来源失效由下面的两列标记。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    # 来源失效留痕（R006，对齐任务的 D009）：记住"曾经有来源、来源已被删除"
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Material(Base):
     """学习资料（D001）。
 
