@@ -90,6 +90,17 @@ X003 复用 X002 装配出的 TextGenerator，应用调用 `task_extraction.extr
 
 X004 复用现有文字模型配置，通过 `event_extraction.extract_event_drafts` 显式取得活动候选；调用方可用 `candidates.save_candidates` 保存待核对数据。无新增安装包或迁移，没有自动提取按钮。专项测试：`uv run --locked pytest tests/test_event_extraction.py -q`；错误处理与契约见 [X004 说明](verification/X004-event-extraction.md)。
 
+R002 追加字段修正记录表；更新代码后需运行 `uv run --locked alembic upgrade head`。应用层通过 `candidates.revise_candidate_field` 追加修正，原始提取与证据不改写，仍不开放候选写入 HTTP 接口。专项测试：`uv run --locked pytest tests/test_candidate_revisions.py -q`；契约与边界见 [R002 说明](verification/R002-field-revisions.md)。
+
+R003 追加核对状态变更记录表；同样需先 `uv run --locked alembic upgrade head`。状态转换与确认前必须字段检查在应用层 `candidates.set_candidate_review_status`，仍不开放候选 HTTP 接口。专项测试：`uv run --locked pytest tests/test_candidate_review.py -q`；转换集合与确认规则见 [R003 说明](verification/R003-review-transitions.md)。
+
+R004 给 `tasks` 增加来源候选关联列；更新代码后需运行 `uv run --locked alembic upgrade head`。应用层 `conversion.convert_candidate_to_task` 把已确认的任务候选转为正式任务，幂等且只解析代码可识别的日期写法。专项测试：`uv run --locked pytest tests/test_candidate_conversion.py -q`；映射与日期精度见 [R004 说明](verification/R004-task-conversion.md)。
+
+R005 给 `fixed_events` 增加来源候选关联列；同样需先 `uv run --locked alembic upgrade head`。应用层 `conversion.convert_candidate_to_event` 把已确认的日程候选转为固定日程，起止不可确定时拒绝。专项测试：`uv run --locked pytest tests/test_candidate_event_conversion.py -q`；时间解析与校验见 [R005 说明](verification/R005-event-conversion.md)。
+
+R006 新增 `course_rules` 表；更新代码后需运行 `uv run --locked alembic upgrade head`。应用层 `conversion.convert_candidate_to_rule` 把已确认的规则候选转为正式课程规则，幂等且只保留原文不做日期换算；`GET /api/v1/rules` 按课程／学期只读查询。专项测试：`uv run --locked pytest tests/test_candidate_rule_conversion.py -q`；字段映射与删除留痕见 [R006 说明](verification/R006-confirmed-rules.md)。
+
+R007 给 `fixed_events` 补齐来源失效留痕列；更新代码后需运行 `uv run --locked alembic upgrade head`。来源详情接口 `GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source` 返回出处、引用与可验证状态，资料删除后不再返回可验证引用。专项测试：`uv run --locked pytest tests/test_source_detail.py -q`；结构与失效行为见 [R007 说明](verification/R007-source-detail.md)。
 X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_drafts` 得到待核对规则，按需显式保存。无新增依赖、迁移和自动入口。专项测试：`uv run --locked pytest tests/test_rule_extraction.py -q`；完整原文及条件字段契约见 [X005 说明](verification/X005-rule-extraction.md)。
 
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。

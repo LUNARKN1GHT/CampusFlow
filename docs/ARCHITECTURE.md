@@ -188,6 +188,17 @@ X002 在 application/ports/generation.py 定义 TextGenerator，仅交换受控�
 
 X003 的 application/task_extraction.py 定义任务专用字段并复用 X002 授权与生成边界；domain/deadline_completeness.py 仅检查截止原文完整性，不依赖模型或系统时间，不生成可排期日期。缺失及建议原因由代码补充，模型不能覆盖。调用方显式使用 X001 保存草稿，仍保持 pending；日期换算及核对交互由后续模块负责，见 [X003 说明](verification/X003-progress.md)。
 
+R002 在 domain/candidates.py 增加 FieldRevision 与 effective_fields：字段修正按追加保存修正前后值、操作者与来源类型，原始提取与证据不改写；application/candidates.py 的 revise_candidate_field 复用同一字段出处规则，用户填写的值不能声明为原文规定，来源只能标为用户补充或规划建议。新表 candidate_field_revisions 由 infrastructure 仓储持久化，候选核对状态仍由 R003 定义转换。见 [R002 说明](verification/R002-field-revisions.md)。
+
+R003 在 domain/candidates.py 定义合法转换、按类型的必需字段与 require_confirmed_for_conversion：确认前检查叠加修正后的生效取值，缺少必需字段默认拒绝、可显式确认并记录原因；被忽略或已失效的候选不参与正式约束。application/candidates.py 的 set_candidate_review_status 更新状态并写入 candidate_review_changes 留痕（方向、操作者、原因、时间），与 task_progress_changes 对齐。见 [R003 说明](verification/R003-review-transitions.md)。
+
+R004 在 domain/candidate_conversion.py 定义任务候选到正式任务的字段映射与截止解析：只有日期的写法不补时刻，相对或无效写法只保留原文到 due_note，日期来源按字段出处映射。application/conversion.py 的 convert_candidate_to_task 要求候选已确认，在一个事务里创建任务并写入 source_material_id 与唯一的 source_candidate_id，重复调用返回既有任务。见 [R004 说明](verification/R004-task-conversion.md)。
+
+R005 在 domain/event_conversion.py 定义日程候选到固定日程的起止解析：必须能解析出日期与时刻，只有日期或相对写法一律拒绝，不按全天或常见时长补造。application/conversion.py 的 convert_candidate_to_event 按工作空间时区换算后复用 validate_fixed_event 校验区间，写入唯一的 source_candidate_id，重复调用返回既有日程。见 [R005 说明](verification/R005-event-conversion.md)。
+
+R006 在 domain/rule_conversion.py 定义规则候选到正式课程规则的字段映射：title 与 rule_text 必需，缺任一项拒绝；conditions／scope／effective 只保留原文，不解析生效日期、不换算相对写法。application/conversion.py 的 convert_candidate_to_rule 要求候选已确认，在一个事务里创建 `course_rules`（迁移 r007_course_rules）并写入 source_material_id 与唯一的 source_candidate_id，重复调用返回既有规则；application/rules.py 的 list_rules 提供按课程／学期过滤的只读查询，`GET /api/v1/rules` 限当前空间。资料删除时规则保留并写入来源失效留痕，删除影响预览计入 linked_rule_ids 与确认指纹。见 [R006 说明](verification/R006-confirmed-rules.md)。
+
+R007 提供任务与日程的来源详情只读接口：`GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source`。application/source_detail.py 组合候选原始字段、逐条修正、原文引用与定位，只把仍能定位到原文的引用作为可验证引用返回；domain/source_detail.py 定义来源类型与引用可验证规则。固定日程补齐来源失效留痕（迁移 r006_event_source_invalidation），资料删除时与任务一并写入，删除影响预览新增关联日程并计入确认指纹。见 [R007 说明](verification/R007-source-detail.md)。
 X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候选；domain/rule_extraction.py 校验完整片段及限定语句边界，不依赖模型或数据库。条件/范围/生效信息保留独立证据，未知不推定无条件。调用方显式使用 X001 保存 pending 候选，正式确认由 R 系列处理。见 [X005 说明](verification/X005-rule-extraction.md)。
 
 目标数据分组如下，具体字段和迁移在功能实现时确定：

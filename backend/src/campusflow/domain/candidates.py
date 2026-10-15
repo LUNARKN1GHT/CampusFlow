@@ -2,10 +2,12 @@
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
 from campusflow.domain.errors import DomainError
+from campusflow.domain.states import ReviewStatus
 
 type JsonValue = str | int | float | bool | None | list[JsonValue] | dict[str, JsonValue]
 
@@ -85,43 +87,47 @@ def _json_value(value: JsonValue, depth: int = 0) -> None:
         raise DomainError("字段值含无效字符")
 
 
+def _validate_field(field: CandidateField, names: set[str]) -> None:
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field.name) or field.name in names:
+        raise DomainError("候选字段名无效或重复")
+    names.add(field.name)
+    if not isinstance(field.origin, FieldOrigin):
+        raise DomainError("字段必须标明原文、用户补充、系统推断或规划建议")
+    _json_value(field.value)
+    try:
+        encoded = json.dumps(field.value, ensure_ascii=False, allow_nan=False)
+    except (ValueError, TypeError, OverflowError):
+        raise DomainError("字段值不能包含无效数字或不可保存的数据") from None
+    if len(encoded) > 32000:
+        raise DomainError("字段值过长")
+    _text(field.missing_reason, 500, "缺失原因", required=field.value is None)
+    _text(field.explanation, 1000, "字段说明")
+    if field.value is not None:
+        if field.origin in (FieldOrigin.DOCUMENT, FieldOrigin.INFERRED) and not field.evidence:
+            raise DomainError("原文规定或系统推断必须关联来源证据")
+        if field.origin in (FieldOrigin.INFERRED, FieldOrigin.SUGGESTION):
+            _text(field.explanation, 1000, "推断依据或建议说明", required=True)
+    if len(field.evidence) > 32:
+        raise DomainError("单个字段的证据数量过多")
+    seen = set()
+    for evidence in field.evidence:
+        if type(evidence.chunk_id) is not int or evidence.chunk_id < 1:
+            raise DomainError("证据片段编号无效")
+        _text(evidence.quote, 6000, "原文摘录", required=True)
+        key = (evidence.chunk_id, evidence.quote)
+        if key in seen:
+            raise DomainError("同一字段的证据重复")
+        seen.add(key)
+
+
 def validate_candidate(draft: CandidateDraft) -> None:
     if not isinstance(draft.kind, CandidateKind):
         raise DomainError("候选类型必须是任务、日程或规则")
     if not 1 <= len(draft.fields) <= 64:
         raise DomainError("候选事项必须包含 1 至 64 个字段")
-    names = set()
+    names: set[str] = set()
     for item in draft.fields:
-        if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", item.name) or item.name in names:
-            raise DomainError("候选字段名无效或重复")
-        names.add(item.name)
-        if not isinstance(item.origin, FieldOrigin):
-            raise DomainError("字段必须标明原文、用户补充、系统推断或规划建议")
-        _json_value(item.value)
-        try:
-            encoded = json.dumps(item.value, ensure_ascii=False, allow_nan=False)
-        except (ValueError, TypeError, OverflowError):
-            raise DomainError("字段值不能包含无效数字或不可保存的数据") from None
-        if len(encoded) > 32000:
-            raise DomainError("字段值过长")
-        _text(item.missing_reason, 500, "缺失原因", required=item.value is None)
-        _text(item.explanation, 1000, "字段说明")
-        if item.value is not None:
-            if item.origin in (FieldOrigin.DOCUMENT, FieldOrigin.INFERRED) and not item.evidence:
-                raise DomainError("原文规定或系统推断必须关联来源证据")
-            if item.origin in (FieldOrigin.INFERRED, FieldOrigin.SUGGESTION):
-                _text(item.explanation, 1000, "推断依据或建议说明", required=True)
-        if len(item.evidence) > 32:
-            raise DomainError("单个字段的证据数量过多")
-        seen = set()
-        for evidence in item.evidence:
-            if type(evidence.chunk_id) is not int or evidence.chunk_id < 1:
-                raise DomainError("证据片段编号无效")
-            _text(evidence.quote, 6000, "原文摘录", required=True)
-            key = (evidence.chunk_id, evidence.quote)
-            if key in seen:
-                raise DomainError("同一字段的证据重复")
-            seen.add(key)
+        _validate_field(item, names)
     for identifier in (draft.scope.semester_id, draft.scope.course_id):
         if identifier is not None and (type(identifier) is not int or identifier < 1):
             raise DomainError("适用学期或课程编号无效")
@@ -134,3 +140,130 @@ def validate_candidate(draft: CandidateDraft) -> None:
         _text(reason.message, 1000, "核对原因", required=True)
         if reason.field is not None and reason.field not in names:
             raise DomainError("核对原因指向了不存在的字段")
+
+
+@dataclass(frozen=True)
+class FieldRevision:
+    """R002：一次字段修正。保存修正前后值、操作者与来源类型。
+
+    原始提取与证据不改动；修正值不再沿用原文证据，因此不能声明为原文规定。
+    """
+
+    field_name: str
+    previous_value: JsonValue
+    new_value: JsonValue
+    previous_origin: FieldOrigin
+    new_origin: FieldOrigin
+    operator: str
+    note: str | None = None
+
+
+def _field_after_revision(field: CandidateField, revision: FieldRevision) -> CandidateField:
+    # 修正值由用户提供，不继承原文证据；空值缺理由时按缺失字段处理。
+    return CandidateField(
+        name=field.name,
+        value=revision.new_value,
+        origin=revision.new_origin,
+        evidence=(),
+        explanation=revision.note,
+        missing_reason=revision.note if revision.new_value is None else None,
+    )
+
+
+def validate_field_revision(field: CandidateField, revision: FieldRevision) -> None:
+    """核对修正前后的取值一致，并确认修正结果符合字段出处规则。"""
+    if revision.field_name != field.name:
+        raise DomainError("修正记录的字段名与目标字段不一致")
+    if not isinstance(revision.previous_origin, FieldOrigin):
+        raise DomainError("修正前的来源类型无效")
+    if revision.previous_origin is not field.origin or revision.previous_value != field.value:
+        raise DomainError("修正前取值与字段当前状态不一致")
+    _text(revision.operator, 100, "操作者", required=True)
+    _text(revision.note, 1000, "修正说明")
+    _validate_field(_field_after_revision(field, revision), set())
+
+
+def apply_revisions(field: CandidateField, revisions: Sequence[FieldRevision]) -> CandidateField:
+    """按先后顺序叠加同一字段的修正，得到当前生效字段。"""
+    current = field
+    for revision in revisions:
+        current = _field_after_revision(current, revision)
+    return current
+
+
+def effective_fields(
+    fields: Sequence[CandidateField], revisions: Sequence[FieldRevision]
+) -> tuple[CandidateField, ...]:
+    """原始字段叠加修正后的生效取值，供核对界面展示。"""
+    by_name: dict[str, list[FieldRevision]] = {}
+    for revision in revisions:
+        by_name.setdefault(revision.field_name, []).append(revision)
+    return tuple(apply_revisions(field, by_name.get(field.name, ())) for field in fields)
+
+
+# R003：按类型定义的必需字段，与提取 spec 的 allow_missing=False 保持一致。
+REQUIRED_FIELDS: dict[CandidateKind, tuple[str, ...]] = {
+    CandidateKind.TASK: ("title",),
+    CandidateKind.EVENT: ("title", "activity_text"),
+    CandidateKind.RULE: (),
+}
+
+_REVIEW_LABELS = {
+    ReviewStatus.PENDING: "待核对",
+    ReviewStatus.CONFIRMED: "已确认",
+    ReviewStatus.IGNORED: "已忽略",
+    ReviewStatus.SUPERSEDED: "已失效",
+}
+
+# 用户可以撤销核对决定退回待核对；已失效只允许重新打开，不再直接跳转。
+REVIEW_TRANSITIONS: dict[ReviewStatus, frozenset[ReviewStatus]] = {
+    ReviewStatus.PENDING: frozenset(
+        {ReviewStatus.CONFIRMED, ReviewStatus.IGNORED, ReviewStatus.SUPERSEDED}
+    ),
+    ReviewStatus.CONFIRMED: frozenset({ReviewStatus.PENDING, ReviewStatus.SUPERSEDED}),
+    ReviewStatus.IGNORED: frozenset({ReviewStatus.PENDING}),
+    ReviewStatus.SUPERSEDED: frozenset({ReviewStatus.PENDING}),
+}
+
+
+@dataclass(frozen=True)
+class ReviewChange:
+    """R003：一次候选核对状态变更，保存转换方向、操作者与原因。"""
+
+    from_status: ReviewStatus
+    to_status: ReviewStatus
+    operator: str
+    reason: str | None = None
+
+
+def validate_review_change(change: ReviewChange) -> None:
+    if not isinstance(change.from_status, ReviewStatus) or not isinstance(
+        change.to_status, ReviewStatus
+    ):
+        raise DomainError("核对状态无效")
+    if change.to_status is change.from_status:
+        raise DomainError(f"候选已经处于{_REVIEW_LABELS[change.from_status]}状态")
+    if change.to_status not in REVIEW_TRANSITIONS[change.from_status]:
+        raise DomainError(
+            f"不允许从{_REVIEW_LABELS[change.from_status]}转换为{_REVIEW_LABELS[change.to_status]}"
+        )
+    _text(change.operator, 100, "操作者", required=True)
+    _text(change.reason, 500, "变更原因")
+
+
+def missing_required_fields(
+    kind: CandidateKind, fields: Sequence[CandidateField]
+) -> tuple[str, ...]:
+    """按候选类型列出仍然缺失的必需字段名，供确认前提示。"""
+    present = {field.name: field for field in fields}
+    return tuple(
+        name
+        for name in REQUIRED_FIELDS.get(kind, ())
+        if (field := present.get(name)) is None or field.value is None
+    )
+
+
+def require_confirmed_for_conversion(status: ReviewStatus) -> None:
+    """被忽略或已失效的候选不参与正式约束，只有已确认项可以转换。"""
+    if status is not ReviewStatus.CONFIRMED:
+        raise DomainError("只有已确认的候选事项可以转换为正式事项")

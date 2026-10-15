@@ -1,9 +1,11 @@
 """API 输入输出 schema。"""
 
 from datetime import date, datetime, time
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from campusflow.domain.candidates import FieldOrigin
 from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 
 
@@ -197,3 +199,73 @@ class AvailabilitySlotOut(BaseModel):
     day_of_week: int
     start_time: time
     end_time: time
+
+
+class RuleOut(BaseModel):
+    """正式课程规则（R006）：只含经核对确认转换的规则。"""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    course_id: int | None
+    semester_id: int | None
+    title: str
+    rule_text: str
+    conditions_text: str | None
+    scope_text: str | None
+    effective_text: str | None
+    source_material_id: int | None
+    source_candidate_id: int | None
+    # 来源状态（对齐 D009）：available 还有来源 / invalidated 来源已被删除 / none 无来源
+    source_state: str
+    source_invalidated_at: datetime | None
+    source_invalidated_note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SourceCitationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    chunk_id: int
+    quote: str
+    locator_type: str
+    locator_value: str
+
+
+class SourceFieldOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    name: str
+    value: Any
+    origin: FieldOrigin
+    note: str | None
+    verifiable: bool
+    citations: list[SourceCitationOut]
+
+
+class SourceCorrectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    field_name: str
+    previous_value: Any
+    new_value: Any
+    new_origin: FieldOrigin
+    operator: str
+    note: str | None
+    changed_at: datetime
+
+
+class SourceDetailOut(BaseModel):
+    """R007：任务或日程的来源详情。"""
+
+    model_config = ConfigDict(from_attributes=True)
+    object_type: str
+    object_id: int
+    source_type: str
+    source_state: str
+    source_note: str | None
+    material_id: int | None
+    material_title: str | None
+    version_no: int | None
+    candidate_id: int | None
+    due_source: str | None
+    due_note: str | None
+    fields: list[SourceFieldOut]
+    corrections: list[SourceCorrectionOut]

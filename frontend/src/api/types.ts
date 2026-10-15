@@ -180,6 +180,8 @@ export type MaterialDeleteImpact = {
   linked_task_ids: number[]
   unfinished_job_count: number
   candidate_count: number
+  linked_fixed_event_ids: number[]
+  linked_rule_ids: number[]
   confirm_token: string
   backup_note: string
 }
@@ -209,4 +211,101 @@ export type MaterialUploadParams = {
   course_id: number | null
   class_name: string | null
   allow_duplicate: boolean
+}
+
+export type ReviewStatus = 'pending' | 'confirmed' | 'ignored' | 'superseded'
+export type CandidateKind = 'task' | 'event' | 'rule'
+
+export type CandidateReason = {
+  code: string
+  message: string
+  field: string | null
+}
+
+export type CandidateSummary = {
+  id: number
+  kind: CandidateKind
+  review_status: ReviewStatus
+  title: string | null
+  course_id: number | null
+  semester_id: number | null
+  class_name: string | null
+  source_material_id: number
+  source_version_id: number
+  version_no: number
+  review_reasons: CandidateReason[]
+  created_at: string
+}
+
+export type FieldOrigin = 'document' | 'user' | 'inferred' | 'suggestion'
+
+export type CandidateEvidence = {
+  chunk_id: number
+  quote: string
+  locator_type: string
+  locator_value: string
+  verifiable: boolean
+}
+
+export type CandidateFieldView = {
+  name: string
+  value: unknown
+  origin: FieldOrigin
+  effective_value: unknown
+  effective_origin: FieldOrigin
+  explanation: string | null
+  missing_reason: string | null
+  verifiable: boolean
+  evidence: CandidateEvidence[]
+}
+
+export type CandidateRevision = {
+  id: number
+  field_name: string
+  previous_value: unknown
+  new_value: unknown
+  previous_origin: FieldOrigin
+  new_origin: FieldOrigin
+  operator: string
+  note: string | null
+  created_at: string
+}
+
+export type CandidateReviewChange = {
+  id: number
+  from_status: ReviewStatus
+  to_status: ReviewStatus
+  operator: string
+  reason: string | null
+  changed_at: string
+}
+
+export type CandidateConversion = { kind: CandidateKind; object_id: number; title: string }
+export type CandidateConversionResult = CandidateConversion & { created: boolean }
+
+export type CandidateReviewDetail = {
+  id: number
+  kind: CandidateKind
+  review_status: ReviewStatus
+  created_at: string
+  scope: {
+    course_id: number | null
+    semester_id: number | null
+    class_name: string | null
+    course_name: string | null
+    semester_name: string | null
+  }
+  source: {
+    material_id: number
+    material_title: string
+    version_id: number
+    version_no: number
+  }
+  fields: CandidateFieldView[]
+  revisions: CandidateRevision[]
+  review_reasons: CandidateReason[]
+  review_changes: CandidateReviewChange[]
+  missing_required_fields: string[]
+  allowed_transitions: ReviewStatus[]
+  converted: CandidateConversion | null
 }
