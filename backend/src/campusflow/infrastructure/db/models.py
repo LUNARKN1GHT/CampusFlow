@@ -10,6 +10,7 @@ from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -79,6 +80,11 @@ class Task(Base):
     # 与手工建的任务分不出来。这两列记住"曾经有来源、来源已被删除"。
     source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
+    # R004：核对转换而来时指向来源候选，唯一约束保证一个候选只建一个任务；
+    # 候选随资料删除后置空，来源失效由上面的两列标记。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，
@@ -125,6 +131,15 @@ class FixedEvent(Base):
     location: Mapped[str | None] = mapped_column(String(200))
     recurrence: Mapped[str] = mapped_column(String(20), default=EventRecurrence.NONE)
     repeat_until: Mapped[date | None] = mapped_column(Date)
+    # R005：核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程；
+    # 候选随资料删除后置空，不伪造来源。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    # R007：来源失效留痕（对齐任务的 D009）。候选删除后只靠置空无法与手工日程区分，
+    # 因此记住"曾经有来源、来源已被删除"。
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
 
 
 class AvailabilitySlot(Base):
@@ -135,6 +150,42 @@ class AvailabilitySlot(Base):
     day_of_week: Mapped[int] = mapped_column(Integer)  # 0=周一 … 6=周日
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
+
+
+class CourseRule(Base):
+    """R006：由已确认规则候选转换而来的课程规则。
+
+    条件、适用范围与生效声明只保存原文文本，不解析日期、不换算相对写法；
+    缺少年份或依据不足时保留待核对，不把猜测当成已确认约束。
+    """
+
+    __tablename__ = "course_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    rule_text: Mapped[str] = mapped_column(String)
+    conditions_text: Mapped[str | None] = mapped_column(String)
+    scope_text: Mapped[str | None] = mapped_column(String)
+    effective_text: Mapped[str | None] = mapped_column(String)
+    # 来源资料（核对转规则时写入）；删除资料时置空并留下失效留痕
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
+    # 核对转换而来时指向来源候选，唯一约束保证一个候选只建一条规则；
+    # 候选随资料删除后置空，来源失效由下面的两列标记。
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    # 来源失效留痕（R006，对齐任务的 D009）：记住"曾经有来源、来源已被删除"
+    source_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_invalidated_note: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class Material(Base):
@@ -271,3 +322,113 @@ class ProcessingJobAttempt(Base):
     error_reason: Mapped[str | None] = mapped_column(String(500))  # 经 sanitize 清洗
     retryable: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExtractedItem(Base):
+    """X001：候选事项仅保存核对状态，不保存任务执行进度。"""
+
+    __tablename__ = "extracted_items"
+    __table_args__ = (
+        CheckConstraint("kind IN ('task', 'event', 'rule')", name="ck_candidate_kind"),
+        CheckConstraint(
+            "review_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_candidate_review_status",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    source_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    review_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending"
+    )
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    review_reasons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExtractedField(Base):
+    __tablename__ = "extracted_fields"
+    __table_args__ = (
+        UniqueConstraint("candidate_id", "name", name="uq_candidate_field_name"),
+        CheckConstraint(
+            "origin IN ('document', 'user', 'inferred', 'suggestion')", name="ck_field_origin"
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(64))
+    value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    origin: Mapped[str] = mapped_column(String(20))
+    explanation: Mapped[str | None] = mapped_column(String(1000))
+    missing_reason: Mapped[str | None] = mapped_column(String(500))
+
+
+class CandidateFieldEvidence(Base):
+    __tablename__ = "candidate_field_evidence"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_fields.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    quote: Mapped[str] = mapped_column(String(6000))
+
+
+class CandidateFieldRevision(Base):
+    """R002：字段修正按追加保存，不改写原始提取与证据。"""
+
+    __tablename__ = "candidate_field_revisions"
+    __table_args__ = (
+        CheckConstraint(
+            "previous_origin IN ('document', 'user', 'inferred', 'suggestion')",
+            name="ck_revision_previous_origin",
+        ),
+        CheckConstraint(
+            "new_origin IN ('document', 'user', 'inferred', 'suggestion')",
+            name="ck_revision_new_origin",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_fields.id", ondelete="CASCADE"), index=True
+    )
+    previous_value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    new_value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
+    previous_origin: Mapped[str] = mapped_column(String(20))
+    new_origin: Mapped[str] = mapped_column(String(20))
+    operator: Mapped[str] = mapped_column(String(100))
+    note: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CandidateReviewChange(Base):
+    """R003：候选核对状态变更留痕，保存转换方向、操作者与原因。"""
+
+    __tablename__ = "candidate_review_changes"
+    __table_args__ = (
+        CheckConstraint(
+            "from_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_review_change_from_status",
+        ),
+        CheckConstraint(
+            "to_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
+            name="ck_review_change_to_status",
+        ),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    from_status: Mapped[str] = mapped_column(String(20))
+    to_status: Mapped[str] = mapped_column(String(20))
+    operator: Mapped[str] = mapped_column(String(100))
+    reason: Mapped[str | None] = mapped_column(String(500))
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

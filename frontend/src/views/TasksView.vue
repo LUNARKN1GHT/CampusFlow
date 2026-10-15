@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -7,6 +8,7 @@ import type { Course, DueSourceType, Semester, Task, TaskInput, TaskPriority, Ta
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 
+const route = useRoute()
 const tasks = ref<Task[]>([])
 const courses = ref<Course[]>([])
 const semesters = ref<Semester[]>([])
@@ -48,6 +50,20 @@ const progressLabels: Record<TaskProgress, string> = {
 const priorityLabels: Record<TaskPriority, string> = { low: '低', medium: '中', high: '高' }
 const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
+function queryNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/** 核对界面确认后生成的正式事项由此参数直达并高亮。 */
+const highlightedTaskId = computed(() => queryNumber(route.query.task))
+
+async function scrollToHighlighted(): Promise<void> {
+  await nextTick()
+  if (highlightedTaskId.value === null) return
+  document.querySelector(`[data-task-id="${highlightedTaskId.value}"]`)?.scrollIntoView({ block: 'center' })
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -60,6 +76,7 @@ async function load() {
   } finally {
     loading.value = false
   }
+  await scrollToHighlighted()
 }
 
 function openEditor(task?: Task) {
@@ -173,7 +190,7 @@ onMounted(load)
       <section class="panel">
         <p v-if="loading" class="muted">正在加载任务…</p>
         <div v-else-if="visibleTasks.length" class="task-list">
-          <article v-for="task in visibleTasks" :key="task.id" class="task-row">
+          <article v-for="task in visibleTasks" :key="task.id" class="task-row" :class="{ 'is-highlighted': task.id === highlightedTaskId }" :data-task-id="task.id">
             <div class="priority-marker" :data-priority="task.priority"></div>
             <div class="task-main">
               <div class="task-title-line"><h3>{{ task.title }}</h3><span class="status-pill">{{ progressLabels[task.progress] }}</span><span v-if="task.overdue" class="status-pill overdue-pill">已逾期</span></div>

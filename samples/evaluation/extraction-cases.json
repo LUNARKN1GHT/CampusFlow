@@ -1,0 +1,241 @@
+{
+  "sample_set_version": "b011-b012-2026-09-29",
+  "purpose": "X010 提取与不确定信息识别评测的人工标注。chunk 是解析成功后的原文片段（本评测固定“解析已完成”的前提，因此解析成功率不进入任何指标）。model_facts 是替换模型给出的固定回答，只用于验证计数口径，不代表真实模型效果。",
+  "annotation_source": "人工标注依据 samples/synthetic/b011/expected.json、samples/synthetic/b012/expected.json 与 samples/synthetic/b012/README.md。",
+  "reason_units": {
+    "missing_year": "deadline.year",
+    "missing_time": "deadline.time",
+    "relative_date": "deadline.relative",
+    "unrecognized_date": "deadline.unrecognized",
+    "ambiguous_date": "deadline.ambiguous",
+    "source_incomplete": "source.coverage",
+    "source_conflict": "deadline.conflict",
+    "missing_due_text": "task.due_text",
+    "missing_submission_method": "task.submission_method"
+  },
+  "cases": [
+    {
+      "case_id": "chat-truncated",
+      "difficulty": "partial-coverage",
+      "sample_ids": ["CF-IMG-004"],
+      "sources": [
+        {
+          "source_key": "来源版本 #11",
+          "chunk": "课程助教：本周练习已发布，适用于 ALG2026-A 班。\n同学A：请问截止时间是周五晚上吗？\n课程助教：请以课程平台为准。截图只显示到周五，没有年份、具体时刻和提交入口。\n课程助教：补充要求如下：请先完成",
+          "coverage": {
+            "fragment_count": 1,
+            "failures": [
+              {
+                "locator_type": "region",
+                "locator_value": "0.0540,0.8450,0.8460,1.0000",
+                "reason": "last message is cut by screenshot boundary",
+                "retryable": false
+              }
+            ]
+          },
+          "model_facts": {"title": "本周练习", "due_text": "周五"},
+          "expected_facts": {"title": "本周练习", "due_text": "周五"},
+          "expected_uncertain": [
+            "deadline.year",
+            "deadline.time",
+            "deadline.relative",
+            "task.submission_method",
+            "source.coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "blurred-notice",
+      "difficulty": "partial-coverage",
+      "sample_ids": ["CF-IMG-002"],
+      "sources": [
+        {
+          "source_key": "来源版本 #21",
+          "chunk": "数据库系统实验通知（合成）\n实验二：事务隔离级别\n截止：2026 年 10 月 16 日 18:00\n适用教学班：DB2026-A\n提交内容：实验报告、SQL 脚本与运行截图。",
+          "coverage": {
+            "fragment_count": 1,
+            "failures": [
+              {
+                "locator_type": "region",
+                "locator_value": "0.0640,0.2708,1.0000,0.7448",
+                "reason": "intentional Gaussian blur",
+                "retryable": false
+              },
+              {
+                "locator_type": "page",
+                "locator_value": "2",
+                "reason": "declared page count is 2 but only page 1 is present",
+                "retryable": false
+              }
+            ]
+          },
+          "model_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日 18:00",
+            "deliverable": "实验报告、SQL 脚本与运行截图"
+          },
+          "expected_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日 18:00",
+            "deliverable": "实验报告、SQL 脚本与运行截图"
+          },
+          "expected_uncertain": ["task.submission_method", "source.coverage"]
+        }
+      ]
+    },
+    {
+      "case_id": "missing-pages",
+      "difficulty": "partial-coverage",
+      "sample_ids": ["CF-IMG-003"],
+      "sources": [
+        {
+          "source_key": "来源版本 #31",
+          "chunk": "课程实验手册（合成）\n2026 秋季 | NET2026-A | 第 2 页 / 共 3 页\n本页可读内容：实验环境与步骤",
+          "coverage": {
+            "fragment_count": 1,
+            "failures": [
+              {
+                "locator_type": "page",
+                "locator_value": "1",
+                "reason": "page not imported",
+                "retryable": false
+              },
+              {
+                "locator_type": "page",
+                "locator_value": "3",
+                "reason": "page not imported",
+                "retryable": false
+              }
+            ]
+          },
+          "model_facts": {"title": "课程实验手册"},
+          "expected_facts": {"title": "课程实验手册"},
+          "expected_uncertain": [
+            "task.due_text",
+            "task.submission_method",
+            "deadline.year",
+            "deadline.time",
+            "source.coverage"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "relative-date",
+      "difficulty": "relative-date",
+      "sample_ids": ["CF-TXT-001"],
+      "sources": [
+        {
+          "source_key": "来源版本 #41",
+          "chunk": "通知正文：需求分析作业将在下周三 18:00 截止，请通过课程平台提交。",
+          "model_facts": {
+            "title": "需求分析作业",
+            "due_text": "下周三 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_facts": {
+            "title": "需求分析作业",
+            "due_text": "下周三 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_uncertain": ["deadline.year", "deadline.relative"]
+        }
+      ]
+    },
+    {
+      "case_id": "missing-year-time",
+      "difficulty": "missing-field",
+      "sample_ids": ["CF-TXT-002"],
+      "sources": [
+        {
+          "source_key": "来源版本 #51",
+          "chunk": "通知正文：实验一请在 10 月 15 日提交到课程平台。",
+          "model_facts": {
+            "title": "实验一",
+            "due_text": "10 月 15 日",
+            "submission_method": "提交到课程平台"
+          },
+          "expected_facts": {
+            "title": "实验一",
+            "due_text": "10 月 15 日",
+            "submission_method": "提交到课程平台"
+          },
+          "expected_uncertain": ["deadline.year", "deadline.time"]
+        }
+      ]
+    },
+    {
+      "case_id": "conflicting-notices",
+      "difficulty": "cross-source",
+      "sample_ids": ["CF-TXT-005", "CF-TXT-006"],
+      "sources": [
+        {
+          "source_key": "来源版本 #61",
+          "chunk": "通知正文：实验报告截止时间为 2026 年 10 月 18 日 18:00，通过课程平台提交。",
+          "model_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 18 日 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 18 日 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_uncertain": ["deadline.conflict"]
+        },
+        {
+          "source_key": "来源版本 #62",
+          "chunk": "通知正文：实验报告截止时间为 2026 年 10 月 20 日 20:00，通过课程平台提交。",
+          "model_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 20 日 20:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 20 日 20:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "expected_uncertain": ["deadline.conflict"]
+        }
+      ]
+    },
+    {
+      "case_id": "same-name-different-sections",
+      "difficulty": "cross-source",
+      "sample_ids": ["CF-TXT-003", "CF-TXT-004"],
+      "sources": [
+        {
+          "source_key": "来源版本 #71",
+          "class_name": "PHY2026-A",
+          "chunk": "通知正文：大学物理第一次习题截止时间为 2026 年 10 月 10 日 20:00，仅适用于 PHY2026-A 班。",
+          "model_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "expected_uncertain": ["task.submission_method"]
+        },
+        {
+          "source_key": "来源版本 #72",
+          "class_name": "PHY2026-B",
+          "chunk": "通知正文：大学物理第一次习题截止时间为 2026 年 10 月 12 日 18:00，仅适用于 PHY2026-B 班。",
+          "model_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "expected_uncertain": ["task.submission_method"]
+        }
+      ]
+    }
+  ]
+}

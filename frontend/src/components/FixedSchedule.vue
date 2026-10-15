@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { coursesApi, scheduleApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -7,6 +8,7 @@ import { settingsApi } from '../api/settings'
 import type { Course, FixedEvent, FixedEventInput, FixedEventOccurrence } from '../api/types'
 import ApiFeedback from './ApiFeedback.vue'
 
+const route = useRoute()
 const definitions = ref<FixedEvent[]>([])
 const occurrences = ref<FixedEventOccurrence[]>([])
 const courses = ref<Course[]>([])
@@ -62,6 +64,24 @@ const days = computed(() => Array.from({ length: 7 }, (_, index) => {
 
 const weekEnd = computed(() => days.value[6]?.key ?? dateKey(weekStart.value))
 const courseMap = computed(() => new Map(courses.value.map((course) => [course.id, course])))
+let highlightScrolled = false
+
+function queryNumber(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+/** 核对界面确认后生成的固定日程由此参数直达并高亮，只在首次加载后滚动一次。 */
+const highlightedEventId = computed(() => queryNumber(route.query.event))
+
+async function scrollToHighlighted(): Promise<void> {
+  if (highlightScrolled || highlightedEventId.value === null) return
+  await nextTick()
+  const target = document.querySelector(`[data-event-id="${highlightedEventId.value}"]`)
+  if (!target) return
+  target.scrollIntoView({ block: 'center' })
+  highlightScrolled = true
+}
 
 async function load() {
   loading.value = true
@@ -80,6 +100,7 @@ async function load() {
   } finally {
     loading.value = false
   }
+  await scrollToHighlighted()
 }
 
 function changeWeek(offset: number) {
@@ -159,7 +180,7 @@ onMounted(load)
       <div v-for="day in days" :key="day.key" class="week-day"><strong>{{ day.label }}</strong><div v-if="day.events.length" class="day-events"><article v-for="item in day.events" :key="`${item.source_event_id}-${item.starts_at}`"><time>{{ timeRange(item, day.key) }}</time><b>{{ item.title }}</b><span>{{ courseMap.get(item.course_id ?? -1)?.name || item.location || '固定安排' }}</span></article></div><span v-else class="day-empty">无固定安排</span></div>
     </div>
 
-    <div v-if="definitions.length" class="definition-list"><h3 class="subheading">重复规则与编辑</h3><div><article v-for="event in definitions" :key="event.id"><span><strong>{{ event.title }}</strong><small>{{ event.recurrence === 'weekly' ? `每周重复至 ${event.repeat_until}` : '不重复' }}</small></span><span><button type="button" class="text-button" @click="openEditor(event)">编辑</button><button type="button" class="danger-button" @click="deleteEvent(event)">删除</button></span></article></div></div>
+    <div v-if="definitions.length" class="definition-list"><h3 class="subheading">重复规则与编辑</h3><div><article v-for="event in definitions" :key="event.id" :class="{ 'is-highlighted': event.id === highlightedEventId }" :data-event-id="event.id"><span><strong>{{ event.title }}</strong><small>{{ event.recurrence === 'weekly' ? `每周重复至 ${event.repeat_until}` : '不重复' }}</small></span><span><button type="button" class="text-button" @click="openEditor(event)">编辑</button><button type="button" class="danger-button" @click="deleteEvent(event)">删除</button></span></article></div></div>
   </section>
 
   <section v-if="editorOpen" class="panel editor-panel">

@@ -191,6 +191,11 @@ class DeleteImpactOut(BaseModel):
     linked_task_ids: list[int]
     # 还在处理中、会被这次删除一并清掉的作业数（D009）：不为 0 时界面应提示
     unfinished_job_count: int
+    candidate_count: int
+    # R007：由这些候选转换来的固定日程，删除后保留并标记来源已失效
+    linked_fixed_event_ids: list[int]
+    # R006：由这些候选转换来的课程规则，同样保留并标记来源已失效
+    linked_rule_ids: list[int]
     confirm_token: str
     backup_note: str
 
@@ -212,6 +217,9 @@ def delete_impact(
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
         unfinished_job_count=impact.unfinished_job_count,
+        candidate_count=impact.candidate_count,
+        linked_fixed_event_ids=impact.linked_fixed_event_ids,
+        linked_rule_ids=impact.linked_rule_ids,
         confirm_token=impact.confirm_token,
         backup_note=(
             f"本地存储将立即删除；若启用备份，残留副本将在 {days} 天保留期限到期后"
@@ -247,7 +255,7 @@ class MaterialVersionOut(BaseModel):
     version_no: int
     note: str | None
     created_at: datetime
-    source_metadata: dict[str, str | None]
+    source_metadata: dict[str, object]
 
 
 @router.get("/{material_id}/versions", response_model=list[MaterialVersionOut])

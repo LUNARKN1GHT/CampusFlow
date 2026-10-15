@@ -15,9 +15,11 @@ from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.repositories import ProcessingJobData, Repositories
 from campusflow.application.processing import parse_version
 from campusflow.infrastructure.repositories import (
+    SqlAlchemyCandidateRepository,
     SqlAlchemyCourseRepository,
     SqlAlchemyJobRepository,
     SqlAlchemyMaterialRepository,
+    SqlAlchemyRuleRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemySemesterRepository,
     SqlAlchemyTaskRepository,
@@ -42,6 +44,8 @@ def _repos(session: Session) -> Repositories:
         schedule=SqlAlchemyScheduleRepository(session),
         materials=SqlAlchemyMaterialRepository(session),
         jobs=SqlAlchemyJobRepository(session),
+        candidates=SqlAlchemyCandidateRepository(session),
+        rules=SqlAlchemyRuleRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
 

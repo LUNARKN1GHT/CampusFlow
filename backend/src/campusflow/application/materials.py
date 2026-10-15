@@ -5,7 +5,7 @@
 """
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -16,6 +16,7 @@ from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
+    MaterialVersionData,
     NewSourceChunk,
     Repositories,
     SourceChunkData,
@@ -340,7 +341,12 @@ class DeleteImpact:
     chunk_count: int
     linked_task_ids: list[int]
     unfinished_job_count: int
+    candidate_count: int
     confirm_token: str
+    # R007：由本资料候选转换来的固定日程，删除后会保留并标记来源已失效
+    linked_fixed_event_ids: list[int] = field(default_factory=list)
+    # R006：由本资料候选转换来的课程规则，同样保留并标记来源已失效
+    linked_rule_ids: list[int] = field(default_factory=list)
 
 
 def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
@@ -348,6 +354,9 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     versions = repos.materials.list_versions(material_id)
     chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
     linked_tasks = repos.tasks.list_by_source_material(material_id)
+    candidate_ids = repos.candidates.ids_by_material(workspace_id, material_id)
+    linked_event_ids = repos.schedule.list_ids_by_source_candidates(candidate_ids)
+    linked_rule_ids = repos.rules.list_ids_by_source_candidates(candidate_ids)
     # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
     # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
     unfinished_jobs = [
@@ -358,6 +367,9 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         [v.id for v in versions],
         chunk_count,
         [t.id for t in linked_tasks],
+        candidate_ids=candidate_ids,
+        linked_fixed_event_ids=linked_event_ids,
+        linked_rule_ids=linked_rule_ids,
     )
     return DeleteImpact(
         material=material,
@@ -365,7 +377,10 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         chunk_count=chunk_count,
         linked_task_ids=[t.id for t in linked_tasks],
         unfinished_job_count=len(unfinished_jobs),
+        candidate_count=len(candidate_ids),
         confirm_token=token,
+        linked_fixed_event_ids=linked_event_ids,
+        linked_rule_ids=linked_rule_ids,
     )
 
 
@@ -403,6 +418,20 @@ def delete_material(
         for task in repos.tasks.list_by_source_material(material_id):
             repos.tasks.delete(task.id)
 
+    # R007：日程没有"随资料删除"的选项，始终保留并标记来源已失效；
+    # 必须在删除资料前处理，候选级联删除后就不再有来源关联可查。
+    repos.schedule.invalidate_source_candidates(
+        repos.candidates.ids_by_material(workspace_id, material_id),
+        invalidated_at=datetime.now(UTC),
+        note=invalidated_source_note(impact.material.title),
+    )
+    # R006：课程规则与日程同样处理，保留规则并留下"来源已失效"的痕迹
+    repos.rules.invalidate_source_candidates(
+        repos.candidates.ids_by_material(workspace_id, material_id),
+        invalidated_at=datetime.now(UTC),
+        note=invalidated_source_note(impact.material.title),
+    )
+
     repos.materials.delete(material_id)
     repos.uow.commit()
     # 数据库删除成功后清理原文件
@@ -418,10 +447,10 @@ def list_material_versions(repos: Repositories, workspace_id: int, material_id: 
     return repos.materials.list_versions(material_id)
 
 
-def list_version_chunks(
+def get_version(
     repos: Repositories, workspace_id: int, material_id: int, version_no: int
-) -> list[SourceChunkData]:
-    """指定版本的片段与定位信息（D018）。"""
+) -> MaterialVersionData:
+    """指定资料版本（含元数据）；不存在时报错，不返回 None 让调用方猜测。"""
     get_material(repos, workspace_id, material_id)
     version = next(
         (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
@@ -429,7 +458,14 @@ def list_version_chunks(
     )
     if version is None:
         raise NotFoundError("版本不存在")
-    return repos.materials.list_chunks(version.id)
+    return version
+
+
+def list_version_chunks(
+    repos: Repositories, workspace_id: int, material_id: int, version_no: int
+) -> list[SourceChunkData]:
+    """指定版本的片段与定位信息（D018）。"""
+    return repos.materials.list_chunks(get_version(repos, workspace_id, material_id, version_no).id)
 
 
 def read_original_file(

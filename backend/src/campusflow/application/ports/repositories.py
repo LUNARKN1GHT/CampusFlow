@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import Protocol
 
+from campusflow.application.ports.candidates import CandidateRepository
 from campusflow.domain.states import (
     DueSourceType,
     EventRecurrence,
@@ -78,6 +79,8 @@ class TaskData:
     remaining_minutes: int | None
     created_at: datetime
     updated_at: datetime
+    # R004：由候选核对转换而来的任务保留候选关联，用于幂等与来源详情
+    source_candidate_id: int | None = None
     # 读取时按工作空间时区派生，不落库
     overdue: bool = False
 
@@ -115,6 +118,46 @@ class FixedEventData:
     location: str | None
     recurrence: EventRecurrence
     repeat_until: date | None
+    # R005：由核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程
+    source_candidate_id: int | None = None
+    # R007：来源失效留痕（对齐任务的 D009）
+    source_invalidated_at: datetime | None = None
+    source_invalidated_note: str | None = None
+
+    @property
+    def source_state(self) -> str:
+        """来源状态（R007）：还有来源候选 / 来源已失效 / 本来就没有来源。"""
+        from campusflow.domain.materials import source_state
+
+        return source_state(self.source_candidate_id, self.source_invalidated_at)
+
+
+@dataclass
+class RuleData:
+    """R006：由已确认规则候选转换而来的课程规则。"""
+
+    id: int
+    workspace_id: int
+    course_id: int | None
+    semester_id: int | None
+    title: str
+    rule_text: str
+    conditions_text: str | None
+    scope_text: str | None
+    effective_text: str | None
+    source_material_id: int | None
+    source_candidate_id: int | None
+    source_invalidated_at: datetime | None
+    source_invalidated_note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @property
+    def source_state(self) -> str:
+        """来源状态（R006，对齐任务 D009）：还有来源 / 来源已失效 / 本来就没有来源。"""
+        from campusflow.domain.materials import source_state
+
+        return source_state(self.source_material_id, self.source_invalidated_at)
 
 
 @dataclass
@@ -154,7 +197,8 @@ class MaterialVersionData:
     storage_key: str | None
     checksum: str | None
     created_at: datetime
-    source_metadata: dict[str, str | None] = field(default_factory=dict)
+    # 版本元数据：网页快照存文本字段，解析覆盖范围（X008）存结构化对象。
+    source_metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
@@ -384,6 +428,9 @@ class TaskRepository(Protocol):
         priority: TaskPriority,
         estimated_minutes: int | None,
         remaining_minutes: int | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
     ) -> TaskData: ...
 
     def update(
@@ -409,6 +456,10 @@ class TaskRepository(Protocol):
 
     def list_by_source_material(self, material_id: int) -> list[TaskData]: ...
 
+    def get_by_source_candidate(self, candidate_id: int) -> TaskData | None:
+        """按来源候选查已转换的任务（R004 幂等）。"""
+        ...
+
     def unlink_source_material(
         self, material_id: int, *, invalidated_at: datetime, note: str
     ) -> int:
@@ -426,6 +477,10 @@ class TaskRepository(Protocol):
 
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
+
+    def get_version(self, version_id: int) -> MaterialVersionData | None:
+        """按版本编号取版本，供来源关联使用（R004）。"""
+        ...
 
     def exists(self, material_id: int) -> bool:
         """资料是否仍然存在（J007）。
@@ -490,8 +545,12 @@ class MaterialRepository(Protocol):
         storage_key: str | None,
         checksum: str | None = None,
         *,
-        source_metadata: dict[str, str | None] | None = None,
+        source_metadata: dict[str, object] | None = None,
     ) -> MaterialVersionData: ...
+
+    def merge_version_metadata(self, version_id: int, values: dict[str, object]) -> None:
+        """在版本元数据上合并若干键，保留其他键（X008 写入解析覆盖范围）。"""
+        ...
 
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
         """按文件指纹在当前空间查找已有资料（重复导入检测，D006）。"""
@@ -520,6 +579,20 @@ class ScheduleRepository(Protocol):
 
     def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
 
+    def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
+        """按来源候选查已转换的固定日程（R005 幂等）。"""
+        ...
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        """列出由这些候选转换来的固定日程编号（R007）。"""
+        ...
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        """来源候选被删除时解除日程关联并留下失效痕迹（R007）。返回解除数量。"""
+        ...
+
     def create_fixed_event(
         self,
         workspace_id: int,
@@ -530,6 +603,8 @@ class ScheduleRepository(Protocol):
         location: str | None,
         recurrence: EventRecurrence,
         repeat_until: date | None,
+        *,
+        source_candidate_id: int | None = None,
     ) -> FixedEventData: ...
 
     def update_fixed_event(
@@ -556,6 +631,47 @@ class ScheduleRepository(Protocol):
     def delete_availability_slot(self, slot_id: int) -> bool: ...
 
 
+class RuleRepository(Protocol):
+    def create(
+        self,
+        workspace_id: int,
+        course_id: int | None,
+        semester_id: int | None,
+        title: str,
+        rule_text: str,
+        conditions_text: str | None,
+        scope_text: str | None,
+        effective_text: str | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
+    ) -> RuleData: ...
+
+    def get(self, rule_id: int) -> RuleData | None: ...
+
+    def get_by_source_candidate(self, candidate_id: int) -> RuleData | None:
+        """按来源候选查已转换的课程规则（R006 幂等）。"""
+        ...
+
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        course_id: int | None = None,
+        semester_id: int | None = None,
+    ) -> list[RuleData]: ...
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        """列出由这些候选转换来的课程规则编号（R006 删除影响预览）。"""
+        ...
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        """来源候选被删除时解除规则关联并留下失效痕迹（R006）。返回解除数量。"""
+        ...
+
+
 @dataclass
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
@@ -567,4 +683,6 @@ class Repositories:
     schedule: ScheduleRepository
     materials: MaterialRepository
     jobs: JobRepository
+    candidates: CandidateRepository
+    rules: RuleRepository
     uow: UnitOfWork
