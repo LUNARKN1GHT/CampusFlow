@@ -1,12 +1,15 @@
-"""候选保存与核对列表边界：核对空间、适用范围、真实片段与摘录后原子保存，并按核对状态和缺失原因列出。"""
+"""候选保存、核对列表与核对详情边界：核对空间、真实片段与摘录后原子保存，按核对状态和缺失原因列出，详情给出逐字段原始值与生效值及引用可验证状态。"""
 
 from dataclasses import dataclass
 
 from campusflow.application.materials import _require_associations, get_material
 from campusflow.application.ports.candidates import CandidateData, CandidateSummaryData
-from campusflow.application.ports.repositories import Repositories
+from campusflow.application.ports.repositories import Repositories, SourceChunkData
 from campusflow.domain.candidates import (
+    REVIEW_TRANSITIONS,
     CandidateDraft,
+    CandidateField,
+    FieldEvidence,
     FieldOrigin,
     FieldRevision,
     JsonValue,
@@ -18,6 +21,7 @@ from campusflow.domain.candidates import (
     validate_review_change,
 )
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.source_detail import citation_is_verifiable
 from campusflow.domain.states import ReviewStatus
 
 
@@ -243,3 +247,133 @@ def review_counts(
         for code in {reason_code for reason_code, _, _ in item.review_reasons}:
             by_reason[code] = by_reason.get(code, 0) + 1
     return ReviewCounts(len(summaries), by_status, by_reason)
+
+
+# R008：前端核对界面的详情读模型。转换按钮按固定顺序展示，界面才不会出现闪烁的可选状态。
+_TRANSITION_ORDER = (
+    ReviewStatus.CONFIRMED,
+    ReviewStatus.IGNORED,
+    ReviewStatus.SUPERSEDED,
+    ReviewStatus.PENDING,
+)
+
+
+@dataclass(frozen=True)
+class CandidateEvidenceView:
+    chunk_id: int
+    quote: str
+    locator_type: str
+    locator_value: str
+    verifiable: bool
+
+
+@dataclass(frozen=True)
+class CandidateFieldView:
+    """一个候选字段的原始提取值与叠加 R002 修正后的生效值，以及仍可定位的引用。"""
+
+    name: str
+    value: JsonValue
+    origin: FieldOrigin
+    effective_value: JsonValue
+    effective_origin: FieldOrigin
+    explanation: str | None
+    missing_reason: str | None
+    evidence: tuple[CandidateEvidenceView, ...]
+    verifiable: bool
+
+
+@dataclass(frozen=True)
+class CandidateReviewDetail:
+    candidate: CandidateData
+    material_id: int
+    material_title: str
+    version_id: int
+    version_no: int
+    course_name: str | None
+    semester_name: str | None
+    fields: tuple[CandidateFieldView, ...]
+    missing_required_fields: tuple[str, ...]
+    allowed_transitions: tuple[ReviewStatus, ...]
+
+
+def _evidence_view(
+    evidence: FieldEvidence, chunks: dict[int, SourceChunkData]
+) -> CandidateEvidenceView:
+    chunk = chunks.get(evidence.chunk_id)
+    return CandidateEvidenceView(
+        chunk_id=evidence.chunk_id,
+        quote=evidence.quote,
+        # 片段已不存在时不返回定位信息，否则界面会把跳不过去的原文位置显示成可核对的引用
+        locator_type=chunk.locator_type if chunk is not None else "",
+        locator_value=chunk.locator_value if chunk is not None else "",
+        verifiable=citation_is_verifiable(
+            chunk.text if chunk is not None else None, evidence.quote
+        ),
+    )
+
+
+def _field_view(
+    field: CandidateField, effective: CandidateField, chunks: dict[int, SourceChunkData]
+) -> CandidateFieldView:
+    """原始字段决定引用与可验证状态（沿用 R007 规则）；说明与缺失原因展示生效值。"""
+    evidence = tuple(_evidence_view(item, chunks) for item in field.evidence)
+    verifiable = all(item.verifiable for item in evidence)
+    if (
+        field.origin in (FieldOrigin.DOCUMENT, FieldOrigin.INFERRED)
+        and field.value is not None
+        and not any(item.verifiable for item in evidence)
+    ):
+        verifiable = False
+    return CandidateFieldView(
+        name=field.name,
+        value=field.value,
+        origin=field.origin,
+        effective_value=effective.value,
+        effective_origin=effective.origin,
+        explanation=effective.explanation,
+        missing_reason=effective.missing_reason,
+        evidence=evidence,
+        verifiable=verifiable,
+    )
+
+
+def review_detail(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> CandidateReviewDetail:
+    """R008：核对详情 —— 逐字段取值、出处、原文定位与可执行的核对转换。"""
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    version = repos.materials.get_version(candidate.source_version_id)
+    material = repos.materials.get(version.material_id) if version is not None else None
+    if version is None or material is None:
+        raise NotFoundError("候选来源资料不存在")
+    chunks = {chunk.id: chunk for chunk in repos.materials.list_chunks(version.id)}
+    effective_fields = candidate.effective_draft().fields
+    by_name = {field.name: field for field in effective_fields}
+    scope = candidate.draft.scope
+    course = repos.courses.get(scope.course_id) if scope.course_id is not None else None
+    semester = repos.semesters.get(scope.semester_id) if scope.semester_id is not None else None
+    # 适用范围只展示本人空间里的名称，查不到就留空而不是伪造归属
+    course_name = (
+        course.name if course is not None and course.workspace_id == workspace_id else None
+    )
+    semester_name = (
+        semester.name if semester is not None and semester.workspace_id == workspace_id else None
+    )
+    return CandidateReviewDetail(
+        candidate=candidate,
+        material_id=material.id,
+        material_title=material.title,
+        version_id=version.id,
+        version_no=version.version_no,
+        course_name=course_name,
+        semester_name=semester_name,
+        fields=tuple(
+            _field_view(field, by_name[field.name], chunks) for field in candidate.draft.fields
+        ),
+        missing_required_fields=missing_required_fields(candidate.draft.kind, effective_fields),
+        allowed_transitions=tuple(
+            status
+            for status in _TRANSITION_ORDER
+            if status in REVIEW_TRANSITIONS[candidate.review_status]
+        ),
+    )

@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；问答、核对和排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；集中核对列表与详情界面已在本整合分支接入（R008），逐字段修正表单与确认后生成正式事项的入口待 R009，问答与排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
@@ -146,6 +146,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 - R001 已实现待核对事项列表与计数的只读接口（GET /api/v1/candidates 与 GET /api/v1/candidates/summary）：按核对状态（可多选，默认 pending）、事项类型、课程、学期、来源资料和缺失原因代码筛选，返回总数、按状态与按原因分布计数，同一候选重复原因只计一次。接口只接受 ReviewStatus，传任务执行进度值被 422 拒绝，两套状态不混用；列表只给最小字段，逐字段取值与证据仍由 R007 详情接口读取；原因存在 review_reasons JSON 列、代码随 X 系列提取任务增加，故在应用层按代码过滤而非 SQL 硬编码。列表项带来源资料与版本号，可据此跳到原文片段查看未覆盖范围。核对列表界面由 R008 完成，X008 的截图截断与来源矛盾原因代码尚未产出。见 docs/verification/R001-review-list.md。
 
+- R008 已实现集中核对列表与详情界面，并补上支撑界面的两个接口（GET /api/v1/candidates/{id} 与 PATCH /api/v1/candidates/{id}/review-status）：详情并列给出每个字段的原始提取值与叠加 R002 修正后的生效值、四种出处、逐条原文引用与定位，只有仍能定位到原文的引用算可验证；转换接口复用 R003 守卫，缺必须字段时先 400 给出中文原因，需填说明并显式确认后才转换，操作者取当前会话。界面按后端返回的 allowed_transitions 渲染确认／忽略／标记失效／退回待核对，核对失败只在按钮上方显示错误、不出现成功提示且保留已填说明；每条引用可跳转到资料库并按候选所属版本与片段定位原文。逐字段修正表单与确认后生成正式事项的入口由 R009 接入。见 docs/verification/R008-review-workbench.md。
+
 - X004 已提供固定活动候选提取入口，保留起止、地点、参加条件及证据。用户选择 AI 提取后由代码保守检查：提交/完成截止不能充当活动，混合描述拒绝并提示核对；缺开始或结束不猜测，显式保存仍 pending。尚未接 API/队列及正式日程创建。见 docs/verification/X004-event-extraction.md。
 
 - X001 按用户选择将候选、字段和证据分表保存，四种出处为 document/user/inferred/suggestion；新候选固定 pending，不混用任务执行进度。保存入口校验空间、版本与原文摘录，删除影响预览纳入候选集合。X002 已提供统一文字生成接口、智谱适配器和严格候选校验；用户选定 glm-4-flash-250414，与视觉模型分开配置。先授权再调用，非法字段、引用及截断输出拒绝接受；尚未接入自动提取流程，X003–X008 和真实样本评测仍待完成。见 docs/verification/X001-candidate-evidence.md、docs/verification/X002-generation-contract.md 与 docs/planning/X-IMPLEMENTATION.md。
@@ -156,9 +158,9 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 - R003 已实现候选核对状态转换与确认守卫：按类型检查必需字段（任务 title；日程 title、activity_text），缺必需字段默认拒绝、需显式确认并写原因；被忽略或已失效项不参与正式约束，已失效只能退回待核对。每次变更写入候选核对状态记录（方向、操作者、原因、时间）。尚无候选 HTTP 接口，正式事项生成与核对界面由 R004、R005、R008、R009 完成。见 docs/verification/R003-review-transitions.md。
 
-- R004 已实现已确认任务候选转换为正式任务：事务内创建任务并写入来源资料与唯一来源候选关联，重复调用返回既有任务。只有日期的截止不补时刻，相对或无效写法只留原文备注，日期来源按字段出处映射。日程转换由 R005 完成，尚无候选 HTTP 接口与核对界面。见 docs/verification/R004-task-conversion.md。
+- R004 已实现已确认任务候选转换为正式任务：事务内创建任务并写入来源资料与唯一来源候选关联，重复调用返回既有任务。只有日期的截止不补时刻，相对或无效写法只留原文备注，日期来源按字段出处映射。日程转换由 R005 完成，候选 HTTP 接口与核对界面由 R008 接入，正式事项生成入口由 R009 完成。见 docs/verification/R004-task-conversion.md。
 
-- R005 已实现已确认日程候选转换为固定日程：开始与结束都必须能解析出日期与时刻，只有日期或相对写法直接拒绝；时间按工作空间时区换算并复用固定日程校验，重复转换返回既有日程。参加条件不入正式日程，尚无候选 HTTP 接口与核对界面。见 docs/verification/R005-event-conversion.md。
+- R005 已实现已确认日程候选转换为固定日程：开始与结束都必须能解析出日期与时刻，只有日期或相对写法直接拒绝；时间按工作空间时区换算并复用固定日程校验，重复转换返回既有日程。参加条件不入正式日程，候选 HTTP 接口与核对界面由 R008 接入，正式事项生成入口由 R009 完成。见 docs/verification/R005-event-conversion.md。
 
 - R007 已实现任务与日程的来源详情只读接口（GET /api/v1/tasks/{id}/source 与 GET /api/v1/fixed-events/{id}/source）：区分手动与提取来源，返回候选原始字段出处、用户修正、逐条引用与定位，只把仍能定位到原文的引用作为可验证引用。固定日程补齐来源失效留痕，资料删除时与任务一并写入，删除影响预览新增关联日程并计入确认指纹。见 docs/verification/R007-source-detail.md。
 

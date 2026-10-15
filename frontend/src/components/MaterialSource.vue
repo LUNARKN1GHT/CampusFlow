@@ -5,7 +5,13 @@ import { errorMessage } from '../api/client'
 import { materialsApi } from '../api/library'
 import type { Material, MaterialVersion, SourceChunk } from '../api/types'
 
-const props = defineProps<{ material: Material; scope: string }>()
+const props = defineProps<{
+  material: Material
+  scope: string
+  // 候选引用属于某个具体版本与片段；不传时仍默认打开最新版本。
+  initialVersionNo?: number | null
+  initialChunkId?: number | null
+}>()
 const emit = defineEmits<{ close: [] }>()
 
 const versions = ref<MaterialVersion[]>([])
@@ -102,14 +108,21 @@ async function loadAll(): Promise<void> {
   releaseObjectUrl()
   try {
     versions.value = await materialsApi.versions(props.material.id)
-    versionNo.value = versions.value.reduce<number | null>(
+    const latest = versions.value.reduce<number | null>(
       (max, item) => (max === null || item.version_no > max ? item.version_no : max),
       null,
     )
+    // 引用所属版本与最新版本不一致时按引用打开，否则会把旧版本的摘录定位到高亮不到它的新版本上。
+    const pinned = props.initialVersionNo ?? undefined
+    versionNo.value =
+      pinned !== undefined && versions.value.some((item) => item.version_no === pinned)
+        ? pinned
+        : latest
     chunks.value = versionNo.value === null
       ? []
       : await materialsApi.chunks(props.material.id, versionNo.value)
-    selected.value = chunks.value[0] ?? null
+    selected.value =
+      chunks.value.find((chunk) => chunk.id === props.initialChunkId) ?? chunks.value[0] ?? null
     loading.value = false
     await loadSource()
   } catch (caught) {
