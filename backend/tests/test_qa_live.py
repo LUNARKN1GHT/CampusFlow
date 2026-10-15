@@ -357,3 +357,33 @@ def test_case_subset_is_explicit_and_validated_without_network(live, selected, c
     assert result.returncode == code
     if message:
         assert message in result.stdout and b"No model calls" in result.stdout
+
+
+def run_cli(*extra):
+    return subprocess.run(
+        [sys.executable, str(ROOT / "scripts/evaluate_qa_live.py"), *extra],
+        capture_output=True,
+        check=False,
+    )
+
+
+def test_alternate_cases_file_is_used_and_default_is_untouched(live):
+    alternate = ROOT / "samples/synthetic/q001/cases-v2.json"
+    result = run_cli("--cases", str(alternate))
+    assert result.stdout.count(b"cases x 2 repeats") == 1
+    assert b"15 cases x 2 repeats" in result.stdout
+    assert run_cli().stdout.count(b"9 cases x 2 repeats") == 1
+
+
+def test_rejected_alternate_cases_file_fails_before_any_output(live):
+    missing = ROOT / "samples/synthetic/q001/does-not-exist.json"
+    result = run_cli("--cases", str(missing))
+    assert result.returncode != 0 and b"No model calls" not in result.stdout
+
+
+@pytest.mark.parametrize(("budget", "ok"), [("3", True), ("0", False), ("abc", False)])
+def test_budget_must_be_a_positive_number(live, budget, ok):
+    result = run_cli("--budget-cny", budget)
+    assert (result.returncode == 0) is ok
+    if ok:
+        assert b"budget <= 3 CNY" in result.stdout and b"No model calls" in result.stdout

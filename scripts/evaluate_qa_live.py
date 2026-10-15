@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import evaluate_qa_preparation as prep
@@ -505,7 +505,7 @@ def prepare_followup(source: Path, destination: Path, manifest: dict) -> None:
         result = prep.load_json(source / "results.json")
         if result["status"] != "completed_pending_review":
             raise RunStopped("finish_or_resume_parent_first")
-        previous = Client("", source / "billing.json", Decimal("1"), resume=True)
+        previous = Client("", source / "billing.json", Decimal(manifest["budget_cny"]), resume=True)
         save(destination / "billing.json", previous.ledger)
         save(
             destination / "budget-origin.json",
@@ -517,7 +517,7 @@ def prepare_followup(source: Path, destination: Path, manifest: dict) -> None:
                     (source / "billing.json").read_bytes()
                 ).hexdigest(),
                 "inherited_calls": len(previous.ledger["calls"]),
-                "budget_cny": "1",
+                "budget_cny": manifest["budget_cny"],
             },
         )
         save(source / "followup.json", {"destination": str(destination.resolve())})
@@ -534,8 +534,25 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, choices=(30, 60), default=30)
     parser.add_argument("--follow-up-from", type=Path, help="继承已完成实验账本进行新提示词复测")
     parser.add_argument("--case-ids", nargs="+", help="仅复测指定样本，选择会写入清单")
+    parser.add_argument(
+        "--cases",
+        type=Path,
+        default=prep.DEFAULT_CASES,
+        help="样本文件；默认沿用已调试的那一份，新批次另建文件以保留旧指纹",
+    )
+    parser.add_argument(
+        "--budget-cny",
+        default="1",
+        help="本轮累计预留上限；提高上限需用户单独授权，且不能靠新建目录重复使用旧额度",
+    )
     args = parser.parse_args()
-    asset = prep.load_json(prep.DEFAULT_CASES)
+    try:
+        budget = Decimal(args.budget_cny)
+    except InvalidOperation:
+        parser.error("预算必须是数字")
+    if budget <= 0:
+        parser.error("预算必须为正数")
+    asset = prep.load_json(args.cases)
     prep.validate_cases(asset)
     all_case_ids = [c["id"] for c in asset["cases"]]
     if args.case_ids:
@@ -546,7 +563,7 @@ def main() -> int:
         asset["cases"] = [c for c in asset["cases"] if c["id"] in args.case_ids]
     print(
         f"4 combinations; {len(asset['cases'])} cases x 2 repeats; "
-        "budget <= 1 CNY; synthetic data only"
+        f"budget <= {budget} CNY; synthetic data only"
     )
     if not args.execute:
         print("Dry run only. No model calls.")
@@ -571,10 +588,11 @@ def main() -> int:
         "commit_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=prep.ROOT)
         .decode()
         .strip(),
-        "cases_sha256": hashlib.sha256(prep.DEFAULT_CASES.read_bytes()).hexdigest(),
+        "cases_path": str(args.cases),
+        "cases_sha256": hashlib.sha256(args.cases.read_bytes()).hexdigest(),
         "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "preparation_script_sha256": hashlib.sha256(Path(prep.__file__).read_bytes()).hexdigest(),
-        "budget_cny": "1",
+        "budget_cny": str(budget),
         "embedding_cny_per_million_tokens": "0.5",
         "generation_cny_per_million_tokens": "0",
         "price_verified_on": "2026-10-15",
@@ -631,7 +649,7 @@ def main() -> int:
         client = Client(
             key,
             args.output_dir / "billing.json",
-            Decimal("1"),
+            budget,
             lambda key, endpoint, payload: post(key, endpoint, payload, args.timeout),
             resume=args.resume or bool(args.follow_up_from),
         )
