@@ -152,6 +152,12 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 - R009 已实现逐字段修正与确认后生成正式事项的界面入口（PATCH /api/v1/candidates/{id}/fields/{name} 与 POST /api/v1/candidates/{id}/convert）：修正复用 R002 用例，只追加记录、原始提取与证据不改写，出处只允许用户补充或规划建议，清空取值必须填说明；转换按候选类型分派到 R004／R005／R006，命中既有来源候选关联时返回 created=false，界面据此提示没有重复创建。详情新增 converted 字段，界面按类型给出打开任务／固定日程的入口（课程规则只有查询接口，暂不提供跳转），并对目标条目高亮定位。见 docs/verification/R009-review-actions.md。
 
+- X007 按用户选择严格匹配选定学期内的课程名与教学班，不做简称或模糊猜测。同名多班、无法匹配及原文/已有绑定冲突保留原文与选项；唯一结果也只是待核对建议，不修改原 scope。显式保存复用 X001，未接页面及自动入口。见 docs/verification/X007-course-matching.md。
+
+- X006 按用户选择使用代码换算明确相对日期。依据须是当前资料版本内有完整年份的发布日期或适用校历声明，并显式指定来源时区；缺依据不猜测，学期开始日不冒充教学第一周起点。输出保留原文、计算依据及 inferred 出处，显式保存仍 pending，未接自动入口及页面。详见 docs/verification/X006-relative-dates.md。
+
+- X005 按用户选择保留完整规则原文，再单列条件、范围和生效信息。正文保留证据片段全文，限定信息需为完整语句，不能删去否定或例外；未知不等于无条件。入口只返回待核对草稿，生效声明不做日期换算；未接自动流程及正式规则确认。见 docs/verification/X005-rule-extraction.md。
+
 - X004 已提供固定活动候选提取入口，保留起止、地点、参加条件及证据。用户选择 AI 提取后由代码保守检查：提交/完成截止不能充当活动，混合描述拒绝并提示核对；缺开始或结束不猜测，显式保存仍 pending。尚未接 API/队列及正式日程创建。见 docs/verification/X004-event-extraction.md。
 
 - X001 按用户选择将候选、字段和证据分表保存，四种出处为 document/user/inferred/suggestion；新候选固定 pending，不混用任务执行进度。保存入口校验空间、版本与原文摘录，删除影响预览纳入候选集合。X002 已提供统一文字生成接口、智谱适配器和严格候选校验；用户选定 glm-4-flash-250414，与视觉模型分开配置。先授权再调用，非法字段、引用及截断输出拒绝接受；尚未接入自动提取流程，X003–X008 和真实样本评测仍待完成。见 docs/verification/X001-candidate-evidence.md、docs/verification/X002-generation-contract.md 与 docs/planning/X-IMPLEMENTATION.md。

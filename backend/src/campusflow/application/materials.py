@@ -16,6 +16,7 @@ from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser, ParseOutcome
 from campusflow.application.ports.repositories import (
     MaterialData,
+    MaterialVersionData,
     NewSourceChunk,
     Repositories,
     SourceChunkData,
@@ -446,10 +447,10 @@ def list_material_versions(repos: Repositories, workspace_id: int, material_id: 
     return repos.materials.list_versions(material_id)
 
 
-def list_version_chunks(
+def get_version(
     repos: Repositories, workspace_id: int, material_id: int, version_no: int
-) -> list[SourceChunkData]:
-    """指定版本的片段与定位信息（D018）。"""
+) -> MaterialVersionData:
+    """指定资料版本（含元数据）；不存在时报错，不返回 None 让调用方猜测。"""
     get_material(repos, workspace_id, material_id)
     version = next(
         (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),
@@ -457,7 +458,14 @@ def list_version_chunks(
     )
     if version is None:
         raise NotFoundError("版本不存在")
-    return repos.materials.list_chunks(version.id)
+    return version
+
+
+def list_version_chunks(
+    repos: Repositories, workspace_id: int, material_id: int, version_no: int
+) -> list[SourceChunkData]:
+    """指定版本的片段与定位信息（D018）。"""
+    return repos.materials.list_chunks(get_version(repos, workspace_id, material_id, version_no).id)
 
 
 def read_original_file(

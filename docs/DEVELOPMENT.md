@@ -101,8 +101,13 @@ R005 给 `fixed_events` 增加来源候选关联列；同样需先 `uv run --loc
 R006 新增 `course_rules` 表；更新代码后需运行 `uv run --locked alembic upgrade head`。应用层 `conversion.convert_candidate_to_rule` 把已确认的规则候选转为正式课程规则，幂等且只保留原文不做日期换算；`GET /api/v1/rules` 按课程／学期只读查询。专项测试：`uv run --locked pytest tests/test_candidate_rule_conversion.py -q`；字段映射与删除留痕见 [R006 说明](verification/R006-confirmed-rules.md)。
 
 R007 给 `fixed_events` 补齐来源失效留痕列；更新代码后需运行 `uv run --locked alembic upgrade head`。来源详情接口 `GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source` 返回出处、引用与可验证状态，资料删除后不再返回可验证引用。专项测试：`uv run --locked pytest tests/test_source_detail.py -q`；结构与失效行为见 [R007 说明](verification/R007-source-detail.md)。
+X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_drafts` 得到待核对规则，按需显式保存。无新增依赖、迁移和自动入口。专项测试：`uv run --locked pytest tests/test_rule_extraction.py -q`；完整原文及条件字段契约见 [X005 说明](verification/X005-rule-extraction.md)。
 
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
+
+X007 的 `course_matching.match_candidate_course` 接受所选学期及带证据的课程/班级原文字段，返回待核对匹配建议，不修改候选 scope。调用方按需显式使用 `save_candidates` 保存；无新增依赖或配置。专项测试：`uv run --locked pytest tests/test_course_matching.py -q`；契约见 [X007 说明](verification/X007-course-matching.md)。
+
+X006 的 `relative_dates.resolve_task_deadline` 为 X003 草稿附加日期换算结果，不额外调用模型。需显式提供当前版本内的依据片段及来源时区，输出再按需调用 `save_candidates` 保存。无新增配置或依赖；专项测试为 `uv run --locked pytest tests/test_relative_dates.py -q`，输入和限制见 [X006 说明](verification/X006-relative-dates.md)。
 
 表结构由 Alembic 迁移管理，在 `backend/` 目录执行：
 

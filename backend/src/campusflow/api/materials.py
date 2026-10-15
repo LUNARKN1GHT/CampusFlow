@@ -255,7 +255,7 @@ class MaterialVersionOut(BaseModel):
     version_no: int
     note: str | None
     created_at: datetime
-    source_metadata: dict[str, str | None]
+    source_metadata: dict[str, object]
 
 
 @router.get("/{material_id}/versions", response_model=list[MaterialVersionOut])
