@@ -1,8 +1,10 @@
 import { apiRequest } from './client'
 import type {
+  CandidateConversionResult,
   CandidateKind,
   CandidateReviewDetail,
   CandidateSummary,
+  FieldOrigin,
   ReviewStatus,
 } from './types'
 
@@ -57,6 +59,11 @@ export const candidatesApi = {
     material_id: filters.materialId,
   })}`),
   get: (id: number) => apiRequest<CandidateReviewDetail>(`/candidates/${id}`),
+  reviseField: (id: number, fieldName: string, input: { value: unknown; origin: FieldOrigin; note?: string | null }) => apiRequest<CandidateReviewDetail>(`/candidates/${id}/fields/${encodeURIComponent(fieldName)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  }),
+  convert: (id: number) => apiRequest<CandidateConversionResult>(`/candidates/${id}/convert`, { method: 'POST' }),
   setReviewStatus: (id: number, input: ReviewStatusInput) => apiRequest<CandidateReviewDetail>(`/candidates/${id}/review-status`, {
     method: 'PATCH',
     body: JSON.stringify(input),

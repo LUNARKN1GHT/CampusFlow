@@ -17,6 +17,17 @@ const actionError = ref('')
 const successMessage = ref('')
 const reasonText = ref('')
 const acknowledge = ref(false)
+const correctionField = ref<string | null>(null)
+const correctionValue = ref('')
+const correctionOrigin = ref<'user' | 'suggestion'>('user')
+const correctionNote = ref('')
+const correctionSaving = ref(false)
+const correctionError = ref('')
+const correctionSuccess = ref('')
+const correctionSuccessField = ref<string | null>(null)
+const converting = ref(false)
+const convertError = ref('')
+const convertMessage = ref('')
 
 const reviewStatusLabels: Record<ReviewStatus, string> = {
   pending: '待核对', confirmed: '已确认', ignored: '已忽略', superseded: '已失效',
@@ -27,6 +38,9 @@ const originLabels: Record<FieldOrigin, string> = {
 }
 const transitionLabels: Record<ReviewStatus, string> = {
   pending: '退回待核对', confirmed: '确认', ignored: '忽略', superseded: '标记失效',
+}
+const convertLabels: Record<CandidateKind, string> = {
+  task: '生成正式任务', event: '生成固定日程', rule: '生成课程规则',
 }
 const fieldLabels: Record<string, string> = {
   title: '标题', activity_text: '活动内容', due_date: '截止日期', due_time: '截止时刻',
@@ -80,6 +94,18 @@ function displayValue(value: unknown): string {
   }
 }
 
+/** 修正表单的可编辑初始值：字符串原样，数字／布尔转文本，其他值序列化，空值留空。 */
+function editValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return ''
+  }
+}
+
 function changed(field: CandidateFieldView): boolean {
   return JSON.stringify(field.value) !== JSON.stringify(field.effective_value)
 }
@@ -128,6 +154,88 @@ async function transition(to: ReviewStatus) {
   }
 }
 
+function openCorrection(field: CandidateFieldView) {
+  correctionField.value = field.name
+  correctionValue.value = editValue(field.effective_value)
+  correctionOrigin.value = 'user'
+  correctionNote.value = ''
+  correctionError.value = ''
+  correctionSuccess.value = ''
+  correctionSuccessField.value = null
+}
+
+async function submitCorrection() {
+  if (!correctionField.value || !detail.value) return
+  const fieldName = correctionField.value
+  const field = detail.value.fields.find((item) => item.name === fieldName)
+  const raw = correctionValue.value.trim()
+  const note = correctionNote.value.trim()
+  let value: unknown = null
+  if (raw !== '') {
+    if (typeof field?.effective_value === 'number') {
+      const parsed = Number(raw)
+      if (!Number.isFinite(parsed)) {
+        correctionError.value = `${fieldLabel(fieldName)}需要数字取值；请填写数字，或留空并填写说明来清空它。`
+        return
+      }
+      value = parsed
+    } else {
+      value = raw
+    }
+  }
+  if (value === null && !note) {
+    // 空取值依赖说明作为缺失原因，先在前端拦下，不让用户撞 400。
+    correctionError.value = '留空取值时必须填写说明；该说明会作为这个字段的缺失原因。'
+    return
+  }
+  correctionSaving.value = true
+  correctionError.value = ''
+  correctionSuccess.value = ''
+  try {
+    detail.value = await candidatesApi.reviseField(props.candidateId, fieldName, {
+      value,
+      origin: correctionOrigin.value,
+      note: note || null,
+    })
+    correctionField.value = null
+    correctionSuccessField.value = fieldName
+    correctionSuccess.value = `已保存「${fieldLabel(fieldName)}」的修正；原始提取与修正留痕已保留。`
+    emit('changed')
+  } catch (caught) {
+    // 与核对转换一致：失败时保留已填内容，错误显示在表单内，不给出成功提示。
+    correctionError.value = errorMessage(caught)
+    correctionSuccess.value = ''
+  } finally {
+    correctionSaving.value = false
+  }
+}
+
+async function convertCandidate() {
+  if (!detail.value) return
+  const current = detail.value
+  converting.value = true
+  convertError.value = ''
+  convertMessage.value = ''
+  try {
+    const result = await candidatesApi.convert(props.candidateId)
+    const converted = { kind: result.kind, object_id: result.object_id, title: result.title }
+    try {
+      detail.value = await candidatesApi.get(props.candidateId)
+    } catch {
+      // 生成已成功；刷新失败时用接口返回值补上入口，不把成功误报成失败。
+      detail.value = { ...current, converted }
+    }
+    convertMessage.value = result.created
+      ? `已生成${kindLabels[result.kind]} #${result.object_id}。`
+      : '该候选此前已生成过同一事项，本次没有重复创建。'
+    emit('changed')
+  } catch (caught) {
+    convertError.value = errorMessage(caught)
+  } finally {
+    converting.value = false
+  }
+}
+
 onMounted(loadDetail)
 watch(() => props.candidateId, loadDetail)
 </script>
@@ -169,7 +277,22 @@ watch(() => props.candidateId, loadDetail)
             <strong>{{ fieldLabel(field.name) }}</strong>
             <span class="status-pill origin-pill" :data-origin="field.effective_origin">{{ originLabels[field.effective_origin] }}</span>
             <span v-if="!field.verifiable" class="status-pill stale-pill">字段值引用已失效</span>
+            <button v-if="correctionField !== field.name" type="button" class="text-button" @click="openCorrection(field)">修正</button>
           </div>
+          <form v-if="correctionField === field.name" class="stack-form correction-form" @submit.prevent="submitCorrection">
+            <label>修正后的取值<textarea v-model="correctionValue" rows="2" placeholder="留空表示该字段没有取值；此时必须填写说明"></textarea></label>
+            <div class="form-grid">
+              <label>修正出处<select v-model="correctionOrigin"><option value="user">用户补充</option><option value="suggestion">规划建议</option></select></label>
+              <label>修正说明（留空取值时必填）<textarea v-model.trim="correctionNote" rows="2" maxlength="1000" placeholder="例如：已向老师确认；或按原文第 3 页抄录"></textarea></label>
+            </div>
+            <p v-if="correctionError" class="form-error" role="alert">{{ correctionError }}</p>
+            <div class="lifecycle-actions">
+              <button type="submit" :disabled="correctionSaving">{{ correctionSaving ? '正在保存…' : '保存修正' }}</button>
+              <button type="button" class="button-secondary" :disabled="correctionSaving" @click="correctionField = null">取消</button>
+            </div>
+            <p class="form-help">用户修正只能标为「用户补充」或「规划建议」，不能声明为原文规定或系统推断；原始提取不会被改写。</p>
+          </form>
+          <p v-if="correctionSuccessField === field.name" class="success-message" role="status">{{ correctionSuccess }}</p>
           <p>生效值：{{ displayValue(field.effective_value) }}</p>
           <p v-if="changed(field)">原始提取：{{ displayValue(field.value) }}（出处：{{ originLabels[field.origin] }}）</p>
           <p v-if="field.explanation">{{ field.explanation }}</p>
@@ -226,6 +349,23 @@ watch(() => props.candidateId, loadDetail)
           <span v-if="!detail.allowed_transitions.length" class="muted small">当前状态没有可用的核对转换。</span>
         </div>
         <p class="form-help">转换范围由后端按核对规则给出；已失效事项只能退回待核对。确认后的事项才会进入正式任务与日程。</p>
+      </div>
+
+      <h3 class="subheading">生成正式事项</h3>
+      <div class="convert-box">
+        <template v-if="detail.converted">
+          <p class="convert-identity"><span class="status-pill kind-pill">{{ kindLabels[detail.converted.kind] }}</span><span>已生成 #{{ detail.converted.object_id }} · {{ detail.converted.title }}</span></p>
+          <router-link v-if="detail.converted.kind === 'task'" class="link-button" :to="{ path: '/tasks', query: { task: String(detail.converted.object_id) } }">打开任务</router-link>
+          <router-link v-else-if="detail.converted.kind === 'event'" class="link-button" :to="{ path: '/tasks', query: { event: String(detail.converted.object_id) } }">打开固定日程</router-link>
+          <p v-else class="form-help">课程规则 #{{ detail.converted.object_id }}「{{ detail.converted.title }}」已生成；规则页面尚未开放，暂不能打开。</p>
+        </template>
+        <template v-else-if="detail.review_status === 'confirmed'">
+          <p v-if="convertError" class="form-error" role="alert">{{ convertError }}</p>
+          <button type="button" :disabled="converting" @click="convertCandidate">{{ converting ? '正在生成…' : convertLabels[detail.kind] }}</button>
+          <p class="form-help">重复点击或请求重试不会创建重复事项：已存在同一事项时直接返回既有对象。</p>
+        </template>
+        <p v-else class="form-help">只有已确认的候选才能生成正式事项；请先完成上方核对并确认，缺必须字段的候选需要先补齐。</p>
+        <p v-if="convertMessage" class="success-message" role="status">{{ convertMessage }}</p>
       </div>
     </template>
   </section>

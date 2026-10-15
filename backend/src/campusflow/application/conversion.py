@@ -1,8 +1,9 @@
-"""R004/R005：把已确认的任务或日程候选转换为正式事项，关联候选与来源资料。"""
+"""R004/R005/R006：把已确认的任务、日程或规则候选转换为正式事项，关联候选与来源资料。"""
 
+from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
-from campusflow.application.candidates import get_candidate
+from campusflow.application.candidates import CandidateData, get_candidate
 from campusflow.application.ports.repositories import (
     FixedEventData,
     Repositories,
@@ -15,13 +16,68 @@ from campusflow.application.scope import (
 )
 from campusflow.application.settings import get_settings
 from campusflow.domain.candidate_conversion import build_task_conversion
-from campusflow.domain.candidates import require_confirmed_for_conversion
+from campusflow.domain.candidates import (
+    CandidateKind,
+    require_confirmed_for_conversion,
+)
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.event_conversion import build_event_conversion
 from campusflow.domain.rule_conversion import build_rule_conversion
 from campusflow.domain.schedule import validate_fixed_event
 from campusflow.domain.states import EventRecurrence, TaskPriority
 from campusflow.domain.timezones import in_workspace_timezone
+
+
+@dataclass(frozen=True)
+class CandidateConversion:
+    """候选已生成的正式事项；只带编号与标题，不复制正式事项的全部字段。"""
+
+    kind: CandidateKind
+    object_id: int
+    title: str
+
+
+def find_candidate_conversion(
+    repos: Repositories, candidate: CandidateData
+) -> CandidateConversion | None:
+    """候选是否已生成正式事项；没有就返回 None，不猜也不占位。"""
+    if candidate.draft.kind is CandidateKind.TASK:
+        task = repos.tasks.get_by_source_candidate(candidate.id)
+        return (
+            None if task is None else CandidateConversion(CandidateKind.TASK, task.id, task.title)
+        )
+    if candidate.draft.kind is CandidateKind.EVENT:
+        event = repos.schedule.get_fixed_event_by_source_candidate(candidate.id)
+        return (
+            None
+            if event is None
+            else CandidateConversion(CandidateKind.EVENT, event.id, event.title)
+        )
+    rule = repos.rules.get_by_source_candidate(candidate.id)
+    return None if rule is None else CandidateConversion(CandidateKind.RULE, rule.id, rule.title)
+
+
+def convert_candidate(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[CandidateConversion, bool]:
+    """按类型把已确认候选转换为正式事项，返回 (事项, 本次是否新建)。
+
+    重复点击或请求重试命中既有的来源候选关联，返回同一事项并把 created 置为
+    false，界面据此提示「已存在」而不是再造一条。
+    """
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    require_confirmed_for_conversion(candidate.review_status)
+    existing = find_candidate_conversion(repos, candidate)
+    if existing is not None:
+        return existing, False
+    if candidate.draft.kind is CandidateKind.TASK:
+        task = convert_candidate_to_task(repos, workspace_id, candidate_id)
+        return CandidateConversion(CandidateKind.TASK, task.id, task.title), True
+    if candidate.draft.kind is CandidateKind.EVENT:
+        event = convert_candidate_to_event(repos, workspace_id, candidate_id)
+        return CandidateConversion(CandidateKind.EVENT, event.id, event.title), True
+    rule = convert_candidate_to_rule(repos, workspace_id, candidate_id)
+    return CandidateConversion(CandidateKind.RULE, rule.id, rule.title), True
 
 
 def convert_candidate_to_task(
