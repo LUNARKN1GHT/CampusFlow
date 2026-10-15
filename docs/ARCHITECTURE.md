@@ -192,6 +192,8 @@ R004 在 domain/candidate_conversion.py 定义任务候选到正式任务的字�
 
 R005 在 domain/event_conversion.py 定义日程候选到固定日程的起止解析：必须能解析出日期与时刻，只有日期或相对写法一律拒绝，不按全天或常见时长补造。application/conversion.py 的 convert_candidate_to_event 按工作空间时区换算后复用 validate_fixed_event 校验区间，写入唯一的 source_candidate_id，重复调用返回既有日程。见 [R005 说明](verification/R005-event-conversion.md)。
 
+R006 在 domain/rule_conversion.py 定义规则候选到正式课程规则的字段映射：title 与 rule_text 必需，缺任一项拒绝；conditions／scope／effective 只保留原文，不解析生效日期、不换算相对写法。application/conversion.py 的 convert_candidate_to_rule 要求候选已确认，在一个事务里创建 `course_rules`（迁移 r007_course_rules）并写入 source_material_id 与唯一的 source_candidate_id，重复调用返回既有规则；application/rules.py 的 list_rules 提供按课程／学期过滤的只读查询，`GET /api/v1/rules` 限当前空间。资料删除时规则保留并写入来源失效留痕，删除影响预览计入 linked_rule_ids 与确认指纹。见 [R006 说明](verification/R006-confirmed-rules.md)。
+
 R007 提供任务与日程的来源详情只读接口：`GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source`。application/source_detail.py 组合候选原始字段、逐条修正、原文引用与定位，只把仍能定位到原文的引用作为可验证引用返回；domain/source_detail.py 定义来源类型与引用可验证规则。固定日程补齐来源失效留痕（迁移 r006_event_source_invalidation），资料删除时与任务一并写入，删除影响预览新增关联日程并计入确认指纹。见 [R007 说明](verification/R007-source-detail.md)。
 
 目标数据分组如下，具体字段和迁移在功能实现时确定：

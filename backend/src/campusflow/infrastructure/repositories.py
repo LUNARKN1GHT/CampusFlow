@@ -18,6 +18,7 @@ from campusflow.application.ports.repositories import (
     ProcessingJobAttemptData,
     ProcessingJobData,
     Repositories,
+    RuleData,
     SemesterData,
     SourceChunkData,
     TaskData,
@@ -36,6 +37,7 @@ from campusflow.infrastructure.candidate_repository import SqlAlchemyCandidateRe
 from campusflow.infrastructure.db.models import (
     AvailabilitySlot,
     Course,
+    CourseRule,
     FixedEvent,
     Material,
     MaterialVersion,
@@ -168,6 +170,26 @@ def _slot_to_data(row: AvailabilitySlot) -> AvailabilitySlotData:
         day_of_week=row.day_of_week,
         start_time=row.start_time,
         end_time=row.end_time,
+    )
+
+
+def _rule_to_data(row: CourseRule) -> RuleData:
+    return RuleData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        course_id=row.course_id,
+        semester_id=row.semester_id,
+        title=row.title,
+        rule_text=row.rule_text,
+        conditions_text=row.conditions_text,
+        scope_text=row.scope_text,
+        effective_text=row.effective_text,
+        source_material_id=row.source_material_id,
+        source_candidate_id=row.source_candidate_id,
+        source_invalidated_at=row.source_invalidated_at,
+        source_invalidated_note=row.source_invalidated_note,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
     )
 
 
@@ -910,6 +932,97 @@ class SqlAlchemyScheduleRepository:
         return True
 
 
+class SqlAlchemyRuleRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create(
+        self,
+        workspace_id: int,
+        course_id: int | None,
+        semester_id: int | None,
+        title: str,
+        rule_text: str,
+        conditions_text: str | None,
+        scope_text: str | None,
+        effective_text: str | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
+    ) -> RuleData:
+        row = CourseRule(
+            workspace_id=workspace_id,
+            course_id=course_id,
+            semester_id=semester_id,
+            title=title,
+            rule_text=rule_text,
+            conditions_text=conditions_text,
+            scope_text=scope_text,
+            effective_text=effective_text,
+            source_material_id=source_material_id,
+            source_candidate_id=source_candidate_id,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _rule_to_data(row)
+
+    def get(self, rule_id: int) -> RuleData | None:
+        row = self._session.get(CourseRule, rule_id)
+        return _rule_to_data(row) if row is not None else None
+
+    def get_by_source_candidate(self, candidate_id: int) -> RuleData | None:
+        row = self._session.scalar(
+            select(CourseRule).where(CourseRule.source_candidate_id == candidate_id)
+        )
+        return _rule_to_data(row) if row is not None else None
+
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        course_id: int | None = None,
+        semester_id: int | None = None,
+    ) -> list[RuleData]:
+        stmt = select(CourseRule).where(CourseRule.workspace_id == workspace_id)
+        if course_id is not None:
+            stmt = stmt.where(CourseRule.course_id == course_id)
+        if semester_id is not None:
+            stmt = stmt.where(CourseRule.semester_id == semester_id)
+        stmt = stmt.order_by(CourseRule.id)
+        return [_rule_to_data(row) for row in self._session.scalars(stmt)]
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        if not candidate_ids:
+            return []
+        return list(
+            self._session.scalars(
+                select(CourseRule.id)
+                .where(CourseRule.source_candidate_id.in_(candidate_ids))
+                .order_by(CourseRule.id)
+            )
+        )
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        if not candidate_ids:
+            return 0
+        rows = list(
+            self._session.scalars(
+                select(CourseRule).where(CourseRule.source_candidate_id.in_(candidate_ids))
+            )
+        )
+        for row in rows:
+            row.source_material_id = None
+            row.source_candidate_id = None
+            # 留痕（R006/D009）：规则留下"来源曾是这份资料、现在已被删除"的记录，
+            # 否则它与手工录入的规则在界面上完全一样
+            row.source_invalidated_at = invalidated_at
+            row.source_invalidated_note = note
+        self._session.flush()
+        return len(rows)
+
+
 def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
     return ProcessingJobData(
         id=row.id,
@@ -1105,5 +1218,6 @@ def build_repositories(session: Session) -> Repositories:
         materials=SqlAlchemyMaterialRepository(session),
         jobs=SqlAlchemyJobRepository(session),
         candidates=SqlAlchemyCandidateRepository(session),
+        rules=SqlAlchemyRuleRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )

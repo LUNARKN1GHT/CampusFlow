@@ -92,11 +92,12 @@ def deletion_confirmation_token(
     linked_task_ids: list[int],
     candidate_ids: list[int] | None = None,
     linked_fixed_event_ids: list[int] | None = None,
+    linked_rule_ids: list[int] | None = None,
 ) -> str:
     """删除确认指纹：影响内容的稳定哈希（D008）。
 
     预览与执行必须基于同一份影响内容；任何一项变化（版本、片段数、
-    关联任务、候选与关联日程）都会使旧确认失效，防止用过期的确认执行新的删除。
+    关联任务、候选、关联日程与关联规则）都会使旧确认失效，防止用过期的确认执行新的删除。
     """
     import hashlib
     import json
@@ -109,6 +110,7 @@ def deletion_confirmation_token(
             "linked_task_ids": sorted(linked_task_ids),
             "candidate_ids": sorted(candidate_ids or []),
             "linked_fixed_event_ids": sorted(linked_fixed_event_ids or []),
+            "linked_rule_ids": sorted(linked_rule_ids or []),
         },
         sort_keys=True,
     )

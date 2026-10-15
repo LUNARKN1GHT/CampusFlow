@@ -6,28 +6,22 @@ from campusflow.application.candidates import get_candidate
 from campusflow.application.ports.repositories import (
     FixedEventData,
     Repositories,
+    RuleData,
     TaskData,
 )
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import (
+    require_course_in_workspace,
+    require_semester_in_workspace,
+)
 from campusflow.application.settings import get_settings
 from campusflow.domain.candidate_conversion import build_task_conversion
 from campusflow.domain.candidates import require_confirmed_for_conversion
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.event_conversion import build_event_conversion
+from campusflow.domain.rule_conversion import build_rule_conversion
 from campusflow.domain.schedule import validate_fixed_event
 from campusflow.domain.states import EventRecurrence, TaskPriority
 from campusflow.domain.timezones import in_workspace_timezone
-
-
-def _require_course_in_workspace(
-    repos: Repositories, workspace_id: int, course_id: int | None
-) -> None:
-    if course_id is None:
-        return
-    course = repos.courses.get(course_id)
-    if course is None:
-        raise NotFoundError("课程不存在")
-    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
 
 
 def convert_candidate_to_task(
@@ -40,7 +34,7 @@ def convert_candidate_to_task(
     if existing is not None:
         return existing
     course_id = candidate.draft.scope.course_id
-    _require_course_in_workspace(repos, workspace_id, course_id)
+    require_course_in_workspace(repos, workspace_id, course_id)
     version = repos.materials.get_version(candidate.source_version_id)
     if version is None:
         raise NotFoundError("候选来源版本不存在")
@@ -79,7 +73,7 @@ def convert_candidate_to_event(
     if existing is not None:
         return existing
     course_id = candidate.draft.scope.course_id
-    _require_course_in_workspace(repos, workspace_id, course_id)
+    require_course_in_workspace(repos, workspace_id, course_id)
     conversion = build_event_conversion(candidate.draft.kind, candidate.effective_draft().fields)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     starts_at = in_workspace_timezone(conversion.starts_at, timezone)
@@ -104,3 +98,43 @@ def convert_candidate_to_event(
         repos.uow.rollback()
         raise
     return event
+
+
+def convert_candidate_to_rule(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> RuleData:
+    """转换已确认的规则候选（R006）；重复调用返回既有规则，不重复创建。
+
+    未确认（待核对/已忽略/已失效）的候选不能当作正式要求；
+    条件、范围与生效声明只保留原文，不做日期换算。
+    """
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    require_confirmed_for_conversion(candidate.review_status)
+    existing = repos.rules.get_by_source_candidate(candidate.id)
+    if existing is not None:
+        return existing
+    scope = candidate.draft.scope
+    require_course_in_workspace(repos, workspace_id, scope.course_id)
+    require_semester_in_workspace(repos, workspace_id, scope.semester_id)
+    version = repos.materials.get_version(candidate.source_version_id)
+    if version is None:
+        raise NotFoundError("候选来源版本不存在")
+    conversion = build_rule_conversion(candidate.draft.kind, candidate.effective_draft().fields)
+    try:
+        rule = repos.rules.create(
+            workspace_id,
+            scope.course_id,
+            scope.semester_id,
+            conversion.title,
+            conversion.rule_text,
+            conversion.conditions_text,
+            conversion.scope_text,
+            conversion.effective_text,
+            source_material_id=version.material_id,
+            source_candidate_id=candidate.id,
+        )
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return rule
