@@ -280,6 +280,9 @@ export type CandidateReviewChange = {
   changed_at: string
 }
 
+export type CandidateConversion = { kind: CandidateKind; object_id: number; title: string }
+export type CandidateConversionResult = CandidateConversion & { created: boolean }
+
 export type CandidateReviewDetail = {
   id: number
   kind: CandidateKind
@@ -304,4 +307,5 @@ export type CandidateReviewDetail = {
   review_changes: CandidateReviewChange[]
   missing_required_fields: string[]
   allowed_transitions: ReviewStatus[]
+  converted: CandidateConversion | null
 }

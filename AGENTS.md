@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；集中核对列表与详情界面已在本整合分支接入（R008），逐字段修正表单与确认后生成正式事项的入口待 R009，问答与排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；集中核对列表、详情界面与逐字段修正／生成正式事项入口已在本整合分支接入（R008、R009），M3 端到端验收待 R010，问答与排期尚待完成。独立复验另列任务，不将代码已合并等同于阶段验收通过。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
@@ -149,6 +149,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 - R006 已实现已确认规则候选转换为正式课程规则并保存：title 与 rule_text 必需，缺任一项拒绝；conditions／scope／effective 只保留原文，不解析生效日期、不换算相对写法。`course_rules.source_candidate_id` 唯一约束保证幂等，重复转换返回既有规则，未确认候选不能转换。新增 GET /api/v1/rules 只读查询，按 course／semester 过滤且限当前空间；删除资料时规则保留并标记来源失效，删除影响预览计入 linked_rule_ids 与确认指纹。候选 HTTP 接口与核对界面由 R008 接入，界面上的生成入口由 R009 完成。见 docs/verification/R006-confirmed-rules.md。
 
 - R008 已实现集中核对列表与详情界面，并补上支撑界面的两个接口（GET /api/v1/candidates/{id} 与 PATCH /api/v1/candidates/{id}/review-status）：详情并列给出每个字段的原始提取值与叠加 R002 修正后的生效值、四种出处、逐条原文引用与定位，只有仍能定位到原文的引用算可验证；转换接口复用 R003 守卫，缺必须字段时先 400 给出中文原因，需填说明并显式确认后才转换，操作者取当前会话。界面按后端返回的 allowed_transitions 渲染确认／忽略／标记失效／退回待核对，核对失败只在按钮上方显示错误、不出现成功提示且保留已填说明；每条引用可跳转到资料库并按候选所属版本与片段定位原文。逐字段修正表单与确认后生成正式事项的入口由 R009 接入。见 docs/verification/R008-review-workbench.md。
+
+- R009 已实现逐字段修正与确认后生成正式事项的界面入口（PATCH /api/v1/candidates/{id}/fields/{name} 与 POST /api/v1/candidates/{id}/convert）：修正复用 R002 用例，只追加记录、原始提取与证据不改写，出处只允许用户补充或规划建议，清空取值必须填说明；转换按候选类型分派到 R004／R005／R006，命中既有来源候选关联时返回 created=false，界面据此提示没有重复创建。详情新增 converted 字段，界面按类型给出打开任务／固定日程的入口（课程规则只有查询接口，暂不提供跳转），并对目标条目高亮定位。见 docs/verification/R009-review-actions.md。
 
 - X004 已提供固定活动候选提取入口，保留起止、地点、参加条件及证据。用户选择 AI 提取后由代码保守检查：提交/完成截止不能充当活动，混合描述拒绝并提示核对；缺开始或结束不猜测，显式保存仍 pending。尚未接 API/队列及正式日程创建。见 docs/verification/X004-event-extraction.md。
 

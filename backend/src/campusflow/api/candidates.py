@@ -1,4 +1,4 @@
-"""待核对事项 HTTP 路由（R001 列表、R008 核对详情与状态转换）。"""
+"""待核对事项 HTTP 路由（R001 列表、R008 核对详情与状态转换、R009 修正与生成入口）。"""
 
 from datetime import datetime
 from typing import Annotated, Any
@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.application import candidates as use_cases
+from campusflow.application import conversion as conversions
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.domain.candidates import FieldOrigin
@@ -181,6 +182,20 @@ class ReviewChangeOut(BaseModel):
     changed_at: datetime
 
 
+class CandidateConversionOut(BaseModel):
+    """候选已生成的正式事项；界面据此提供打开入口，不复制正式事项字段。"""
+
+    kind: str
+    object_id: int
+    title: str
+
+
+class CandidateConversionResultOut(CandidateConversionOut):
+    """转换结果额外带 created：false 表示命中既有事项，本次没有新建。"""
+
+    created: bool
+
+
 class CandidateReviewDetailOut(BaseModel):
     """核对详情：逐字段取值与证据、修正与核对留痕、缺失必需字段与可选转换。"""
 
@@ -196,6 +211,7 @@ class CandidateReviewDetailOut(BaseModel):
     review_changes: list[ReviewChangeOut]
     missing_required_fields: list[str]
     allowed_transitions: list[ReviewStatus]
+    converted: CandidateConversionOut | None
 
 
 class ReviewStatusPatch(BaseModel):
@@ -206,7 +222,38 @@ class ReviewStatusPatch(BaseModel):
     acknowledge_missing: bool = False
 
 
-def _to_detail_out(detail: use_cases.CandidateReviewDetail) -> CandidateReviewDetailOut:
+class FieldRevisionPatch(BaseModel):
+    """R002 逐字段修正：只追加修正记录，原始提取与证据不会被改写。"""
+
+    value: Any
+    origin: FieldOrigin
+    note: str | None = Field(default=None, max_length=1000)
+
+
+def _to_conversion_out(
+    conversion: conversions.CandidateConversion | None,
+) -> CandidateConversionOut | None:
+    if conversion is None:
+        return None
+    return CandidateConversionOut(
+        kind=conversion.kind.value,
+        object_id=conversion.object_id,
+        title=conversion.title,
+    )
+
+
+def _detail_out(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> CandidateReviewDetailOut:
+    """详情与已生成的正式事项一起返回，界面据此决定是否给出打开入口。"""
+    detail = use_cases.review_detail(repos, workspace_id, candidate_id)
+    return _to_detail_out(detail, conversions.find_candidate_conversion(repos, detail.candidate))
+
+
+def _to_detail_out(
+    detail: use_cases.CandidateReviewDetail,
+    conversion: conversions.CandidateConversion | None,
+) -> CandidateReviewDetailOut:
     candidate = detail.candidate
     return CandidateReviewDetailOut(
         id=candidate.id,
@@ -271,6 +318,7 @@ def _to_detail_out(detail: use_cases.CandidateReviewDetail) -> CandidateReviewDe
         ],
         missing_required_fields=list(detail.missing_required_fields),
         allowed_transitions=list(detail.allowed_transitions),
+        converted=_to_conversion_out(conversion),
     )
 
 
@@ -278,7 +326,7 @@ def _to_detail_out(detail: use_cases.CandidateReviewDetail) -> CandidateReviewDe
 def get_candidate_detail(
     candidate_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> CandidateReviewDetailOut:
-    return _to_detail_out(use_cases.review_detail(repos, workspace.id, candidate_id))
+    return _detail_out(repos, workspace.id, candidate_id)
 
 
 @router.patch("/candidates/{candidate_id}/review-status", response_model=CandidateReviewDetailOut)
@@ -299,4 +347,49 @@ def patch_candidate_review_status(
         reason=payload.reason,
         acknowledge_missing=payload.acknowledge_missing,
     )
-    return _to_detail_out(use_cases.review_detail(repos, workspace.id, candidate_id))
+    return _detail_out(repos, workspace.id, candidate_id)
+
+
+@router.patch(
+    "/candidates/{candidate_id}/fields/{field_name}", response_model=CandidateReviewDetailOut
+)
+def patch_candidate_field(
+    candidate_id: int,
+    field_name: str,
+    payload: FieldRevisionPatch,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    operator: Annotated[str, Depends(require_session)],
+) -> CandidateReviewDetailOut:
+    """逐字段修正复用 R002 用例：追加修正记录，原始提取与证据不改写。
+
+    用户填写的值只能标为用户补充或规划建议；标成原文规定或系统推断会被
+    应用层拒绝（缺原文证据），错误以中文原因返回。
+    """
+    use_cases.revise_candidate_field(
+        repos,
+        workspace.id,
+        candidate_id,
+        field_name,
+        value=payload.value,
+        origin=payload.origin,
+        operator=operator,
+        note=payload.note,
+    )
+    return _detail_out(repos, workspace.id, candidate_id)
+
+
+@router.post("/candidates/{candidate_id}/convert", response_model=CandidateConversionResultOut)
+def post_candidate_conversion(
+    candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CandidateConversionResultOut:
+    """把已确认候选转换为正式事项；重复调用返回既有事项并把 created 置为 false。"""
+    conversion, created = conversions.convert_candidate(repos, workspace.id, candidate_id)
+    return CandidateConversionResultOut(
+        kind=conversion.kind.value,
+        object_id=conversion.object_id,
+        title=conversion.title,
+        created=created,
+    )
