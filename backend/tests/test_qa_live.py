@@ -118,6 +118,9 @@ def test_answer_payload_does_not_include_gold_labels(live):
     assert "NEVER_SEND_GOLD" not in text and "expected_claims" not in text
     assert payload["thinking"] == {"type": "disabled"}
     assert "tools" not in payload
+    supplied = json.loads(payload["messages"][1]["content"])
+    assert supplied["allowed_citation_ids"] == ["a"]
+    assert supplied["sources"][0]["locator"] == "p1"
 
 
 @pytest.mark.parametrize("bad", ["truncated", "duplicate", "nonfinite", "bad-disposition"])
@@ -266,3 +269,67 @@ def test_completed_resume_makes_no_more_api_calls(live, tmp_path):
     )
     report = live.execute(asset, client, tmp_path, repeats=1, resume=True)
     assert len(report["runs"]) == 36
+
+
+def test_followup_inherits_budget_once_and_prevents_old_run_restart(live, tmp_path):
+    source = tmp_path / "previous"
+    target = tmp_path / "next"
+    source.mkdir()
+    target.mkdir()
+    manifest = {
+        "cases_sha256": "test",
+        "budget_cny": "1",
+        "dimensions": 1024,
+        "repeats": 2,
+        "embedding_cny_per_million_tokens": "0.5",
+        "generation_cny_per_million_tokens": "0",
+    }
+    live.save(source / "manifest.json", manifest)
+    live.save(source / "results.json", {"status": "completed_pending_review"})
+    original = live.Client(
+        "key", source / "billing.json", Decimal(1), lambda *args: response("embeddings")
+    )
+    original.embed("embedding-2", "样本", "index")
+    live.prepare_followup(source, target, manifest)
+    carried = live.Client(
+        "key",
+        target / "billing.json",
+        Decimal(1),
+        lambda *args: response("embeddings"),
+        resume=True,
+    )
+    assert carried.ledger == original.ledger
+    carried.embed("embedding-3", "样本", "index")
+    assert len(carried.ledger["calls"]) == 2
+    assert sum(Decimal(c["reserved_cny"]) for c in carried.ledger["calls"]) == 2 * live.RESERVE
+    with pytest.raises(live.RunStopped, match="already_forwarded"):
+        live.prepare_followup(source, target, manifest)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/evaluate_qa_live.py"),
+            "--execute",
+            "--resume",
+            "--output-dir",
+            str(source),
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert not (source / ".active").exists()
+
+
+def test_followup_rejects_changed_budget_and_active_parent(live, tmp_path):
+    source = tmp_path / "previous"
+    target = tmp_path / "next"
+    source.mkdir()
+    target.mkdir()
+    manifest = {"cases_sha256": "test", "budget_cny": "1"}
+    live.save(source / "manifest.json", manifest)
+    with pytest.raises(live.RunStopped, match="configuration_changed"):
+        live.prepare_followup(source, target, {**manifest, "budget_cny": "2"})
+    assert not (target / "billing.json").exists()
+    (source / ".active").write_text("running")
+    with pytest.raises(live.RunStopped, match="parent_run_active"):
+        live.prepare_followup(source, target, manifest)
