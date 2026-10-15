@@ -146,6 +146,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 - R001 已实现待核对事项列表与计数的只读接口（GET /api/v1/candidates 与 GET /api/v1/candidates/summary）：按核对状态（可多选，默认 pending）、事项类型、课程、学期、来源资料和缺失原因代码筛选，返回总数、按状态与按原因分布计数，同一候选重复原因只计一次。接口只接受 ReviewStatus，传任务执行进度值被 422 拒绝，两套状态不混用；列表只给最小字段，逐字段取值与证据仍由 R007 详情接口读取；原因存在 review_reasons JSON 列、代码随 X 系列提取任务增加，故在应用层按代码过滤而非 SQL 硬编码。列表项带来源资料与版本号，可据此跳到原文片段查看未覆盖范围。核对列表界面由 R008 完成，X008 的截图截断与来源矛盾原因代码尚未产出。见 docs/verification/R001-review-list.md。
 
+- R006 已实现已确认规则候选转换为正式课程规则并保存：title 与 rule_text 必需，缺任一项拒绝；conditions／scope／effective 只保留原文，不解析生效日期、不换算相对写法。`course_rules.source_candidate_id` 唯一约束保证幂等，重复转换返回既有规则，未确认候选不能转换。新增 GET /api/v1/rules 只读查询，按 course／semester 过滤且限当前空间；删除资料时规则保留并标记来源失效，删除影响预览计入 linked_rule_ids 与确认指纹。候选 HTTP 接口与核对界面由 R008 接入，界面上的生成入口由 R009 完成。见 docs/verification/R006-confirmed-rules.md。
+
 - X004 已提供固定活动候选提取入口，保留起止、地点、参加条件及证据。用户选择 AI 提取后由代码保守检查：提交/完成截止不能充当活动，混合描述拒绝并提示核对；缺开始或结束不猜测，显式保存仍 pending。尚未接 API/队列及正式日程创建。见 docs/verification/X004-event-extraction.md。
 
 - X001 按用户选择将候选、字段和证据分表保存，四种出处为 document/user/inferred/suggestion；新候选固定 pending，不混用任务执行进度。保存入口校验空间、版本与原文摘录，删除影响预览纳入候选集合。X002 已提供统一文字生成接口、智谱适配器和严格候选校验；用户选定 glm-4-flash-250414，与视觉模型分开配置。先授权再调用，非法字段、引用及截断输出拒绝接受；尚未接入自动提取流程，X003–X008 和真实样本评测仍待完成。见 docs/verification/X001-candidate-evidence.md、docs/verification/X002-generation-contract.md 与 docs/planning/X-IMPLEMENTATION.md。
