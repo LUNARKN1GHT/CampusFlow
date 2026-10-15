@@ -19,6 +19,7 @@ from campusflow.infrastructure.repositories import (
     SqlAlchemyCourseRepository,
     SqlAlchemyJobRepository,
     SqlAlchemyMaterialRepository,
+    SqlAlchemyRuleRepository,
     SqlAlchemyScheduleRepository,
     SqlAlchemySemesterRepository,
     SqlAlchemyTaskRepository,
@@ -44,6 +45,7 @@ def _repos(session: Session) -> Repositories:
         materials=SqlAlchemyMaterialRepository(session),
         jobs=SqlAlchemyJobRepository(session),
         candidates=SqlAlchemyCandidateRepository(session),
+        rules=SqlAlchemyRuleRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
 

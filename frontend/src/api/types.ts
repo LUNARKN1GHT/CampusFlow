@@ -181,6 +181,7 @@ export type MaterialDeleteImpact = {
   unfinished_job_count: number
   candidate_count: number
   linked_fixed_event_ids: number[]
+  linked_rule_ids: number[]
   confirm_token: string
   backup_note: string
 }

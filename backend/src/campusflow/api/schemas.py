@@ -201,6 +201,28 @@ class AvailabilitySlotOut(BaseModel):
     end_time: time
 
 
+class RuleOut(BaseModel):
+    """正式课程规则（R006）：只含经核对确认转换的规则。"""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    course_id: int | None
+    semester_id: int | None
+    title: str
+    rule_text: str
+    conditions_text: str | None
+    scope_text: str | None
+    effective_text: str | None
+    source_material_id: int | None
+    source_candidate_id: int | None
+    # 来源状态（对齐 D009）：available 还有来源 / invalidated 来源已被删除 / none 无来源
+    source_state: str
+    source_invalidated_at: datetime | None
+    source_invalidated_note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class SourceCitationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     chunk_id: int

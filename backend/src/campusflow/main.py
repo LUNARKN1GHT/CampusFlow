@@ -10,6 +10,7 @@ from campusflow.api import candidates as candidates_api
 from campusflow.api import courses as courses_api
 from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
+from campusflow.api import rules as rules_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
@@ -94,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         materials_api.router,
         jobs_api.router,
         candidates_api.router,
+        rules_api.router,
     ):
         app.include_router(
             router,

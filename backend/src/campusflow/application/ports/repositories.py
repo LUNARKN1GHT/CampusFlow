@@ -133,6 +133,34 @@ class FixedEventData:
 
 
 @dataclass
+class RuleData:
+    """R006：由已确认规则候选转换而来的课程规则。"""
+
+    id: int
+    workspace_id: int
+    course_id: int | None
+    semester_id: int | None
+    title: str
+    rule_text: str
+    conditions_text: str | None
+    scope_text: str | None
+    effective_text: str | None
+    source_material_id: int | None
+    source_candidate_id: int | None
+    source_invalidated_at: datetime | None
+    source_invalidated_note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @property
+    def source_state(self) -> str:
+        """来源状态（R006，对齐任务 D009）：还有来源 / 来源已失效 / 本来就没有来源。"""
+        from campusflow.domain.materials import source_state
+
+        return source_state(self.source_material_id, self.source_invalidated_at)
+
+
+@dataclass
 class AvailabilitySlotData:
     id: int
     workspace_id: int
@@ -598,6 +626,47 @@ class ScheduleRepository(Protocol):
     def delete_availability_slot(self, slot_id: int) -> bool: ...
 
 
+class RuleRepository(Protocol):
+    def create(
+        self,
+        workspace_id: int,
+        course_id: int | None,
+        semester_id: int | None,
+        title: str,
+        rule_text: str,
+        conditions_text: str | None,
+        scope_text: str | None,
+        effective_text: str | None,
+        *,
+        source_material_id: int | None = None,
+        source_candidate_id: int | None = None,
+    ) -> RuleData: ...
+
+    def get(self, rule_id: int) -> RuleData | None: ...
+
+    def get_by_source_candidate(self, candidate_id: int) -> RuleData | None:
+        """按来源候选查已转换的课程规则（R006 幂等）。"""
+        ...
+
+    def list(
+        self,
+        workspace_id: int,
+        *,
+        course_id: int | None = None,
+        semester_id: int | None = None,
+    ) -> list[RuleData]: ...
+
+    def list_ids_by_source_candidates(self, candidate_ids: list[int]) -> list[int]:
+        """列出由这些候选转换来的课程规则编号（R006 删除影响预览）。"""
+        ...
+
+    def invalidate_source_candidates(
+        self, candidate_ids: list[int], *, invalidated_at: datetime, note: str
+    ) -> int:
+        """来源候选被删除时解除规则关联并留下失效痕迹（R006）。返回解除数量。"""
+        ...
+
+
 @dataclass
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
@@ -610,4 +679,5 @@ class Repositories:
     materials: MaterialRepository
     jobs: JobRepository
     candidates: CandidateRepository
+    rules: RuleRepository
     uow: UnitOfWork
