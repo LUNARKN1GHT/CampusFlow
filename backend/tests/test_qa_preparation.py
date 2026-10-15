@@ -199,6 +199,25 @@ def test_cli_artifacts_use_b017_header_and_refuse_overwrite(tmp_path):
         rows = list(csv.DictReader(stream))
     assert {r["metric_id"] for r in rows} == {"CIT-SUPPORT", "UNC-RECALL", "UNC-PRECISION"}
     assert all(r["reviewed_by"] == "" and r["excluded_count"] == "0" for r in rows)
+    with (destination / "annotation-review.csv").open(encoding="utf-8-sig", newline="") as stream:
+        review = list(csv.DictReader(stream))
+    assert len(review) == 9
+    assert all(r["annotation_review"] == "pending" and not r["reviewer"] for r in review)
+    sources = json.loads(review[0]["eligible_sources_json"])
+    assert [s["id"] for s in sources] == ["physics-a"]
     original = (destination / "evidence.json").read_bytes()
     assert subprocess.run(command, cwd=ROOT, capture_output=True, check=False).returncode == 2
     assert (destination / "evidence.json").read_bytes() == original
+
+
+def test_review_sheet_preserves_chinese_and_neutralizes_formula_prefix(asset, tmp_path):
+    asset["cases"][0]["question"] = '\t=HYPERLINK("https://example.invalid","中文")'
+    path = tmp_path / "review.csv"
+    QA.write_annotation_review(asset, path)
+    assert path.read_bytes().startswith(b"\xef\xbb\xbf")
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    assert rows[0]["question"] == "'" + asset["cases"][0]["question"]
+    assert json.loads(rows[0]["expected_claims_json"]) == asset["cases"][0]["expected_claims"]
+    with pytest.raises(FileExistsError):
+        QA.write_annotation_review(asset, path)

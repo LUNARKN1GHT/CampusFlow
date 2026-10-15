@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CASES = ROOT / "samples/synthetic/q001/cases.json"
-COMPONENT = "q001-offline-preparation-v1"
+COMPONENT = "q001-offline-preparation-v2"
 DISPOSITIONS = {"answer", "uncertain", "conflict", "insufficient"}
 STATUSES = {"completed", "failed", "timeout"}
 
@@ -338,6 +338,53 @@ def metric_rows(report: dict) -> list[dict]:
     return rows
 
 
+def write_annotation_review(asset: dict, destination: Path) -> None:
+    """导出未签字的人工标注复核表，不把脚本自检当作人工通过。"""
+    columns = (
+        "sample_set_version",
+        "case_id",
+        "question",
+        "scope_json",
+        "eligible_sources_json",
+        "relevant_ids_json",
+        "expected_claims_json",
+        "expected_uncertainties_json",
+        "expected_disposition",
+        "annotation_review",
+        "reviewer",
+        "reviewed_at",
+        "notes",
+    )
+
+    # 带 BOM 便于 Windows 表格软件识别中文；制表符、换行等开头也检查公式前缀。
+    def cell(value: str) -> str:
+        return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) else value
+
+    with destination.open("x", encoding="utf-8-sig", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=columns)
+        writer.writeheader()
+        for case in asset["cases"]:
+            row = {
+                "sample_set_version": asset["version"],
+                "case_id": case["id"],
+                "question": case["question"],
+                "scope_json": json.dumps(case["scope"], ensure_ascii=False),
+                "eligible_sources_json": json.dumps(
+                    [d for d in asset["corpus"] if eligible(d, case)], ensure_ascii=False
+                ),
+                **{
+                    key + "_json": json.dumps(case[key], ensure_ascii=False)
+                    for key in ("relevant_ids", "expected_claims", "expected_uncertainties")
+                },
+                "expected_disposition": case["expected_disposition"],
+                "annotation_review": "pending",
+                "reviewer": "",
+                "reviewed_at": "",
+                "notes": "",
+            }
+            writer.writerow({key: cell(value) for key, value in row.items()})
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
@@ -420,6 +467,7 @@ def main() -> int:
                             **row,
                         }
                     )
+        write_annotation_review(asset, destination / "annotation-review.csv")
         for report in reports:
             flags = sum(bool(s["hard_failures"]) for s in report["samples"])
             print(
