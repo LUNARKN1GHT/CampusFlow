@@ -11,13 +11,14 @@ Worker 调用本用例完成解析：读取原文件 → 按来源类型选解�
 
 import logging
 
-from campusflow.application.ports.parsers import DocumentParser, ParseFailure
+from campusflow.application.ports.parsers import DocumentParser, ParseFailure, ParseOutcome
 from campusflow.application.ports.repositories import (
     ProcessingJobData,
     Repositories,
     SourceChunkData,
 )
 from campusflow.application.ports.storage import FileStorage
+from campusflow.application.source_uncertainty import COVERAGE_KEY
 from campusflow.domain.errors import DomainError, PermanentError
 from campusflow.domain.jobs import is_retryable
 from campusflow.domain.materials import (
@@ -109,6 +110,31 @@ def _scope_summary(fragment_count: int, failures: list[ParseFailure]) -> str:
     return scope
 
 
+def coverage_metadata(outcome: ParseOutcome) -> dict[str, object]:
+    """结构化保存解析覆盖范围（X008），供提取候选时判断来源是否完整。
+
+    作业的 scope 字段是给人看的说明文字，程序无法据它判断"哪一块没覆盖"；
+    这里按固定结构存回资料版本元数据，只含定位与原因，不含原文全文（J001）。
+    整份解析重跑后会覆盖本键，覆盖范围始终反映最近一次结果。
+    """
+    failures: list[dict[str, object]] = []
+    for failure in outcome.failures:
+        try:
+            locator_type, locator_value = failure.locator.as_chunk_locator()
+        except ValueError:
+            # 定位缺失不影响"这一块没读出"的事实，保留类型并留空位置
+            locator_type, locator_value = failure.locator.kind, ""
+        failures.append(
+            {
+                "locator_type": locator_type,
+                "locator_value": locator_value,
+                "reason": failure.reason[:500],
+                "retryable": failure.retryable,
+            }
+        )
+    return {"fragment_count": len(outcome.fragments), "failures": failures}
+
+
 def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> list[SourceChunkData]:
     """执行解析作业（Worker 入口调用）。
 
@@ -167,6 +193,10 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
             _abandon_write(repos, job_id, blocked)
             return []
         chunks = repos.materials.add_chunks(fragments_to_chunks(outcome, version.id))
+        # 覆盖范围随解析结果一并落库（X008）：候选提取据此判断来源是否完整
+        repos.materials.merge_version_metadata(
+            version.id, {COVERAGE_KEY: coverage_metadata(outcome)}
+        )
 
         if not outcome.failures:
             status = JobStatus.DONE

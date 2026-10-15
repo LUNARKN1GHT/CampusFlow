@@ -7,9 +7,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, ValidationError
 
-from campusflow.application.materials import get_material, list_version_chunks
+from campusflow.application.materials import get_material, get_version, list_version_chunks
 from campusflow.application.ports.generation import GenerationRequest, TextGenerator
 from campusflow.application.ports.repositories import Repositories, SourceChunkData
+from campusflow.application.source_uncertainty import stored_uncovered_ranges, with_coverage_reasons
 from campusflow.domain.candidates import (
     CandidateDraft,
     CandidateField,
@@ -242,10 +243,17 @@ def generate_for_version(
     generator: TextGenerator,
     spec: ExtractionSpec,
 ) -> list[CandidateDraft]:
-    """应用入口：联网前核对空间；只返回草稿，后续提取用例再调用 X001 保存。"""
+    """应用入口：联网前核对空间；只返回草稿，后续提取用例再调用 X001 保存。
+
+    X008：来源未完整解析时，本批每条草稿都带上"来源不完整"核对原因。
+    这只增加待核对提示，不改核对状态——截断来源的候选仍以 pending 落库，
+    由用户核对原始资料后决定。
+    """
     material = get_material(repos, workspace_id, material_id)
     if material.archived:
         raise DomainError("资料已归档，请恢复后再提取")
     chunks = list_version_chunks(repos, workspace_id, material_id, version_no)
     scope = CandidateScope(material.semester_id, material.course_id, material.class_name)
-    return generate_candidates(generator, spec, chunks, scope=scope)
+    drafts = generate_candidates(generator, spec, chunks, scope=scope)
+    version = get_version(repos, workspace_id, material_id, version_no)
+    return with_coverage_reasons(drafts, stored_uncovered_ranges(version))

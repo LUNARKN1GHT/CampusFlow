@@ -136,3 +136,42 @@ class SqlAlchemyCandidateRepository:
                 .order_by(ExtractedItem.id)
             )
         )
+
+    def list_by_scope(
+        self,
+        workspace_id: int,
+        semester_id: int | None,
+        course_id: int | None,
+        class_name: str | None,
+    ) -> list[CandidateData]:
+        rows = self._session.scalars(
+            select(ExtractedItem)
+            .where(
+                ExtractedItem.workspace_id == workspace_id,
+                ExtractedItem.semester_id.is_(None)
+                if semester_id is None
+                else ExtractedItem.semester_id == semester_id,
+                ExtractedItem.course_id.is_(None)
+                if course_id is None
+                else ExtractedItem.course_id == course_id,
+                ExtractedItem.class_name.is_(None)
+                if class_name is None
+                else ExtractedItem.class_name == class_name,
+            )
+            .order_by(ExtractedItem.id)
+        )
+        return [self._to_data(row) for row in rows]
+
+    def set_review_reasons(
+        self, workspace_id: int, candidate_id: int, reasons: tuple[ReviewReason, ...]
+    ) -> None:
+        row = self._session.scalar(
+            select(ExtractedItem).where(
+                ExtractedItem.id == candidate_id, ExtractedItem.workspace_id == workspace_id
+            )
+        )
+        if row is None:
+            return
+        # JSONB 列必须整体赋值：原地修改不会被 SQLAlchemy 视为变更
+        row.review_reasons = [asdict(reason) for reason in reasons]
+        self._session.flush()
