@@ -230,6 +230,10 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 
 上述顺序细化 README 的三阶段功能边界。后续依赖在实际使用时加入锁文件，不为未实现能力预装整套 AI SDK。
 
+## Q001 评测准备边界
+
+`scripts/evaluate_qa_preparation.py` 独立于应用运行时，只读取合成样本及离线预设输出，以 B017 口径记录引用支持和不确定性计数；不调用检索器、数据库或供应商，不改变现有业务接口。未知表达保留人工复核，真实模型速度与费用保持未测。真实比较与选型尚待后续工作，见 [准备说明](verification/Q001-preparation.md)。
+
 ## 7. 官方资料
 
 - [Vue 快速开始](https://vuejs.org/guide/quick-start)、[TypeScript 支持](https://vuejs.org/guide/typescript/overview)、[Vite 入门](https://vite.dev/guide/)：前端工程基线。

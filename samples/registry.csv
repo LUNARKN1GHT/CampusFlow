@@ -22,3 +22,4 @@ CF-PDF-006,C001 课程替代关系总表计算机切片,public-reference,学校�
 CF-YAML-001,C001 强制先修成环反例,synthetic,人工构造的三课程循环先修关系,project-internal,依赖成环阻塞与环路径展示验收,not-applicable-synthetic,samples/course-paths/synthetic/cycle.yaml,随验收集版本保留,active,quality-owner,2026-10-08,不得输出伪造完整顺序
 CF-YAML-002,C001 先修课程缺项反例,synthetic,人工构造的方案外先修课程引用,project-internal,缺项阻塞与部分顺序验收,not-applicable-synthetic,samples/course-paths/synthetic/missing-prereq.yaml,随验收集版本保留,active,quality-owner,2026-10-08,缺项不得静默略过
 CF-YAML-003,C001 并修与建议先学示例,synthetic,人工构造的并修与软约束关系,project-internal,关系分类建模验收,not-applicable-synthetic,samples/course-paths/synthetic/coreq-and-recommended.yaml,随验收集版本保留,active,quality-owner,2026-10-08,真实预修表无并修与建议先学样本
+CF-JSON-001,Q001 中文检索问答离线准备集,synthetic,项目人工编写的九个问题与十一个证据片段,project-internal,离线计数自检与后续项目内模型评测,not-applicable-synthetic,samples/synthetic/q001/cases.json,随验收集版本保留,active,quality-owner,2026-10-15,仅合成样本登记；语义标注与选型结论待独立复核

@@ -143,6 +143,10 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 仓库根目录可运行 `git diff --check` 检查空白问题。依赖变更必须同步锁文件：后端使用 `uv add`／`uv lock`，前端使用 `npm install`；日常安装使用 `uv sync --locked` 和 `npm ci`。
 
+## Q001 离线评测准备
+
+在仓库根目录执行 `python scripts/evaluate_qa_preparation.py --output-dir data/q001/run-001`，生成逐题证据 JSON 和 B017 格式的 CSV。仅使用 Python 标准库，无需启动数据库或设置模型密钥；每次用新目录保留历史。预设回答只检查计数流程，不代表供应商效果，详见 [Q001 准备说明](verification/Q001-preparation.md)。
+
 ## 当前限制
 
 - 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
