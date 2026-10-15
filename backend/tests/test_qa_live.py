@@ -333,3 +333,27 @@ def test_followup_rejects_changed_budget_and_active_parent(live, tmp_path):
     (source / ".active").write_text("running")
     with pytest.raises(live.RunStopped, match="parent_run_active"):
         live.prepare_followup(source, target, manifest)
+
+
+@pytest.mark.parametrize(
+    ("selected", "code", "message"),
+    [
+        (["missing-year-time", "partial-coverage"], 0, b"2 cases x 2 repeats"),
+        (["missing-year-time", "missing-year-time"], 2, None),
+        (["unknown"], 2, None),
+    ],
+)
+def test_case_subset_is_explicit_and_validated_without_network(live, selected, code, message):
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/evaluate_qa_live.py"),
+            "--case-ids",
+            *selected,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == code
+    if message:
+        assert message in result.stdout and b"No model calls" in result.stdout

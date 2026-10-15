@@ -48,6 +48,16 @@ python scripts/evaluate_qa_live.py --execute --timeout 60 --output-dir data/q001
 
 新目录继承全部历史账本，调用序号接着递增，`budget-origin.json` 保存父记录指纹和继承数量。预算转移成功后原目录写入 `followup.json`，拒绝再次分叉或恢复旧实验；继续中断的复测应在新目录使用 `--resume`。新旧提示词的结果不混在同一组中；提示词版本改变时原目录不能直接继续，避免把两版输出算成一次实验。初次运行约定的已知费用仍只作公开单价估算，未知调用保留未知。
 
+### 状态定义针对性复测保存点
+
+`q001-source-id-v3` 沿用严格字段与编号要求，补充状态定义：相关资料有部分缺失用 `uncertain`，完全没有相关有效资料才用 `insufficient`，冲突优先单独展示。只选择 `missing-year-time` 和 `partial-coverage` 两个场景，四组各重复两次，共 16 份回答；不是第三次完整 72 题测试。选择写入清单，继续同目录时不允许改变选择。代码专项测试累计 57 项通过。
+
+```powershell
+python scripts/evaluate_qa_live.py --execute --timeout 60 --output-dir data/q001/live-status-001 --follow-up-from data/q001/live-strict-001 --case-ids missing-year-time partial-coverage --env-file backend/.env
+```
+
+该命令承接原有 336 次调用账本，不能另开独立预算。运行完成后补充结果记录；独立人工语义复核和更复杂的检索样本仍是后续工作。
+
 ## 官方依据（2026-10-15 核实）
 
 - [Embedding-2](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2)：0.5 元／百万 Tokens，固定 1024 维。
