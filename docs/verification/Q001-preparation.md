@@ -71,4 +71,14 @@ python scripts/evaluate_qa_preparation.py --output-dir data/q001/run-001
 
 复验命令：在 `backend/` 设置独立测试库 `CAMPUSFLOW_TEST_DATABASE_URL` 后运行 `python -m pytest -q --tb=short -x -p no:cacheprovider`；在根目录运行 `python scripts/validate_sample_registry.py`、`python scripts/validate_evaluation_assets.py`，以及 `python -m ruff check --config backend/pyproject.toml scripts/evaluate_qa_preparation.py`。脚本格式检查同样使用 `--config backend/pyproject.toml`，避免机器全局配置影响结果。
 
+留档运行基于提交 `76dbe52b5e3d04a60dafd97f22407d07a9e7c4ab`，见 [逐题证据](../evaluation/q001-preparation/evidence.json) 和 [计数表](../evaluation/q001-preparation/records.csv)。以下数字只验证预设输出的计数结果：
+
+| 预设组 | 引用支持 | 不确定性召回 | 不确定性准确 | 运行失败／其中超时 |
+| --- | --- | --- | --- | --- |
+| reference | 8/8 | 6/6 | 6/6 | 0/0 |
+| degraded | 4/7 | 2/6 | 2/2 | 0/0 |
+| failure | 6/8 | 5/6 | 5/5 | 3/1 |
+
+degraded 的越界、伪造引用和失效来源出现在三题的错误标记中；另外的补造日期、缺失事实及漏报原因反映在支持率、覆盖诊断和不确定性计数中。它的运行失败数为零不代表答案没有错误。failure 保留全部九题，三条失败分别为超时、格式错误和缺失输出。
+
 后续顺序：先复核样本和评分规则；再由用户决定候选模型、可用账号及费用上限；接入真实检索／回答运行器并记录实际费用和耗时；最后按 B017 汇总人工复核结果、形成选型依据。真实运行器应与当前预设自检明确区分，不把供应商名称贴到 fixture 成绩上。完成真实比较之前，不关闭 Q001，也不宣称 Q002／Q003 的选型前提已满足。
