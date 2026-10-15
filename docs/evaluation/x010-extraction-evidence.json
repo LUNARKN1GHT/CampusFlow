@@ -1,0 +1,960 @@
+{
+  "generated_at": "2026-10-15T03:38:52+00:00",
+  "commit_sha": "d75333713b65772b0efcd47973b40412ad45e4a2",
+  "sample_set_version": "b011-b012-2026-09-29",
+  "component_version": "campusflow-extraction-pipeline@v1",
+  "metric_spec": "docs/quality/evaluation-metrics.md",
+  "source_asset": "docs/quality/evaluation-record-template.csv",
+  "caveat": "模型回答是事先写好的固定文本（假适配器），本文件只用于核对 B017 计数口径，不代表真实模型成绩；解析在本评测中固定为成功，不进入任何指标。",
+  "runs": [
+    {
+      "config_id": "fake-baseline",
+      "description": "假模型按人工标注作答：用于验证计数口径本身",
+      "model": "fake（FakeTextGenerator，回答取自样本清单的 model_facts）",
+      "inject_coverage_reasons": true,
+      "run_status": "completed",
+      "structural_failure_count": 0,
+      "samples": [
+        {
+          "case_id": "chat-truncated",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #11",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "本周练习",
+            "due_text": "周五"
+          },
+          "predicted_facts": {
+            "title": "本周练习",
+            "due_text": "周五"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.relative",
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        },
+        {
+          "case_id": "blurred-notice",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #21",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日 18:00",
+            "deliverable": "实验报告、SQL 脚本与运行截图"
+          },
+          "predicted_facts": {
+            "title": "实验二：事务隔离级别",
+            "deliverable": "实验报告、SQL 脚本与运行截图",
+            "due_text": "2026 年 10 月 16 日 18:00"
+          },
+          "matched_facts": [
+            "deliverable",
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "missing-pages",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #31",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "课程实验手册"
+          },
+          "predicted_facts": {
+            "title": "课程实验手册"
+          },
+          "matched_facts": [
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 1
+        },
+        {
+          "case_id": "relative-date",
+          "difficulty": "relative-date",
+          "source_key": "来源版本 #41",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "需求分析作业",
+            "due_text": "下周三 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "需求分析作业",
+            "submission_method": "通过课程平台提交",
+            "due_text": "下周三 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "missing-year-time",
+          "difficulty": "missing-field",
+          "source_key": "来源版本 #51",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验一",
+            "due_text": "10 月 15 日",
+            "submission_method": "提交到课程平台"
+          },
+          "predicted_facts": {
+            "title": "实验一",
+            "submission_method": "提交到课程平台",
+            "due_text": "10 月 15 日"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #61",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 18 日 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "实验报告",
+            "submission_method": "通过课程平台提交",
+            "due_text": "2026 年 10 月 18 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [
+            "deadline.conflict"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #62",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 20 日 20:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "实验报告",
+            "submission_method": "通过课程平台提交",
+            "due_text": "2026 年 10 月 20 日 20:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [
+            "deadline.conflict"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #71",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #72",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        }
+      ]
+    },
+    {
+      "config_id": "fake-degraded",
+      "description": "同一批样本、同样解析成功，只有模型回答变差：漏提产出物、答错截止原文、丢掉时刻、忽略未覆盖范围",
+      "model": "fake（FakeTextGenerator，回答取自样本清单的 model_facts）",
+      "inject_coverage_reasons": false,
+      "run_status": "completed",
+      "structural_failure_count": 0,
+      "samples": [
+        {
+          "case_id": "chat-truncated",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #11",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "本周练习",
+            "due_text": "周五"
+          },
+          "predicted_facts": {
+            "title": "本周练习",
+            "due_text": "请以课程平台为准"
+          },
+          "matched_facts": [
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [
+            "due_text"
+          ],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.unrecognized",
+            "deadline.year",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [
+            "deadline.relative",
+            "source.coverage"
+          ],
+          "overflagged_uncertain": [
+            "deadline.unrecognized"
+          ],
+          "matched_fact_count": 1
+        },
+        {
+          "case_id": "blurred-notice",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #21",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日 18:00",
+            "deliverable": "实验报告、SQL 脚本与运行截图"
+          },
+          "predicted_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日"
+          },
+          "matched_facts": [
+            "title"
+          ],
+          "missing_facts": [
+            "deliverable"
+          ],
+          "wrong_facts": [
+            "due_text"
+          ],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [
+            "source.coverage"
+          ],
+          "overflagged_uncertain": [
+            "deadline.time"
+          ],
+          "matched_fact_count": 1
+        },
+        {
+          "case_id": "missing-pages",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #31",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "课程实验手册"
+          },
+          "predicted_facts": {
+            "title": "课程实验手册"
+          },
+          "matched_facts": [
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [
+            "source.coverage"
+          ],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 1
+        },
+        {
+          "case_id": "relative-date",
+          "difficulty": "relative-date",
+          "source_key": "来源版本 #41",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "需求分析作业",
+            "due_text": "下周三 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "需求分析作业",
+            "submission_method": "通过课程平台提交",
+            "due_text": "下周三 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "missing-year-time",
+          "difficulty": "missing-field",
+          "source_key": "来源版本 #51",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验一",
+            "due_text": "10 月 15 日",
+            "submission_method": "提交到课程平台"
+          },
+          "predicted_facts": {
+            "title": "实验一",
+            "submission_method": "提交到课程平台",
+            "due_text": "10 月 15 日"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #61",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 18 日 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "实验报告",
+            "submission_method": "通过课程平台提交",
+            "due_text": "2026 年 10 月 18 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [
+            "deadline.conflict"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #62",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 20 日 20:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "实验报告",
+            "submission_method": "通过课程平台提交",
+            "due_text": "2026 年 10 月 20 日 20:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [
+            "deadline.conflict"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #71",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #72",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        }
+      ]
+    },
+    {
+      "config_id": "fake-invalid-output",
+      "description": "其中一个来源的模型回答不合 JSON 契约：该样本按结构性失败计入失败数，不剔除、不重跑、不用其余样本补摊",
+      "model": "fake（FakeTextGenerator，回答取自样本清单的 model_facts）",
+      "inject_coverage_reasons": true,
+      "run_status": "partial",
+      "structural_failure_count": 1,
+      "samples": [
+        {
+          "case_id": "chat-truncated",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #11",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "本周练习",
+            "due_text": "周五"
+          },
+          "predicted_facts": {
+            "title": "本周练习",
+            "due_text": "周五"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.relative",
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        },
+        {
+          "case_id": "blurred-notice",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #21",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验二：事务隔离级别",
+            "due_text": "2026 年 10 月 16 日 18:00",
+            "deliverable": "实验报告、SQL 脚本与运行截图"
+          },
+          "predicted_facts": {
+            "title": "实验二：事务隔离级别",
+            "deliverable": "实验报告、SQL 脚本与运行截图",
+            "due_text": "2026 年 10 月 16 日 18:00"
+          },
+          "matched_facts": [
+            "deliverable",
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "source.coverage",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "missing-pages",
+          "difficulty": "partial-coverage",
+          "source_key": "来源版本 #31",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "课程实验手册"
+          },
+          "predicted_facts": {
+            "title": "课程实验手册"
+          },
+          "matched_facts": [
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year",
+            "source.coverage",
+            "task.due_text",
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 1
+        },
+        {
+          "case_id": "relative-date",
+          "difficulty": "relative-date",
+          "source_key": "来源版本 #41",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "需求分析作业",
+            "due_text": "下周三 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "需求分析作业",
+            "submission_method": "通过课程平台提交",
+            "due_text": "下周三 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.relative",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "missing-year-time",
+          "difficulty": "missing-field",
+          "source_key": "来源版本 #51",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验一",
+            "due_text": "10 月 15 日",
+            "submission_method": "提交到课程平台"
+          },
+          "predicted_facts": {
+            "title": "实验一",
+            "submission_method": "提交到课程平台",
+            "due_text": "10 月 15 日"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "system_uncertain": [
+            "deadline.time",
+            "deadline.year"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #61",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 18 日 18:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {
+            "title": "实验报告",
+            "submission_method": "通过课程平台提交",
+            "due_text": "2026 年 10 月 18 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [],
+          "unflagged_uncertain": [
+            "deadline.conflict"
+          ],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 3
+        },
+        {
+          "case_id": "conflicting-notices",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #62",
+          "structural_failure": true,
+          "expected_facts": {
+            "title": "实验报告",
+            "due_text": "2026 年 10 月 20 日 20:00",
+            "submission_method": "通过课程平台提交"
+          },
+          "predicted_facts": {},
+          "matched_facts": [],
+          "missing_facts": [
+            "due_text",
+            "submission_method",
+            "title"
+          ],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "deadline.conflict"
+          ],
+          "system_uncertain": [],
+          "unflagged_uncertain": [
+            "deadline.conflict"
+          ],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 0
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #71",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 10 日 20:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        },
+        {
+          "case_id": "same-name-different-sections",
+          "difficulty": "cross-source",
+          "source_key": "来源版本 #72",
+          "structural_failure": false,
+          "expected_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "predicted_facts": {
+            "title": "大学物理第一次习题",
+            "due_text": "2026 年 10 月 12 日 18:00"
+          },
+          "matched_facts": [
+            "due_text",
+            "title"
+          ],
+          "missing_facts": [],
+          "wrong_facts": [],
+          "extra_facts": [],
+          "expected_uncertain": [
+            "task.submission_method"
+          ],
+          "system_uncertain": [
+            "task.submission_method"
+          ],
+          "unflagged_uncertain": [],
+          "overflagged_uncertain": [],
+          "matched_fact_count": 2
+        }
+      ]
+    }
+  ]
+}
