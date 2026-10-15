@@ -44,8 +44,11 @@ TASK_SPEC = ExtractionSpec(
 )
 
 
-def _check_task_fields(draft: CandidateDraft) -> CandidateDraft:
-    """只接收 X002 按 TASK_SPEC 验证过的草稿，再增加任务专用检查。"""
+def check_task_fields(draft: CandidateDraft) -> CandidateDraft:
+    """只接收 X002 按 TASK_SPEC 验证过的草稿，再增加任务专用检查。
+
+    纯函数，不读取数据库，供提取入口与 X010 评测脚本共用。
+    """
     # 核对原因由本地规则产生；模型不能用同名原因覆盖缺失/建议标记。
     generated: list[ReviewReason] = []
     for field in draft.fields:
@@ -85,4 +88,4 @@ def extract_task_drafts(
     drafts = generate_for_version(
         repos, workspace_id, material_id, version_no, generator, TASK_SPEC
     )
-    return [_check_task_fields(draft) for draft in drafts]
+    return [check_task_fields(draft) for draft in drafts]
