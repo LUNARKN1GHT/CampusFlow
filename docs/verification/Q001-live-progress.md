@@ -110,14 +110,60 @@ python scripts/evaluate_qa_live.py --execute --cases samples/synthetic/q001/case
 | [q001-batch2-review-worksheet.csv](../evaluation/q001-batch2-review-worksheet.csv) | 121 | 逐条回答复核 |
 | [q001-batch2-annotation-review-worksheet.csv](../evaluation/q001-batch2-annotation-review-worksheet.csv) | 15 | 人工标注复核 |
 
-## 官方依据（2026-10-15 核实）
+## 第三批次：跨供应商同时对比（2026-10-16）
+
+前四批**全部只用智谱一家**，回答模型候选里没有 DeepSeek，验收条件①「供应商选择要有样本数据」因此立不住。本轮为运行器补上多供应商支持，并用同一次运行同时比较智谱两款与 DeepSeek 一款。
+
+运行器改动（默认值一律保持原样，不传新参数时行为与之前完全一致）：新增「模型 → 供应商」登记表，域名与密钥按型号所属供应商路由，因此跨供应商比较不需要改动调用点；预扣与计价改为按型号计算（GLM 免费档记 0，DeepSeek 按输入／输出分别计价，取高峰价做保守预扣）；新增 `--embedders`／`--generators` 指定本轮模型集。说明见 [架构说明](../ARCHITECTURE.md)。
+
+```powershell
+python scripts/evaluate_qa_live.py --execute --cases samples/synthetic/q001/cases-v2.json `
+  --budget-cny 3 --timeout 60 --embedders embedding-3 `
+  --generators glm-4-flash-250414 glm-4.5-flash deepseek-flash `
+  --output-dir data/q001/live-batch3 --env-file backend/.env
+```
+
+密钥由 `.env` 文件提供（两家各一把），并在调用时屏蔽环境中同名的旧变量，确保用的是文件里那把。**215 次请求全部 `completed`，无失败、无中断、无重试**，1 MiB 响应上限与禁跳转策略未触发。向量请求 122 次 × 0.004096 元 = 累计保守预留 **0.4997120 元**；回答请求 93 次，其中 DeepSeek 31 次（预留 1.0158080 元，按高峰价）、GLM 62 次记 0；**合计预留 1.5155200 元**，未超过本轮 3 元。已返回用量的公开价估算 **0.0557415 元**（DeepSeek 0.0547080 元 + 向量 0.0010335 元），**无未知用量调用**。预留是刹车不是账单，实付以供应商账单为准。
+
+manifest 的旧字段 `generation_cny_per_million_tokens` 沿用智谱口径记为 `"0"`，本轮**会产生歧义**（读者易误以为生成全免费），故另增 `provider_prices_cny_per_million_tokens` 与 `price_basis_note` 写明 DeepSeek 属付费档；**跨供应商单价只看新字段**。
+
+### 第三批实测结果
+
+证据：[汇总](../evaluation/q001-live-batch3/summary.json)、[回答](../evaluation/q001-live-batch3/results.json)、[账本](../evaluation/q001-live-batch3/billing.json)、[运行记录](../evaluation/q001-live-batch3/20261016T044355658838-execution.json)、[人工复核表](../evaluation/q001-live-batch3/answer-review.csv)。
+
+| 配置 | 格式合格 | 错引编号 | 检索命中 | 结论与预标注不符 | p95 时延 |
+| --- | --- | --- | --- | --- | --- |
+| embedding-3 + DeepSeek-Flash | 30/30 | 0 | 30/30 | **4** | **1746.947 毫秒** |
+| embedding-3 + GLM-4.5-Flash | 30/30 | 0 | 30/30 | 6 | 4751.564 毫秒 |
+| embedding-3 + GLM-4-Flash-250414 | 30/30 | 0 | 30/30 | 7 | 4802.332 毫秒 |
+
+三点说明：
+
+1. **4 条不符是共性问题，不是模型差异**。`stat-paper-words` 与 `os-lab2-deadline` 两题，三组、两遍全部把 `uncertain` 答成 `insufficient`，第二批次四组也完全相同。剔除这两题后，**组特有差异为 0 : 2 : 3**（DeepSeek : GLM-4.5-Flash : GLM-4-Flash-250414）。
+2. **与第二批的一致性核对（偏差如实报告）**：
+   - `glm-4-flash-250414`：两批都是 7 条，且**条目完全相同**（`submission-paraphrase` 两遍 + `partial-coverage` 第 2 遍），跨批可复现，是稳定差异。
+   - `glm-4.5-flash`：第二批 4 条、第三批 6 条，**相差 2 条**，多出的都是 `partial-coverage` 本题的两次；该模型**跨批不稳定**，只报好看的那一批是不诚实的。
+   - 延迟上 `glm-4.5-flash` 第二批 p95 达 17.4 秒（最大 26.2 秒）、第三批 p95 4.75 秒（最大 19.5 秒），**批次间网络波动明显**，跨批延迟数字只能谨慎使用；三组之间的同批比较才是干净的。
+3. 选型判据（开跑前写死）、逐关判定与未覆盖的限制见 [Q001 模型选型结论](Q001-model-selection.md)。其中**向量模型一项本批数据不能区分**两款候选，该文档同时更正了此前据跨批次汇总得出的延迟排序。
+
+本轮**仍不关闭 Q001、不宣布选型定稿**：90 条回答的语义正确性待非作者成员独立复核，红线中的 `fabricated_date`／`dead_reference` 也只能由人工判定。复核回来后按既定流程回填评分并核对验收证据。
+
+| 文件 | 行数 | 用途 |
+| --- | --- | --- |
+| [q001-live-batch3/answer-review.csv](../evaluation/q001-live-batch3/answer-review.csv) | 90 | 逐条回答复核 |
+| [q001-live-batch3/annotation-review.csv](../evaluation/q001-live-batch3/annotation-review.csv) | 15 | 人工标注复核 |
+
+建议与第二批的两份工作表**一次交给同一位复核人**，减少重复投入；两批口径相同（同一份样本、同一 `prompt_version`、同一 `sample_set_version`），可以合并成一轮复核。
+
+## 官方依据（2026-10-15 核实，2026-10-16 追加 DeepSeek）
 
 - [Embedding-2](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2)：0.5 元／百万 Tokens，固定 1024 维。
 - [Embedding-3](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)：0.5 元／百万 Tokens，允许 1024 维。
 - [文本向量接口](https://docs.bigmodel.cn/api-reference/模型-api/文本嵌入)：固定使用官方 embeddings 地址；两种型号输入限制不同，运行器使用短文本逐条请求并检查返回长度和数值。
 - [GLM-4-Flash-250414](https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414) 与 [GLM-4.5-Flash](https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash)：型号页当前均标明免费。后者可关闭深度思考；比较时保留该配置。
+- [DeepSeek 模型与价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing)（2026-10-16 核实）：型号名 `deepseek-flash`（版本 DeepSeek-V4.1-Flash），OpenAI 兼容接入口 `https://api.deepseek.com`。属**付费档**：百万 token 高峰价 输入（缓存未命中）2 元、输出 8 元，空闲时段为高峰价的一半，缓存命中输入 0.04 元。高峰时段为北京时间周一至周五 9:00–12:00 与 14:00–18:00（不含中国法定节假日）。**思考模式默认开启**，跨模型比较必须显式关闭（本项目已关闭）。价格可能变动，重跑前需重新核实。
 - [官方价格说明](https://docs.bigmodel.cn/cn/guide/start/pricing)：按型号与输入／输出计费，后续重跑需重新核实价格。本文不是永久价格承诺。
-- [隐私政策](https://docs.bigmodel.cn/cn/terms/privacy-policy)／[服务协议](https://docs.bigmodel.cn/cn/terms/service-agreement)：平台个人信息存储说明为境内、必要期限，政策也涉及匿名数据用于服务改进；没有据此获得 API 请求零留存或绝不训练的承诺。本轮不上传真实课程／个人资料；具体 API 保留天数与账号专属条款仍待供应商澄清。
+- [隐私政策](https://docs.bigmodel.cn/cn/terms/privacy-policy)／[服务协议](https://docs.bigmodel.cn/cn/terms/service-agreement)：平台个人信息存储说明为境内、必要期限，政策也涉及匿名数据用于服务改进；没有据此获得 API 请求零留存或绝不训练的承诺。本轮不上传真实课程／个人资料；具体 API 保留天数与账号专属条款仍待供应商澄清。**DeepSeek 的隐私政策与服务协议尚未核实**：第三批上送内容与智谱轮次相同，均为合成样本，不含真实课程或个人资料；该供应商的数据留存与训练使用条款仍待澄清，在澄清前不得把真实校务资料发往该接口。
 
 ## 后续检查清单
 
