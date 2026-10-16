@@ -1,7 +1,9 @@
 """Q001 真实运行器的无联网测试：预算、落盘、范围及人工待核对边界。"""
 
+import argparse
 import importlib
 import json
+import os
 import subprocess
 import sys
 from decimal import Decimal
@@ -10,6 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
+KEYS = {"zhipu": "key"}
 
 
 @pytest.fixture
@@ -55,7 +58,7 @@ def test_reservation_saved_before_request_and_budget_stops_second(live, tmp_path
         calls.append(endpoint)
         return response(endpoint)
 
-    client = live.Client("private-key", path, live.RESERVE, transport)
+    client = live.Client({"zhipu": "private-key"}, path, live.RESERVE, transport)
     client.embed("embedding-2", "样本", "query")
     with pytest.raises(live.RunStopped, match="budget_limit"):
         client.embed("embedding-3", "样本", "query")
@@ -74,7 +77,7 @@ def test_reservation_saved_before_request_and_budget_stops_second(live, tmp_path
     ],
 )
 def test_missing_or_invalid_usage_keeps_reservation_and_stops(live, tmp_path, usage):
-    client = live.Client("key", tmp_path / "bill.json", Decimal(1), lambda *args: {"usage": usage})
+    client = live.Client(KEYS, tmp_path / "bill.json", Decimal(1), lambda *args: {"usage": usage})
     with pytest.raises(live.RunStopped):
         client.embed("embedding-2", "样本", "query")
     call = client.ledger["calls"][0]
@@ -87,7 +90,7 @@ def test_missing_or_invalid_usage_keeps_reservation_and_stops(live, tmp_path, us
 def test_invalid_vectors_are_not_ranked(live, tmp_path, vector):
     raw = response("embeddings")
     raw["data"][0]["embedding"] = vector
-    client = live.Client("key", tmp_path / "bill.json", Decimal(1), lambda *args: raw)
+    client = live.Client(KEYS, tmp_path / "bill.json", Decimal(1), lambda *args: raw)
     with pytest.raises(live.RunStopped, match="invalid_"):
         client.embed("embedding-3", "样本", "query")
 
@@ -148,7 +151,7 @@ def test_four_combinations_keep_every_sample_pending_and_no_gold_in_calls(live, 
         assert "expected_claims" not in json.dumps(payload)
         return response(endpoint)
 
-    client = live.Client("key", tmp_path / "bill.json", Decimal(1), transport)
+    client = live.Client(KEYS, tmp_path / "bill.json", Decimal(1), transport)
     report = live.execute(asset, client, tmp_path, repeats=1)
     assert report["status"] == "completed_pending_review"
     assert len(report["runs"]) == 36 and report["unattempted_samples"] == 0
@@ -166,7 +169,7 @@ def test_network_stop_saves_completed_work_without_retry(live, tmp_path):
         count += 1
         raise live.RunStopped("network_failure_or_timeout")
 
-    client = live.Client("key", tmp_path / "bill.json", Decimal(1), transport)
+    client = live.Client(KEYS, tmp_path / "bill.json", Decimal(1), transport)
     report = live.execute(asset, client, tmp_path, repeats=2)
     assert count == 1
     assert report["status"] == "stopped" and report["unattempted_samples"] == 72
@@ -211,7 +214,7 @@ def test_resume_preserves_failed_attempt_budget_and_skips_completed(live, tmp_pa
         return response(endpoint)
 
     billing = tmp_path / "bill.json"
-    first = live.Client("key", billing, Decimal(1), first_transport)
+    first = live.Client(KEYS, billing, Decimal(1), first_transport)
     stopped = live.execute(asset, first, tmp_path, repeats=1)
     assert [r["status"] for r in stopped["runs"]] == ["completed", "failed"]
     old_calls = json.loads(billing.read_text(encoding="utf-8"))["calls"]
@@ -221,7 +224,7 @@ def test_resume_preserves_failed_attempt_budget_and_skips_completed(live, tmp_pa
         resumed_calls.append(payload)
         return response(endpoint)
 
-    client = live.Client("key", billing, Decimal(1), second_transport, resume=True)
+    client = live.Client(KEYS, billing, Decimal(1), second_transport, resume=True)
     result = live.execute(asset, client, tmp_path, repeats=1, resume=True)
     assert result["status"] == "completed_pending_review"
     assert result["unattempted_samples"] == 0 and len(result["runs"]) == 37
@@ -246,26 +249,26 @@ def test_resume_preserves_failed_attempt_budget_and_skips_completed(live, tmp_pa
 
 def test_resume_does_not_reset_reserved_budget(live, tmp_path):
     path = tmp_path / "bill.json"
-    client = live.Client("key", path, live.RESERVE, lambda *args: response("embeddings"))
+    client = live.Client(KEYS, path, live.RESERVE, lambda *args: response("embeddings"))
     client.embed("embedding-2", "样本", "query")
     resumed = live.Client(
-        "key", path, live.RESERVE, lambda *args: pytest.fail("no new call"), resume=True
+        KEYS, path, live.RESERVE, lambda *args: pytest.fail("no new call"), resume=True
     )
     with pytest.raises(live.RunStopped, match="budget_limit"):
         resumed.embed("embedding-3", "样本", "query")
     with pytest.raises(live.RunStopped, match="billing_already_exists"):
-        live.Client("key", path, Decimal(1))
+        live.Client(KEYS, path, Decimal(1))
     with pytest.raises(live.RunStopped, match="budget_changed"):
-        live.Client("key", path, Decimal(1), resume=True)
+        live.Client(KEYS, path, Decimal(1), resume=True)
 
 
 def test_completed_resume_makes_no_more_api_calls(live, tmp_path):
     asset = live.prep.load_json(live.prep.DEFAULT_CASES)
     path = tmp_path / "bill.json"
-    client = live.Client("key", path, Decimal(1), lambda key, ep, payload: response(ep))
+    client = live.Client(KEYS, path, Decimal(1), lambda key, ep, payload: response(ep))
     live.execute(asset, client, tmp_path, repeats=1)
     client = live.Client(
-        "key", path, Decimal(1), lambda *args: pytest.fail("no new call"), resume=True
+        KEYS, path, Decimal(1), lambda *args: pytest.fail("no new call"), resume=True
     )
     report = live.execute(asset, client, tmp_path, repeats=1, resume=True)
     assert len(report["runs"]) == 36
@@ -287,12 +290,12 @@ def test_followup_inherits_budget_once_and_prevents_old_run_restart(live, tmp_pa
     live.save(source / "manifest.json", manifest)
     live.save(source / "results.json", {"status": "completed_pending_review"})
     original = live.Client(
-        "key", source / "billing.json", Decimal(1), lambda *args: response("embeddings")
+        KEYS, source / "billing.json", Decimal(1), lambda *args: response("embeddings")
     )
     original.embed("embedding-2", "样本", "index")
     live.prepare_followup(source, target, manifest)
     carried = live.Client(
-        "key",
+        KEYS,
         target / "billing.json",
         Decimal(1),
         lambda *args: response("embeddings"),
@@ -387,3 +390,220 @@ def test_budget_must_be_a_positive_number(live, budget, ok):
     assert (result.returncode == 0) is ok
     if ok:
         assert b"budget <= 3 CNY" in result.stdout and b"No model calls" in result.stdout
+
+
+def test_default_combination_count_stays_pinned(live):
+    # 不传新参数时必须仍是历史的两组向量 × 两组回答，否则既有证据不可比。
+    result = run_cli()
+    assert result.returncode == 0
+    assert b"4 combinations; 9 cases x 2 repeats" in result.stdout
+
+
+def test_planned_three_group_invocation_parses_offline(live):
+    # 与本轮真实调用完全一致的参数组合，先在无联网下确认组数、题数与预算。
+    result = run_cli(
+        "--cases",
+        str(ROOT / "samples/synthetic/q001/cases-v2.json"),
+        "--budget-cny",
+        "3",
+        "--embedders",
+        "embedding-3",
+        "--generators",
+        "glm-4-flash-250414",
+        "glm-4.5-flash",
+        "deepseek-flash",
+    )
+    assert result.returncode == 0
+    assert b"3 combinations; 15 cases x 2 repeats; budget <= 3 CNY" in result.stdout
+    assert b"No model calls" in result.stdout
+
+
+def test_unregistered_or_repeated_models_are_rejected_before_output(live, tmp_path):
+    out = tmp_path / "run"
+    assert run_cli("--generators", "gpt-4", "--output-dir", str(out)).returncode == 2
+    assert not out.exists()
+    # 同一组合被重复指定会重复计费，必须拒绝。
+    assert run_cli("--embedders", "embedding-3", "embedding-3").returncode == 2
+    assert run_cli("--generators", "deepseek-flash", "deepseek-flash").returncode == 2
+
+
+def test_reserve_is_paid_only_for_paid_generators(live):
+    assert live.reserve_for("glm-4-flash-250414") == 0
+    assert live.reserve_for("glm-4.5-flash") == 0
+    assert live.reserve_for("embedding-2") == live.RESERVE
+    assert live.reserve_for("embedding-3") == live.RESERVE
+    assert live.reserve_for("deepseek-flash") == (
+        Decimal("2") / 10**6 * 8192 + Decimal("8") / 10**6 * 2048
+    )
+    with pytest.raises(live.RunStopped, match="unapproved_model_or_endpoint"):
+        live.reserve_for("gpt-4")
+
+
+def test_paid_generation_is_reserved_and_priced_from_usage(live, tmp_path):
+    client = live.Client(
+        {"deepseek": "key"},
+        tmp_path / "bill.json",
+        Decimal("1"),
+        lambda *a: response("chat/completions"),
+    )
+    client.request("chat/completions", live.answer_payload("deepseek-flash", "问", []), "answer")
+    call = client.ledger["calls"][0]
+    assert Decimal(call["reserved_cny"]) == live.reserve_for("deepseek-flash")
+    assert Decimal(call["estimated_cny_from_usage"]) == (
+        Decimal(20) * live.CHAT_PRICE["deepseek-flash"][0]
+        + Decimal(5) * live.CHAT_PRICE["deepseek-flash"][1]
+    )
+
+
+def test_free_generator_keeps_zero_reservation_and_cost(live, tmp_path):
+    client = live.Client(
+        KEYS, tmp_path / "bill.json", Decimal("1"), lambda *a: response("chat/completions")
+    )
+    client.request(
+        "chat/completions", live.answer_payload("glm-4-flash-250414", "问", []), "answer"
+    )
+    call = client.ledger["calls"][0]
+    assert Decimal(call["reserved_cny"]) == 0
+    assert Decimal(call["estimated_cny_from_usage"]) == 0
+
+
+def test_paid_generation_still_stops_at_budget_limit(live, tmp_path):
+    client = live.Client(
+        {"deepseek": "key"},
+        tmp_path / "bill.json",
+        live.reserve_for("deepseek-flash"),
+        lambda *a: response("chat/completions"),
+    )
+    payload = live.answer_payload("deepseek-flash", "问", [])
+    client.request("chat/completions", payload, "answer")
+    with pytest.raises(live.RunStopped, match="budget_limit"):
+        client.request("chat/completions", payload, "answer")
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [("deepseek-flash", True), ("glm-4.5-flash", True), ("glm-4-flash-250414", False)],
+)
+def test_thinking_mode_disabled_where_supported(live, model, expected):
+    payload = live.answer_payload(model, "问", [])
+    assert ("thinking" in payload) is expected
+    if expected:
+        assert payload["thinking"] == {"type": "disabled"}
+
+
+def test_endpoint_must_match_model_kind(live, tmp_path):
+    client = live.Client(
+        KEYS, tmp_path / "bill.json", Decimal("1"), lambda *a: response("embeddings")
+    )
+    with pytest.raises(live.RunStopped, match="unapproved_model_or_endpoint"):
+        client.request("chat/completions", {"model": "embedding-2"}, "mismatch")
+    assert client.ledger["calls"] == []
+
+
+def test_missing_provider_key_stops_before_any_bookkeeping(live, tmp_path):
+    client = live.Client(
+        {"zhipu": "key"}, tmp_path / "bill.json", Decimal("1"), lambda *a: pytest.fail("no call")
+    )
+    with pytest.raises(live.RunStopped, match="missing_provider_key"):
+        client.request(
+            "chat/completions", live.answer_payload("deepseek-flash", "问", []), "answer"
+        )
+    assert client.ledger["calls"] == []
+
+
+def test_cli_names_the_missing_key_without_echoing_any_secret(live, tmp_path):
+    out = tmp_path / "run"
+    env = {k: v for k, v in os.environ.items() if k not in ("ZHIPU_API_KEY", "DEEPSEEK_API_KEY")}
+    env["ZHIPU_API_KEY"] = "zhipu-secret-value"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/evaluate_qa_live.py"),
+            "--execute",
+            "--output-dir",
+            str(out),
+            "--embedders",
+            "embedding-3",
+            "--generators",
+            "deepseek-flash",
+        ],
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 2
+    assert b"Missing valid DEEPSEEK_API_KEY. No calls made." in result.stdout
+    assert b"zhipu-secret-value" not in result.stdout + result.stderr
+    # 缺密钥不得留下半成品目录。
+    assert not out.exists()
+
+
+def test_resume_rejects_wrong_reservation_and_accepts_historical_shape(live, tmp_path):
+    path = tmp_path / "bill.json"
+    wrong = {
+        "sequence": 1,
+        "model_requested": "deepseek-flash",
+        "purpose": "answer",
+        "status": "completed",
+        "reserved_cny": "0",
+        "estimated_cny_from_usage": None,
+        "usage": None,
+    }
+    live.save(path, {"budget_cny": "1", "calls": [wrong]})
+    with pytest.raises(live.RunStopped, match="invalid_saved_ledger"):
+        live.Client(KEYS, path, Decimal("1"), resume=True)
+    # 历史账本形态（向量记 RESERVE、免费生成记 0）仍须通过校验。
+    historical = [
+        {**wrong, "model_requested": "embedding-2", "reserved_cny": str(live.RESERVE)},
+        {**wrong, "sequence": 2, "model_requested": "glm-4-flash-250414", "reserved_cny": "0"},
+    ]
+    live.save(path, {"budget_cny": "1", "calls": historical})
+    client = live.Client(KEYS, path, Decimal("1"), resume=True)
+    assert len(client.ledger["calls"]) == 2
+
+
+def test_manifest_records_models_and_cross_vendor_prices(live):
+    args = argparse.Namespace(
+        cases=ROOT / "samples/synthetic/q001/cases-v2.json",
+        embedders=["embedding-3"],
+        generators=["glm-4-flash-250414", "glm-4.5-flash", "deepseek-flash"],
+    )
+    manifest = live.manifest_for(
+        live.prep.load_json(args.cases), args, Decimal("3"), ["zhipu", "deepseek"]
+    )
+    prices = manifest["provider_prices_cny_per_million_tokens"]
+    assert prices["deepseek-flash"] == {"input": "2", "output": "8"}
+    assert prices["glm-4-flash-250414"] == {"input": "0", "output": "0"}
+    assert prices["embedding-3"] == {"input": "0.5", "output": "0"}
+    assert manifest["embedders"] == ["embedding-3"]
+    assert len(manifest["generators"]) == 3
+    assert manifest["provider_base_urls"]["deepseek"] == "https://api.deepseek.com/"
+    assert manifest["budget_cny"] == "3" and manifest["case_ids"]
+    # 付费事实必须能在证据里查到，不能只靠沿用智谱口径的旧字段。
+    assert "deepseek" in " ".join(manifest["price_sources"])
+    assert "付费档" in manifest["price_basis_note"]
+
+
+def test_three_group_run_pairs_single_embedder_with_each_generator(live, tmp_path):
+    asset = live.prep.load_json(live.prep.DEFAULT_CASES)
+    # 跨供应商运行必须同时持有两家密钥，缺一家会被 missing_provider_key 拦住。
+    client = live.Client(
+        {"zhipu": "key", "deepseek": "key"},
+        tmp_path / "bill.json",
+        Decimal("1"),
+        lambda k, ep, p: response(ep),
+    )
+    report = live.execute(
+        asset,
+        client,
+        tmp_path,
+        repeats=1,
+        embedders=("embedding-3",),
+        generators=("glm-4-flash-250414", "deepseek-flash"),
+    )
+    assert report["status"] == "completed_pending_review"
+    assert report["planned_samples"] == 18 and len(report["runs"]) == 18
+    assert {r["config_id"] for r in report["runs"]} == {
+        "embedding-3+glm-4-flash-250414",
+        "embedding-3+deepseek-flash",
+    }
