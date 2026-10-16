@@ -24,6 +24,16 @@ Q001 待复核的其实有两件事，本脚本各出一份读得懂的对照表
 产出：
     docs/evaluation/q001-review-worksheet.csv             逐条回答对照表（161 行）
     docs/evaluation/q001-annotation-review-worksheet.csv  人工标注对照表（9 行）
+
+第二批（`cases-v2.json`，同课程干扰资料与未见问题）另出一套表，用同一脚本指定来源：
+
+    uv run --locked --project backend python scripts/prepare_q001_review_sheet.py \
+        --experiment "v4-第二批=docs/evaluation/q001-live-batch2/answer-review.csv=四组各答 15 题" \
+        --annotation-source docs/evaluation/q001-live-batch2/annotation-review.csv \
+        --output docs/evaluation/q001-batch2-review-worksheet.csv \
+        --annotation-output docs/evaluation/q001-batch2-annotation-review-worksheet.csv
+
+不给 `--experiment` 时仍用内置的三轮历史实验，产出与原来逐字节相同。
 """
 
 from __future__ import annotations
@@ -331,25 +341,52 @@ def _write(path: Path, header: tuple[str, ...], rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+def _parse_experiment(value: str) -> tuple[str, str, str]:
+    """接收「实验名=证据文件=说明」，三段都必填，避免靠猜。"""
+    parts = value.split("=")
+    if len(parts) != 3 or not all(part.strip() for part in parts):
+        raise argparse.ArgumentTypeError("格式应为「实验名=证据文件=说明」")
+    return parts[0].strip(), parts[1].strip(), parts[2].strip()
+
+
+def _relative(path: Path) -> str:
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="生成 Q001 可读复核对照表")
     parser.add_argument("--output", type=Path, default=WORKSHEET_PATH)
     parser.add_argument("--annotation-output", type=Path, default=ANNOTATION_PATH)
+    parser.add_argument(
+        "--experiment",
+        type=_parse_experiment,
+        action="append",
+        help="要收进对照表的实验，可重复；不给则用内置的三轮历史实验",
+    )
+    parser.add_argument(
+        "--annotation-source",
+        default=ANNOTATION_SOURCE,
+        help="人工标注复核的证据文件；不给则用内置的首批标注表",
+    )
     args = parser.parse_args(argv)
+    experiments = tuple(args.experiment) if args.experiment else EXPERIMENTS
 
-    rows = build()
+    rows = build(experiments)
     _write(args.output, HEADER, rows)
-    for experiment, source, note in EXPERIMENTS:
+    for experiment, source, note in experiments:
         count = sum(1 for row in rows if row["来源文件"] == source)
         print(f"{experiment:<12} {count:>3} rows   {source}")
         print(f"{'':<12}           {note}")
-    print(f"wrote {args.output.relative_to(REPO_ROOT)} ({len(rows)} rows, {len(HEADER)} cols)")
+    print(f"wrote {_relative(args.output)} ({len(rows)} rows, {len(HEADER)} cols)")
 
-    annotations = build_annotation()
+    annotations = build_annotation(args.annotation_source)
     _write(args.annotation_output, ANNOTATION_HEADER, annotations)
     print(
-        f"wrote {args.annotation_output.relative_to(REPO_ROOT)} "
-        f"({len(annotations)} rows, {len(ANNOTATION_HEADER)} cols)  {ANNOTATION_SOURCE}"
+        f"wrote {_relative(args.annotation_output)} "
+        f"({len(annotations)} rows, {len(ANNOTATION_HEADER)} cols)  {args.annotation_source}"
     )
     return 0
 
