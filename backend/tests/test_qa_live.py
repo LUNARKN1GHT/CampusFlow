@@ -48,6 +48,13 @@ def response(endpoint):
     }
 
 
+def over_reservation_response():
+    """复审复现的形态：DeepSeek 返回用量远超本次预留，旧代码仍记 completed。"""
+    raw = response("chat/completions")
+    raw["usage"] = {"prompt_tokens": 20000, "completion_tokens": 10, "total_tokens": 20010}
+    return raw
+
+
 def test_reservation_saved_before_request_and_budget_stops_second(live, tmp_path):
     path = tmp_path / "billing.json"
     calls = []
@@ -446,13 +453,20 @@ def test_paid_generation_is_reserved_and_priced_from_usage(live, tmp_path):
         Decimal("1"),
         lambda *a: response("chat/completions"),
     )
-    client.request("chat/completions", live.answer_payload("deepseek-flash", "问", []), "answer")
+    payload = live.answer_payload("deepseek-flash", "问", [])
+    client.request("chat/completions", payload, "answer")
     call = client.ledger["calls"][0]
-    assert Decimal(call["reserved_cny"]) == live.reserve_for("deepseek-flash")
+    # 预留额必须对应这次请求的实际大小，并记录所用上界以便复算。
+    assert call["input_token_bound"] == live.payload_token_bound(payload)
+    assert Decimal(call["reserved_cny"]) == live.reserve_for(
+        "deepseek-flash", call["input_token_bound"]
+    )
     assert Decimal(call["estimated_cny_from_usage"]) == (
         Decimal(20) * live.CHAT_PRICE["deepseek-flash"][0]
         + Decimal(5) * live.CHAT_PRICE["deepseek-flash"][1]
     )
+    # 正常用量必须落在预留之内，否则刹车就没有意义。
+    assert Decimal(call["estimated_cny_from_usage"]) <= Decimal(call["reserved_cny"])
 
 
 def test_free_generator_keeps_zero_reservation_and_cost(live, tmp_path):
@@ -607,3 +621,125 @@ def test_three_group_run_pairs_single_embedder_with_each_generator(live, tmp_pat
         "embedding-3+glm-4-flash-250414",
         "embedding-3+deepseek-flash",
     }
+
+
+def test_payload_token_bound_tracks_request_size(live):
+    empty = live.answer_payload("deepseek-flash", "问", [])
+    one = live.answer_payload(
+        "deepseek-flash", "问", [{"id": "d", "text": "文" * 4000, "locator": "p", "scope": []}]
+    )
+    assert live.payload_token_bound(empty) < live.payload_token_bound(one)
+    # 上界不得小于真实序列化字节数，否则预留会低估输入。
+    assert live.payload_token_bound(one) >= len(live.serialize_request(one))
+
+
+def test_paid_chat_reservation_follows_payload_size_not_a_fixed_cap(live):
+    small = live.answer_payload("deepseek-flash", "问", [])
+    large = live.answer_payload(
+        "deepseek-flash",
+        "问",
+        [{"id": "d-1", "text": "文" * 20000, "locator": "p1", "scope": ["a"]}],
+    )
+    # sources 的 locator/scope/id 不受固定上限约束，预留必须跟着请求体变大。
+    assert live.reserve_for("deepseek-flash", live.payload_token_bound(large)) > live.reserve_for(
+        "deepseek-flash", live.payload_token_bound(small)
+    )
+    # 免费档不受输入长度影响。
+    assert live.reserve_for("glm-4.5-flash", live.payload_token_bound(large)) == 0
+
+
+def test_oversized_paid_payload_is_rejected_before_any_call(live, tmp_path):
+    client = live.Client(
+        {"deepseek": "key"},
+        tmp_path / "bill.json",
+        Decimal("0.03"),
+        lambda *a: pytest.fail("no call"),
+    )
+    payload = live.answer_payload(
+        "deepseek-flash", "问", [{"id": "d", "text": "文" * 20000, "locator": "p", "scope": []}]
+    )
+    with pytest.raises(live.RunStopped, match="budget_limit"):
+        client.request("chat/completions", payload, "answer")
+    # 拒绝发生在记账和任何网络调用之前。
+    assert client.ledger["calls"] == []
+
+
+def test_usage_over_reservation_keeps_real_cost_and_stops(live, tmp_path):
+    client = live.Client(
+        {"deepseek": "key"},
+        tmp_path / "bill.json",
+        Decimal("3"),
+        lambda *a: over_reservation_response(),
+    )
+    with pytest.raises(live.RunStopped, match="usage_exceeds_reserved_limit"):
+        client.request(
+            "chat/completions", live.answer_payload("deepseek-flash", "问", []), "answer"
+        )
+    call = client.ledger["calls"][0]
+    assert call["status"] == "usage_exceeds_reserved_limit"
+    assert call["error"] == "usage_exceeds_reserved_limit"
+    # 真实费用（复审复现值 0.04008 元）必须留下，而不是只累计固定的 reserved_cny。
+    assert Decimal(call["estimated_cny_from_usage"]) == Decimal("0.040080")
+    assert Decimal(call["estimated_cny_from_usage"]) > Decimal(call["reserved_cny"])
+    assert live.committed_cny(client.ledger["calls"]) == Decimal("0.040080")
+
+
+def test_over_reservation_stops_the_run_without_further_calls(live, tmp_path):
+    asset = live.prep.load_json(live.prep.DEFAULT_CASES)
+    calls = []
+
+    def transport(key, endpoint, payload):
+        calls.append(endpoint)
+        return over_reservation_response() if endpoint == "chat/completions" else response(endpoint)
+
+    client = live.Client(
+        {"zhipu": "key", "deepseek": "key"}, tmp_path / "bill.json", Decimal("3"), transport
+    )
+    report = live.execute(
+        asset,
+        client,
+        tmp_path,
+        repeats=1,
+        embedders=("embedding-3",),
+        generators=("deepseek-flash",),
+    )
+    assert report["status"] == "stopped"
+    assert report["stop_reason"] == "usage_exceeds_reserved_limit"
+    # 首次超预留后不得再发起对话调用，也不得凭空记出样本结果。
+    assert calls.count("chat/completions") == 1
+    assert report["runs"] == []
+
+
+def test_output_over_max_tokens_is_treated_as_an_anomaly(live, tmp_path):
+    raw = response("chat/completions")
+    raw["usage"] = {"prompt_tokens": 20, "completion_tokens": 3000, "total_tokens": 3020}
+    client = live.Client({"deepseek": "key"}, tmp_path / "bill.json", Decimal("3"), lambda *a: raw)
+    with pytest.raises(live.RunStopped, match="usage_exceeds_reserved_limit"):
+        client.request(
+            "chat/completions", live.answer_payload("deepseek-flash", "问", []), "answer"
+        )
+    assert client.ledger["calls"][0]["status"] == "usage_exceeds_reserved_limit"
+
+
+def test_resume_rejects_a_tampered_input_bound(live, tmp_path):
+    path = tmp_path / "bill.json"
+    base = {
+        "sequence": 1,
+        "model_requested": "deepseek-flash",
+        "purpose": "answer",
+        "status": "completed",
+        "reserved_cny": str(live.reserve_for("deepseek-flash", live.INPUT_TOKEN_CAP)),
+        "estimated_cny_from_usage": None,
+        "usage": None,
+    }
+    live.save(path, {"budget_cny": "1", "calls": [{**base, "input_token_bound": 1}]})
+    with pytest.raises(live.RunStopped, match="invalid_saved_ledger"):
+        live.Client(KEYS, path, Decimal("1"), resume=True)
+    # 自洽的新形态账本必须能继续。
+    consistent = {
+        **base,
+        "input_token_bound": 4096,
+        "reserved_cny": str(live.reserve_for("deepseek-flash", 4096)),
+    }
+    live.save(path, {"budget_cny": "1", "calls": [consistent]})
+    assert len(live.Client(KEYS, path, Decimal("1"), resume=True).ledger["calls"]) == 1

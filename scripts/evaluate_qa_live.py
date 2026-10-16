@@ -51,8 +51,12 @@ CHAT_PRICE = {
     m: (Decimal(i) / 1_000_000, Decimal(o) / 1_000_000)
     for m, (i, o) in CHAT_PRICE_PER_MILLION.items()
 }
-INPUT_TOKEN_CAP = 8192  # 单次调用按输入上限预留，未知用量不释放。
+INPUT_TOKEN_CAP = 8192  # 向量模型的输入硬上限（也是历史默认预留口径），未知用量不释放。
 OUTPUT_TOKEN_CAP = 2048  # 等于请求里的 max_tokens。
+# 付费对话的输入 token 上界：字节级 BPE 不会比 UTF-8 字节数切出更多 token，再加固定
+# 余量覆盖各家的消息模板。请求体里 sources 的 locator/scope/id 长度不受固定上限约束，
+# 所以预留必须按当次请求实际序列化后的大小算，不能把 8192 当成已受约束的输入上限。
+TOKEN_BOUND_MARGIN = 64
 RESERVE = PRICE * INPUT_TOKEN_CAP
 # 这些型号默认带思考模式，必须显式关闭，否则输出格式与时延与其他组不可比。
 THINKING_SWITCH = ("glm-4.5-flash", "deepseek-flash")
@@ -119,14 +123,43 @@ def strict_json(text: str):
     return json.loads(text, object_pairs_hook=pairs, parse_constant=invalid)
 
 
-def reserve_for(model: str) -> Decimal:
-    """按型号取单次调用的预留额；免费档为 0，其余按各自上限估算，未知用量不释放。"""
+def reserve_for(model: str, input_tokens: int = INPUT_TOKEN_CAP) -> Decimal:
+    """按型号与本次请求的输入上界取预留额；免费档为 0，未知用量不释放。
+
+    input_tokens 只影响付费对话模型：预留额必须覆盖这次实际要发出去的内容。
+    向量模型不取该参数，因为 8192 是模型硬上限、且 embed() 已把文本限制在 500 字节内，
+    固定预留本身就已经是上界。默认值让没有记录上界的历史账本仍按旧口径复算。
+    """
     if model in EMBED_PRICE:
         return EMBED_PRICE[model] * INPUT_TOKEN_CAP
     if model in CHAT_PRICE:
         input_price, output_price = CHAT_PRICE[model]
-        return input_price * INPUT_TOKEN_CAP + output_price * OUTPUT_TOKEN_CAP
+        return input_price * input_tokens + output_price * OUTPUT_TOKEN_CAP
     raise RunStopped("unapproved_model_or_endpoint")
+
+
+def serialize_request(payload: dict) -> bytes:
+    """与 post() 发送时完全一致的序列化，保证预留口径和实际请求体同源。"""
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def payload_token_bound(payload: dict) -> int:
+    """输入 token 的可靠上界：按实际发送的字节数算，再留消息模板的固定余量。"""
+    return len(serialize_request(payload)) + TOKEN_BOUND_MARGIN
+
+
+def committed_cny(calls) -> Decimal:
+    """已记账金额：已结算的按「实测费用与预留额中的较大者」，未结算的按预留，均不释放。
+
+    取较大者是为了让超预留那一次的真实费用进入后续预算判定，而不是只累计固定的
+    reserved_cny；正常结算的调用因此与旧口径完全一致。
+    """
+    total = Decimal(0)
+    for call in calls:
+        reserved = Decimal(call["reserved_cny"])
+        estimate = call.get("estimated_cny_from_usage")
+        total += reserved if estimate is None else max(reserved, Decimal(estimate))
+    return total
 
 
 def price_table(models) -> dict:
@@ -148,7 +181,7 @@ def post(api_key: str, endpoint: str, payload: dict, timeout: int = 30) -> dict:
         raise RunStopped("unapproved_model_or_endpoint")
     request = urllib.request.Request(
         PROVIDER_ROOT[provider] + endpoint,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        data=serialize_request(payload),
         headers={"Authorization": "Bearer " + api_key, "Content-Type": "application/json"},
     )
     try:
@@ -184,10 +217,14 @@ class Client:
                 raise RunStopped("budget_changed")
             for sequence, call in enumerate(self.ledger["calls"], start=1):
                 model = call["model_requested"]
+                # 没有记录上界的历史账本按旧口径复算，避免把老账本误判为损坏。
+                bound = call.get("input_token_bound", INPUT_TOKEN_CAP)
                 if (
                     call["sequence"] != sequence
                     or (model not in CHAT_PRICE and model not in EMBED_PRICE)
-                    or Decimal(call["reserved_cny"]) != reserve_for(model)
+                    or type(bound) is not int
+                    or bound <= 0
+                    or Decimal(call["reserved_cny"]) != reserve_for(model, bound)
                 ):
                     raise RunStopped("invalid_saved_ledger")
         else:
@@ -205,9 +242,11 @@ class Client:
         api_key = self.keys.get(MODEL_PROVIDER[model], "")
         if not api_key:
             raise RunStopped("missing_provider_key")
-        reserve = reserve_for(model)
-        committed = sum(Decimal(c["reserved_cny"]) for c in self.ledger["calls"])
-        if committed + reserve > self.budget:
+        # 付费对话按本次请求的实际大小预留：请求体里的 locator/scope/id 不受固定上限约束，
+        # 沿用固定的 8192 会让超出预留的用量照样记成正常完成，预算刹车不成立。
+        bound = payload_token_bound(payload) if endpoint == "chat/completions" else INPUT_TOKEN_CAP
+        reserve = reserve_for(model, bound)
+        if committed_cny(self.ledger["calls"]) + reserve > self.budget:
             raise RunStopped("budget_limit")
         record = {
             "sequence": len(self.ledger["calls"]) + 1,
@@ -215,6 +254,7 @@ class Client:
             "purpose": purpose,
             "status": "started",
             "reserved_cny": str(reserve),
+            "input_token_bound": bound,
             "estimated_cny_from_usage": None,
             "usage": None,
         }
@@ -233,23 +273,35 @@ class Client:
             keys = ("prompt_tokens", "total_tokens")
             if any(type(usage.get(k)) is not int or usage[k] < 0 for k in keys):
                 raise RunStopped("usage_invalid_stop")
-            if endpoint == "embeddings" and not (
-                usage["prompt_tokens"] <= usage["total_tokens"] <= 8192
-            ):
-                raise RunStopped("usage_exceeds_reserved_limit")
-            if endpoint == "chat/completions" and (
-                type(usage.get("completion_tokens")) is not int
-                or usage["completion_tokens"] < 0
-                or usage["total_tokens"] != usage["prompt_tokens"] + usage["completion_tokens"]
-            ):
-                raise RunStopped("usage_invalid_stop")
             if endpoint == "embeddings":
+                # 8192 是向量模型的输入硬上限；超限说明返回用量不可信，费用无从估计。
+                if not (usage["prompt_tokens"] <= usage["total_tokens"] <= INPUT_TOKEN_CAP):
+                    raise RunStopped("usage_exceeds_reserved_limit")
                 estimated = usage["total_tokens"] * EMBED_PRICE[model]
             else:
+                if (
+                    type(usage.get("completion_tokens")) is not int
+                    or usage["completion_tokens"] < 0
+                    or usage["total_tokens"] != usage["prompt_tokens"] + usage["completion_tokens"]
+                ):
+                    raise RunStopped("usage_invalid_stop")
                 input_price, output_price = CHAT_PRICE[model]
                 estimated = (
                     usage["prompt_tokens"] * input_price + usage["completion_tokens"] * output_price
                 )
+            # 用量折算费用超过当次预留、或输出超过 max_tokens：保留真实费用后停止，不能只
+            # 累计固定的 reserved_cny，否则超出的那部分会消失在账外。
+            if estimated > reserve or (
+                endpoint == "chat/completions" and usage["completion_tokens"] > OUTPUT_TOKEN_CAP
+            ):
+                record.update(
+                    status="usage_exceeds_reserved_limit",
+                    model_returned=raw.get("model"),
+                    usage={k: usage[k] for k in (*keys, "completion_tokens") if k in usage},
+                    estimated_cny_from_usage=str(estimated),
+                    error="usage_exceeds_reserved_limit",
+                )
+                raise RunStopped("usage_exceeds_reserved_limit")
             record.update(
                 status="completed",
                 model_returned=raw.get("model"),
@@ -258,7 +310,9 @@ class Client:
             )
             return raw
         except RunStopped as exc:
-            record.update(status="failed_unknown_billing", error=str(exc))
+            # 已记下真实费用的异常不再覆盖成「费用未知」。
+            if record["status"] == "started":
+                record.update(status="failed_unknown_billing", error=str(exc))
             raise
         finally:
             record["latency_ms"] = round((time.perf_counter() - started) * 1000, 3)
@@ -306,7 +360,7 @@ def answer_payload(model: str, question: str, sources: list[dict]) -> dict:
         "model": model,
         "stream": False,
         "temperature": 0,
-        "max_tokens": 2048,
+        "max_tokens": OUTPUT_TOKEN_CAP,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": PROMPT},
@@ -637,6 +691,14 @@ def manifest_for(asset: dict, args, budget: Decimal, providers: list[str]) -> di
             "DeepSeek-Flash 属付费档，取高峰时段价（输入 2 元、输出 8 元），"
             "空闲时段为其一半。上面两个沿用智谱口径的旧字段不反映其他供应商的收费，"
             "跨供应商实际单价只看 provider_prices_cny_per_million_tokens。"
+        ),
+        "reservation_note": (
+            "付费对话按本次请求的实际大小预留：序列化后的 UTF-8 字节数加 64 作为输入 token "
+            "上界（字节级 BPE 不会切出比字节数更多的 token），输出按 max_tokens 预留。"
+            "请求体里 sources 的 locator/scope/id 长度不受固定上限约束，因此不能沿用固定的 "
+            "8192。返回用量折算费用超过当次预留、或输出超过 max_tokens 时，保留真实费用、"
+            "停止后续调用并在账本记 usage_exceeds_reserved_limit。"
+            "向量模型仍按 8192 预留：那是模型硬上限，且 embed() 已把文本限制在 500 字节内。"
         ),
         "price_sources": [
             "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2",
