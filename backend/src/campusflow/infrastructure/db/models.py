@@ -51,6 +51,11 @@ class IndexedBlock(Base):
         CheckConstraint("state IN ('pending', 'running', 'done', 'failed', 'skipped')"),
         CheckConstraint("(state = 'done') = (embedding IS NOT NULL)"),
         CheckConstraint("NOT retryable OR state = 'failed'"),
+        CheckConstraint(
+            "(state = 'running' AND claim_token IS NOT NULL AND lease_until IS NOT NULL) OR "
+            "(state <> 'running' AND claim_token IS NULL AND lease_until IS NULL)",
+            name="ck_indexed_blocks_claim",
+        ),
     )
     profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"), primary_key=True)
     block_id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -70,6 +75,22 @@ class IndexedBlock(Base):
     retryable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     failure_code: Mapped[str | None] = mapped_column(String(40))
     embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024))
+    claim_token: Mapped[str | None] = mapped_column(String(32))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexManifest(Base):
+    """完整来源/块清单快照；身份包含配置、来源、分块设置和解析覆盖。"""
+
+    __tablename__ = "index_manifests"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

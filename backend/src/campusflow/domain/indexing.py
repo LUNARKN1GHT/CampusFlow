@@ -1,7 +1,8 @@
-"""Q004 索引进度规则；尚未连接持久化和队列，不据部分成功声称完整可检索。"""
+"""Q004 索引进度与覆盖规则；不据部分成功声称完整可检索。"""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
 from campusflow.domain.errors import DomainError
@@ -14,6 +15,38 @@ class BlockIndexState(StrEnum):
     DONE = "done"
     FAILED = "failed"
     SKIPPED = "skipped"  # 没有可索引正文等显式跳过原因，不能计为成功向量。
+
+
+@dataclass(frozen=True)
+class BlockClaim:
+    """只在领取事务提交后使用；外部调用结束后凭 token 写回。"""
+
+    block_id: str
+    profile_id: str
+    token: str
+    text: str
+    lease_until: datetime
+
+
+def validated_index_coverage(raw: object, source_count: int) -> tuple[bool, int]:
+    """严格验证解析覆盖，损坏/缺失元数据只能算未知，不能把有文本当作完整。"""
+    if not isinstance(raw, dict):
+        return False, 0
+    failures = raw.get("failures")
+    if not isinstance(failures, list):
+        return False, 0
+    known = type(raw.get("fragment_count")) is int and raw["fragment_count"] == source_count
+    for failure in failures:
+        if not isinstance(failure, dict) or not (
+            isinstance(failure.get("locator_type"), str)
+            and failure["locator_type"].strip()
+            and isinstance(failure.get("locator_value"), str)
+            and isinstance(failure.get("reason"), str)
+            and failure["reason"].strip()
+            and type(failure.get("retryable")) is bool
+        ):
+            known = False
+    return bool(known), len(failures)
 
 
 @dataclass(frozen=True)

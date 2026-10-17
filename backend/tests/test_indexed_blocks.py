@@ -16,6 +16,30 @@ from campusflow.infrastructure.embedding_profiles import SqlEmbeddingProfiles
 from campusflow.infrastructure.indexed_blocks import SqlIndexedBlocks
 
 
+class ClaimingStore(SqlIndexedBlocks):
+    """既有存储场景也先领取；独立领取和过期竞争在新测试中验证。"""
+
+    def save_success(self, workspace_id, profile_id, block_id, result):
+        claim = self.claim(workspace_id, profile_id, block_id)
+        return super().save_success(
+            workspace_id,
+            profile_id,
+            block_id,
+            result,
+            token=claim.token if claim else "unclaimed",
+        )
+
+    def save_failure(self, workspace_id, profile_id, block_id, code):
+        claim = self.claim(workspace_id, profile_id, block_id)
+        return super().save_failure(
+            workspace_id,
+            profile_id,
+            block_id,
+            code,
+            token=claim.token if claim else "unclaimed",
+        )
+
+
 @pytest.fixture
 def sample(client):
     workspace_id = client.get("/api/v1/settings").json()["workspace_id"]
@@ -44,7 +68,7 @@ def sample(client):
         )[0]
         profile = EmbeddingProfile()
         SqlEmbeddingProfiles(session).register(profile)
-        SqlIndexedBlocks(session).register(workspace_id, profile.id, block)
+        ClaimingStore(session).register(workspace_id, profile.id, block)
     yield engine, workspace_id, profile, block
     engine.dispose()
 
@@ -56,13 +80,13 @@ def vector(profile, value=0.1):
 def test_actual_vector_storage_and_retry_preserve_first_success(sample):
     engine, workspace, profile, block = sample
     with Session(engine) as session, session.begin():
-        store = SqlIndexedBlocks(session)
+        store = ClaimingStore(session)
         store.register(workspace, profile.id, block)
         assert store.save_failure(workspace, profile.id, block.id, "upstream_transient")
         assert store.progress(workspace, profile.id, block.version_id)[0].retryable
         assert store.save_success(workspace, profile.id, block.id, vector(profile))
     with Session(engine) as session, session.begin():
-        store = SqlIndexedBlocks(session)
+        store = ClaimingStore(session)
         assert not store.save_success(workspace, profile.id, block.id, vector(profile, 0.2))
         assert not store.save_failure(workspace, profile.id, block.id, "upstream_transient")
         assert session.scalar(select(func.count()).select_from(IndexedBlock)) == 1
@@ -79,7 +103,7 @@ def test_model_generation_isolation_at_same_dimensions(sample):
     other = replace(profile, revision="next")
     with Session(engine) as session, session.begin():
         SqlEmbeddingProfiles(session).register(other)
-        store = SqlIndexedBlocks(session)
+        store = ClaimingStore(session)
         store.register(workspace, other.id, block)
         store.save_success(workspace, profile.id, block.id, vector(profile))
         assert (
@@ -94,7 +118,7 @@ def test_model_generation_isolation_at_same_dimensions(sample):
 def test_rollback_does_not_leave_success_without_vector_or_partial_commit(sample):
     engine, workspace, profile, block = sample
     with Session(engine) as session:
-        SqlIndexedBlocks(session).save_success(workspace, profile.id, block.id, vector(profile))
+        ClaimingStore(session).save_success(workspace, profile.id, block.id, vector(profile))
         session.rollback()
     with Session(engine) as session:
         row = session.get(IndexedBlock, (profile.id, block.id))
@@ -106,16 +130,17 @@ def test_float32_overflow_and_all_zero_underflow_are_rejected(sample, value):
     engine, workspace, profile, block = sample
     with Session(engine) as session:
         with pytest.raises(DomainError):
-            SqlIndexedBlocks(session).save_success(
+            ClaimingStore(session).save_success(
                 workspace, profile.id, block.id, vector(profile, value)
             )
+        session.rollback()
         assert session.get(IndexedBlock, (profile.id, block.id)).state == "pending"
 
 
 def test_foreign_workspace_and_raw_error_are_rejected(sample):
     engine, workspace, profile, block = sample
     with Session(engine) as session:
-        store = SqlIndexedBlocks(session)
+        store = ClaimingStore(session)
         with pytest.raises(NotFoundError):
             store.register(workspace + 100, profile.id, block)
         with pytest.raises(NotFoundError):
@@ -128,13 +153,13 @@ def test_foreign_workspace_and_raw_error_are_rejected(sample):
 def test_source_deleted_cascades_vectors_and_late_save_cannot_recreate(sample):
     engine, workspace, profile, block = sample
     with Session(engine) as session, session.begin():
-        SqlIndexedBlocks(session).save_success(workspace, profile.id, block.id, vector(profile))
+        ClaimingStore(session).save_success(workspace, profile.id, block.id, vector(profile))
     with Session(engine) as session, session.begin():
         session.delete(session.get(SourceChunk, block.source_chunk_id))
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(IndexedBlock)) == 0
         with pytest.raises(NotFoundError):
-            SqlIndexedBlocks(session).save_success(workspace, profile.id, block.id, vector(profile))
+            ClaimingStore(session).save_success(workspace, profile.id, block.id, vector(profile))
 
 
 def test_modified_source_cannot_accept_old_vector(sample):
@@ -143,7 +168,7 @@ def test_modified_source_cannot_accept_old_vector(sample):
         session.get(SourceChunk, block.source_chunk_id).text = "改变后的原文"
     with Session(engine) as session:
         with pytest.raises(DomainError):
-            SqlIndexedBlocks(session).save_success(workspace, profile.id, block.id, vector(profile))
+            ClaimingStore(session).save_success(workspace, profile.id, block.id, vector(profile))
 
 
 def test_two_concurrent_writers_preserve_one_success(sample):
@@ -156,7 +181,7 @@ def test_two_concurrent_writers_preserve_one_success(sample):
     def save(value):
         with Session(engine) as session, session.begin():
             barrier.wait(timeout=5)
-            return SqlIndexedBlocks(session).save_success(
+            return ClaimingStore(session).save_success(
                 workspace, profile.id, block.id, vector(profile, value)
             ), value
 
@@ -178,7 +203,7 @@ def test_superseded_version_rejects_late_write(sample):
         session.add(MaterialVersion(material_id=material_id, version_no=2, note="更新版"))
     with Session(engine) as session:
         with pytest.raises(DomainError, match="新版本"):
-            SqlIndexedBlocks(session).save_success(workspace, profile.id, block.id, vector(profile))
+            ClaimingStore(session).save_success(workspace, profile.id, block.id, vector(profile))
         assert session.get(IndexedBlock, (profile.id, block.id)).embedding is None
 
 
@@ -204,7 +229,7 @@ def test_blank_source_is_explicitly_skipped(sample):
                 SourceLocation("paragraph", "2", paragraph=2),
             )
         )[0]
-        store = SqlIndexedBlocks(session)
+        store = ClaimingStore(session)
         store.register(workspace, profile.id, blank)
         assert session.get(IndexedBlock, (profile.id, blank.id)).state == "skipped"
         with pytest.raises(DomainError, match="空白"):

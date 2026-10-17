@@ -42,6 +42,7 @@ TABLES = ", ".join(
         "source_chunks",
         "embedding_profiles",
         "indexed_blocks",
+        "index_manifests",
     )
 )
 

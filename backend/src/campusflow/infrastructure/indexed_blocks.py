@@ -2,6 +2,8 @@
 
 import math
 import struct
+from datetime import timedelta
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
@@ -10,7 +12,7 @@ from sqlalchemy.orm import Session
 from campusflow.domain.chunking import ChunkSource, RetrievalBlock, SourceLocation
 from campusflow.domain.embeddings import EmbeddedText
 from campusflow.domain.errors import DomainError, NotFoundError
-from campusflow.domain.indexing import BlockIndexProgress, BlockIndexState
+from campusflow.domain.indexing import BlockClaim, BlockIndexProgress, BlockIndexState
 from campusflow.infrastructure.db.models import IndexedBlock, Material, MaterialVersion, SourceChunk
 from campusflow.infrastructure.embedding_profiles import SqlEmbeddingProfiles
 
@@ -140,7 +142,13 @@ class SqlIndexedBlocks:
         ).validate_against(source)
 
     def save_success(
-        self, workspace_id: int, profile_id: str, block_id: str, result: EmbeddedText
+        self,
+        workspace_id: int,
+        profile_id: str,
+        block_id: str,
+        result: EmbeddedText,
+        *,
+        token: str,
     ) -> bool:
         profile = self._profile(profile_id)
         result.validate_for(profile)
@@ -151,6 +159,18 @@ class SqlIndexedBlocks:
             raise DomainError("向量不能安全存入单精度字段") from None
         if not all(math.isfinite(value) for value in values) or not any(values):
             raise DomainError("向量存储转换后无效")
+        row = self._locked_current(workspace_id, profile_id, block_id)
+        if row.state == "skipped":
+            raise DomainError("跳过的空白块不能保存向量")
+        if not self._owns_claim(row, token):
+            return False
+        row.embedding = list(values)
+        row.state, row.retryable, row.failure_code = "done", False, None
+        row.claim_token, row.lease_until = None, None
+        self.session.flush()
+        return True
+
+    def _locked_current(self, workspace_id: int, profile_id: str, block_id: str) -> IndexedBlock:
         # 与 register 保持来源 -> 索引块的加锁顺序，避免并发登记/保存相互反锁。
         source_id = self.session.scalar(
             select(IndexedBlock.source_chunk_id).where(
@@ -164,23 +184,52 @@ class SqlIndexedBlocks:
         source = self._source(workspace_id, source_id)
         row = self._row(workspace_id, profile_id, block_id)
         self._validate_current(row, source)
-        if row.state == "done":
-            return False
-        if row.state == "skipped":
-            raise DomainError("跳过的空白块不能保存向量")
-        row.embedding = list(values)
-        row.state, row.retryable, row.failure_code = "done", False, None
-        self.session.flush()
-        return True
+        return row
 
-    def save_failure(self, workspace_id: int, profile_id: str, block_id: str, code: str) -> bool:
+    def _owns_claim(self, row: IndexedBlock, token: str) -> bool:
+        # 取数据库实际时钟，不能用事务开始时间：等待锁时凭证可能已经过期。
+        now = self.session.scalar(select(func.clock_timestamp()))
+        return (
+            row.state == "running"
+            and isinstance(token, str)
+            and bool(token)
+            and row.claim_token == token
+            and row.lease_until is not None
+            and row.lease_until > now
+        )
+
+    def claim(
+        self, workspace_id: int, profile_id: str, block_id: str, *, lease_seconds: int = 900
+    ) -> BlockClaim | None:
+        """短事务原子领取，过期领取可替换；调用方须提交后才请求模型。"""
+        if type(lease_seconds) is not int or not 1 <= lease_seconds <= 900:
+            raise DomainError("领取有效期必须为 1 至 900 秒")
+        row = self._locked_current(workspace_id, profile_id, block_id)
+        now = self.session.scalar(select(func.clock_timestamp()))
+        eligible = (
+            row.state == "pending"
+            or (row.state == "failed" and row.retryable)
+            or (row.state == "running" and row.lease_until <= now)
+        )
+        if not eligible:
+            return None
+        row.state, row.retryable, row.failure_code = "running", False, None
+        row.claim_token = uuid4().hex
+        row.lease_until = now + timedelta(seconds=lease_seconds)
+        self.session.flush()
+        return BlockClaim(row.block_id, row.profile_id, row.claim_token, row.text, row.lease_until)
+
+    def save_failure(
+        self, workspace_id: int, profile_id: str, block_id: str, code: str, *, token: str
+    ) -> bool:
         if code not in FAILURE_CODES:
             raise DomainError("失败原因必须使用安全代码，不能写入原始异常或密钥")
-        row = self._row(workspace_id, profile_id, block_id)
-        if row.state in {"done", "skipped"}:
+        row = self._locked_current(workspace_id, profile_id, block_id)
+        if not self._owns_claim(row, token):
             return False
         row.state, row.failure_code = "failed", code
         row.retryable = code == "upstream_transient"
+        row.claim_token, row.lease_until = None, None
         self.session.flush()
         return True
 
