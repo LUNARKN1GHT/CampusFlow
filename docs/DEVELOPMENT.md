@@ -149,6 +149,10 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 真实比较入口 `python scripts/evaluate_qa_live.py` 默认不联网。用户授权的型号、费用上限、显式执行／继续运行参数及恢复点见 [Q001 真实评测进度](verification/Q001-live-progress.md)。继续运行不能重置预算，也不能覆盖已有人工复核记录。
 
+## Q003 检索分块
+
+Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
+
 ## 当前限制
 
 - 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。

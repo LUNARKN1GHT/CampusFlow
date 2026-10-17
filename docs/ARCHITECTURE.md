@@ -236,6 +236,10 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 
 `scripts/evaluate_qa_live.py` 为独立真实比较入口，默认仅打印计划；显式执行使用用户选定的型号集合与合成样本（默认仍是智谱两向量 × 两对话共四组，可用 `--embedders` / `--generators` 指定其他组合），域名与密钥按模型所属供应商路由，因此可跨供应商比较；预算预留和逐请求响应落盘，停止后可显式继承账本继续。不替代 Q002 的生产向量接口或 Q004 的索引流程；真实引用语义待人工复核，不能把编号合法视为支持正确。首轮中断及已知限制见 [真实评测记录](verification/Q001-live-progress.md)。
 
+## Q003 原文分块边界
+
+Q003 的 `domain/chunking.py` 只做可复现的原文切片，`application/retrieval_blocks.py` 先复用资料/版本授权读取，再生成带来源指纹和字符范围的检索块。分块默认保持原片段边界和全部字符，不修改 D017 来源记录；持久化和向量化留 Q004。位置使用 Unicode 码点而非浏览器 UTF-16 下标，公开引用协议留 Q007，见 [Q003 契约](verification/Q003-source-blocks.md)。
+
 ## 7. 官方资料
 
 - [Vue 快速开始](https://vuejs.org/guide/quick-start)、[TypeScript 支持](https://vuejs.org/guide/typescript/overview)、[Vite 入门](https://vite.dev/guide/)：前端工程基线。
