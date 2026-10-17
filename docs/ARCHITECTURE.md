@@ -255,3 +255,7 @@ Windows 使用 Docker 运行现有 Linux RQ Worker，API 保持本机启动。�
 ## Q003 原文分块边界
 
 Q003 的 `domain/chunking.py` 只做可复现的原文切片，`application/retrieval_blocks.py` 先复用资料/版本授权读取，再生成带来源指纹和字符范围的检索块。分块默认保持原片段边界和全部字符，不修改 D017 来源记录；持久化和向量化留 Q004。位置使用 Unicode 码点而非浏览器 UTF-16 下标，公开引用协议留 Q007，见 [Q003 契约](verification/Q003-source-blocks.md)。
+
+## Q009 模型超时、重试与失败降级
+
+模型调用分两层控制：适配器负责单次请求的等待上限与有限内部重试，作业层只根据异常是否可重试决定是否重投。`TransientError` 表示服务抖动（408／429／5xx／网络／超时），`PermanentError` 表示请求被拒绝或来源不可用；新增的 `ModelOutputError` 进一步标记「模型有响应但内容不可用」。`domain/model_failures.py` 把异常转换为「服务不可用／请求被拒绝／输出无效」三类固定用户文案，未预期异常也按服务不可用处理，确保失败时不会返回可能被误认为答案的内容。视觉识别的超时、重试次数和退避由 `CAMPUSFLOW_VISION_*` 配置，永久错误不重试；扫描 PDF 的单页失败只标记该页。问答接口与页面展示、资料不足判定分别留 Q011、Q012，见 [Q009 说明](verification/Q009-model-resilience.md)。
