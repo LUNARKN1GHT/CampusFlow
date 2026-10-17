@@ -40,6 +40,7 @@ TABLES = ", ".join(
         "processing_jobs",
         "processing_job_attempts",
         "source_chunks",
+        "embedding_profiles",
     )
 )
 

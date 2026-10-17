@@ -236,6 +236,10 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 
 `scripts/evaluate_qa_live.py` 为独立真实比较入口，默认仅打印计划；显式执行使用用户选定的型号集合与合成样本（默认仍是智谱两向量 × 两对话共四组，可用 `--embedders` / `--generators` 指定其他组合），域名与密钥按模型所属供应商路由，因此可跨供应商比较；预算预留和逐请求响应落盘，停止后可显式继承账本继续。不替代 Q002 的生产向量接口或 Q004 的索引流程；真实引用语义待人工复核，不能把编号合法视为支持正确。首轮中断及已知限制见 [真实评测记录](verification/Q001-live-progress.md)。
 
+## Q002 向量配置与调用边界
+
+Q002 新增独立的向量端口及智谱适配器。不可变配置表登记供应商、型号、本地代次、维度和生成设置；应用入口必须核对已登记配置，返回结果和比较操作必须带同一配置编号。注册事务与外部请求分开，先提交配置再请求模型；无自动联网或隐式重试。后续 Q004/Q005 在索引外键和 SQL 检索条件中落实相同身份约束，当前不提供生产检索。详见 [Q002 契约](verification/Q002-embedding-adapter.md)。
+
 ## 7. 官方资料
 
 - [Vue 快速开始](https://vuejs.org/guide/quick-start)、[TypeScript 支持](https://vuejs.org/guide/typescript/overview)、[Vite 入门](https://vite.dev/guide/)：前端工程基线。
@@ -247,3 +251,7 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 ## 资料处理运行补充（J009）
 
 Windows 使用 Docker 运行现有 Linux RQ Worker，API 保持本机启动。两端共享同一数据库、Redis 库号和私有原文件目录。解析器注册表组合 PDF 文本解析、扫描页视觉回退与表格关联；数据库迁移分叉通过合并迁移汇合。只读诊断不调用模型，不修改任务，日志及 RQ 失败记录不保存原始异常堆栈。详见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
+
+## Q003 原文分块边界
+
+Q003 的 `domain/chunking.py` 只做可复现的原文切片，`application/retrieval_blocks.py` 先复用资料/版本授权读取，再生成带来源指纹和字符范围的检索块。分块默认保持原片段边界和全部字符，不修改 D017 来源记录；持久化和向量化留 Q004。位置使用 Unicode 码点而非浏览器 UTF-16 下标，公开引用协议留 Q007，见 [Q003 契约](verification/Q003-source-blocks.md)。

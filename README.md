@@ -70,7 +70,11 @@ flowchart LR
     UseCases --> DB[(PostgreSQL)]
 ```
 
+工程进展：Q002 已提供 Embedding-3 向量生成和不可变配置记录，阻止不同模型版本结果混用；后台索引与查询仍由后续任务接入，见 [Q002 说明](docs/verification/Q002-embedding-adapter.md)。
+
 ## 1. 产品定位与服务对象
+
+Q003 已实现保留来源版本、页码/段落/表格位置的检索分块，过长原文按句末优先切分，重叠不改变原文身份；尚未接向量索引和问答页面。见 [Q003 说明](docs/verification/Q003-source-blocks.md)。
 
 CampusFlow 以学生个人工作空间为基本单位，提供从学习资料到个人行动的完整流程。
 
