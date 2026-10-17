@@ -8,6 +8,7 @@
 
 from datetime import date, datetime, time
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -38,6 +39,37 @@ class EmbeddingProfileRecord(Base):
     revision: Mapped[str] = mapped_column(String(100))
     dimensions: Mapped[int] = mapped_column(Integer)
     generation_config: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexedBlock(Base):
+    """Q004 逐块进度与成功向量；同一配置/块只有一行。"""
+
+    __tablename__ = "indexed_blocks"
+    __table_args__ = (
+        CheckConstraint("start_offset >= 0 AND end_offset > start_offset"),
+        CheckConstraint("state IN ('pending', 'running', 'done', 'failed', 'skipped')"),
+        CheckConstraint("(state = 'done') = (embedding IS NOT NULL)"),
+        CheckConstraint("NOT retryable OR state = 'failed'"),
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"), primary_key=True)
+    block_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    source_fingerprint: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    chunker_version: Mapped[str] = mapped_column(String(100))
+    text: Mapped[str] = mapped_column(String)
+    state: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    failure_code: Mapped[str | None] = mapped_column(String(40))
+    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -151,6 +151,8 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## Q003 检索分块
 
+Q004 存储检查点增加 pgvector Python 依赖与 `q004_indexed_blocks` 迁移；更新代码后执行 `uv sync --locked`、`uv run --locked alembic upgrade head`。现有 Worker 尚未自动建立向量索引。恢复范围与测试命令见 [Q004 进度](verification/Q004-progress.md)。
+
 Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
 
 ## 当前限制

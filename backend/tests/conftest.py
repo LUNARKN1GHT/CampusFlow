@@ -41,6 +41,7 @@ TABLES = ", ".join(
         "processing_job_attempts",
         "source_chunks",
         "embedding_profiles",
+        "indexed_blocks",
     )
 )
 
