@@ -186,6 +186,7 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 - 后端位于 `backend/src/campusflow/`：`api` 处理 HTTP，`application` 编排用例并定义接口，`domain` 保存纯业务规则，`infrastructure` 实现外部能力，`workers` 保存后台入口，`main` 负责装配。
 - 领域层不依赖 Web 框架、ORM 或模型 SDK；API 不直接查库和调用模型，应用层通过接口使用基础设施。不要为未实现模块批量创建空 CRUD 或无实际用途的抽象。
 - 前端位于 `frontend/src/`：页面放 `views`，共享组件放 `components`，HTTP 调用放 `api`；路由和跨页面状态按需引入。
+- 前端配色统一使用 `frontend/src/styles.css` 的语义 token（`:root` 为浅色、`:root[data-theme="dark"]` 为深色），组件内不要写死色值；界面主题（浅色／深色／跟随系统）由 `composables/useTheme.ts` 解析后写入 `documentElement[data-theme]`，并用 `localStorage` 按浏览器持久化，属于本机显示偏好、不写入工作空间设置。
 - 已接入 PostgreSQL 17、SQLAlchemy 2、psycopg 3、Alembic；Compose 启用 pgvector 扩展并提供 Redis 7，向量检索尚未实现；耗时解析已接入 RQ 与独立 Linux Worker，Windows 通过 Docker 运行。启动和诊断见 docs/MATERIAL_PROCESSING.md。
 - 文件保存在后端私有存储，解析采用 pypdf 与可替换 OCR／多模态适配器；模型供应商和具体模型待样本评估，不将模型输出直接视为事实或执行授权。
 - API 统一前缀 `/api/v1`，当前包括健康检查及学期、课程、任务、固定日程、可用时间接口。健康检查只表示进程存活；业务草案、数据库就绪与外部执行结果不得用健康状态代替。
