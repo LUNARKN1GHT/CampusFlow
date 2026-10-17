@@ -4,6 +4,8 @@
 
 ## 环境
 
+N010 增加 `n010_version_relations` 数据库迁移，无新增依赖。更新后执行 `uv run --locked alembic upgrade head`；可在 OpenAPI `/docs` 登录后调用版本关系创建/查询接口，正式对照页面留 N017。接口示例及测试范围见 [N010 说明](verification/N010-version-relations.md)。
+
 - Python 3.12，由 `backend/.python-version` 指定；uv 可在同步时寻找或安装相应解释器。
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)。
 - Node.js 建议 24，最低 22.12，使用 npm；版本提示见 `frontend/.nvmrc`。

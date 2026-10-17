@@ -237,6 +237,38 @@ class MaterialVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MaterialVersionRelation(Base):
+    """用户声明的版本关系；原文件、片段及正式事项保持原位。"""
+
+    __tablename__ = "material_version_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "source_version_id",
+            "target_version_id",
+            "kind",
+            name="uq_material_version_relation",
+        ),
+        CheckConstraint("source_version_id <> target_version_id"),
+        CheckConstraint("kind IN ('same_source', 'replacement_claim')"),
+        CheckConstraint("kind <> 'same_source' OR source_version_id < target_version_id"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    source_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    target_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(30))
+    statement: Mapped[str] = mapped_column(String(1000))
+    actor: Mapped[str] = mapped_column(String(200))
+    source_snapshot: Mapped[dict] = mapped_column(JSONB)
+    target_snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SourceChunk(Base):
     """来源片段：资料版本中的最小定位单元（D004/D017）。
 
