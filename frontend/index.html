@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="CampusFlow 校园学习事务智能助理" />
     <title>CampusFlow · 开发骨架</title>
+    <script>
+      // 在样式生效前写入主题，避免首屏闪回浅色；逻辑与 composables/useTheme.ts 保持一致。
+      (function () {
+        try {
+          var stored = localStorage.getItem('campusflow-theme')
+          var mode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'light'
+          var dark = mode === 'system'
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+            : mode === 'dark'
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>
