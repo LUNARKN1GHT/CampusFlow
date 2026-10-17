@@ -1,0 +1,74 @@
+{
+  "commit_sha": "6deee01848c5aa8890148f63da9e295f6802917c",
+  "cases_path": "samples\\synthetic\\q001\\cases-v2.json",
+  "cases_sha256": "a529808ed4bf806bdc2a20e88fdd64cf7a527bd26719e847e4d98429ed1be264",
+  "script_sha256": "9bef9e944cb9e6affb0d2fb89359f90036cc9914d8a131a944e321f48d1fd9cf",
+  "preparation_script_sha256": "94cec18b7009029e15faf9478fbfdd0b91565306608e067475aca3682b612ef9",
+  "budget_cny": "3",
+  "embedding_cny_per_million_tokens": "0.5",
+  "generation_cny_per_million_tokens": "0",
+  "price_verified_on": "2026-10-15",
+  "dimensions": 1024,
+  "repeats": 2,
+  "retry_count": 0,
+  "prompt_version": "q001-source-id-v3",
+  "case_ids": [
+    "deadline-a",
+    "deadline-b",
+    "submission-paraphrase",
+    "missing-year-time",
+    "conflicting-notices",
+    "partial-coverage",
+    "conditional-rule",
+    "no-material",
+    "archived-only",
+    "algo-hw1",
+    "eng-grading",
+    "stat-paper-words",
+    "ds-exam",
+    "physics-a-2nd-deadline",
+    "os-lab2-deadline"
+  ],
+  "embedders": [
+    "embedding-3"
+  ],
+  "generators": [
+    "glm-4-flash-250414",
+    "glm-4.5-flash",
+    "deepseek-flash"
+  ],
+  "provider_base_urls": {
+    "deepseek": "https://api.deepseek.com/",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4/"
+  },
+  "provider_prices_cny_per_million_tokens": {
+    "embedding-3": {
+      "input": "0.5",
+      "output": "0"
+    },
+    "glm-4-flash-250414": {
+      "input": "0",
+      "output": "0"
+    },
+    "glm-4.5-flash": {
+      "input": "0",
+      "output": "0"
+    },
+    "deepseek-flash": {
+      "input": "2",
+      "output": "8"
+    }
+  },
+  "price_verified_on_by_provider": {
+    "zhipu": "2026-10-15",
+    "deepseek": "2026-10-16"
+  },
+  "price_basis_note": "单价为人民币元/百万 token，取自各供应商官方定价页。GLM 两个模型属免费档记 0；DeepSeek-Flash 属付费档，取高峰时段价（输入 2 元、输出 8 元），空闲时段为其一半。上面两个沿用智谱口径的旧字段不反映其他供应商的收费，跨供应商实际单价只看 provider_prices_cny_per_million_tokens。",
+  "price_sources": [
+    "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2",
+    "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3",
+    "https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414",
+    "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash",
+    "https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "commit_sha": "1d8b90d33f268bf5d6e9b3563bd89bed3d4fd113",
+  "cases_sha256": "ca87bcbcca15d2575f47b774cfe67e117c87ddd05167dc4652ca62a3b29f79dd",
+  "script_sha256": "c9deb725d297dc7c7351c1382ca92defdc7fff6697449da4126f71904fde4424",
+  "preparation_script_sha256": "94cec18b7009029e15faf9478fbfdd0b91565306608e067475aca3682b612ef9",
+  "budget_cny": "1",
+  "embedding_cny_per_million_tokens": "0.5",
+  "generation_cny_per_million_tokens": "0",
+  "price_verified_on": "2026-10-15",
+  "dimensions": 1024,
+  "repeats": 2,
+  "retry_count": 0,
+  "prompt_version": "q001-source-id-v2",
+  "price_sources": [
+    "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2",
+    "https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3",
+    "https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414",
+    "https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash"
+  ]
+}

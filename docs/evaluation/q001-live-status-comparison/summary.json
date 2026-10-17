@@ -1,0 +1,23 @@
+{
+  "mode": "targeted_diagnostic_pending_semantic_review",
+  "prompt_version": "q001-source-id-v3",
+  "selected_cases": [
+    "missing-year-time",
+    "partial-coverage"
+  ],
+  "sample_count": 16,
+  "valid_structure": 16,
+  "invalid_reference_answers": 0,
+  "disposition_matches": 16,
+  "cumulative_calls": 380,
+  "inherited_calls": 336,
+  "new_calls": 44,
+  "cumulative_reserved_cny": "0.8437760",
+  "cumulative_estimated_known_cny": "0.0015755",
+  "unknown_usage_calls": [
+    51
+  ],
+  "actual_billed_cny": null,
+  "independent_review_complete": false,
+  "model_selection_complete": false
+}

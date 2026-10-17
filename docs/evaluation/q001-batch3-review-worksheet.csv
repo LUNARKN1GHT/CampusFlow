@@ -1,0 +1,654 @@
+﻿序号,实验,来源文件,原表行号,场景,轮次,回答状态,问题,系统检出-坏引用编号,系统检出-检索命中/应有,原资料（编号｜原文）,模型结论,模型主张（含引用编号）,模型不确定提示,人工预标注要点,人工预标注要点依据原文,人工预标注不确定项,supported_claims,total_claims,correct_uncertainties,output_uncertainties,hard_failures,reviewer,reviewed_at,notes
+1,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,1,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题最晚提交时间为2026年10月10日20:00前。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+2,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,2,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+3,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,3,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",insufficient,,"1. 缺失信息
+   说明：现有资料中未提及物理A班练习的提交地点。",1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+4,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,4,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+   引用编号：os-lab1-log
+2. 操作系统实验一请在10月15日提交到课程平台。
+   引用编号：os-partial-date","1. 缺失具体时刻
+   说明：资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+5,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,5,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：两个来源中关于网络实验报告截止时间的说法相互矛盾。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+6,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,6,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 数据库实验二的内容是事务隔离级别。
+   引用编号：scan-readable
+2. 实验二的提交格式要求未能在提供的资料中找到，因为相关部分无法识别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：实验二的具体提交格式要求在提供的资料中未明确说明，因为相关部分无法识别。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+7,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,7,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训者不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+8,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,8,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,,,,1. insufficient_material,,,,,,,,
+9,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,9,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+10,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,10,algo-hw1,1,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。
+   引用编号：algo-hw1
+2. 第一次作业不可以补交。
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+11,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,11,eng-grading,1,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 英语课平时成绩占总成绩的40%，期末考试成绩占60%。
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+12,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,12,stat-paper-words,1,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺失具体要求
+   说明：现有资料中未提供统计学论文的具体字数要求。",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+13,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,13,ds-exam,1,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00。
+   引用编号：ds-exam-v2","1. conflict
+   说明：两个来源提供了不同的考试时间，存在矛盾。","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+14,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,14,physics-a-2nd-deadline,1,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+15,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,15,os-lab2-deadline,1,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失截止时间信息
+   说明：现有资料中未发现操作系统实验二的截止时间信息。",,,1. missing_deadline,,,,,,,,
+16,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,16,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+17,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,17,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+18,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,18,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",insufficient,,"1. 缺失信息
+   说明：现有资料中未提及物理A班练习的提交地点。",1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+19,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,19,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+   引用编号：os-lab1-log
+2. 操作系统实验一请在10月15日提交到课程平台。
+   引用编号：os-partial-date","1. 缺失具体时刻
+   说明：资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+20,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,20,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：两个来源提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+21,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,21,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,,"1. 资料不完整
+   说明：关于数据库实验二的内容和提交格式的要求，第二页资料未导入，无法识别提交格式所在区域。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+22,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,22,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训者不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+23,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,23,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,,,,1. insufficient_material,,,,,,,,
+24,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,24,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+25,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,25,algo-hw1,2,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。
+   引用编号：algo-hw1
+2. 第一次作业不可以补交。
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+26,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,26,eng-grading,2,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 英语课平时成绩占总成绩的40%，期末考试成绩占60%。
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+27,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,27,stat-paper-words,2,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺失具体要求
+   说明：现有资料中未提供统计学论文的具体字数要求。",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+28,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,28,ds-exam,2,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00。
+   引用编号：ds-exam-v2","1. conflict
+   说明：两个来源提供了不同的考试时间，存在矛盾。","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+29,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,29,physics-a-2nd-deadline,2,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+30,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,30,os-lab2-deadline,2,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失截止时间信息
+   说明：现有资料中未发现操作系统实验二的截止时间信息。",,,1. missing_deadline,,,,,,,,
+31,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,31,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+32,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,32,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+33,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,33,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a
+2. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交
+   引用编号：physics-a-2nd",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+34,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,34,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201
+   引用编号：os-lab1-log
+2. 实验一请在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 年份缺失
+   说明：资料中未明确说明实验一提交的具体年份
+2. 具体时刻缺失
+   说明：资料中未明确说明实验一提交的具体时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+35,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,35,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2",,"1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+36,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,36,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,,"1. 缺失信息
+   说明：资料中仅提到实验二为事务隔离级别，但未提供具体内容；提交格式所在区域无法识别，因此无法确定提交格式要求",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+37,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,37,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+38,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,38,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+39,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,39,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,,,,1. insufficient_material,,,,,,,,
+40,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,40,algo-hw1,1,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法课第一次作业最晚提交时间是2026年10月20日23:59
+   引用编号：algo-hw1
+2. 算法课第一次作业逾期不接受补交
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+41,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,41,eng-grading,1,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 英语课平时成绩占总成绩的40%
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+42,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,42,stat-paper-words,1,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺少具体字数信息
+   说明：资料中仅提到""统计学期中论文题目自选，字数与格式要求见后续通知""，但未提供具体的字数要求",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+43,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,43,ds-exam,1,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00
+   引用编号：ds-exam-v2","1. 时间冲突
+   说明：两个来源提供了不同的考试时间，且第二个来源未说明是否替代第一个安排","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+44,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,44,physics-a-2nd-deadline,1,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+45,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,45,os-lab2-deadline,1,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺少截止时间信息
+   说明：提供的资料中只提到了操作系统实验二为进程调度模拟，但未提及任何截止时间信息。",,,1. missing_deadline,,,,,,,,
+46,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,46,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+47,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,47,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+48,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,48,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a
+2. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交
+   引用编号：physics-a-2nd",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+49,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,49,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201
+   引用编号：os-lab1-log
+2. 实验一请在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 年份缺失
+   说明：资料中未明确说明实验一提交的具体年份
+2. 具体时刻缺失
+   说明：资料中未明确说明实验一提交的具体时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+50,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,50,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2",,"1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+51,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,51,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,,"1. 缺失信息
+   说明：资料中仅提到实验二为事务隔离级别，但未提供具体内容；提交格式所在区域无法识别，因此无法确定提交格式要求",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+52,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,52,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+53,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,53,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+54,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,54,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,,,,1. insufficient_material,,,,,,,,
+55,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,55,algo-hw1,2,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法课第一次作业最晚提交时间是2026年10月20日23:59
+   引用编号：algo-hw1
+2. 算法课第一次作业逾期不接受补交
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+56,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,56,eng-grading,2,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 英语课平时成绩占总成绩的40%
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+57,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,57,stat-paper-words,2,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺少具体字数信息
+   说明：资料中仅提到""统计学期中论文题目自选，字数与格式要求见后续通知""，但未提供具体的字数要求",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+58,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,58,ds-exam,2,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00
+   引用编号：ds-exam-v2","1. 时间冲突
+   说明：两个来源提供了不同的考试时间，且第二个来源未说明是否替代第一个安排","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+59,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,59,physics-a-2nd-deadline,2,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+60,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,60,os-lab2-deadline,2,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺少截止时间信息
+   说明：提供的资料中只提到了实验二为进程调度模拟，但未提及任何截止时间信息。",,,1. missing_deadline,,,,,,,,
+61,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,61,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+62,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,62,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+63,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,63,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a
+2. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+64,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,64,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台。
+   引用编号：os-partial-date
+2. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+   引用编号：os-lab1-log","1. 缺少年份
+   说明：来源明确说明正文未写年份，无法确定10月15日属于哪一年。
+2. 缺少具体时刻
+   说明：来源明确说明正文未写具体时刻，无法确定截止的具体时间点。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+65,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,65,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2
+3. net-v2 没有替代旧通知的声明。
+   引用编号：net-v2","1. 来源矛盾
+   说明：net-v1 与 net-v2 对同一实验报告的截止时间给出不同日期和时刻，且 net-v2 未声明替代旧通知，无法确定以哪一个为准。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+66,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,66,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别。
+   引用编号：scan-readable","1. 页面缺失
+   说明：第二页未导入，提交格式所在区域无法识别，因此无法回答提交格式要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+67,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,67,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+   引用编号：lab-rule
+2. 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+   引用编号：chem-safety-class",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+68,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,68,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 无有效资料
+   说明：现有资料中未发现与美术课作业提交时间相关的任何来源，无法确定下次作业的提交时间。",,,1. insufficient_material,,,,,,,,
+69,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,69,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 无有效资料
+   说明：现有资料中未提供任何与音乐课考试安排相关的来源，无法确认当前考试安排。",,,1. insufficient_material,,,,,,,,
+70,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,70,algo-hw1,1,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法设计与分析第一次作业需在2026年10月20日23:59前提交到教学平台。
+   引用编号：algo-hw1
+2. 逾期不再接受补交。
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+71,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,71,eng-grading,1,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+72,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,72,stat-paper-words,1,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺少字数要求
+   说明：现有资料仅说明统计学期中论文字数与格式要求见后续通知，未给出具体字数；另一条资料与论文字数无关。",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+73,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,73,ds-exam,1,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00。
+   引用编号：ds-exam-v2
+3. 调整通知未说明是否替代此前安排。
+   引用编号：ds-exam-v2","1. 来源矛盾
+   说明：ds-exam-v1 与 ds-exam-v2 给出不同的考试日期和时间，且 ds-exam-v2 未说明是否替代此前安排，无法确定最终考试时间。","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+74,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,74,physics-a-2nd-deadline,1,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+75,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,75,os-lab2-deadline,1,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺少实验二截止时间
+   说明：现有资料中，os-lab2 只说明实验二为进程调度模拟、提交方式另行通知，未给出截止时间；os-lab1-log 与 os-partial-date 均涉及实验一，未覆盖实验二的截止时间。",,,1. missing_deadline,,,,,,,,
+76,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,76,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+77,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,77,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-2nd] 大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。
+      定位：physics-b-2nd:paragraph:1（demo.2026-fall.physics.B）
+[physics-b-lab] 大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。
+      定位：physics-b-lab:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+78,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,78,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a
+2. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+79,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,79,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台。
+   引用编号：os-partial-date
+2. 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+   引用编号：os-lab1-log","1. 缺少年份和具体时刻
+   说明：来源仅写明10月15日提交，正文未写年份和具体时刻，因此无法确定准确截止日期和时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+80,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,80,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2
+3. net-v2 文件没有替代旧通知的声明。
+   引用编号：net-v2","1. 来源矛盾
+   说明：net-v1 与 net-v2 对同一实验报告的截止时间给出不同日期和时刻，且 net-v2 未声明替代旧通知，无法确定以哪一个为准。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+81,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,81,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[db-lab1] 数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。
+      定位：db-lab1:paragraph:1（demo.2026-fall.database.A）
+[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别。
+   引用编号：scan-readable","1. 页面缺失
+   说明：第二页未导入，提交格式所在区域无法识别，因此无法确定提交格式要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+82,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,82,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）
+[chem-safety-class] 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+      定位：chem-safety-class:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+   引用编号：lab-rule
+2. 安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。
+   引用编号：chem-safety-class",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+83,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,83,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 无有效资料
+   说明：现有资料中未发现与美术课作业提交时间相关的任何来源，无法回答。",,,1. insufficient_material,,,,,,,,
+84,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,84,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 无有效资料
+   说明：现有资料中未提供任何与音乐课考试安排相关的来源，无法确认当前考试安排。",,,1. insufficient_material,,,,,,,,
+85,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,85,algo-hw1,2,completed,算法课第一次作业最晚什么时候交？可以补交吗？,,1/1,"[algo-hw1] 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。
+      定位：algo-hw1:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-hw1-issue] 第一次作业题目已发布在课程页面，请自行下载打印。
+      定位：algo-hw1-issue:paragraph:1（demo.2026-fall.algorithms.A）
+[algo-grading] 本课程总评由作业40%、上机20%、期末40%构成。
+      定位：algo-grading:paragraph:1（demo.2026-fall.algorithms.A）",answer,"1. 算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台。
+   引用编号：algo-hw1
+2. 逾期不再接受补交。
+   引用编号：algo-hw1",,"1. 第一次作业须在2026年10月20日23:59前提交。
+2. 逾期不再接受补交。","1. 「2026年10月20日23:59前」 来源：algo-hw1
+2. 「逾期不再接受补交」 来源：algo-hw1",,,,,,,,,
+86,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,86,eng-grading,2,completed,英语课平时成绩占总成绩的多少？,,1/1,"[eng-grading] 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+      定位：eng-grading:paragraph:1（demo.2026-fall.english.A）
+[eng-deadline] 英语课期末论文须在2027年1月5日前提交至教学平台。
+      定位：eng-deadline:paragraph:1（demo.2026-fall.english.A）
+[eng-textbook] 本学期使用《学术英语读写教程》第二版，请自行购买。
+      定位：eng-textbook:paragraph:1（demo.2026-fall.english.A）",answer,"1. 本课程总评成绩由平时成绩40%和期末考试成绩60%构成。
+   引用编号：eng-grading",,1. 平时成绩占总成绩的40%。,1. 「平时成绩40%」 来源：eng-grading,,,,,,,,,
+87,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,87,stat-paper-words,2,completed,统计学论文要求写多少字？,,1/1,"[stat-paper] 统计学期中论文题目自选，字数与格式要求见后续通知。
+      定位：stat-paper:paragraph:1（demo.2026-fall.statistics.A）
+[stat-lecture] 本周五统计学停课一次，下周恢复正常。
+      定位：stat-lecture:paragraph:1（demo.2026-fall.statistics.A）",insufficient,,"1. 缺少字数要求
+   说明：现有资料仅说明字数与格式要求见后续通知，未给出具体字数；另一条资料与论文要求无关。",1. 论文题目自选。,1. 「题目自选」 来源：stat-paper,1. missing_requirement,,,,,,,,
+88,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,88,ds-exam,2,completed,数据结构期末考试是什么时候？,,2/2,"[ds-exam-v1] 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+      定位：ds-exam-v1:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-exam-v2] 数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。
+      定位：ds-exam-v2:paragraph:1（demo.2026-fall.datastructure.A）
+[ds-lab] 数据结构上机实验共6次，每次当堂验收。
+      定位：ds-lab:paragraph:1（demo.2026-fall.datastructure.A）",conflict,"1. 数据结构期末考试定于2026年12月28日上午9:00至11:00。
+   引用编号：ds-exam-v1
+2. 数据结构期末考试调整至2026年12月29日下午14:00至16:00，且该通知未说明是否替代此前安排。
+   引用编号：ds-exam-v2","1. 来源矛盾
+   说明：ds-exam-v1 与 ds-exam-v2 给出不同的考试日期和时间，且 ds-exam-v2 未说明是否替代此前安排，无法确定最终考试时间。","1. 第一份通知写2026年12月28日上午9:00至11:00。
+2. 第二份通知写2026年12月29日下午14:00至16:00。","1. 「2026年12月28日上午9:00至11:00」 来源：ds-exam-v1
+2. 「2026年12月29日下午14:00至16:00」 来源：ds-exam-v2",1. source_conflict,,,,,,,,
+89,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,89,physics-a-2nd-deadline,2,completed,大学物理A班第二次习题什么时候交？,,1/1,"[physics-a-2nd] 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+      定位：physics-a-2nd:paragraph:1（demo.2026-fall.physics.A）
+[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）
+[physics-a-exam] 大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。
+      定位：physics-a-exam:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。
+   引用编号：physics-a-2nd",,1. 第二次习题须在2026年10月24日20:00前通过课程平台提交。,1. 「2026年10月24日20:00前」 来源：physics-a-2nd,,,,,,,,,
+90,v4-第三批,docs/evaluation/q001-live-batch3/answer-review.csv,90,os-lab2-deadline,2,completed,操作系统实验二的截止时间是什么？,,1/1,"[os-lab2] 操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。
+      定位：os-lab2:paragraph:1（demo.2026-fall.os.A）
+[os-lab1-log] 操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。
+      定位：os-lab1-log:paragraph:1（demo.2026-fall.os.A）
+[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺少截止时间信息
+   说明：现有资料中，os-lab2 只说明实验二为进程调度模拟、提交方式另行通知，未给出截止时间；os-lab1-log 和 os-partial-date 均针对实验一，未涉及实验二的截止时间。",,,1. missing_deadline,,,,,,,,
