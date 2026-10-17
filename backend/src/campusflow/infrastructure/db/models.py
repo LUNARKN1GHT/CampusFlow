@@ -28,6 +28,19 @@ from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriorit
 from campusflow.infrastructure.db.base import Base
 
 
+class EmbeddingProfileRecord(Base):
+    __tablename__ = "embedding_profiles"
+    __table_args__ = (CheckConstraint("dimensions > 0 AND dimensions <= 4096"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(100))
+    model: Mapped[str] = mapped_column(String(100))
+    revision: Mapped[str] = mapped_column(String(100))
+    dimensions: Mapped[int] = mapped_column(Integer)
+    generation_config: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Workspace(Base):
     __tablename__ = "workspaces"
 

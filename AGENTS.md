@@ -144,6 +144,8 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 
 ## 工程约定
 
+- Q002 按用户选择以不可变 `embedding_profiles` 独立保存供应商、型号、本地代次、维度和生成设置；接入智谱 Embedding-3（1024 维），结果必须携带配置编号。跨型号/代次/设置比较拒绝；数据库禁止改写配置，重复登记幂等。显式单次调用，无自动重试或隐式降级，暂不接页面与后台索引。Q004/Q005 必须沿用配置身份落实索引及检索隔离；本地代次不冒充供应商内部版本。见 docs/verification/Q002-embedding-adapter.md。
+
 - R001 已实现待核对事项列表与计数的只读接口（GET /api/v1/candidates 与 GET /api/v1/candidates/summary）：按核对状态（可多选，默认 pending）、事项类型、课程、学期、来源资料和缺失原因代码筛选，返回总数、按状态与按原因分布计数，同一候选重复原因只计一次。接口只接受 ReviewStatus，传任务执行进度值被 422 拒绝，两套状态不混用；列表只给最小字段，逐字段取值与证据仍由 R007 详情接口读取；原因存在 review_reasons JSON 列、代码随 X 系列提取任务增加，故在应用层按代码过滤而非 SQL 硬编码。列表项带来源资料与版本号，可据此跳到原文片段查看未覆盖范围。核对列表界面由 R008 完成，X008 的截图截断与来源矛盾原因代码尚未产出。见 docs/verification/R001-review-list.md。
 
 - R006 已实现已确认规则候选转换为正式课程规则并保存：title 与 rule_text 必需，缺任一项拒绝；conditions／scope／effective 只保留原文，不解析生效日期、不换算相对写法。`course_rules.source_candidate_id` 唯一约束保证幂等，重复转换返回既有规则，未确认候选不能转换。新增 GET /api/v1/rules 只读查询，按 course／semester 过滤且限当前空间；删除资料时规则保留并标记来源失效，删除影响预览计入 linked_rule_ids 与确认指纹。候选 HTTP 接口与核对界面由 R008 接入，界面上的生成入口由 R009 完成。见 docs/verification/R006-confirmed-rules.md。
