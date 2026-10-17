@@ -5,7 +5,7 @@ from rq import Worker
 
 class SafeWorker(Worker):
     def handle_exception(self, job, *exc_info):
-        self.log.error("job_id=%s stage=parse error=processing_failed", job.id)
+        self.log.error("job_id=%s error=processing_failed", job.id)
 
     def handle_job_failure(self, job, queue, started_job_registry=None, exc_string=""):
         return super().handle_job_failure(

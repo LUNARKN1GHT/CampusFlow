@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     dispatch_on_startup: bool = True
     # 作业超时（秒，J005）：领取后超过这个时长仍是"处理中"就回收为可重试失败
     job_timeout_seconds: int = 900
+    # Q004：后台恢复扫描间隔（秒）；0 表示关闭周期扫描，只在启动时扫一次
+    recovery_interval_seconds: int = Field(default=15, ge=0)
+    # Q004：索引作业心跳超时（秒）；Worker 每领取一块刷新一次心跳
+    embed_job_timeout_seconds: int = Field(default=300, ge=1)
+    # Q004：索引作业自动重投上限；0 表示关闭自动重投
+    embed_job_max_auto_retries: int = Field(default=3, ge=0)
     # 智谱文字/视觉模型共用密钥（ZHIPU_API_KEY；未配置时不得调用真实模型）
     zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
     # X002：用户选择的文字模型，与视觉模型独立配置。

@@ -52,6 +52,9 @@ class RecordingQueue:
         self.enqueued.append(job_id)
         return f"parse-{job_id}"
 
+    def enqueue_index(self, job_id: int) -> str:
+        return f"index-{job_id}"
+
 
 @pytest.fixture(autouse=True)
 def local_queue(client: TestClient):
@@ -255,8 +258,9 @@ def test_delete_impact_counts_unfinished_jobs(client: TestClient, shared_storage
     assert pending["unfinished_job_count"] == 1  # 作业还没跑
 
     parse_version_job(job_id)
+    # 解析完成后会自动新建一个待处理的索引作业（Q004），所以还剩 1 个没跑完
     finished = client.get(f"/api/v1/materials/{material_id}/delete-impact").json()
-    assert finished["unfinished_job_count"] == 0  # 跑完了，不再提示
+    assert finished["unfinished_job_count"] == 1
     # 已完成作业仍然会被删除连带清掉，只是不必再提示"还有活在跑"
     assert _count("SELECT count(*) FROM processing_jobs WHERE id = :id", id=job_id) == 1
 

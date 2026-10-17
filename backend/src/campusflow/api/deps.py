@@ -11,8 +11,10 @@ from fastapi import Depends, Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from campusflow.application import workspaces as workspace_use_cases
+from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.infrastructure.index_manifests import SqlIndexManifests
 from campusflow.infrastructure.repositories import build_repositories
 
 
@@ -31,6 +33,13 @@ def get_current_workspace(
 ) -> WorkspaceData:
     """当前会话的工作空间（MVP 单用户：默认空间，不存在时创建）。"""
     return workspace_use_cases.get_or_create_default_workspace(repos)
+
+
+def get_index_manifests(
+    session: Annotated[Session, Depends(get_session)],
+) -> IndexManifests:
+    """索引清单读取（Q004）：查询只在当前请求会话内进行，不写库。"""
+    return SqlIndexManifests(session)
 
 
 def get_job_queue(request: Request) -> JobQueue | None:
