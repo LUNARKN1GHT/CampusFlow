@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
-from campusflow.domain.errors import DomainError, PermanentError, TransientError
+from campusflow.domain.errors import DomainError, ModelOutputError, PermanentError, TransientError
 
 API_URL = "https://open.bigmodel.cn/api/paas/v4/embeddings"
 MAX_RESPONSE_BYTES = 256 * 1024
@@ -87,7 +87,7 @@ class ZhipuEmbedder:
         except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
             raise TransientError("向量服务连接失败或等待超时，可稍后重试") from None
         if len(data) > MAX_RESPONSE_BYTES:
-            raise PermanentError("向量响应超过读取上限")
+            raise ModelOutputError("向量响应超过读取上限")
         try:
             raw = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_object)
             rows = raw["data"]
@@ -109,5 +109,5 @@ class ZhipuEmbedder:
             RecursionError,
             DomainError,
         ):
-            raise PermanentError("向量响应无效或模型/维度不一致，结果未接受") from None
+            raise ModelOutputError("向量响应无效或模型/维度不一致，结果未接受") from None
         return result

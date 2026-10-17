@@ -13,7 +13,12 @@ import pytest
 from campusflow.application.embeddings import embed_registered_text
 from campusflow.core.config import Settings
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile, cosine_similarity
-from campusflow.domain.errors import DomainError, PermanentError, TransientError
+from campusflow.domain.errors import (
+    DomainError,
+    ModelOutputError,
+    PermanentError,
+    TransientError,
+)
 from campusflow.infrastructure.llm.embeddings import (
     API_URL,
     MAX_RESPONSE_BYTES,
@@ -111,6 +116,9 @@ def test_error_is_safe_and_temporary_failure_can_be_explicitly_retried(adapter, 
     assert "HTTPError:" not in rendered
     assert caught.value.__suppress_context__ and body.closed
     assert opener.open.call_count == 1
+    if error_type is PermanentError:
+        # 4xx 是「请求被拒绝」，不是「模型输出无效」。
+        assert not isinstance(caught.value, ModelOutputError)
     if error_type is TransientError:
         opener.open.side_effect = None
         respond(opener)
@@ -177,7 +185,7 @@ def test_invalid_provider_vectors_are_rejected(adapter, fault):
     elif fault == "not-list":
         row["embedding"] = "x" * 1024
     respond(opener, raw)
-    with pytest.raises(PermanentError):
+    with pytest.raises(ModelOutputError):
         model.embed("原文")
 
 
@@ -189,7 +197,7 @@ def test_invalid_provider_vectors_are_rejected(adapter, fault):
 def test_unreadable_or_oversize_response_fails_closed(adapter, data):
     model, opener = adapter
     opener.open.return_value = io.BytesIO(data)
-    with pytest.raises(PermanentError):
+    with pytest.raises(ModelOutputError):
         model.embed("原文")
 
 

@@ -36,7 +36,12 @@ def build_parser_registry(settings: Settings, *, demo: bool = False) -> ParserRe
     else:
         if not settings.zhipu_api_key:
             raise ValueError("缺少 ZHIPU_API_KEY，请在 backend/.env 配置后启动")
-        vision = ZhipuVisionParser(settings.zhipu_api_key)
+        vision = ZhipuVisionParser(
+            settings.zhipu_api_key,
+            timeout_seconds=settings.vision_timeout_seconds,
+            max_retries=settings.vision_max_retries,
+            backoff_seconds=settings.vision_retry_backoff_seconds,
+        )
     return ParserRegistry(
         text_parser=TextDocumentParser(),
         pdf_parser=TableAwareParser(PdfWithVisionFallbackParser(PdfDocumentParser(), vision)),
