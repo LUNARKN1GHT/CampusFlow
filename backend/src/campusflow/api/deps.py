@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from campusflow.application import workspaces as workspace_use_cases
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.application.ports.version_relations import VersionRelations
 from campusflow.infrastructure.repositories import build_repositories
+from campusflow.infrastructure.version_relations import SqlVersionRelations
 
 
 def get_session(request: Request) -> Iterator[Session]:
@@ -24,6 +26,10 @@ def get_session(request: Request) -> Iterator[Session]:
 
 def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repositories:
     return build_repositories(session)
+
+
+def get_version_relations(session: Annotated[Session, Depends(get_session)]) -> VersionRelations:
+    return SqlVersionRelations(session)
 
 
 def get_current_workspace(
