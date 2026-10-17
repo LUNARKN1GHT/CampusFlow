@@ -146,8 +146,11 @@ docker compose -f infra/docker-compose.worker.yml run --rm worker uv run --locke
 | `pending` 且没有投递时间 | 先恢复 Redis；默认 15 秒内恢复扫描会自动补投，也可调用 `POST /api/v1/jobs/redeliver` 立即补投当前空间的待处理作业 |
 | 已有投递时间但一直 `pending` | 检查 Worker 是否退出、密钥是否填写、两端 Redis 库号是否相同 |
 | Worker 报来源不可用 | 核对两端挂载目录；资料已删除则不应重试或恢复旧结果 |
-| 索引作业 `partial`／`failed` | 只有返回 `retryable=true` 时才调用 `POST /api/v1/jobs/{id}/retry`；先看 `index-progress` 定位失败块 |
-| 长时间 `running` | 索引作业每领取一块会刷新心跳；超过 `EMBED_JOB_TIMEOUT_SECONDS` 后恢复扫描自动回收为可重试失败，并最多自动重投 3 次 |
+| 视觉模型 401／403 或请求被拒绝 | 永久失败，重投不会变好；核对 `ZHIPU_API_KEY`、模型名和账号额度 |
+| 视觉模型 429／5xx／超时 | 临时失败；适配器按配置自动重试，耗尽后作业标记可重试 |
+| 视觉模型返回内容无法解析 | 永久失败（`retryable=false`）；重投无效，需检查模型输出或评估换模型 |
+| `partial`／`failed` | 只有返回 `retryable=true` 时才调用 `POST /api/v1/jobs/{id}/retry`；索引作业先看 `index-progress` 定位失败块，随后重新查状态 |
+| 长时间 `running` | 先停掉卡住的 Worker，再重启 API 执行超时回收，确认状态变为可重试失败后重试；索引作业每领取一块刷新心跳，超过 `EMBED_JOB_TIMEOUT_SECONDS` 后恢复扫描自动回收并最多自动重投 3 次 |
 | 401／404 | 重新登录，核对当前空间和编号；跨空间与不存在都返回 404，不通过改库绕过授权 |
 
 补投成功计数表示进入队列，**不表示解析或索引成功**。资料和待投递记录同时入库，
@@ -158,6 +161,12 @@ Redis 中断不会撤销已保存资料。API 启动时扫描一次，之后默�
 
 错误日志只保留作业编号、阶段和受控错误分类；RQ 失败记录不保存原始堆栈。需要更多
 信息时查看授权状态接口和脱敏后的尝试记录，不打开包含资料正文的调试日志。
+
+视觉识别的重试参数由 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、
+`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和
+`CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）控制；0 次重试表示只调用一次。
+默认最坏等待约 3 分钟，低于作业超时默认 900 秒。适配器内重试只针对临时故障；永久失败
+（401／403、响应结构无效、超限）立即停止，不消耗重试次数。
 
 ## 6. 无模型费用的演示与验证范围
 

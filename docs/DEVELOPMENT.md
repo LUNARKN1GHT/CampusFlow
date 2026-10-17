@@ -159,6 +159,8 @@ Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取�
 
 Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
 
+Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
+
 - 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。

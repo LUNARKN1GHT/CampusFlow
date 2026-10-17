@@ -15,3 +15,10 @@ class TransientError(DomainError):
 
 class PermanentError(DomainError):
     """永久失败（格式不支持、来源已删除）：重试不会成功（J005）。"""
+
+
+class ModelOutputError(PermanentError):
+    """模型返回了响应，但内容不可用（结构错误、超限、维度不一致）。
+
+    与「请求被拒绝」区分：这类失败重试通常无效，但也不是服务不可用。
+    """

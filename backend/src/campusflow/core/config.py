@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     embedding_revision: str = "q001-v1"
     embedding_dimensions: int = Field(default=1024, ge=1, le=4096)
     embedding_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
+    # Q009：视觉识别的单次等待上限、重试次数与线性退避。上限 3 次是为了
+    # 保证最坏等待（4 次调用 + 退避）仍低于 job_timeout_seconds。
+    vision_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
+    vision_max_retries: int = Field(default=2, ge=0, le=3)
+    vision_retry_backoff_seconds: float = Field(default=1.0, ge=0, le=10, allow_inf_nan=False)
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

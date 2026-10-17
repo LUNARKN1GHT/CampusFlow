@@ -3,13 +3,16 @@
 调用 glm-4v-flash 识别图片文字与区域；输出遵循 D011 协议：
 - 可定位区域输出 region 定位（0-1 归一化坐标，与原图一致）
 - 无法定位的结果降级为整页定位（page=1），不伪造坐标
-- 调用失败抛出 VisionRecognitionError 由作业层报告，不生成确定事实
+- 调用失败抛出 VisionRecognitionFailure 子类由作业层报告，不生成确定事实
+- 临时故障（限流、5xx、网络、超时）可重试；请求被拒绝与响应无效不可重试
 """
 
 from __future__ import annotations
 
 import base64
+import http.client
 import json
+import math
 import time
 import urllib.error
 import urllib.request
@@ -20,11 +23,21 @@ from campusflow.application.ports.parsers import (
     ParseOutcome,
     ParserLocator,
 )
-from campusflow.infrastructure.llm.errors import VisionRecognitionError
+from campusflow.infrastructure.llm.errors import (
+    VisionInvalidOutput,
+    VisionRecognitionError,
+    VisionRequestRejected,
+)
 
 API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 DEFAULT_MODEL = "glm-4v-flash"
 SUPPORTED_MIME_TYPES = frozenset({"image/png", "image/jpeg"})
+MAX_RESPONSE_BYTES = 1024 * 1024
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def _parse_locator(bbox: object) -> ParserLocator:
@@ -59,7 +72,7 @@ def _parse_unreadable(raw: object) -> list[ParseFailure]:
     elif isinstance(raw, list) and all(isinstance(note, str) for note in raw):
         items = raw
     else:
-        raise VisionRecognitionError("unreadable 不是字符串或字符串列表")
+        raise VisionInvalidOutput("unreadable 不是字符串或字符串列表")
     return [
         ParseFailure(locator=ParserLocator(kind="page", page=1), reason=note)
         for note in items
@@ -88,11 +101,18 @@ class ZhipuVisionParser:
     ) -> None:
         if not api_key:
             raise ValueError("缺少智谱 API 密钥")
+        if not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 120:
+            raise ValueError("视觉请求等待上限必须为 0 至 120 秒")
+        if type(max_retries) is not int or not 0 <= max_retries <= 3:
+            raise ValueError("视觉识别重试次数必须为 0 至 3 次")
+        if not math.isfinite(backoff_seconds) or not 0 <= backoff_seconds <= 10:
+            raise ValueError("视觉识别重试等待必须为 0 至 10 秒")
         self._api_key = api_key
         self._model = model
         self._timeout = timeout_seconds
         self._max_retries = max_retries
         self._backoff = backoff_seconds
+        self._opener = urllib.request.build_opener(_NoRedirect())
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
         if mime_type not in SUPPORTED_MIME_TYPES:
@@ -142,41 +162,56 @@ class ZhipuVisionParser:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout) as response:
-                return json.loads(response.read().decode())
+            with self._opener.open(request, timeout=self._timeout) as response:
+                data = response.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as exc:
-            raise VisionRecognitionError(f"接口返回错误：HTTP {exc.code}") from exc
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            raise VisionRecognitionError(f"调用失败：{exc}") from exc
+            status = exc.code
+            exc.close()
+            if status in (408, 429) or 500 <= status <= 599:
+                raise VisionRecognitionError(
+                    f"视觉识别服务暂时不可用（HTTP {status}），可稍后重试"
+                ) from None
+            raise VisionRequestRejected(
+                f"视觉识别请求被拒绝（HTTP {status}），请检查模型及账号配置"
+            ) from None
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
+            raise VisionRecognitionError("视觉识别连接失败或等待超时，可稍后重试") from None
+        if len(data) > MAX_RESPONSE_BYTES:
+            raise VisionInvalidOutput("视觉识别响应超过读取上限")
+        try:
+            return json.loads(data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise VisionInvalidOutput("视觉识别响应不是合法 JSON") from None
 
     def _to_outcome(self, raw: dict) -> ParseOutcome:
         """把模型响应转换为协议输出。
 
         所有结构异常（顶层非对象、items/unreadable 类型错误等）统一转为
-        VisionRecognitionError 可报告错误，不产出部分确定片段（D014 验收）。
+        VisionInvalidOutput 可报告错误，不产出部分确定片段（D014 验收）。
+        这类响应重试也不会变好，因此按永久失败处理（Q009）。
         """
         try:
             message = raw["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
-            raise VisionRecognitionError("响应缺少识别内容") from exc
+            raise VisionInvalidOutput("响应缺少识别内容") from exc
         if not isinstance(message, str):
-            raise VisionRecognitionError("识别内容不是文本")
+            raise VisionInvalidOutput("识别内容不是文本")
         try:
             parsed = json.loads(
                 message.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
             )
         except json.JSONDecodeError as exc:
-            raise VisionRecognitionError("识别结果不是合法 JSON") from exc
+            raise VisionInvalidOutput("识别结果不是合法 JSON") from exc
         if not isinstance(parsed, dict):
-            raise VisionRecognitionError("识别结果顶层不是对象")
+            raise VisionInvalidOutput("识别结果顶层不是对象")
 
         raw_items = parsed.get("items")
         if raw_items is None:
             raw_items = []
         if not isinstance(raw_items, list):
-            raise VisionRecognitionError("items 不是列表")
+            raise VisionInvalidOutput("items 不是列表")
         if any(not isinstance(item, dict) for item in raw_items):
-            raise VisionRecognitionError("items 含非对象元素")
+            raise VisionInvalidOutput("items 含非对象元素")
 
         fragments: list[ParsedFragment] = []
         for seq, item in enumerate(raw_items):

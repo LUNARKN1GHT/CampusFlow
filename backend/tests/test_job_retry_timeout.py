@@ -24,7 +24,11 @@ from campusflow.application.processing import ParserRegistry, parse_version, set
 from campusflow.domain.errors import PermanentError
 from campusflow.domain.jobs import DEFAULT_JOB_TIMEOUT_SECONDS, is_retryable, timeout_reason
 from campusflow.domain.states import JobStatus, MaterialStatus
-from campusflow.infrastructure.llm.errors import VisionRecognitionError
+from campusflow.infrastructure.llm.errors import (
+    VisionInvalidOutput,
+    VisionRecognitionError,
+    VisionRequestRejected,
+)
 from campusflow.infrastructure.llm.vision import FakeVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.text import TextDocumentParser
@@ -180,6 +184,8 @@ def _backdate_start(job_id: int, seconds: int) -> None:
 def test_is_retryable_distinguishes_error_kinds() -> None:
     """临时故障可重试，永久失败与普通异常不可重试（J005 交付物）。"""
     assert is_retryable(VisionRecognitionError("上游 503")) is True
+    assert is_retryable(VisionRequestRejected("HTTP 401")) is False
+    assert is_retryable(VisionInvalidOutput("JSON 无效")) is False
     assert is_retryable(PermanentError("来源已删除")) is False
     assert is_retryable(ValueError("格式不支持")) is False
 
