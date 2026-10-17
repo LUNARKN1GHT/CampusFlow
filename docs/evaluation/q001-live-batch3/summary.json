@@ -152,6 +152,7 @@
   "actual_billed_cny": null,
   "total_sample_attempts": 90,
   "distinct_samples": 90,
-  "independent_review_complete": false,
-  "model_selection_complete": false
+  "independent_review_complete": true,
+  "model_selection_complete": true,
+  "review_evidence": "docs/verification/Q001-independent-review.md"
 }
