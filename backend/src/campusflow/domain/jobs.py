@@ -14,6 +14,10 @@ TERMINAL_JOB_STATUSES = frozenset({JobStatus.DONE, JobStatus.PARTIAL, JobStatus.
 RETRYABLE_JOB_STATUSES = frozenset({JobStatus.FAILED, JobStatus.PARTIAL})
 
 DEFAULT_JOB_TIMEOUT_SECONDS = 900
+# 索引作业按块推进，用最近一次心跳判断是否卡死（Q004）
+DEFAULT_EMBED_JOB_TIMEOUT_SECONDS = 300
+# 索引作业自动重投上限：超过之后只保留人工重试入口（Q004）
+DEFAULT_EMBED_MAX_AUTO_RETRIES = 3
 
 # 密钥/令牌/隐私内容模式：Bearer 令牌、sk- 密钥、key= 参数、身份证/手机号等长数字串
 _SENSITIVE_PATTERNS = [

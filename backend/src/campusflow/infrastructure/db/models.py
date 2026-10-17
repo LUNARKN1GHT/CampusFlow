@@ -8,6 +8,7 @@
 
 from datetime import date, datetime, time
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -15,11 +16,13 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Time,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -38,6 +41,69 @@ class EmbeddingProfileRecord(Base):
     revision: Mapped[str] = mapped_column(String(100))
     dimensions: Mapped[int] = mapped_column(Integer)
     generation_config: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexedBlock(Base):
+    """Q004 逐块进度与成功向量；同一配置/块只有一行。"""
+
+    __tablename__ = "indexed_blocks"
+    __table_args__ = (
+        CheckConstraint("start_offset >= 0 AND end_offset > start_offset"),
+        CheckConstraint("state IN ('pending', 'running', 'done', 'failed', 'skipped')"),
+        CheckConstraint("(state = 'done') = (embedding IS NOT NULL)"),
+        CheckConstraint("NOT retryable OR state = 'failed'"),
+        CheckConstraint(
+            "(state = 'running' AND claim_token IS NOT NULL AND lease_until IS NOT NULL) OR "
+            "(state <> 'running' AND claim_token IS NULL AND lease_until IS NULL)",
+            name="ck_indexed_blocks_claim",
+        ),
+        CheckConstraint("attempts >= 0", name="ck_indexed_blocks_attempts"),
+        # 检索加速（Q004）：按余弦距离的 HNSW 索引，语义搜索不必全表扫描。
+        Index(
+            "ix_indexed_blocks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"), primary_key=True)
+    block_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    source_fingerprint: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    chunker_version: Mapped[str] = mapped_column(String(100))
+    text: Mapped[str] = mapped_column(String)
+    state: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    failure_code: Mapped[str | None] = mapped_column(String(40))
+    # 领取次数（含第一次）：达到上限后不再调用模型，避免崩溃或临时失败无限重试。
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024))
+    claim_token: Mapped[str | None] = mapped_column(String(32))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexManifest(Base):
+    """完整来源/块清单快照；身份包含配置、来源、分块设置和解析覆盖。"""
+
+    __tablename__ = "index_manifests"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -286,6 +352,16 @@ class ProcessingJob(Base):
     """后台处理作业（J001）：阶段、覆盖范围、错误原因、尝试次数。"""
 
     __tablename__ = "processing_jobs"
+    __table_args__ = (
+        # 一份资料版本最多只有一个向量索引作业（Q004）：重复的解析结果只会重置它，
+        # 不会产生第二个执行者。
+        Index(
+            "uq_processing_jobs_embed_version",
+            "version_id",
+            unique=True,
+            postgresql_where=text("stage = 'embed'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
@@ -309,6 +385,14 @@ class ProcessingJob(Base):
     delivery_attempts: Mapped[int] = mapped_column(Integer, default=0)
     # 领取时间（J005）：用于识别长期停在 running 的超时作业
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # 心跳（Q004）：索引作业按块推进，长作业借此避免被超时回收误判
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 当前索引作业使用的完整清单；为空表示尚未生成或已重置
+    manifest_id: Mapped[str | None] = mapped_column(
+        ForeignKey("index_manifests.id", ondelete="SET NULL")
+    )
+    # 自动重投次数（Q004）：与人工重试分开计数，防止崩溃循环无限重投
+    auto_retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # 最近一次失败是否可重试（J005）：区分临时故障与永久失败
     retryable: Mapped[bool | None] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

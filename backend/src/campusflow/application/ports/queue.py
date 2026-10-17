@@ -14,3 +14,7 @@ class JobQueue(Protocol):
         队列标识，便于排查，也避免补偿扫描产生语义不同的重复消息。
         """
         ...
+
+    def enqueue_index(self, job_id: int) -> str:
+        """投递向量索引作业（Q004），同样使用稳定作业键。"""
+        ...

@@ -22,7 +22,8 @@ from campusflow.infrastructure.parsers.table_aware import TableAwareParser
 from campusflow.infrastructure.parsers.text import TextDocumentParser
 from campusflow.infrastructure.parsers.web import WebDocumentParser
 from campusflow.infrastructure.parsers.word import WordDocumentParser
-from campusflow.infrastructure.queue.rq_queue import QUEUE_NAME
+from campusflow.infrastructure.queue.rq_queue import INDEX_QUEUE_NAME, QUEUE_NAME
+from campusflow.workers.embeddings import build_demo_embedder, build_embedder, set_embedder_factory
 from campusflow.workers.safe_worker import SafeWorker
 
 
@@ -46,10 +47,20 @@ def build_parser_registry(settings: Settings, *, demo: bool = False) -> ParserRe
     )
 
 
+def _require_test_database(settings: Settings) -> None:
+    database = make_url(settings.database_url).database or ""
+    if not database.endswith("_test"):
+        raise ValueError("演示模式只允许使用名称以 _test 结尾的专用测试库")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="CampusFlow 后台资料解析；Windows 请使用 Docker")
+    parser = argparse.ArgumentParser(
+        description="CampusFlow 后台解析与向量索引；Windows 请使用 Docker"
+    )
     parser.add_argument("--burst", action="store_true", help="处理完当前队列后退出")
-    parser.add_argument("--demo", action="store_true", help="仅限测试库：假识别，不调用模型")
+    parser.add_argument(
+        "--demo", action="store_true", help="仅限测试库：假识别与假向量，不调用模型"
+    )
     args = parser.parse_args()
     if os.name == "nt":
         raise SystemExit(
@@ -57,14 +68,19 @@ def main() -> None:
         )
     try:
         settings = Settings()
+        if args.demo:
+            _require_test_database(settings)
+            set_embedder_factory(build_demo_embedder)
+        else:
+            set_embedder_factory(build_embedder)
         set_parser_registry(build_parser_registry(settings, demo=args.demo))
         connection = redis.Redis.from_url(
             settings.redis_url, socket_connect_timeout=3, socket_timeout=5
         )
         connection.ping()
-        SafeWorker([QUEUE_NAME], connection=connection, log_job_description=False).work(
-            burst=args.burst
-        )
+        SafeWorker(
+            [QUEUE_NAME, INDEX_QUEUE_NAME], connection=connection, log_job_description=False
+        ).work(burst=args.burst)
     except ValueError:
         # 仅上面的受控配置校验信息；不输出连接对象或 Settings。
         raise SystemExit("Worker 配置无效，请运行诊断命令检查模型、测试库与连接设置") from None

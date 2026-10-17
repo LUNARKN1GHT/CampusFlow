@@ -49,16 +49,24 @@ class RecordingQueue:
 
     def __init__(self) -> None:
         self.enqueued: list[int] = []
+        self.index_enqueued: list[int] = []
 
     def enqueue_parse(self, job_id: int) -> str:
         self.enqueued.append(job_id)
         return f"parse-{job_id}"
+
+    def enqueue_index(self, job_id: int) -> str:
+        self.index_enqueued.append(job_id)
+        return f"index-{job_id}"
 
 
 class BrokenQueue:
     """Redis 断连：投递抛异常（与 RQ 连接失败一致）。"""
 
     def enqueue_parse(self, job_id: int) -> str:
+        raise ConnectionError("redis 不可用")
+
+    def enqueue_index(self, job_id: int) -> str:
         raise ConnectionError("redis 不可用")
 
 
@@ -304,11 +312,12 @@ def test_redis_outage_during_retry_recovers_without_duplicates(
     assert retried["enqueued_at"] is None  # 还没投出去，等补偿
     assert retried["is_terminal"] is False
 
-    # Redis 恢复：补偿扫描重投
+    # Redis 恢复：补偿扫描重投（重试的解析作业 + 解析成功后新建的索引作业）
     queue = RecordingQueue()
     client.app.state.job_queue = queue
-    assert compensate_pending_deliveries(client.app) == 1
+    assert compensate_pending_deliveries(client.app) == 2
     assert queue.enqueued == [job_id]
+    assert len(queue.index_enqueued) == 1
 
     parse_version_job(job_id)
     final_chunks = _chunks(material_id)

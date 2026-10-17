@@ -39,10 +39,15 @@ class RecordingQueue:
 
     def __init__(self) -> None:
         self.enqueued: list[int] = []
+        self.index_enqueued: list[int] = []
 
     def enqueue_parse(self, job_id: int) -> str:
         self.enqueued.append(job_id)
         return f"parse-{job_id}"
+
+    def enqueue_index(self, job_id: int) -> str:
+        self.index_enqueued.append(job_id)
+        return f"index-{job_id}"
 
 
 class TransientVisionParser:
@@ -296,6 +301,9 @@ def test_redeliver_pending_jobs(client: TestClient, shared_storage) -> None:
         def enqueue_parse(self, job_id: int) -> str:
             raise ConnectionError("redis 不可用")
 
+        def enqueue_index(self, job_id: int) -> str:
+            raise ConnectionError("redis 不可用")
+
     client.app.state.job_queue = BrokenQueue()
     job_id = _upload(client)["job_id"]
     assert client.get(f"/api/v1/jobs/{job_id}").json()["enqueued_at"] is None
@@ -370,10 +378,15 @@ def test_material_jobs_survive_browser_state_loss(client, shared_storage, queue)
     assert response.json()[0]["status"] == "pending"
     _use_vision_parser(StagedVisionParser())
     parse_version_job(uploaded["job_id"])
-    partial = client.get("/api/v1/jobs", params={"material_id": material_id}).json()[0]
+    jobs = client.get("/api/v1/jobs", params={"material_id": material_id}).json()
+    # 解析成功/部分成功后会自动新建一个索引作业（Q004），按阶段区分
+    partial = next(job for job in jobs if job["stage"] == "parse")
     assert partial["status"] == "partial"
     assert partial["retryable"] is True
     assert "2" in partial["scope"]
+    embed_jobs = [job for job in jobs if job["stage"] == "embed"]
+    assert len(embed_jobs) == 1
+    assert embed_jobs[0]["status"] == "pending"
 
 
 def test_material_jobs_check_ownership_and_deletion(client, shared_storage, queue):
