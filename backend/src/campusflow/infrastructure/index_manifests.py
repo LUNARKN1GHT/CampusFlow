@@ -19,6 +19,8 @@ from campusflow.domain.chunking import (
 from campusflow.domain.embeddings import EmbeddedText
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.indexing import (
+    DEFAULT_BLOCK_LEASE_SECONDS,
+    MAX_BLOCK_ATTEMPTS,
     BlockClaim,
     BlockIndexProgress,
     BlockIndexState,
@@ -132,7 +134,9 @@ class SqlIndexManifests:
         )
         return key
 
-    def _current(self, workspace_id: int, manifest_id: str) -> IndexManifest:
+    def _current(
+        self, workspace_id: int, manifest_id: str, *, verify_snapshot: bool = True
+    ) -> IndexManifest:
         row = self.session.scalar(
             select(IndexManifest)
             .where(
@@ -145,6 +149,10 @@ class SqlIndexManifests:
             raise NotFoundError("索引清单不存在")
         if _identity(row.snapshot) != row.id:
             raise DomainError("索引清单快照已改变，必须重新生成")
+        if not verify_snapshot:
+            return row
+        # 全量重算快照会锁定资料/版本/全部片段；逐块循环内改由每块的来源校验兜底，
+        # 只在生成清单与收尾汇总时做完整比对。
         snapshot, _ = self._snapshot(
             workspace_id, row.version_id, row.profile_id, ChunkingConfig(**row.snapshot["config"])
         )
@@ -152,8 +160,10 @@ class SqlIndexManifests:
             raise DomainError("索引来源或解析覆盖已变化，必须重新生成清单")
         return row
 
-    def summary(self, workspace_id: int, manifest_id: str) -> IndexProgressSummary:
-        manifest = self._current(workspace_id, manifest_id)
+    def summary(
+        self, workspace_id: int, manifest_id: str, *, verify_snapshot: bool = True
+    ) -> IndexProgressSummary:
+        manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
         snapshot = manifest.snapshot
         ids = snapshot["block_ids"]
         records = self.session.scalars(
@@ -170,27 +180,76 @@ class SqlIndexManifests:
         return summarize_index_progress(
             ids,
             [
-                BlockIndexProgress(r.block_id, BlockIndexState(r.state), r.retryable)
+                BlockIndexProgress(
+                    r.block_id,
+                    BlockIndexState(r.state),
+                    r.retryable,
+                    r.attempts,
+                    r.failure_code,
+                )
                 for r in records
             ],
             source_coverage_known=known,
             uncovered_source_count=uncovered + snapshot["empty_source_count"],
         )
 
-    def claim_next(
-        self, workspace_id: int, manifest_id: str, *, lease_seconds: int = 900
-    ) -> BlockClaim | None:
-        manifest = self._current(workspace_id, manifest_id)
-        for key in manifest.snapshot["block_ids"]:
-            claim = self.blocks.claim(
-                workspace_id, manifest.profile_id, key, lease_seconds=lease_seconds
+    def blocks_progress(
+        self, workspace_id: int, manifest_id: str, *, verify_snapshot: bool = False
+    ) -> tuple[BlockIndexProgress, ...]:
+        """逐块进度（只读接口用）：不重算快照，避免查询请求长时间持有行锁。"""
+        manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
+        ids = manifest.snapshot["block_ids"]
+        records = self.session.scalars(
+            select(IndexedBlock)
+            .where(
+                IndexedBlock.workspace_id == workspace_id,
+                IndexedBlock.profile_id == manifest.profile_id,
+                IndexedBlock.version_id == manifest.version_id,
+                IndexedBlock.block_id.in_(ids),
             )
-            if claim is not None:
-                return claim
-        return None
+            .execution_options(populate_existing=True)
+        )
+        by_id = {record.block_id: record for record in records}
+        return tuple(
+            BlockIndexProgress(
+                key,
+                BlockIndexState(by_id[key].state),
+                by_id[key].retryable,
+                by_id[key].attempts,
+                by_id[key].failure_code,
+            )
+            if key in by_id
+            else BlockIndexProgress(key, BlockIndexState.PENDING)
+            for key in ids
+        )
 
-    def _check_claim(self, workspace_id: int, manifest_id: str, claim: BlockClaim) -> None:
-        manifest = self._current(workspace_id, manifest_id)
+    def claim_next(
+        self,
+        workspace_id: int,
+        manifest_id: str,
+        *,
+        lease_seconds: int = DEFAULT_BLOCK_LEASE_SECONDS,
+        max_attempts: int = MAX_BLOCK_ATTEMPTS,
+        verify_snapshot: bool = True,
+    ) -> BlockClaim | None:
+        manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
+        return self.blocks.claim_next(
+            workspace_id,
+            manifest.profile_id,
+            manifest.snapshot["block_ids"],
+            lease_seconds=lease_seconds,
+            max_attempts=max_attempts,
+        )
+
+    def _check_claim(
+        self,
+        workspace_id: int,
+        manifest_id: str,
+        claim: BlockClaim,
+        *,
+        verify_snapshot: bool = True,
+    ) -> None:
+        manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
         if (
             claim.profile_id != manifest.profile_id
             or claim.block_id not in manifest.snapshot["block_ids"]
@@ -198,17 +257,35 @@ class SqlIndexManifests:
             raise DomainError("领取凭证不属于当前清单")
 
     def save_success(
-        self, workspace_id: int, manifest_id: str, claim: BlockClaim, result: EmbeddedText
+        self,
+        workspace_id: int,
+        manifest_id: str,
+        claim: BlockClaim,
+        result: EmbeddedText,
+        *,
+        verify_snapshot: bool = True,
     ) -> bool:
-        self._check_claim(workspace_id, manifest_id, claim)
+        self._check_claim(workspace_id, manifest_id, claim, verify_snapshot=verify_snapshot)
         return self.blocks.save_success(
             workspace_id, claim.profile_id, claim.block_id, result, token=claim.token
         )
 
     def save_failure(
-        self, workspace_id: int, manifest_id: str, claim: BlockClaim, code: str
+        self,
+        workspace_id: int,
+        manifest_id: str,
+        claim: BlockClaim,
+        code: str,
+        *,
+        max_attempts: int = MAX_BLOCK_ATTEMPTS,
+        verify_snapshot: bool = True,
     ) -> bool:
-        self._check_claim(workspace_id, manifest_id, claim)
+        self._check_claim(workspace_id, manifest_id, claim, verify_snapshot=verify_snapshot)
         return self.blocks.save_failure(
-            workspace_id, claim.profile_id, claim.block_id, code, token=claim.token
+            workspace_id,
+            claim.profile_id,
+            claim.block_id,
+            code,
+            token=claim.token,
+            max_attempts=max_attempts,
         )

@@ -5,18 +5,38 @@ import struct
 from datetime import timedelta
 from uuid import uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from campusflow.domain.chunking import ChunkSource, RetrievalBlock, SourceLocation
 from campusflow.domain.embeddings import EmbeddedText
 from campusflow.domain.errors import DomainError, NotFoundError
-from campusflow.domain.indexing import BlockClaim, BlockIndexProgress, BlockIndexState
+from campusflow.domain.indexing import (
+    ATTEMPTS_EXHAUSTED_CODE,
+    BLOCK_FAILURE_CODES,
+    DEFAULT_BLOCK_LEASE_SECONDS,
+    MAX_BLOCK_ATTEMPTS,
+    MAX_BLOCK_LEASE_SECONDS,
+    BlockClaim,
+    BlockIndexProgress,
+    BlockIndexState,
+)
 from campusflow.infrastructure.db.models import IndexedBlock, Material, MaterialVersion, SourceChunk
 from campusflow.infrastructure.embedding_profiles import SqlEmbeddingProfiles
 
-FAILURE_CODES = frozenset({"upstream_transient", "invalid_response", "source_unavailable"})
+# 兼容既有导入名；可写入的失败码集合定义在领域层，避免适配器与用例各写一份。
+FAILURE_CODES = BLOCK_FAILURE_CODES
+
+
+def _validate_lease(lease_seconds: int) -> None:
+    if type(lease_seconds) is not int or not 1 <= lease_seconds <= MAX_BLOCK_LEASE_SECONDS:
+        raise DomainError(f"领取有效期必须为 1 至 {MAX_BLOCK_LEASE_SECONDS} 秒")
+
+
+def _validate_max_attempts(max_attempts: int) -> None:
+    if type(max_attempts) is not int or not 1 <= max_attempts <= 10:
+        raise DomainError("每块最大尝试次数必须为 1 至 10")
 
 
 class SqlIndexedBlocks:
@@ -199,11 +219,17 @@ class SqlIndexedBlocks:
         )
 
     def claim(
-        self, workspace_id: int, profile_id: str, block_id: str, *, lease_seconds: int = 900
+        self,
+        workspace_id: int,
+        profile_id: str,
+        block_id: str,
+        *,
+        lease_seconds: int = DEFAULT_BLOCK_LEASE_SECONDS,
+        max_attempts: int = MAX_BLOCK_ATTEMPTS,
     ) -> BlockClaim | None:
         """短事务原子领取，过期领取可替换；调用方须提交后才请求模型。"""
-        if type(lease_seconds) is not int or not 1 <= lease_seconds <= 900:
-            raise DomainError("领取有效期必须为 1 至 900 秒")
+        _validate_lease(lease_seconds)
+        _validate_max_attempts(max_attempts)
         row = self._locked_current(workspace_id, profile_id, block_id)
         now = self.session.scalar(select(func.clock_timestamp()))
         eligible = (
@@ -213,22 +239,89 @@ class SqlIndexedBlocks:
         )
         if not eligible:
             return None
+        # 次数按领取计数：Worker 领取后崩溃也算一次，保证崩溃循环有界。
+        if row.attempts >= max_attempts:
+            row.state, row.retryable = "failed", False
+            row.failure_code = ATTEMPTS_EXHAUSTED_CODE
+            row.claim_token, row.lease_until = None, None
+            self.session.flush()
+            return None
         row.state, row.retryable, row.failure_code = "running", False, None
         row.claim_token = uuid4().hex
         row.lease_until = now + timedelta(seconds=lease_seconds)
+        row.attempts = row.attempts + 1
         self.session.flush()
         return BlockClaim(row.block_id, row.profile_id, row.claim_token, row.text, row.lease_until)
 
+    def claim_next(
+        self,
+        workspace_id: int,
+        profile_id: str,
+        block_ids: tuple[str, ...] | list[str],
+        *,
+        lease_seconds: int = DEFAULT_BLOCK_LEASE_SECONDS,
+        max_attempts: int = MAX_BLOCK_ATTEMPTS,
+    ) -> BlockClaim | None:
+        """一次查询挑出可领取块再原子领取，避免按清单逐块扫描。
+
+        先做不加锁的候选查询，再交给 claim 按「来源 → 索引块」的固定顺序加锁，
+        避免与 register/save 形成反向锁序。并发下候选被抢走时 claim 返回 None，
+        继续尝试下一个候选。
+        """
+        _validate_lease(lease_seconds)
+        _validate_max_attempts(max_attempts)
+        if not block_ids:
+            return None
+        now = self.session.scalar(select(func.clock_timestamp()))
+        candidates = self.session.scalars(
+            select(IndexedBlock.block_id)
+            .where(
+                IndexedBlock.workspace_id == workspace_id,
+                IndexedBlock.profile_id == profile_id,
+                IndexedBlock.block_id.in_(list(block_ids)),
+                or_(
+                    IndexedBlock.state == "pending",
+                    and_(IndexedBlock.state == "failed", IndexedBlock.retryable.is_(True)),
+                    and_(IndexedBlock.state == "running", IndexedBlock.lease_until <= now),
+                ),
+            )
+            .order_by(IndexedBlock.source_chunk_id, IndexedBlock.start_offset)
+        ).all()
+        for block_id in candidates:
+            claim = self.claim(
+                workspace_id,
+                profile_id,
+                block_id,
+                lease_seconds=lease_seconds,
+                max_attempts=max_attempts,
+            )
+            if claim is not None:
+                return claim
+        return None
+
     def save_failure(
-        self, workspace_id: int, profile_id: str, block_id: str, code: str, *, token: str
+        self,
+        workspace_id: int,
+        profile_id: str,
+        block_id: str,
+        code: str,
+        *,
+        token: str,
+        max_attempts: int = MAX_BLOCK_ATTEMPTS,
     ) -> bool:
+        _validate_max_attempts(max_attempts)
         if code not in FAILURE_CODES:
             raise DomainError("失败原因必须使用安全代码，不能写入原始异常或密钥")
         row = self._locked_current(workspace_id, profile_id, block_id)
         if not self._owns_claim(row, token):
             return False
-        row.state, row.failure_code = "failed", code
-        row.retryable = code == "upstream_transient"
+        row.state = "failed"
+        # 次数用尽后统一记为终态失败：原始码不再重要，也不允许再自动重试。
+        if row.attempts >= max_attempts:
+            row.failure_code, row.retryable = ATTEMPTS_EXHAUSTED_CODE, False
+        else:
+            row.failure_code = code
+            row.retryable = code == "upstream_transient"
         row.claim_token, row.lease_until = None, None
         self.session.flush()
         return True
@@ -246,5 +339,12 @@ class SqlIndexedBlocks:
             .order_by(IndexedBlock.source_chunk_id, IndexedBlock.start_offset)
         )
         return tuple(
-            BlockIndexProgress(r.block_id, BlockIndexState(r.state), r.retryable) for r in rows
+            BlockIndexProgress(
+                r.block_id,
+                BlockIndexState(r.state),
+                r.retryable,
+                r.attempts,
+                r.failure_code,
+            )
+            for r in rows
         )

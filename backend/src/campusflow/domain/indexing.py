@@ -17,6 +17,22 @@ class BlockIndexState(StrEnum):
     SKIPPED = "skipped"  # 没有可索引正文等显式跳过原因，不能计为成功向量。
 
 
+# 每块最多尝试次数（含第一次）：崩溃或临时失败不会无限重试，也不会无限计费。
+MAX_BLOCK_ATTEMPTS = 3
+
+# 块租约默认值：必须长于一次模型调用的等待上限（60 秒），短于作业超时（300 秒）。
+DEFAULT_BLOCK_LEASE_SECONDS = 180
+MAX_BLOCK_LEASE_SECONDS = 900
+
+# 调用方可以写入的块失败码；只允许安全代码，不能写异常原文或密钥。
+BLOCK_FAILURE_CODES = frozenset({"upstream_transient", "invalid_response", "source_unavailable"})
+
+# 由系统在领取/恢复时写入的终态失败码，调用方不能自行指定。
+ATTEMPTS_EXHAUSTED_CODE = "attempts_exhausted"
+LEASE_EXPIRED_CODE = "lease_expired"
+TERMINAL_FAILURE_CODES = frozenset({ATTEMPTS_EXHAUSTED_CODE, LEASE_EXPIRED_CODE})
+
+
 @dataclass(frozen=True)
 class BlockClaim:
     """只在领取事务提交后使用；外部调用结束后凭 token 写回。"""
@@ -54,6 +70,8 @@ class BlockIndexProgress:
     block_id: str
     state: BlockIndexState
     retryable: bool = False
+    attempts: int = 0
+    failure_code: str | None = None
 
     def __post_init__(self):
         if not isinstance(self.block_id, str) or not self.block_id or len(self.block_id) > 128:
@@ -62,6 +80,12 @@ class BlockIndexProgress:
             raise DomainError("索引块状态无效")
         if self.retryable and self.state != BlockIndexState.FAILED:
             raise DomainError("只有失败块可以标记为可重试")
+        if type(self.attempts) is not int or self.attempts < 0:
+            raise DomainError("索引块尝试次数无效")
+        if self.failure_code is not None and self.failure_code not in (
+            BLOCK_FAILURE_CODES | TERMINAL_FAILURE_CODES
+        ):
+            raise DomainError("索引块失败码无效")
 
 
 @dataclass(frozen=True)

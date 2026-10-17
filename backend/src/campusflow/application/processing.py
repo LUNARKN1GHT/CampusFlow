@@ -26,7 +26,12 @@ from campusflow.domain.materials import (
     SUPERSEDED_VERSION_REASON,
     is_superseded,
 )
-from campusflow.domain.states import JobStatus, MaterialSourceType, MaterialStatus
+from campusflow.domain.states import (
+    JobStage,
+    JobStatus,
+    MaterialSourceType,
+    MaterialStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +55,7 @@ def blocked_write_reason(repos: Repositories, job: ProcessingJobData) -> str | N
     return None
 
 
-def _abandon_write(repos: Repositories, job_id: int, reason: str) -> None:
+def abandon_write(repos: Repositories, job_id: int, reason: str) -> None:
     """放弃本次结果写入并留痕（J007）。
 
     作业记为不可重试的终态失败并写明原因；资料当前状态一律不动——
@@ -154,7 +159,7 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
     # 不必再花时间与费用解析（视觉识别是付费调用），直接作废并写明原因
     blocked = blocked_write_reason(repos, job)
     if blocked is not None:
-        _abandon_write(repos, job_id, blocked)
+        abandon_write(repos, job_id, blocked)
         return []
 
     versions = repos.materials.list_versions(job.material_id)
@@ -190,7 +195,7 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
         # 或已经上传了更新的版本。两种情况都不写回任何片段与状态。
         blocked = blocked_write_reason(repos, job)
         if blocked is not None:
-            _abandon_write(repos, job_id, blocked)
+            abandon_write(repos, job_id, blocked)
             return []
         chunks = repos.materials.add_chunks(fragments_to_chunks(outcome, version.id))
         # 覆盖范围随解析结果一并落库（X008）：候选提取据此判断来源是否完整
@@ -221,6 +226,12 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
             retryable=any(f.retryable for f in outcome.failures),
         )
         _set_material_status(repos, material_id, status)
+        # 解析成功即自动接入向量索引（Q004）：作业与片段同事务提交，
+        # 即使投递失败也留有 pending 记录，由补偿扫描补投。
+        if status in (JobStatus.DONE, JobStatus.PARTIAL) and chunks:
+            repos.jobs.create_or_requeue(
+                job.workspace_id, material_id, job.version_id, JobStage.EMBED
+            )
         repos.uow.commit()
         return chunks
     except Exception as exc:

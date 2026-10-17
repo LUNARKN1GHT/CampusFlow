@@ -11,9 +11,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
 
-from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
+from campusflow.api.deps import (
+    get_current_workspace,
+    get_index_manifests,
+    get_job_queue,
+    get_repositories,
+)
 from campusflow.application import jobs as use_cases
 from campusflow.application.dispatch import dispatch_pending_jobs
+from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import (
     ProcessingJobData,
@@ -21,6 +27,11 @@ from campusflow.application.ports.repositories import (
     WorkspaceData,
 )
 from campusflow.domain.errors import DomainError
+from campusflow.domain.indexing import (
+    BlockIndexProgress,
+    BlockIndexState,
+    IndexProgressSummary,
+)
 from campusflow.domain.jobs import can_retry, is_terminal
 from campusflow.domain.states import JobStage, JobStatus
 
@@ -29,6 +40,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
 JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
+IndexManifestsDep = Annotated[IndexManifests, Depends(get_index_manifests)]
 
 
 class JobAttemptOut(BaseModel):
@@ -108,6 +120,109 @@ def list_job_attempts(
         JobAttemptOut.model_validate(attempt, from_attributes=True)
         for attempt in use_cases.list_job_attempts(repos, workspace.id, job_id)
     ]
+
+
+class IndexSummaryOut(BaseModel):
+    """索引进度汇总（Q004）：只有完整覆盖且全部块成功才算完全可检索。"""
+
+    status: JobStatus
+    expected: int
+    indexed: int
+    pending: int
+    running: int
+    failed: int
+    skipped: int
+    retryable_failed: int
+    source_coverage_known: bool
+    uncovered_source_count: int
+    fully_searchable: bool
+
+
+class IndexBlockOut(BaseModel):
+    """单块进度：只含状态与失败码，不返回块正文或向量。"""
+
+    block_id: str
+    state: BlockIndexState
+    attempts: int
+    retryable: bool
+    failure_code: str | None
+
+
+class IndexProgressOut(BaseModel):
+    """逐块索引进度（Q004）。
+
+    manifest_id 为空表示尚未开始索引（等待队列扫描投递）；此时 summary 为 null，
+    前端应显示"等待索引"。blocks 仅在 include_blocks=true 时返回。
+    """
+
+    job_id: int
+    manifest_id: str | None
+    summary: IndexSummaryOut | None
+    blocks: list[IndexBlockOut] | None
+
+
+def _summary_out(summary: IndexProgressSummary) -> IndexSummaryOut:
+    return IndexSummaryOut(
+        status=summary.status,
+        expected=summary.expected,
+        indexed=summary.indexed,
+        pending=summary.pending,
+        running=summary.running,
+        failed=summary.failed,
+        skipped=summary.skipped,
+        retryable_failed=summary.retryable_failed,
+        source_coverage_known=summary.source_coverage_known,
+        uncovered_source_count=summary.uncovered_source_count,
+        fully_searchable=summary.fully_searchable,
+    )
+
+
+def _block_out(progress: BlockIndexProgress) -> IndexBlockOut:
+    return IndexBlockOut(
+        block_id=progress.block_id,
+        state=progress.state,
+        attempts=progress.attempts,
+        retryable=progress.retryable,
+        failure_code=progress.failure_code,
+    )
+
+
+@router.get("/{job_id}/index-progress", response_model=IndexProgressOut)
+def get_index_progress(
+    job_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    manifests: IndexManifestsDep,
+    include_blocks: Annotated[bool, Query()] = False,
+) -> IndexProgressOut:
+    """索引作业的逐块进度（Q004）。
+
+    复用作业归属校验：越权与不存在同为 404。非索引作业不提供该视图。
+    尚未生成清单时返回空汇总，而不是假装"还没有失败"。
+    """
+    job = use_cases.get_job(repos, workspace.id, job_id)
+    if job.stage != JobStage.EMBED:
+        raise DomainError("只有向量索引作业支持逐块进度查询")
+    if job.manifest_id is None:
+        return IndexProgressOut(
+            job_id=job.id,
+            manifest_id=None,
+            summary=None,
+            blocks=[] if include_blocks else None,
+        )
+    # 只读查询不重算快照：避免 GET 请求长时间锁定资料与全部片段。
+    summary = manifests.summary(workspace.id, job.manifest_id, verify_snapshot=False)
+    blocks = (
+        [_block_out(item) for item in manifests.blocks_progress(workspace.id, job.manifest_id)]
+        if include_blocks
+        else None
+    )
+    return IndexProgressOut(
+        job_id=job.id,
+        manifest_id=job.manifest_id,
+        summary=_summary_out(summary),
+        blocks=blocks,
+    )
 
 
 @router.post("/{job_id}/retry", response_model=JobOut)
