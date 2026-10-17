@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     text_model: str = "glm-4-flash-250414"
     text_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
     text_max_tokens: int = Field(default=4096, ge=1, le=8192)
+    # Q002：与文字/视觉分别配置。revision 是本地索引代次，不是供应商版本证明。
+    embedding_model: str = "embedding-3"
+    embedding_revision: str = "q001-v1"
+    embedding_dimensions: int = Field(default=1024, ge=1, le=4096)
+    embedding_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"

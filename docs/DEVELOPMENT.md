@@ -151,6 +151,8 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 ## 当前限制
 
+Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
+
 - 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
