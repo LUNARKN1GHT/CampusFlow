@@ -25,7 +25,7 @@
 ## 验证与保存
 
 - `tests/test_indexing_progress.py`：28 passed；`tests/test_indexed_blocks.py`：11 passed，共 39 项通过。真实数据库验证包含 pgvector 余弦距离运算、重复/并发保存、失败恢复、事务回滚、模型代次隔离、越权拒绝、来源删除/修改/版本替代、空白跳过、单精度溢出和下溢。
-- 后端 Ruff 检查和格式检查通过，前端构建通过；完整后端回归在保存前补录。
+- 完整后端回归 **1086 passed**（90.69 秒，独立库 `campusflow_q004_test`）；后端 Ruff 检查和格式检查、前端构建及 `git diff --check` 通过。现有 Starlette、Alembic 和 integration 标记警告未导致失败。
 - 新增依赖 `pgvector==0.4.2`，其传递依赖含 numpy，锁文件已更新。运行需 `alembic upgrade head`，迁移在测试库实跑通过；全部向量来自测试预设，没有模型费用。
 - 本机商店版 Python 创建隔离环境遇文件加密错误，改用 uv 管理的 Python 3.12.14；Q004 独立环境为 `backend/.venv-q004`（已忽略）。本机执行 `UV_PROJECT_ENVIRONMENT=.venv-q004` 后用 uv，或直接调用该目录下 Python；其他工作目录环境未修改。
 - 测试日志保存在忽略目录 `backend/data/q004-checks/`；没有拿前一次会话中失去进程句柄的回归运行冒充通过。
