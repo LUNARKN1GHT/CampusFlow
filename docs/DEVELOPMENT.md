@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，RQ Worker 已在资料整合分支接入；向量检索尚未实现。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，RQ Worker 已接入；检索排序、带引用问答与两周学习计划已在本分支接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -68,6 +68,13 @@ docker compose -f infra/docker-compose.worker.yml up --build -d
 uv run --locked python -m campusflow.workers.diagnostics
 ```
 
+### 故障恢复
+
+- **数据库不可达**：`/api/v1/ready` 返回 503；诊断输出 `"database":{"ok":false,"code":"database_or_schema_unavailable"}`。启动 PostgreSQL 后先执行 `uv run --locked alembic upgrade head`，确认就绪检查恢复 200，再重启 Worker。
+- **Redis 不可达**：Worker 以退出码 1 结束并提示“Worker 配置无效，请运行诊断命令检查模型、测试库与连接设置”；诊断输出 `"redis":{"ok":false,"code":"redis_unavailable"}`。启动 Redis 后重跑诊断直到 `"ready":true`，再重启 Worker；已入队作业保留，按运行手册重试不会重复创建。
+- **模型服务不可用**：API 返回固定的 503／502 中文文案，并明确本次未生成回答或引用；服务恢复后由用户重试。Worker 的视觉失败重试上限由 `CAMPUSFLOW_VISION_*` 控制，永久错误不重试。
+- 诊断命令只读，不输出密钥、正文或连接口令。2026-10-18 在本机以不可达端口 5439／6399 模拟验证了数据库与 Redis 的诊断输出；并在专用测试库清空全部表后从零执行迁移完成 API 闭环。未停用共享 PostgreSQL，也未在全新机器上从零走完全部流程。
+
 ## 启动前端
 
 在另一个终端从仓库根目录运行：
@@ -104,6 +111,16 @@ R007 给 `fixed_events` 补齐来源失效留痕列；更新代码后需运行 `
 X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_drafts` 得到待核对规则，按需显式保存。无新增依赖、迁移和自动入口。专项测试：`uv run --locked pytest tests/test_rule_extraction.py -q`；完整原文及条件字段契约见 [X005 说明](verification/X005-rule-extraction.md)。
 
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
+
+Q019 为文字生成增加供应方切换：`CAMPUSFLOW_TEXT_PROVIDER=zhipu|deepseek`（默认 `zhipu`）；`deepseek` 使用 `DEEPSEEK_API_KEY` 与 `deepseek-chat` 等型号，适配器固定地址、禁止跳转，与智谱同样不在适配器内自动重试。真实模型语义补跑默认跳过，只在显式开启时运行（仅合成样本，护栏最多 10 次生成调用）：
+
+```bash
+cd backend
+CAMPUSFLOW_Q018_LIVE=1 CAMPUSFLOW_TEXT_PROVIDER=deepseek CAMPUSFLOW_TEXT_MODEL=deepseek-chat \
+  uv run --locked pytest tests/test_qa_acceptance_live.py -q -s
+```
+
+结果与限制见 [Q018 说明](verification/Q018-acceptance.md) 的 Q019 节。
 
 X007 的 `course_matching.match_candidate_course` 接受所选学期及带证据的课程/班级原文字段，返回待核对匹配建议，不修改候选 scope。调用方按需显式使用 `save_candidates` 保存；无新增依赖或配置。专项测试：`uv run --locked pytest tests/test_course_matching.py -q`；契约见 [X007 说明](verification/X007-course-matching.md)。
 
@@ -155,13 +172,36 @@ Q004 存储检查点增加 pgvector Python 依赖及 `q004_indexed_blocks`、`q0
 
 Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
 
+## M5 两周计划
+
+M5 新增迁移 `p001_planning_drafts`（`plan_drafts`、`plan_blocks`、`plan_versions`）。启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。计划生成完全本地计算，不需要模型密钥。
+
+本地冒烟流程：
+
+1. 在「任务」页创建带 `remaining_minutes` 或 `estimated_minutes` 的任务，并在固定日程区域录入每周可用时间；
+2. 打开 `/plan`，可填写“缺失耗时按”“单段最长”“提交缓冲”假设，点击“生成未来两周草案”；
+3. 页面显示工作空间时区、草案版本、时间块、未排任务、待补充项、假设、冲突与检查覆盖；
+4. 接受后成为当前计划；接受前不会改变任何现有安排；
+5. 已接受计划可锁定／解锁时间块，或调整时间；移动会校验固定日程与时间块重叠，版本冲突返回 409；
+6. `/` 总览读取当前计划、未来 7 天截止任务、未完整排入数量、冲突数量与待核对数量。
+
+接口与验收映射见 [M5 计划实现与验收记录](verification/M5-planning.md)。专项测试：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_planning_domain.py tests/test_planning_edges.py tests/test_plans_api.py
+uv run --locked pytest tests/test_qa_api.py -k intent
+```
+
+接受草案时服务端会重新采集输入并比较指纹；任务、固定日程、可用时间或设置发生变化后，旧草案返回 409，需要重新生成。旧草案也不能覆盖较新接受的计划。
+
 ## 当前限制
 
 Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
 
 Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
 
-- 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
+- 手动管理、资料处理、核对、带引用问答与两周计划已实现；仍无生产身份系统。真实模型语义复核（Q019）、M5 的 V001–V007 独立验收与发布准备尚未完成。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。

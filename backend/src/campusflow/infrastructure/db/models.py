@@ -551,6 +551,88 @@ class QaConversation(Base):
     )
 
 
+class PlanDraft(Base):
+    """P001：计划草案。输入快照与假设随草案保存，接受状态与版本独立维护。
+
+    时间块与任务原始 DDL 分表保存：调整或移动计划块不会改写任务截止。
+    version 用于并发校验，每次生成、接受、移动或锁定都递增。
+    """
+
+    __tablename__ = "plan_drafts"
+    __table_args__ = (
+        CheckConstraint("range_end >= range_start", name="ck_plan_drafts_range"),
+        CheckConstraint("version >= 1", name="ck_plan_drafts_version"),
+        CheckConstraint(
+            "status IN ('draft', 'accepted', 'superseded')", name="ck_plan_drafts_status"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    range_start: Mapped[date] = mapped_column(Date)
+    range_end: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    input_snapshot: Mapped[dict] = mapped_column(JSONB)
+    input_fingerprint: Mapped[str] = mapped_column(String(64))
+    assumptions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    gaps: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    unscheduled: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    coverage: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PlanBlock(Base):
+    """P001：草案中的建议时间块。task_id 只关联任务，不复制或改写 DDL。"""
+
+    __tablename__ = "plan_blocks"
+    __table_args__ = (
+        CheckConstraint("ends_at > starts_at", name="ck_plan_blocks_interval"),
+        CheckConstraint("minutes > 0", name="ck_plan_blocks_minutes"),
+        CheckConstraint("kind IN ('task', 'buffer')", name="ck_plan_blocks_kind"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("plan_drafts.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="SET NULL"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20), default="task", server_default="task")
+    title: Mapped[str] = mapped_column(String(300))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    minutes: Mapped[int] = mapped_column(Integer)
+    seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    reason: Mapped[str] = mapped_column(String(1000))
+    constraint_source: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanVersion(Base):
+    """P001：草案每次实质变化的快照，保证同一草案的版本可追溯。"""
+
+    __tablename__ = "plan_versions"
+    __table_args__ = (UniqueConstraint("draft_id", "version_no"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("plan_drafts.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    change: Mapped[str] = mapped_column(String(30))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class QaTurn(Base):
     """Q014/Q017：一轮问答的范围、引用与覆盖快照；引用在读取时重新复核。"""
 

@@ -45,6 +45,9 @@ TABLES = ", ".join(
         "index_manifests",
         "qa_turns",
         "qa_conversations",
+        "plan_versions",
+        "plan_blocks",
+        "plan_drafts",
     )
 )
 

@@ -4,8 +4,9 @@
 回答正文与引用、覆盖、冲突分别返回，旧会话读取时重新核对引用来源。
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -19,12 +20,15 @@ from campusflow.api.deps import (
     get_session,
     get_text_generator,
 )
+from campusflow.api.plans import PlanDraftOut
 from campusflow.application import conversations as conversation_use_cases
+from campusflow.application import planning as planning_use_cases
 from campusflow.application import qa as use_cases
 from campusflow.application.ports.embeddings import Embedder
 from campusflow.application.ports.generation import TextGenerator
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.retrieval import validate_retrieval_scope
+from campusflow.application.settings import get_settings
 from campusflow.domain.citations import Citation, RevalidatedCitation
 from campusflow.domain.conversation import QaConversationData, QaTurnData
 from campusflow.domain.errors import DomainError
@@ -34,6 +38,7 @@ from campusflow.domain.qa import (
     CoverageNotice,
     MaterialComparison,
     QaAnswer,
+    QaIntentKind,
 )
 from campusflow.domain.ranking import RankingMode
 from campusflow.domain.retrieval import RetrievalScope
@@ -172,6 +177,7 @@ class ConversationDetailOut(BaseModel):
 
 class IntentIn(ScopeFields):
     question: str = Field(min_length=1, max_length=2000)
+    execute: bool = False
 
 
 class IntentOut(BaseModel):
@@ -180,6 +186,8 @@ class IntentOut(BaseModel):
     boundary: str | None
     executed: bool
     parameters: dict
+    plan: PlanDraftOut | None = None
+    conflicts: list[dict] | None = None
 
 
 def _location(citation: Citation) -> str:
@@ -351,12 +359,40 @@ def interpret_intent(
         intent = use_cases.detect_intent(generator, payload.question, scope)
     except DomainError as error:
         return _failure_response(error)
+    plan = None
+    conflicts = None
+    executed = False
+    boundary = intent.boundary
+    if payload.execute and intent.kind is QaIntentKind.PLANNING:
+        settings = get_settings(repos, workspace.id)
+        today = datetime.now(UTC).astimezone(ZoneInfo(settings.timezone)).date()
+        draft = planning_use_cases.generate_draft(
+            repos,
+            workspace.id,
+            semester_id=scope.semester_id,
+            range_start=today,
+            range_end=today + timedelta(days=13),
+        )
+        plan = PlanDraftOut.from_data(draft)
+        executed = True
+        boundary = intent.boundary
+    elif payload.execute and intent.kind is QaIntentKind.CONFLICT_CHECK:
+        current = planning_use_cases.current_plan(
+            repos, workspace.id, semester_id=scope.semester_id
+        )
+        if current is None:
+            boundary = "尚无已接受计划，未执行冲突检查；请先生成并接受计划草案。"
+        else:
+            conflicts = current.conflicts
+            executed = True
     return IntentOut(
         intent=intent.kind.value,
         available=intent.available,
-        boundary=intent.boundary,
-        executed=False,
+        boundary=boundary,
+        executed=executed,
         parameters=intent.parameters,
+        plan=plan,
+        conflicts=conflicts,
     )
 
 
