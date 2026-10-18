@@ -59,7 +59,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 相关用例：`test_conversation_keeps_scope_and_marks_deleted_citation_invalid`、`test_job_write_guard.py` 中删除后写入被拒绝的用例、`test_material_delete_invalidation.py` 中来源失效用例。
 
-本轮执行结果：`27 passed`（2026-10-18）。结论：自动化通过；真实队列与独立复验仍按 V003 记录执行。
+上述集合执行结果：`27 passed`（2026-10-18）。同日 V003 补齐真实 Redis + 独立 Linux RQ Worker 复验：解析中删除、第二块向量计算中删除、旧引用失效、保留任务与进度、迟到重复消息不复活均通过。脚本、环境及证据见 [V003-deletion-race.md](V003-deletion-race.md)；待非作者审核，不代表 M5 整体验收完成。
 
 ## V004 页面易用性与无障碍走查
 
@@ -121,7 +121,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 | --- | --- |
 | V001 八项 MVP 验收 | 真实模型语义复核（Q019 #392）未补跑，未独立验收 |
 | V002 空间隔离与资料内指令边界 | 自动化 68 passed；独立跨模块验收未执行 |
-| V003 删除与运行中处理竞态 | 自动化 27 passed；真实队列复验未执行 |
+| V003 删除与运行中处理竞态 | 真实队列复验通过，脚本与证据已补齐；待非作者审核 |
 | V004 易用性与无障碍 | 键盘全流程与对比度已检查；屏幕阅读器实测与独立走查未执行 |
 | V005 时延与成本 | 本地解析／计划时延已测；模型与队列费用未测 |
 | V006 启动与故障恢复 | 文档与诊断路径已验证；全新机器从零验证未执行 |
