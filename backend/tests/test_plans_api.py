@@ -310,6 +310,28 @@ def test_draft_block_cannot_be_moved_before_accepting(client) -> None:
     assert "已接受计划" in response.json()["detail"]
 
 
+def test_overview_reports_today_plan_and_upcoming_tasks(client) -> None:
+    before = client.get("/api/v1/plans/overview")
+    assert before.status_code == 200
+    assert before.json()["has_plan"] is False
+    assert before.json()["today_blocks"] == []
+
+    _task(client, title="即将到期", due_time=None)
+    accepted = _accepted_plan(client)
+
+    overview = client.get("/api/v1/plans/overview")
+    assert overview.status_code == 200
+    body = overview.json()
+    assert body["has_plan"] is True
+    assert body["plan_status"] == "accepted"
+    assert body["plan_version"] == accepted["version"]
+    titles = [task["title"] for task in body["upcoming_tasks"]]
+    assert "即将到期" in titles
+    assert all(task["due_date"] == "2026-10-19" for task in body["upcoming_tasks"])
+    assert body["pending_review_count"] == 0
+    assert body["unscheduled_count"] == 0
+
+
 def test_range_validation(client) -> None:
     response = client.post(
         "/api/v1/plans/drafts",

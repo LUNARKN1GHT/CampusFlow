@@ -177,6 +177,15 @@ def accept_plan_draft(
     return PlanDraftOut.from_data(draft)
 
 
+@router.get("/plans/overview", response_model=dict)
+def get_plan_overview(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict:
+    return use_cases.overview(repos, workspace.id, semester_id=semester_id)
+
+
 @router.get("/plans/current", response_model=PlanDraftOut | None)
 def get_current_plan(
     workspace: CurrentWorkspace,
