@@ -1,0 +1,161 @@
+{
+  "mode": "diagnostic_pending_semantic_review",
+  "prompt_version": "q001-source-id-v2",
+  "groups": [
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 6207.121,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "missing-year-time",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "missing-year-time",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 15737.789,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "missing-year-time",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "missing-year-time",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 5042.265,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "missing-year-time",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "missing-year-time",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 6431.75,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "missing-year-time",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "missing-year-time",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    }
+  ],
+  "cumulative_call_count": 336,
+  "inherited_call_count": 170,
+  "new_call_count": 166,
+  "cumulative_reserved_cny": "0.7454720",
+  "cumulative_estimated_known_cny": "0.0013990",
+  "unknown_usage_calls": [
+    51
+  ],
+  "actual_billed_cny": null,
+  "independent_review_complete": false,
+  "model_selection_complete": false
+}

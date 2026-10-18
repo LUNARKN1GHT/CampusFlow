@@ -1,0 +1,828 @@
+{
+  "version": "q001-preparation-v2",
+  "sample_id": "CF-JSON-002",
+  "license": "project-internal",
+  "scope_fields": [
+    "workspace",
+    "semester",
+    "course",
+    "class"
+  ],
+  "corpus": [
+    {
+      "id": "physics-a",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-a:paragraph:1",
+      "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。"
+    },
+    {
+      "id": "physics-b",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "B"
+      ],
+      "state": "active",
+      "locator": "physics-b:paragraph:1",
+      "text": "大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。"
+    },
+    {
+      "id": "physics-old",
+      "scope": [
+        "demo",
+        "2025-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-old:paragraph:1",
+      "text": "大学物理A班第一次习题须在2025年10月8日20:00前提交。"
+    },
+    {
+      "id": "physics-foreign",
+      "scope": [
+        "another",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-foreign:paragraph:1",
+      "text": "另一个工作空间的大学物理A班作业在2026年10月9日截止。"
+    },
+    {
+      "id": "physics-deleted",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "unavailable",
+      "locator": "physics-deleted:paragraph:1",
+      "text": "已删除通知曾写10月11日提交，不得继续作为可验证引用。"
+    },
+    {
+      "id": "os-partial-date",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "os",
+        "A"
+      ],
+      "state": "active",
+      "locator": "os-notice:paragraph:1",
+      "text": "实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。"
+    },
+    {
+      "id": "net-v1",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "network",
+        "A"
+      ],
+      "state": "active",
+      "locator": "net-v1:paragraph:1",
+      "text": "实验报告截止时间为2026年10月18日18:00。"
+    },
+    {
+      "id": "net-v2",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "network",
+        "A"
+      ],
+      "state": "active",
+      "locator": "net-v2:paragraph:1",
+      "text": "实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。"
+    },
+    {
+      "id": "scan-readable",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "database",
+        "A"
+      ],
+      "state": "active",
+      "locator": "synthetic-scan:page:1",
+      "text": "实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。"
+    },
+    {
+      "id": "lab-rule",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "chemistry",
+        "A"
+      ],
+      "state": "active",
+      "locator": "lab-rule:paragraph:1",
+      "text": "通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。"
+    },
+    {
+      "id": "music-archived",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "music",
+        "A"
+      ],
+      "state": "archived",
+      "locator": "music-archived:paragraph:1",
+      "text": "归档的旧考试通知，不作为当前问答的有效证据。"
+    },
+    {
+      "id": "physics-a-lab",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-a-lab:paragraph:1",
+      "text": "大学物理A班实验报告一须在2026年10月9日17:00前提交至实验中心，不接受电子版。"
+    },
+    {
+      "id": "physics-a-2nd",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-a-2nd:paragraph:1",
+      "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。"
+    },
+    {
+      "id": "physics-a-exam",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "physics-a-exam:paragraph:1",
+      "text": "大学物理A班期中考试安排在第8周周四第5-6节，具体教室另行通知。"
+    },
+    {
+      "id": "physics-b-lab",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "B"
+      ],
+      "state": "active",
+      "locator": "physics-b-lab:paragraph:1",
+      "text": "大学物理B班实验报告一须在2026年10月13日17:00前提交至实验中心。"
+    },
+    {
+      "id": "physics-b-2nd",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "B"
+      ],
+      "state": "active",
+      "locator": "physics-b-2nd:paragraph:1",
+      "text": "大学物理B班第二次习题须在2026年10月26日18:00前通过课程平台提交。"
+    },
+    {
+      "id": "os-lab1-log",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "os",
+        "A"
+      ],
+      "state": "active",
+      "locator": "os-lab1-log:paragraph:1",
+      "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。"
+    },
+    {
+      "id": "os-lab2",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "os",
+        "A"
+      ],
+      "state": "active",
+      "locator": "os-lab2:paragraph:1",
+      "text": "操作系统实验二为进程调度模拟，题目见附件，提交方式另行通知。"
+    },
+    {
+      "id": "db-lab1",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "database",
+        "A"
+      ],
+      "state": "active",
+      "locator": "db-lab1:paragraph:1",
+      "text": "数据库实验一为SQL查询练习，需在实验课内完成并当堂验收。"
+    },
+    {
+      "id": "chem-safety-class",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "chemistry",
+        "A"
+      ],
+      "state": "active",
+      "locator": "chem-safety-class:paragraph:1",
+      "text": "安全培训定于第5周周二14:00在化工楼301举行，缺席需补训。"
+    },
+    {
+      "id": "algo-hw1-issue",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "algorithms",
+        "A"
+      ],
+      "state": "active",
+      "locator": "algo-hw1-issue:paragraph:1",
+      "text": "第一次作业题目已发布在课程页面，请自行下载打印。"
+    },
+    {
+      "id": "algo-lab",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "algorithms",
+        "A"
+      ],
+      "state": "active",
+      "locator": "algo-lab:paragraph:1",
+      "text": "上机实验安排在每周五第7-8节，地点为计算机楼A302。"
+    },
+    {
+      "id": "algo-grading",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "algorithms",
+        "A"
+      ],
+      "state": "active",
+      "locator": "algo-grading:paragraph:1",
+      "text": "本课程总评由作业40%、上机20%、期末40%构成。"
+    },
+    {
+      "id": "eng-presentation",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "english",
+        "A"
+      ],
+      "state": "active",
+      "locator": "eng-presentation:paragraph:1",
+      "text": "口头报告分组名单见课程群通知，每组15分钟。"
+    },
+    {
+      "id": "eng-textbook",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "english",
+        "A"
+      ],
+      "state": "active",
+      "locator": "eng-textbook:paragraph:1",
+      "text": "本学期使用《学术英语读写教程》第二版，请自行购买。"
+    },
+    {
+      "id": "eng-deadline",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "english",
+        "A"
+      ],
+      "state": "active",
+      "locator": "eng-deadline:paragraph:1",
+      "text": "英语课期末论文须在2027年1月5日前提交至教学平台。"
+    },
+    {
+      "id": "stat-lecture",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "statistics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "stat-lecture:paragraph:1",
+      "text": "本周五统计学停课一次，下周恢复正常。"
+    },
+    {
+      "id": "ds-lab",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "datastructure",
+        "A"
+      ],
+      "state": "active",
+      "locator": "ds-lab:paragraph:1",
+      "text": "数据结构上机实验共6次，每次当堂验收。"
+    },
+    {
+      "id": "algo-hw1",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "algorithms",
+        "A"
+      ],
+      "state": "active",
+      "locator": "algo-hw1:paragraph:1",
+      "text": "算法设计与分析第一次作业请在2026年10月20日23:59前提交到教学平台，逾期不再接受补交。"
+    },
+    {
+      "id": "eng-grading",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "english",
+        "A"
+      ],
+      "state": "active",
+      "locator": "eng-grading:paragraph:1",
+      "text": "本课程总评成绩由平时成绩40%和期末考试成绩60%构成。"
+    },
+    {
+      "id": "stat-paper",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "statistics",
+        "A"
+      ],
+      "state": "active",
+      "locator": "stat-paper:paragraph:1",
+      "text": "统计学期中论文题目自选，字数与格式要求见后续通知。"
+    },
+    {
+      "id": "ds-exam-v1",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "datastructure",
+        "A"
+      ],
+      "state": "active",
+      "locator": "ds-exam-v1:paragraph:1",
+      "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00。"
+    },
+    {
+      "id": "ds-exam-v2",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "datastructure",
+        "A"
+      ],
+      "state": "active",
+      "locator": "ds-exam-v2:paragraph:1",
+      "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00。本通知未说明是否替代此前安排。"
+    }
+  ],
+  "cases": [
+    {
+      "id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "question": "本学期大学物理A班第一次习题最晚什么时候交？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "physics-a"
+      ],
+      "expected_claims": [
+        {
+          "text": "须在2026年10月10日20:00前提交。",
+          "evidence": [
+            "physics-a"
+          ],
+          "support_quote": "2026年10月10日20:00前"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "question": "大学物理B班第一次习题的截止时间是什么？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "B"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "physics-b"
+      ],
+      "expected_claims": [
+        {
+          "text": "须在2026年10月12日18:00前提交。",
+          "evidence": [
+            "physics-b"
+          ],
+          "support_quote": "2026年10月12日18:00前"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "question": "物理A班的练习应该交到哪儿？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "physics-a"
+      ],
+      "expected_claims": [
+        {
+          "text": "通过课程平台提交。",
+          "evidence": [
+            "physics-a"
+          ],
+          "support_quote": "通过课程平台提交"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "question": "操作系统实验一的准确截止日期和时刻是什么？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "os",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "os-partial-date"
+      ],
+      "expected_claims": [
+        {
+          "text": "原文仅写10月15日，未明确年份和时刻。",
+          "evidence": [
+            "os-partial-date"
+          ],
+          "support_quote": "10月15日"
+        }
+      ],
+      "expected_uncertainties": [
+        "missing_year",
+        "missing_time"
+      ],
+      "expected_disposition": "uncertain"
+    },
+    {
+      "id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "question": "网络实验报告到底是18日还是20日截止？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "network",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "expected_claims": [
+        {
+          "text": "第一份通知写2026年10月18日18:00。",
+          "evidence": [
+            "net-v1"
+          ],
+          "support_quote": "2026年10月18日18:00"
+        },
+        {
+          "text": "第二份通知写2026年10月20日20:00。",
+          "evidence": [
+            "net-v2"
+          ],
+          "support_quote": "2026年10月20日20:00"
+        }
+      ],
+      "expected_uncertainties": [
+        "source_conflict"
+      ],
+      "expected_disposition": "conflict"
+    },
+    {
+      "id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "question": "数据库实验二是什么内容，提交格式有哪些要求？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "database",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "scan-readable"
+      ],
+      "expected_claims": [
+        {
+          "text": "实验二为事务隔离级别。",
+          "evidence": [
+            "scan-readable"
+          ],
+          "support_quote": "实验二为事务隔离级别"
+        }
+      ],
+      "expected_uncertainties": [
+        "source_incomplete"
+      ],
+      "expected_disposition": "uncertain"
+    },
+    {
+      "id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "question": "没通过安全培训，有老师陪同就能进入实验室吗？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "chemistry",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "lab-rule"
+      ],
+      "expected_claims": [
+        {
+          "text": "未通过者不得进入，教师陪同也不例外。",
+          "evidence": [
+            "lab-rule"
+          ],
+          "support_quote": "未通过者不得进入，教师陪同也不例外"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "question": "美术课下次作业什么时候交？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "art",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [],
+      "expected_claims": [],
+      "expected_uncertainties": [
+        "insufficient_material"
+      ],
+      "expected_disposition": "insufficient"
+    },
+    {
+      "id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "question": "音乐课当前考试安排是什么？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "music",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [],
+      "expected_claims": [],
+      "expected_uncertainties": [
+        "insufficient_material"
+      ],
+      "expected_disposition": "insufficient"
+    },
+    {
+      "id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "question": "算法课第一次作业最晚什么时候交？可以补交吗？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "algorithms",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "algo-hw1"
+      ],
+      "expected_claims": [
+        {
+          "text": "第一次作业须在2026年10月20日23:59前提交。",
+          "evidence": [
+            "algo-hw1"
+          ],
+          "support_quote": "2026年10月20日23:59前"
+        },
+        {
+          "text": "逾期不再接受补交。",
+          "evidence": [
+            "algo-hw1"
+          ],
+          "support_quote": "逾期不再接受补交"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "question": "英语课平时成绩占总成绩的多少？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "english",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "eng-grading"
+      ],
+      "expected_claims": [
+        {
+          "text": "平时成绩占总成绩的40%。",
+          "evidence": [
+            "eng-grading"
+          ],
+          "support_quote": "平时成绩40%"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "question": "统计学论文要求写多少字？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "statistics",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "stat-paper"
+      ],
+      "expected_claims": [
+        {
+          "text": "论文题目自选。",
+          "evidence": [
+            "stat-paper"
+          ],
+          "support_quote": "题目自选"
+        }
+      ],
+      "expected_uncertainties": [
+        "missing_requirement"
+      ],
+      "expected_disposition": "uncertain"
+    },
+    {
+      "id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "question": "数据结构期末考试是什么时候？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "datastructure",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2"
+      ],
+      "expected_claims": [
+        {
+          "text": "第一份通知写2026年12月28日上午9:00至11:00。",
+          "evidence": [
+            "ds-exam-v1"
+          ],
+          "support_quote": "2026年12月28日上午9:00至11:00"
+        },
+        {
+          "text": "第二份通知写2026年12月29日下午14:00至16:00。",
+          "evidence": [
+            "ds-exam-v2"
+          ],
+          "support_quote": "2026年12月29日下午14:00至16:00"
+        }
+      ],
+      "expected_uncertainties": [
+        "source_conflict"
+      ],
+      "expected_disposition": "conflict"
+    },
+    {
+      "id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "question": "大学物理A班第二次习题什么时候交？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "physics",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "physics-a-2nd"
+      ],
+      "expected_claims": [
+        {
+          "text": "第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+          "evidence": [
+            "physics-a-2nd"
+          ],
+          "support_quote": "2026年10月24日20:00前"
+        }
+      ],
+      "expected_uncertainties": [],
+      "expected_disposition": "answer"
+    },
+    {
+      "id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "question": "操作系统实验二的截止时间是什么？",
+      "scope": [
+        "demo",
+        "2026-fall",
+        "os",
+        "A"
+      ],
+      "top_k": 3,
+      "relevant_ids": [
+        "os-lab2"
+      ],
+      "expected_claims": [],
+      "expected_uncertainties": [
+        "missing_deadline"
+      ],
+      "expected_disposition": "uncertain"
+    }
+  ]
+}

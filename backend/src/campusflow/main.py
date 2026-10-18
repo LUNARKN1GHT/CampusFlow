@@ -1,6 +1,7 @@
+import asyncio
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager, suppress
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -10,13 +11,19 @@ from campusflow.api import candidates as candidates_api
 from campusflow.api import courses as courses_api
 from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
+from campusflow.api import qa as qa_api
 from campusflow.api import rules as rules_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api.health import router as health_router
 from campusflow.application.dispatch import dispatch_pending_jobs
-from campusflow.application.jobs import reclaim_stale_jobs
+from campusflow.application.jobs import (
+    RecoveryResult,
+    reclaim_stale_jobs,
+    run_recovery_sweep,
+)
+from campusflow.application.ports.repositories import Repositories
 from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.infrastructure.db.engine import create_db_engine
@@ -67,14 +74,68 @@ def reclaim_timed_out_jobs(app: FastAPI) -> int:
         return 0
 
 
+@contextmanager
+def _repositories(app: FastAPI) -> Iterator[Repositories]:
+    """每次恢复步骤使用独立会话：一步失败回滚不会影响其他步骤。"""
+    with app.state.session_factory() as session:
+        yield build_repositories(session)
+
+
+def run_recovery(app: FastAPI) -> RecoveryResult:
+    """一次完整恢复扫描（Q004）：投递补偿 + 超时回收 + 索引自动重投。"""
+    settings: Settings = app.state.settings
+    result = run_recovery_sweep(
+        lambda: _repositories(app),
+        app.state.job_queue,
+        dispatch_enabled=settings.dispatch_on_startup,
+        timeout_seconds=settings.job_timeout_seconds,
+        embed_timeout_seconds=settings.embed_job_timeout_seconds,
+        max_auto_retries=settings.embed_job_max_auto_retries,
+    )
+    if result.delivered or result.reclaimed or result.auto_retried:
+        logger.info(
+            "恢复扫描：投递 %s 条，回收 %s 个，自动重投 %s 个",
+            result.delivered,
+            result.reclaimed,
+            result.auto_retried,
+        )
+    return result
+
+
+async def _recovery_loop(app: FastAPI, interval_seconds: int) -> None:
+    """后台周期恢复。同步数据库操作放到线程里，不阻塞请求处理。"""
+    while True:
+        await asyncio.sleep(interval_seconds)
+        try:
+            await asyncio.to_thread(run_recovery, app)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # 单轮失败不能让定时任务退出
+            logger.warning("recovery_sweep_failed: 定期恢复扫描失败，下一轮重试")
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        compensate_pending_deliveries(application)
-        reclaim_timed_out_jobs(application)
-        yield
+        # 启动时先扫一次（等价于原来的启动补偿 + 超时回收）
+        try:
+            run_recovery(application)
+        except Exception:  # 启动扫描尽力而为，绝不阻塞服务启动
+            logger.warning("recovery_sweep_failed: 启动恢复扫描失败，等待下一轮")
+        task: asyncio.Task[None] | None = None
+        if settings.recovery_interval_seconds > 0:
+            task = asyncio.create_task(
+                _recovery_loop(application, settings.recovery_interval_seconds)
+            )
+        try:
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 
@@ -96,6 +157,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         jobs_api.router,
         candidates_api.router,
         rules_api.router,
+        qa_api.router,
     ):
         app.include_router(
             router,

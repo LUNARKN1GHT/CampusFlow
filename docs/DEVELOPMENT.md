@@ -143,7 +143,23 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 仓库根目录可运行 `git diff --check` 检查空白问题。依赖变更必须同步锁文件：后端使用 `uv add`／`uv lock`，前端使用 `npm install`；日常安装使用 `uv sync --locked` 和 `npm ci`。
 
+## Q001 离线评测准备
+
+在仓库根目录执行 `python scripts/evaluate_qa_preparation.py --output-dir data/q001/run-001`，生成逐题证据 JSON 和 B017 格式的 CSV。仅使用 Python 标准库，无需启动数据库或设置模型密钥；每次用新目录保留历史。预设回答只检查计数流程，不代表供应商效果，详见 [Q001 准备说明](verification/Q001-preparation.md)。
+
+真实比较入口 `python scripts/evaluate_qa_live.py` 默认不联网。用户授权的型号、费用上限、显式执行／继续运行参数及恢复点见 [Q001 真实评测进度](verification/Q001-live-progress.md)。继续运行不能重置预算，也不能覆盖已有人工复核记录。
+
+## Q003 检索分块
+
+Q004 存储检查点增加 pgvector Python 依赖及 `q004_indexed_blocks`、`q004_index_manifests` 两个迁移（向量存储、完整清单、领取有效期）；更新代码后执行 `uv sync --locked`、`uv run --locked alembic upgrade head`。现有 Worker 尚未自动建立向量索引。恢复范围与测试命令见 [Q004 进度](verification/Q004-progress.md)。
+
+Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
+
 ## 当前限制
+
+Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
+
+Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
 
 - 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。

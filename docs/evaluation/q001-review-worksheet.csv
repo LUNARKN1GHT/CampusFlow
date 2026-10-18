@@ -1,0 +1,638 @@
+﻿序号,实验,来源文件,原表行号,场景,轮次,回答状态,问题,系统检出-坏引用编号,系统检出-检索命中/应有,原资料（编号｜原文）,模型结论,模型主张（含引用编号）,模型不确定提示,人工预标注要点,人工预标注要点依据原文,人工预标注不确定项,supported_claims,total_claims,correct_uncertainties,output_uncertainties,hard_failures,reviewer,reviewed_at,notes
+1,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,1,deadline-a,1,invalid_answer,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+2,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,2,deadline-b,1,invalid_answer,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+3,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,3,submission-paraphrase,1,invalid_answer,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习应该通过课程平台提交，具体提交时间须在2026年10月10日20:00前。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+4,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,4,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写年份和具体时刻。
+   引用编号：os-partial-date","1. 缺少年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+5,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,5,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：两个来源文件提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+6,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,6,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是关于事务隔离级别，但提交格式的要求未在提供的资料中说明。
+   引用编号：scan-readable","1. 资料不完整
+   说明：提供的资料中，第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+7,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,7,conditional-rule,1,invalid_answer,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+8,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,8,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺乏信息
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息。",,,1. insufficient_material,,,,,,,,
+9,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,9,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺乏资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+10,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,10,deadline-a,2,invalid_answer,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+11,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,11,deadline-b,2,invalid_answer,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+12,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,12,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习应该通过课程平台提交，具体提交时间未在资料中明确说明。
+   引用编号：physics-a","1. 资料不完整
+   说明：资料中只说明了第一次习题的提交时间和方式，但没有说明提交地点。",1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+13,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,13,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写年份和具体时刻。
+   引用编号：os-partial-date","1. 缺少年份和具体时刻
+   说明：资料中未提供操作系统实验一的准确年份和提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+14,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,14,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：资料net-v1和net-v2中分别提供了不同的截止时间，分别为2026年10月18日18:00和2026年10月20日20:00。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+15,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,15,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是关于事务隔离级别，但具体内容无法确定，因为第二页未导入。
+   引用编号：scan-readable
+2. 提交格式的要求无法确定，因为相关区域在提供的资料中无法识别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：由于第二页未导入，无法获取实验二的具体内容和提交格式的详细信息。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+16,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,16,conditional-rule,2,invalid_answer,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+17,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,17,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺乏信息
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息。",,,1. insufficient_material,,,,,,,,
+18,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,18,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺乏资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+19,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,19,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a:paragraph:1",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+20,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,20,deadline-b,1,failed,大学物理B班第一次习题的截止时间是什么？,,,,,,,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+21,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,21,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,physics-b:paragraph:1,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b:paragraph:1",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+22,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,22,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a:paragraph:1",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+23,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,23,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. missing information
+   说明：资料中未提供实验一的年份和具体提交时刻，只提到了日期为10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+24,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,24,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两个来源提供了不同的截止日期，且net-v2没有明确说明是否替代net-v1的通知","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+25,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,25,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,,"1. 信息缺失
+   说明：资料中仅提到实验二为事务隔离级别，但第二页未导入，导致提交格式要求无法识别",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+26,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,26,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,lab-rule:paragraph:1,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+27,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,27,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+28,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,28,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+29,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,29,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a:paragraph:1",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+30,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,30,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,physics-b:paragraph:1,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b:paragraph:1",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+31,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,31,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a:paragraph:1",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+32,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,32,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. missing information
+   说明：资料中未提供实验一的年份和具体提交时刻，只提到了日期为10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+33,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,33,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两份通知分别提供了不同的截止日期，且第二份通知明确表示没有替代旧通知的声明","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+34,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,34,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,synthetic-scan:page:1,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：synthetic-scan:page:1","1. 信息缺失
+   说明：资料中提到第二页未导入，导致提交格式所在区域无法识别，因此无法提供提交格式的具体要求",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+35,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,35,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,lab-rule:paragraph:1,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+36,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,36,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+37,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,37,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+38,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,38,deadline-a,1,invalid_answer,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+39,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,39,deadline-b,1,invalid_answer,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+40,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,40,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习应该通过课程平台提交，具体提交时间未在资料中明确说明。
+   引用编号：physics-a","1. 资料不完整
+   说明：资料中只说明了第一次习题的提交时间和方式，但没有说明提交地点。",1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+41,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,41,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写年份和具体时刻。
+   引用编号：os-partial-date","1. 缺少年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+42,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,42,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：两个来源文件提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+43,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,43,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是关于事务隔离级别，但提交格式的要求未能在提供的资料中找到。
+   引用编号：scan-readable","1. 资料不完整
+   说明：提供的资料中，第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+44,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,44,conditional-rule,1,invalid_answer,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+45,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,45,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺乏信息
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息。",,,1. insufficient_material,,,,,,,,
+46,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,46,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺乏资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+47,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,47,deadline-a,2,invalid_answer,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+48,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,48,deadline-b,2,invalid_answer,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+49,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,49,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习应该通过课程平台提交，具体提交时间未在资料中明确说明。
+   引用编号：physics-a","1. 资料不完整
+   说明：资料中只说明了第一次习题的提交时间和方式，但没有说明提交地点。",1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+50,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,50,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写年份和具体时刻。
+   引用编号：os-partial-date","1. 缺少年份和具体时刻
+   说明：资料中未提供操作系统实验一的准确年份和提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+51,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,51,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：两个来源文件提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+52,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,52,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是关于事务隔离级别，但提交格式的要求未在提供的资料中说明。
+   引用编号：scan-readable","1. 资料不完整
+   说明：提供的资料中，第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+53,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,53,conditional-rule,2,invalid_answer,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+54,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,54,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺乏资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+55,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,55,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺乏资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+56,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,56,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a:paragraph:1",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+57,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,57,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,physics-b:paragraph:1,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b:paragraph:1",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+58,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,58,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a:paragraph:1",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+59,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,59,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. missing information
+   说明：资料中未提供实验一的年份和具体提交时刻，只提到了日期为10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+60,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,60,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两份通知分别提供了不同的截止日期，且后一份通知没有明确说明替代旧通知","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+61,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,61,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,synthetic-scan:page:1,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：synthetic-scan:page:1","1. 缺失信息
+   说明：资料中未提供实验二的具体内容细节和提交格式要求，仅提到实验二为事务隔离级别，且第二页未导入导致提交格式信息无法识别",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+62,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,62,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,lab-rule:paragraph:1,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+63,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,63,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+64,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,64,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+65,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,65,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a:paragraph:1",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+66,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,66,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,physics-b:paragraph:1,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交
+   引用编号：physics-b:paragraph:1",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+67,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,67,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,physics-a:paragraph:1,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a:paragraph:1",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+68,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,68,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. missing information
+   说明：资料中未提供实验一的年份和具体时刻，只提到了10月15日这一日期",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+69,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,69,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两个来源提供了不同的截止日期，且net-v2没有明确说明是否替代net-v1的通知","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+70,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,70,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,synthetic-scan:page:1,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：synthetic-scan:page:1","1. 信息缺失
+   说明：提交格式所在区域无法识别，因为第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+71,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,71,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,lab-rule:paragraph:1,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。
+   引用编号：lab-rule:paragraph:1",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+72,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,72,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+73,v1-首轮,docs/evaluation/q001-live-comparison/answer-review.csv,73,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+74,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,1,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题最晚须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+75,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,2,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+76,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,3,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+77,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,4,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+78,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,5,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：资料net-v1和net-v2中关于网络实验报告截止时间的声明相互矛盾。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+79,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,6,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是事务隔离级别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：第二页未导入，无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+80,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,7,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+81,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,8,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the deadline for the next art class assignment.",,,1. insufficient_material,,,,,,,,
+82,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,9,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+83,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,10,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题最晚须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+84,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,11,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+85,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,12,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+86,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,13,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+87,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,14,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：资料net-v1和net-v2中关于网络实验报告截止时间的声明相互矛盾。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+88,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,15,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是事务隔离级别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：第二页未导入，无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+89,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,16,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+90,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,17,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the deadline for the next art class assignment.",,,1. insufficient_material,,,,,,,,
+91,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,18,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+92,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,19,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+93,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,20,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+94,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,21,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+95,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,22,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻，仅提到10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+96,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,23,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 截止日期冲突
+   说明：两份通知分别提供了不同的截止日期（10月18日和10月20日），且net-v2文件明确表示没有替代旧通知的声明，因此无法确定哪个日期是最终有效的截止日期。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+97,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,24,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 资料不完整
+   说明：提交格式所在区域无法识别，因为第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+98,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,25,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训不得进入实验室，即使有教师陪同也不允许
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+99,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,26,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+100,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,27,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+101,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,28,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+102,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,29,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+103,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,30,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+104,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,31,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻，仅提到10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+105,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,32,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两份通知分别提供了不同的截止日期（18日和20日），且后一份通知未声明替代旧通知","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+106,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,33,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 资料缺失
+   说明：提交格式所在区域无法识别，因为第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+107,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,34,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训不得进入实验室，即使有教师陪同也不允许
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+108,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,35,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+109,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,36,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+110,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,37,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题最晚须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+111,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,38,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+112,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,39,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+113,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,40,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+114,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,41,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：资料net-v1和net-v2中关于网络实验报告截止时间的声明相互矛盾。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+115,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,42,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是事务隔离级别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：第二页未导入，无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+116,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,43,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+117,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,44,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the deadline for the next art class assignment.",,,1. insufficient_material,,,,,,,,
+118,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,45,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+119,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,46,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 本学期大学物理A班第一次习题最晚须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+120,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,47,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+121,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,48,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 物理A班的练习须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+122,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,49,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+123,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,50,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 网络实验报告截止时间为2026年10月18日18:00。
+   引用编号：net-v1
+2. 网络实验报告截止时间为2026年10月20日20:00。
+   引用编号：net-v2","1. 矛盾通知
+   说明：资料net-v1和net-v2中关于网络实验报告截止时间的声明相互矛盾。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+124,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,51,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 数据库实验二的内容是事务隔离级别。
+   引用编号：scan-readable","1. 资料不完整
+   说明：第二页未导入，无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+125,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,52,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训的人员不得进入实验室，即使有老师陪同也不行。
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+126,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,53,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the deadline for the next art class assignment.",,,1. insufficient_material,,,,,,,,
+127,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,54,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. no sources provided
+   说明：There are no sources available to answer the question about the current exam arrangements for the music class.",,,1. insufficient_material,,,,,,,,
+128,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,55,deadline-a,1,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+129,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,56,deadline-b,1,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+130,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,57,submission-paraphrase,1,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+131,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,58,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻，仅提到10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+132,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,59,conflicting-notices,1,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 日期冲突
+   说明：两份通知分别提供了不同的截止日期（10月18日和10月20日），且net-v2明确表示没有替代旧通知的声明，因此无法确定哪个日期是最终有效的截止日期。","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+133,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,60,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 资料缺失
+   说明：提交格式所在区域无法识别，因为第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+134,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,61,conditional-rule,1,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训不得进入实验室，即使有教师陪同也不允许
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+135,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,62,no-material,1,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+136,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,63,archived-only,1,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+137,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,64,deadline-a,2,completed,本学期大学物理A班第一次习题最晚什么时候交？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 须在2026年10月10日20:00前提交。,1. 「2026年10月10日20:00前」 来源：physics-a,,,,,,,,,
+138,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,65,deadline-b,2,completed,大学物理B班第一次习题的截止时间是什么？,,1/1,"[physics-b] 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+      定位：physics-b:paragraph:1（demo.2026-fall.physics.B）",answer,"1. 大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。
+   引用编号：physics-b",,1. 须在2026年10月12日18:00前提交。,1. 「2026年10月12日18:00前」 来源：physics-b,,,,,,,,,
+139,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,66,submission-paraphrase,2,completed,物理A班的练习应该交到哪儿？,,1/1,"[physics-a] 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+      定位：physics-a:paragraph:1（demo.2026-fall.physics.A）",answer,"1. 大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。
+   引用编号：physics-a",,1. 通过课程平台提交。,1. 「通过课程平台提交」 来源：physics-a,,,,,,,,,
+140,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,67,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",insufficient,,"1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻，仅提到10月15日",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+141,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,68,conflicting-notices,2,completed,网络实验报告到底是18日还是20日截止？,,2/2,"[net-v1] 实验报告截止时间为2026年10月18日18:00。
+      定位：net-v1:paragraph:1（demo.2026-fall.network.A）
+[net-v2] 实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。
+      定位：net-v2:paragraph:1（demo.2026-fall.network.A）",conflict,"1. 实验报告截止时间为2026年10月18日18:00
+   引用编号：net-v1
+2. 实验报告截止时间为2026年10月20日20:00
+   引用编号：net-v2","1. 矛盾信息
+   说明：两个来源提供了不同的截止日期，且net-v2没有声明替代旧通知","1. 第一份通知写2026年10月18日18:00。
+2. 第二份通知写2026年10月20日20:00。","1. 「2026年10月18日18:00」 来源：net-v1
+2. 「2026年10月20日20:00」 来源：net-v2",1. source_conflict,,,,,,,,
+142,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,69,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",insufficient,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 资料缺失
+   说明：提交格式所在区域无法识别，因为第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+143,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,70,conditional-rule,2,completed,没通过安全培训，有老师陪同就能进入实验室吗？,,1/1,"[lab-rule] 通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。
+      定位：lab-rule:paragraph:1（demo.2026-fall.chemistry.A）",answer,"1. 未通过安全培训不得进入实验室，即使有教师陪同也不允许
+   引用编号：lab-rule",,1. 未通过者不得进入，教师陪同也不例外。,1. 「未通过者不得进入，教师陪同也不例外」 来源：lab-rule,,,,,,,,,
+144,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,71,no-material,2,completed,美术课下次作业什么时候交？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于美术课下次作业提交时间的信息",,,1. insufficient_material,,,,,,,,
+145,v2-严格编号,docs/evaluation/q001-live-strict-comparison/answer-review.csv,72,archived-only,2,completed,音乐课当前考试安排是什么？,,0/0,,insufficient,,"1. 缺少资料
+   说明：现有资料中未发现关于音乐课当前考试安排的信息",,,1. insufficient_material,,,,,,,,
+146,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,1,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+147,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,2,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 数据库实验二的内容是关于事务隔离级别。
+   引用编号：scan-readable
+2. 提交格式的要求无法识别，因为第二页未导入。
+   引用编号：scan-readable","1. 部分缺失
+   说明：第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+148,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,3,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+149,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,4,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 数据库实验二的内容是关于事务隔离级别。
+   引用编号：scan-readable
+2. 提交格式的要求无法识别，因为第二页未导入。
+   引用编号：scan-readable","1. 部分缺失
+   说明：第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+150,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,5,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 实验一需要在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+151,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,6,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 缺失信息
+   说明：提交格式所在区域无法识别，第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+152,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,7,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 实验一需要在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+153,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,8,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 缺失信息
+   说明：提交格式所在区域无法识别，第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+154,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,9,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+155,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,10,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 数据库实验二的内容是关于事务隔离级别。
+   引用编号：scan-readable
+2. 提交格式的要求无法识别，因为第二页未导入。
+   引用编号：scan-readable","1. 部分缺失
+   说明：第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+156,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,11,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。
+   引用编号：os-partial-date","1. 缺失年份和具体时刻
+   说明：资料中未提供操作系统实验一的年份和具体提交时刻。",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+157,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,12,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 数据库实验二的内容是关于事务隔离级别。
+   引用编号：scan-readable
+2. 提交格式的要求无法识别，因为第二页未导入。
+   引用编号：scan-readable","1. 部分缺失
+   说明：第二页未导入，导致无法识别提交格式的要求。",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+158,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,13,missing-year-time,1,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 实验一需要在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+159,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,14,partial-coverage,1,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 缺失信息
+   说明：提交格式所在区域无法识别，第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,
+160,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,15,missing-year-time,2,completed,操作系统实验一的准确截止日期和时刻是什么？,,1/1,"[os-partial-date] 实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。
+      定位：os-notice:paragraph:1（demo.2026-fall.os.A）",uncertain,"1. 实验一需要在10月15日提交到课程平台
+   引用编号：os-partial-date","1. 缺失信息
+   说明：资料中未提供实验一的具体年份和提交时刻",1. 原文仅写10月15日，未明确年份和时刻。,1. 「10月15日」 来源：os-partial-date,"1. missing_year
+2. missing_time",,,,,,,,
+161,v3-状态定向,docs/evaluation/q001-live-status-comparison/answer-review.csv,16,partial-coverage,2,completed,数据库实验二是什么内容，提交格式有哪些要求？,,1/1,"[scan-readable] 实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。
+      定位：synthetic-scan:page:1（demo.2026-fall.database.A）",uncertain,"1. 实验二为事务隔离级别
+   引用编号：scan-readable","1. 缺失信息
+   说明：提交格式所在区域无法识别，第二页未导入",1. 实验二为事务隔离级别。,1. 「实验二为事务隔离级别」 来源：scan-readable,1. source_incomplete,,,,,,,,

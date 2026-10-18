@@ -14,7 +14,7 @@ from campusflow.application.ports.parsers import (
     ParserLocator,
 )
 from campusflow.domain.jobs import is_retryable
-from campusflow.infrastructure.llm.errors import VisionRecognitionError
+from campusflow.infrastructure.llm.errors import VisionRecognitionFailure
 from campusflow.infrastructure.parsers.pdf_render import render_pdf_page
 
 SCAN_PAGE_REASON = "扫描页"
@@ -61,7 +61,7 @@ class PdfWithVisionFallbackParser:
             try:
                 image = self._render(content, page)
                 vision_outcome = self._vision_parser.parse(image, "image/png")
-            except (VisionRecognitionError, ValueError) as exc:
+            except (VisionRecognitionFailure, ValueError) as exc:
                 failures.append(
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page),

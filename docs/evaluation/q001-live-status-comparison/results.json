@@ -1,0 +1,612 @@
+{
+  "mode": "real_api_pending_human_review",
+  "sample_set_version": "q001-preparation-v1",
+  "recorded_at": "2026-10-15T14:25:11.075291+00:00",
+  "status": "completed_pending_review",
+  "repeats": 2,
+  "planned_samples": 16,
+  "runs": [
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4290.843,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失年份和具体时刻\",\"explanation\":\"资料中未提供操作系统实验一的年份和具体提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失年份和具体时刻",
+            "explanation": "资料中未提供操作系统实验一的年份和具体提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3399.639,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是关于事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分缺失\",\"explanation\":\"第二页未导入，导致无法识别提交格式的要求。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是关于事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分缺失",
+            "explanation": "第二页未导入，导致无法识别提交格式的要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5295.701,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失年份和具体时刻\",\"explanation\":\"资料中未提供操作系统实验一的年份和具体提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失年份和具体时刻",
+            "explanation": "资料中未提供操作系统实验一的年份和具体提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4556.215,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是关于事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分缺失\",\"explanation\":\"第二页未导入，导致无法识别提交格式的要求。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是关于事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分缺失",
+            "explanation": "第二页未导入，导致无法识别提交格式的要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 18072.092,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验一需要在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"资料中未提供实验一的具体年份和提交时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验一需要在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "资料中未提供实验一的具体年份和提交时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 12201.909,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"提交格式所在区域无法识别，第二页未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "提交格式所在区域无法识别，第二页未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5590.695,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验一需要在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"资料中未提供实验一的具体年份和提交时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验一需要在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "资料中未提供实验一的具体年份和提交时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6396.419,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"提交格式所在区域无法识别，第二页未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "提交格式所在区域无法识别，第二页未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3289.633,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失年份和具体时刻\",\"explanation\":\"资料中未提供操作系统实验一的年份和具体提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失年份和具体时刻",
+            "explanation": "资料中未提供操作系统实验一的年份和具体提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5779.662,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是关于事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分缺失\",\"explanation\":\"第二页未导入，导致无法识别提交格式的要求。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是关于事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分缺失",
+            "explanation": "第二页未导入，导致无法识别提交格式的要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4132.433,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失年份和具体时刻\",\"explanation\":\"资料中未提供操作系统实验一的年份和具体提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失年份和具体时刻",
+            "explanation": "资料中未提供操作系统实验一的年份和具体提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3812.777,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是关于事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分缺失\",\"explanation\":\"第二页未导入，导致无法识别提交格式的要求。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是关于事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分缺失",
+            "explanation": "第二页未导入，导致无法识别提交格式的要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6541.586,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验一需要在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"资料中未提供实验一的具体年份和提交时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验一需要在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "资料中未提供实验一的具体年份和提交时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6885.222,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"提交格式所在区域无法识别，第二页未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "提交格式所在区域无法识别，第二页未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5010.326,
+      "retrieved_ids": [
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验一需要在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"资料中未提供实验一的具体年份和提交时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验一需要在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "资料中未提供实验一的具体年份和提交时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4494.761,
+      "retrieved_ids": [
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"提交格式所在区域无法识别，第二页未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "提交格式所在区域无法识别，第二页未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    }
+  ],
+  "caveat": "未经人工语义复核；没有引用支持率或模型选型结论。费用为用量乘单价估算。",
+  "unattempted_samples": 0
+}

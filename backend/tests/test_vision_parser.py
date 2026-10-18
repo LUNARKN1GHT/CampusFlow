@@ -5,13 +5,47 @@
 """
 
 import json
+import urllib.error
 
 import pytest
 
-from campusflow.infrastructure.llm.errors import VisionRecognitionError
-from campusflow.infrastructure.llm.vision import ZhipuVisionParser
+from campusflow.infrastructure.llm.errors import (
+    VisionInvalidOutput,
+    VisionRecognitionError,
+    VisionRequestRejected,
+)
+from campusflow.infrastructure.llm.vision import MAX_RESPONSE_BYTES, ZhipuVisionParser
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"fake"
+
+
+class _Response:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+
+    def read(self, limit: int = -1) -> bytes:
+        return self._body if limit < 0 else self._body[:limit]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args) -> bool:
+        return False
+
+
+class _Opener:
+    """按调用次数返回响应或抛异常，用来验证真实 HTTP 分支。"""
+
+    def __init__(self, action) -> None:
+        self._action = action
+        self.calls = 0
+
+    def open(self, request, timeout=None):
+        self.calls += 1
+        result = self._action(self.calls)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 def _make_parser(post_result, **kwargs) -> ZhipuVisionParser:
@@ -83,11 +117,11 @@ def test_api_failure_raises_reportable_error() -> None:
 
 def test_invalid_response_shapes_raise_error() -> None:
     parser = _make_parser({"unexpected": True})
-    with pytest.raises(VisionRecognitionError, match="缺少识别内容"):
+    with pytest.raises(VisionInvalidOutput, match="缺少识别内容"):
         parser.parse(PNG_BYTES, "image/png")
 
     parser = _make_parser({"choices": [{"message": {"content": "不是 JSON"}}]})
-    with pytest.raises(VisionRecognitionError, match="JSON"):
+    with pytest.raises(VisionInvalidOutput, match="JSON"):
         parser.parse(PNG_BYTES, "image/png")
 
 
@@ -120,20 +154,20 @@ def test_retry_eventually_succeeds() -> None:
 def test_top_level_array_is_reportable_error() -> None:
     """模型返回合法 JSON 但顶层不是对象（如 []）时，报可报告错误而非泄漏 AttributeError。"""
     parser = _make_parser({"choices": [{"message": {"content": "[]"}}]})
-    with pytest.raises(VisionRecognitionError, match="顶层"):
+    with pytest.raises(VisionInvalidOutput, match="顶层"):
         parser.parse(PNG_BYTES, "image/png")
 
 
 def test_items_with_non_dict_elements_is_reportable_error() -> None:
     """items 含非对象元素时报可报告错误，不泄漏 AttributeError。"""
     parser = _make_parser({"choices": [{"message": {"content": '{"items": ["文字串"]}'}}]})
-    with pytest.raises(VisionRecognitionError, match="非对象"):
+    with pytest.raises(VisionInvalidOutput, match="非对象"):
         parser.parse(PNG_BYTES, "image/png")
 
 
 def test_items_not_a_list_is_reportable_error() -> None:
     parser = _make_parser({"choices": [{"message": {"content": '{"items": {"a": 1}}'}}]})
-    with pytest.raises(VisionRecognitionError, match="items"):
+    with pytest.raises(VisionInvalidOutput, match="items"):
         parser.parse(PNG_BYTES, "image/png")
 
 
@@ -171,5 +205,80 @@ def test_bbox_order_and_confidence_range_validated() -> None:
 
 def test_content_not_string_is_reportable_error() -> None:
     parser = _make_parser({"choices": [{"message": {"content": {"items": []}}}]})
-    with pytest.raises(VisionRecognitionError, match="文本"):
+    with pytest.raises(VisionInvalidOutput, match="文本"):
+        parser.parse(PNG_BYTES, "image/png")
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"timeout_seconds": 0},
+        {"timeout_seconds": 121},
+        {"max_retries": -1},
+        {"max_retries": 4},
+        {"max_retries": True},
+        {"backoff_seconds": -1},
+        {"backoff_seconds": 11},
+    ],
+)
+def test_invalid_retry_configuration_rejected(kwargs: dict) -> None:
+    """Q009：直接构造适配器也不能绕过配置边界。"""
+    with pytest.raises(ValueError):
+        ZhipuVisionParser("test-key", **kwargs)
+
+
+def test_http_auth_error_is_permanent_and_not_retried() -> None:
+    """401 等请求被拒绝属于永久失败，不做无意义重试。"""
+    opener = _Opener(lambda _: urllib.error.HTTPError("https://example", 401, "no", None, None))
+    parser = ZhipuVisionParser("test-key", max_retries=2, backoff_seconds=0)
+    parser._opener = opener  # noqa: SLF001
+    with pytest.raises(VisionRequestRejected, match="HTTP 401"):
+        parser.parse(PNG_BYTES, "image/png")
+    assert opener.calls == 1
+
+
+def test_http_server_error_is_retried_then_reported() -> None:
+    """5xx 是临时故障：按上限重试，耗尽后报告失败。"""
+    opener = _Opener(lambda _: urllib.error.HTTPError("https://example", 503, "busy", None, None))
+    parser = ZhipuVisionParser("test-key", max_retries=1, backoff_seconds=0)
+    parser._opener = opener  # noqa: SLF001
+    with pytest.raises(VisionRecognitionError, match="连续失败"):
+        parser.parse(PNG_BYTES, "image/png")
+    assert opener.calls == 2
+
+
+def test_http_rate_limit_is_retried_then_succeeds() -> None:
+    """429 是临时故障，重试成功后返回正常结果。"""
+    body = json.dumps(_api_response([{"text": "重试成功", "bbox": [0.1, 0.1, 0.5, 0.5]}])).encode()
+    opener = _Opener(
+        lambda call: (
+            urllib.error.HTTPError("https://example", 429, "slow down", None, None)
+            if call == 1
+            else _Response(body)
+        )
+    )
+    parser = ZhipuVisionParser("test-key", max_retries=1, backoff_seconds=0)
+    parser._opener = opener  # noqa: SLF001
+    outcome = parser.parse(PNG_BYTES, "image/png")
+    assert opener.calls == 2
+    assert outcome.fragments[0].text == "重试成功"
+
+
+def test_oversized_response_is_permanent_output_error() -> None:
+    """超过读取上限的响应不可用，也不重试。"""
+    body = b"{" + b" " * (MAX_RESPONSE_BYTES + 10) + b"}"
+    opener = _Opener(lambda _: _Response(body))
+    parser = ZhipuVisionParser("test-key", max_retries=2, backoff_seconds=0)
+    parser._opener = opener  # noqa: SLF001
+    with pytest.raises(VisionInvalidOutput, match="上限"):
+        parser.parse(PNG_BYTES, "image/png")
+    assert opener.calls == 1
+
+
+def test_network_error_is_transient() -> None:
+    """连接失败属于临时故障，可重试。"""
+    opener = _Opener(lambda _: urllib.error.URLError("connection reset"))
+    parser = ZhipuVisionParser("test-key", max_retries=0, backoff_seconds=0)
+    parser._opener = opener  # noqa: SLF001
+    with pytest.raises(VisionRecognitionError, match="连续失败"):
         parser.parse(PNG_BYTES, "image/png")

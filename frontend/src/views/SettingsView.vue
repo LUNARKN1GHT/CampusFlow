@@ -6,6 +6,7 @@ import { errorMessage } from '../api/client'
 import { settingsApi } from '../api/settings'
 import type { AvailabilitySlot } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { useTheme } from '../composables/useTheme'
 
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const commonTimezones = ['Asia/Shanghai', 'Asia/Tokyo', 'Asia/Hong_Kong', 'Asia/Singapore', 'Europe/London', 'America/New_York']
@@ -19,6 +20,7 @@ const slots = ref<AvailabilitySlot[]>([])
 const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
+const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
 
 async function load() {
   loading.value = true
@@ -117,5 +119,13 @@ onMounted(load)
         <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排学习块。</div>
       </section>
     </template>
+
+    <section class="panel editor-panel">
+      <div class="section-heading"><div><p class="eyebrow">显示</p><h2>界面主题</h2></div></div>
+      <div class="segmented" role="group" aria-label="界面主题">
+        <button v-for="option in themeOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': themeMode === option.value }" :aria-pressed="themeMode === option.value" @click="setThemeMode(option.value)">{{ option.label }}</button>
+      </div>
+      <p class="form-help">选择立即生效，并保存在本机浏览器；“跟随系统”会随操作系统深浅色设置自动切换。主题只影响当前浏览器，不写入工作空间设置。</p>
+    </section>
   </main>
 </template>
