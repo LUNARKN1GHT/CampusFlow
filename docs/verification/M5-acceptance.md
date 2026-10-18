@@ -18,6 +18,19 @@
 
 阻断项：真实模型语义复核（Q019 #392）尚未补跑；未做独立人工验收。V001 保持开放。
 
+2026-10-18 复跑覆盖上述八项的自动化证据集合：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_qa_acceptance.py tests/test_qa_api.py \
+  tests/test_deadline_completeness.py tests/test_plans_api.py \
+  tests/test_planning_edges.py tests/test_planning_domain.py \
+  tests/test_material_delete_invalidation.py tests/test_index_orchestration.py -q
+```
+
+结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；不能替代真实模型语义复核与独立人工验收。
+
+
 ## V002 空间隔离与资料内指令边界
 
 - 计划草案跨工作空间不可见：`test_plan_from_another_workspace_is_not_visible`。
@@ -57,9 +70,9 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - 总览重复空状态；
 - 尚无当前计划时把 404 显示为“加载失败”，现改为正常空状态。
 
-新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。
+新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义；另覆盖过期草案后的刷新与加载失败后的重试恢复。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
 
-在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `7 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
 
 语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测与独立走查，V004 保持开放。
 
@@ -79,7 +92,14 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 已更新 [DEVELOPMENT.md](../DEVELOPMENT.md)：补充 M5 迁移、启动新代码前步骤、计划冒烟流程、专项测试命令、输入指纹与 409 语义、当前限制，并新增数据库、Redis 与模型服务不可用时的诊断和恢复路径。
 
-本轮按文档在独立端口启动后端（8001，测试库）与前端（5174），完成登录、生成、接受、锁定、移动与总览走查，启动说明可用。2026-10-18 进一步以不可达端口模拟故障：诊断分别输出 `database_or_schema_unavailable` 与 `redis_unavailable`，Worker 在 Redis 不可达时以退出码 1 结束并提示运行诊断。未停用共享 PostgreSQL，未在全新机器或空数据库上从零执行，V006 保持开放。
+本轮按文档在独立端口启动后端（8001，测试库）与前端（5174），完成登录、生成、接受、锁定、移动与总览走查，启动说明可用。2026-10-18 进一步以不可达端口模拟故障：诊断分别输出 `database_or_schema_unavailable` 与 `redis_unavailable`，Worker 在 Redis 不可达时以退出码 1 结束并提示运行诊断。
+
+同日执行空库迁移闭环：在专用测试库删除全部业务表与 `alembic_version`（保留已存在的 vector 扩展）后，从零执行 `alembic upgrade head`，成功到达 `p001_planning_drafts`；在新端口 8002 启动后端，`/api/v1/ready` 返回数据库正常，并完成登录、学期、课程、可用时段、任务、草案生成、接受及当前计划／总览读取。
+
+另在 8003 端口以不可达数据库启动后端，`/api/v1/ready` 返回 503 与 `{"detail":"数据库不可用"}`；切回可用数据库重启后返回 200 与 `database:"ok"`，验证了停机后的恢复路径。
+
+限制：本机账号没有 CREATEDB 与创建 `vector` 扩展的权限，因此没有新建全新数据库，也未在全新机器或空 PostgreSQL 实例上验证；Worker／Redis 全链路未运行。V006 保持开放。
+
 
 
 ## V007 发布说明与候选版本验收
