@@ -73,7 +73,7 @@ uv run --locked python -m campusflow.workers.diagnostics
 - **数据库不可达**：`/api/v1/ready` 返回 503；诊断输出 `"database":{"ok":false,"code":"database_or_schema_unavailable"}`。启动 PostgreSQL 后先执行 `uv run --locked alembic upgrade head`，确认就绪检查恢复 200，再重启 Worker。
 - **Redis 不可达**：Worker 以退出码 1 结束并提示“Worker 配置无效，请运行诊断命令检查模型、测试库与连接设置”；诊断输出 `"redis":{"ok":false,"code":"redis_unavailable"}`。启动 Redis 后重跑诊断直到 `"ready":true`，再重启 Worker；已入队作业保留，按运行手册重试不会重复创建。
 - **模型服务不可用**：API 返回固定的 503／502 中文文案，并明确本次未生成回答或引用；服务恢复后由用户重试。Worker 的视觉失败重试上限由 `CAMPUSFLOW_VISION_*` 控制，永久错误不重试。
-- 诊断命令只读，不输出密钥、正文或连接口令。2026-10-18 在本机以不可达端口 5439／6399 模拟验证了数据库与 Redis 的诊断输出；未停用共享 PostgreSQL，也未在全新机器上从零走完全部流程。
+- 诊断命令只读，不输出密钥、正文或连接口令。2026-10-18 在本机以不可达端口 5439／6399 模拟验证了数据库与 Redis 的诊断输出；并在专用测试库清空全部表后从零执行迁移完成 API 闭环。未停用共享 PostgreSQL，也未在全新机器上从零走完全部流程。
 
 ## 启动前端
 
