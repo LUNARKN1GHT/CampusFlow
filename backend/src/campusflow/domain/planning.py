@@ -288,6 +288,23 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
             )
         )
 
+    if options.segment_minutes is not None:
+        assumptions.append(
+            {
+                "kind": "segment",
+                "value": options.segment_minutes,
+                "text": f"按用户选择，每段学习时间不超过 {options.segment_minutes} 分钟",
+            }
+        )
+    if options.buffer_minutes is not None:
+        assumptions.append(
+            {
+                "kind": "buffer",
+                "value": options.buffer_minutes,
+                "text": f"按用户选择，在截止前预留 {options.buffer_minutes} 分钟提交缓冲",
+            }
+        )
+
     return ResolvedInput(
         tasks=tuple(tasks),
         gaps=tuple(gaps),
@@ -444,94 +461,121 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
         seq = 0
         deadline = task.due_at
         for window in windows:
+            while remaining > 0:
+                window_start, window_end = window
+                if deadline is not None and window_start >= deadline:
+                    break
+
+                day = window_start.date()
+                day_end = day_last_end.get(day)
+                if day_end is not None:
+                    earliest = day_end + timedelta(minutes=inputs.break_minutes)
+                    if earliest > window_start:
+                        window_start = earliest
+                        window[0] = earliest
+                daily_remaining = inputs.daily_capacity_minutes - daily_used.get(day, 0)
+                week = day.isocalendar()[:2]
+                weekly_remaining = inputs.weekly_capacity_minutes - weekly_used.get(week, 0)
+                if daily_remaining <= 0 or weekly_remaining <= 0:
+                    window[0] = window_end
+                    break
+
+                latest_end = window_end
+                if deadline is not None:
+                    latest_end = min(
+                        window_end, deadline - timedelta(minutes=resolved.buffer_minutes)
+                    )
+                available = int((latest_end - window_start).total_seconds() // 60)
+                if available <= 0:
+                    window[0] = window_end
+                    break
+                minutes = min(
+                    remaining,
+                    available,
+                    daily_remaining,
+                    weekly_remaining,
+                    resolved.segment_minutes,
+                )
+                if minutes <= 0:
+                    window[0] = window_end
+                    break
+                block_end = window_start + timedelta(minutes=minutes)
+                reason = (
+                    f"在截止 {deadline.isoformat()} 前安排"
+                    if deadline is not None
+                    else "在可用时间内安排"
+                )
+                constraint_source: list[dict[str, Any]] = [
+                    {"kind": "availability", "text": "使用工作空间可用时间"},
+                    {
+                        "kind": "priority",
+                        "value": task.priority,
+                        "text": "按任务重要性与截止顺序安排",
+                    },
+                    {
+                        "kind": "daily_capacity",
+                        "value": inputs.daily_capacity_minutes,
+                        "text": "不超过每日学习容量",
+                    },
+                    {
+                        "kind": "weekly_capacity",
+                        "value": inputs.weekly_capacity_minutes,
+                        "text": "不超过每周学习容量",
+                    },
+                ]
+                if inputs.break_minutes > 0:
+                    constraint_source.append(
+                        {
+                            "kind": "break",
+                            "value": inputs.break_minutes,
+                            "text": "同一任务段之间保留休息",
+                        }
+                    )
+                constraint_source.append(
+                    {
+                        "kind": "segment",
+                        "value": resolved.segment_minutes,
+                        "text": "大任务分段安排，单段不超过设定时长",
+                    }
+                )
+                if deadline is not None:
+                    if resolved.buffer_minutes > 0:
+                        constraint_source.append(
+                            {
+                                "kind": "buffer",
+                                "value": resolved.buffer_minutes,
+                                "text": "在截止前预留检查与提交缓冲",
+                            }
+                        )
+                    constraint_source.append(
+                        {
+                            "kind": "deadline",
+                            "value": deadline.isoformat(),
+                            "date_only": task.due_date_only,
+                            "text": "任务明确截止时间",
+                        }
+                    )
+                blocks.append(
+                    BlockSuggestion(
+                        task_id=task.task_id,
+                        title=task.title,
+                        starts_at=window_start,
+                        ends_at=block_end,
+                        minutes=minutes,
+                        seq=seq,
+                        reason=reason,
+                        constraint_source=tuple(constraint_source),
+                    )
+                )
+                window[0] = block_end
+                remaining -= minutes
+                scheduled += minutes
+                seq += 1
+                daily_used[day] = daily_used.get(day, 0) + minutes
+                weekly_used[week] = weekly_used.get(week, 0) + minutes
+                day_last_end[day] = block_end
             if remaining <= 0:
                 break
-            window_start, window_end = window
-            if deadline is not None and window_start >= deadline:
-                break
-
-            day = window_start.date()
-            day_end = day_last_end.get(day)
-            if day_end is not None:
-                earliest = day_end + timedelta(minutes=inputs.break_minutes)
-                if earliest > window_start:
-                    window_start = earliest
-                    window[0] = earliest
-            daily_remaining = inputs.daily_capacity_minutes - daily_used.get(day, 0)
-            week = day.isocalendar()[:2]
-            weekly_remaining = inputs.weekly_capacity_minutes - weekly_used.get(week, 0)
-            if daily_remaining <= 0 or weekly_remaining <= 0:
-                window[0] = window_end
-                continue
-
-            latest_end = min(window_end, deadline) if deadline is not None else window_end
-            available = int((latest_end - window_start).total_seconds() // 60)
-            if available <= 0:
-                continue
-            minutes = min(remaining, available, daily_remaining, weekly_remaining)
-            if minutes <= 0:
-                window[0] = window_end
-                continue
-            block_end = window_start + timedelta(minutes=minutes)
-            reason = (
-                f"在截止 {deadline.isoformat()} 前安排"
-                if deadline is not None
-                else "在可用时间内安排"
-            )
-            constraint_source: list[dict[str, Any]] = [
-                {"kind": "availability", "text": "使用工作空间可用时间"},
-                {
-                    "kind": "priority",
-                    "value": task.priority,
-                    "text": "按任务重要性与截止顺序安排",
-                },
-                {
-                    "kind": "daily_capacity",
-                    "value": inputs.daily_capacity_minutes,
-                    "text": "不超过每日学习容量",
-                },
-                {
-                    "kind": "weekly_capacity",
-                    "value": inputs.weekly_capacity_minutes,
-                    "text": "不超过每周学习容量",
-                },
-            ]
-            if inputs.break_minutes > 0:
-                constraint_source.append(
-                    {
-                        "kind": "break",
-                        "value": inputs.break_minutes,
-                        "text": "同一任务段之间保留休息",
-                    }
-                )
-            if deadline is not None:
-                constraint_source.append(
-                    {
-                        "kind": "deadline",
-                        "value": deadline.isoformat(),
-                        "date_only": task.due_date_only,
-                        "text": "任务明确截止时间",
-                    }
-                )
-            blocks.append(
-                BlockSuggestion(
-                    task_id=task.task_id,
-                    title=task.title,
-                    starts_at=window_start,
-                    ends_at=block_end,
-                    minutes=minutes,
-                    seq=seq,
-                    reason=reason,
-                    constraint_source=tuple(constraint_source),
-                )
-            )
-            window[0] = block_end
-            remaining -= minutes
-            scheduled += minutes
-            seq += 1
-            daily_used[day] = daily_used.get(day, 0) + minutes
-            weekly_used[week] = weekly_used.get(week, 0) + minutes
-            day_last_end[day] = block_end
 
         if remaining == 0:
             status = "scheduled"
