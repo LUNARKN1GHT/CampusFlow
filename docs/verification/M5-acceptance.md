@@ -23,7 +23,17 @@
 - 计划草案跨工作空间不可见：`test_plan_from_another_workspace_is_not_visible`。
 - 意图协议只接受固定枚举与参数白名单；模型返回工具名被 502 拒绝：`test_intent_protocol_returns_boundaries_and_rejects_tools`。
 - 资料内指令不会被当作执行授权：X 系列与 Q015 既有测试；本轮未新增真实样本复验。
-- 结论：计划部分通过；跨模块完整验收仍待 V002 负责人执行。
+- 2026-10-18 复跑空间隔离相关测试集合：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_workspace_scope.py tests/test_plans_api.py \
+  tests/test_qa_api.py tests/test_jobs_api.py tests/test_source_read.py \
+  tests/test_index_orchestration.py -q
+```
+
+结果 `68 passed`。覆盖猜 ID 读取／修改课程、学期、任务、日程与可用时段，跨空间关联创建，列表只返回当前空间数据，错误响应不泄露其他空间名称或编号；同时覆盖计划草案、问答会话、资料读取与索引编排的空间边界。结论：自动化部分通过；跨模块完整验收仍待 V002 负责人执行，V002 保持开放。
+
 
 ## V003 删除与运行中处理的端到端竞态
 
