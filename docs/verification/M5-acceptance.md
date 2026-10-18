@@ -54,10 +54,14 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 ## V005 典型样本处理时延与模型成本
 
-- 两周计划为确定性本地计算，不调用模型。
-- 本机测试库、单任务样本，连续 5 次 `POST /plans/drafts`：14.2–23.9 ms。
+- 环境：2026-10-18，macOS arm64、Python 3.12、本地 PostgreSQL 17；解析使用仓库内合成样本，未调用外部模型。
+- 两周计划为确定性本地计算，不调用模型。本机测试库、单任务样本，连续 5 次 `POST /plans/drafts`：14.2–23.9 ms。
+- PDF 文本层（`output/pdf/b010-text-and-cross-page-table.pdf`，7.2 KiB，3 个片段）：5 次解析 6.3–7.2 ms。
+- 普通 DOCX（`samples/synthetic/n001/word-notice-paragraph.docx`，36.3 KiB，9 个片段）：17.2–19.5 ms。
+- 表格 DOCX（`samples/synthetic/n001/word-notice-table.docx`，36.3 KiB，19 个片段）：18.4–19.7 ms。
 - 计划功能不产生模型费用；问答与嵌入成本仍以 Q001 账本为准。
-- 本轮未测量大样本或并发场景，V005 的“典型样本”口径仍需按验收方法补测。
+- 未测量：视觉识别、嵌入与生成的端到端时延和费用（本机未配置模型密钥，Redis 队列未运行）；大文件与并发场景同样未覆盖。V005 的模型用量部分仍不完整，不能据此宣称典型样本全链路达标。
+
 
 ## V006 本地整套启动与故障恢复说明
 
