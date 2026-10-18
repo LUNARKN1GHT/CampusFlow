@@ -140,8 +140,17 @@ def test_user_selected_assumptions_are_applied_and_echoed() -> None:
     assert resolved.segment_minutes == 60
     assert resolved.buffer_minutes == 0
     kinds = {item["kind"] for item in resolved.assumptions}
-    assert kinds == {"duration", "due_date"}
-    assert all("假设" in item["text"] for item in resolved.assumptions)
+    assert kinds == {"buffer", "due_date", "duration", "segment"}
+    assert all(
+        "假设" in item["text"]
+        for item in resolved.assumptions
+        if item["kind"] in {"duration", "due_date"}
+    )
+    assert all(
+        "按用户选择" in item["text"]
+        for item in resolved.assumptions
+        if item["kind"] in {"segment", "buffer"}
+    )
     assert resolved.gaps == ()
 
 
@@ -223,6 +232,7 @@ def test_allocation_respects_earlier_deadline_first() -> None:
         range_end=date(2026, 10, 20),
         now=datetime(2026, 10, 19, 0, tzinfo=tz),
         availability=(AvailabilityRule(0, time(18), time(22)),),
+        buffer_minutes=0,
         tasks=(
             PlanningTask(
                 task_id=1,
@@ -264,6 +274,7 @@ def test_allocation_never_crosses_deadline_and_keeps_shortfall_reason() -> None:
         range_end=date(2026, 10, 19),
         now=datetime(2026, 10, 19, 0, tzinfo=tz),
         availability=(AvailabilityRule(0, time(18), time(22)),),
+        buffer_minutes=0,
         tasks=(
             PlanningTask(
                 task_id=1,
@@ -462,6 +473,83 @@ def test_weekly_capacity_is_respected_across_days() -> None:
         any(source["kind"] == "weekly_capacity" for source in block.constraint_source)
         for block in result.blocks
     )
+
+
+def test_large_task_is_split_and_total_matches_required_minutes() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(23)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="大作业",
+                course_id=None,
+                priority="high",
+                minutes=200,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+        break_minutes=15,
+        segment_minutes=60,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert len(result.blocks) == 4
+    assert all(block.minutes <= 60 for block in result.blocks)
+    assert sum(block.minutes for block in result.blocks) == 200
+    ordered = sorted(result.blocks, key=lambda block: block.starts_at)
+    assert all(
+        (later.starts_at - earlier.ends_at).total_seconds() >= 15 * 60
+        for earlier, later in zip(ordered, ordered[1:], strict=False)
+    )
+    assert all(
+        any(source["kind"] == "segment" for source in block.constraint_source)
+        for block in result.blocks
+    )
+
+
+def test_submission_buffer_moves_work_earlier_than_deadline() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="提交作业",
+                course_id=None,
+                priority="high",
+                minutes=60,
+                due_at=datetime(2026, 10, 19, 20, tzinfo=tz),
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+        buffer_minutes=30,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert len(result.blocks) == 1
+    assert result.blocks[0].ends_at <= datetime(2026, 10, 19, 19, 30, tzinfo=tz)
+    assert any(source["kind"] == "buffer" for source in result.blocks[0].constraint_source)
+
+
+def test_explicit_segment_and_buffer_choices_are_echoed_as_assumptions() -> None:
+    resolved = resolve_assumptions(
+        _input(tasks=(_task(minutes=60, due_at=None),)),
+        AssumptionOptions(segment_minutes=45, buffer_minutes=10),
+    )
+    kinds = {item["kind"] for item in resolved.assumptions}
+    assert {"segment", "buffer"} <= kinds
+    assert resolved.segment_minutes == 45
+    assert resolved.buffer_minutes == 10
 
 
 def test_zero_duration_does_not_silently_enter_schedule() -> None:
