@@ -65,7 +65,7 @@
 backend: uv run ruff check src tests        -> All checks passed!
 backend: uv run pytest -q                   -> 1306 passed, 9 warnings
 frontend: npm run build                     -> typecheck 通过，vite build 成功
-frontend: npx playwright test（清空专用测试库）-> 8 passed, 1 skipped（M2 队列用例按环境跳过）
+frontend: npx playwright test（清空专用测试库）-> 9 passed, 1 skipped（M2 队列用例按环境跳过）
 ```
 
 `P010` 的边界测试位于 `backend/tests/test_planning_edges.py`，其余计划领域测试位于 `backend/tests/test_planning_domain.py`。
