@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 
-import { errorMessage } from '../api/client'
+import { ApiError, errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { PlanBlock, PlanConflict, PlanDraft } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
@@ -144,7 +144,12 @@ async function load() {
     current.value = await plansApi.current()
     draft.value = current.value
   } catch (caught) {
-    error.value = errorMessage(caught)
+    if (caught instanceof ApiError && caught.status === 404) {
+      current.value = null
+      draft.value = null
+    } else {
+      error.value = errorMessage(caught)
+    }
   } finally {
     loading.value = false
   }

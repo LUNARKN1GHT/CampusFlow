@@ -44,9 +44,13 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 - 计划时间按浏览器时区显示，而非工作空间时区；
 - ≤760px 导航横向截断；
-- 总览重复空状态。
+- 总览重复空状态；
+- 尚无当前计划时把 404 显示为“加载失败”，现改为正常空状态。
 
-走查快照显示主要区域有角色与可读名称（navigation、region、heading、form label、button 文本）。新增 `frontend/tests/e2e/plan.spec.ts` 覆盖生成、接受、锁定、移动与总览，并修复了因首页改版而失效的旧选择器；隔离端口下 e2e 为 `6 passed, 1 skipped`。未执行键盘全流程、屏幕阅读器和颜色对比度专项检查，V004 保持开放。
+新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。
+
+在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `7 passed, 1 skipped`（资料库真实队列用例按环境跳过）。未执行屏幕阅读器（VoiceOver／NVDA）与颜色对比度专项检查，也未做独立走查，V004 保持开放。
+
 
 ## V005 典型样本处理时延与模型成本
 
