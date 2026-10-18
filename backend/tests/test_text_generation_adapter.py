@@ -14,7 +14,9 @@ from campusflow.core.config import Settings
 from campusflow.domain.errors import ModelOutputError, PermanentError, TransientError
 from campusflow.infrastructure.llm.text import (
     API_URL,
+    DEEPSEEK_API_URL,
     MAX_RESPONSE_BYTES,
+    DeepSeekTextGenerator,
     ZhipuTextGenerator,
     _NoRedirect,
 )
@@ -160,6 +162,42 @@ def test_factory_uses_independent_text_configuration(monkeypatch):
     model.generate(REQUEST)
     payload = json.loads(opener.open.call_args.args[0].data)
     assert payload["model"] == "glm-4-flash-250414"
+
+
+def test_factory_dispatches_deepseek_provider(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    settings = Settings(
+        _env_file=None,
+        CAMPUSFLOW_TEXT_PROVIDER="deepseek",
+        DEEPSEEK_API_KEY="test-secret",
+        text_model="deepseek-chat",
+    )
+    model = build_text_generator(settings)
+    assert isinstance(model, DeepSeekTextGenerator)
+    opener = Mock()
+    model._opener = opener
+    return_bytes(opener, json.dumps(envelope()).encode())
+    model.generate(REQUEST)
+    request = opener.open.call_args.args[0]
+    assert request.full_url == DEEPSEEK_API_URL
+    payload = json.loads(request.data)
+    assert payload["model"] == "deepseek-chat"
+
+
+def test_deepseek_provider_requires_its_own_key(monkeypatch):
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    # 有智谱密钥但没有 DeepSeek 密钥也不能代替
+    with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
+        build_text_generator(
+            Settings(_env_file=None, CAMPUSFLOW_TEXT_PROVIDER="deepseek", ZHIPU_API_KEY="test")
+        )
+
+
+def test_unknown_text_provider_is_rejected():
+    with pytest.raises(ValueError, match="未知的文字模型供应方"):
+        build_text_generator(
+            Settings(_env_file=None, CAMPUSFLOW_TEXT_PROVIDER="unknown", ZHIPU_API_KEY="test")
+        )
 
 
 @pytest.mark.parametrize(
