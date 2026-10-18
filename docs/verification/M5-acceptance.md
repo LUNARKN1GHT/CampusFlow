@@ -36,7 +36,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 相关用例：`test_conversation_keeps_scope_and_marks_deleted_citation_invalid`、`test_job_write_guard.py` 中删除后写入被拒绝的用例、`test_material_delete_invalidation.py` 中来源失效用例。
 
-结论：自动化通过；真实队列与独立复验仍按 V003 记录执行。
+本轮执行结果：`27 passed`（2026-10-18）。结论：自动化通过；真实队列与独立复验仍按 V003 记录执行。
 
 ## V004 页面易用性与无障碍走查
 
@@ -57,7 +57,9 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 ## V006 本地整套启动与故障恢复说明
 
-已更新 [DEVELOPMENT.md](../DEVELOPMENT.md)：补充 M5 迁移、启动新代码前步骤、计划冒烟流程、专项测试命令、输入指纹与 409 语义、当前限制。独立按文档从零启动验证尚未执行。
+已更新 [DEVELOPMENT.md](../DEVELOPMENT.md)：补充 M5 迁移、启动新代码前步骤、计划冒烟流程、专项测试命令、输入指纹与 409 语义、当前限制。
+
+本轮按文档在独立端口启动后端（8001，测试库）与前端（5174），完成登录、生成、接受、锁定、移动与总览走查，启动说明可用。未在全新机器或空数据库上从零执行。
 
 ## V007 发布说明与候选版本验收
 
