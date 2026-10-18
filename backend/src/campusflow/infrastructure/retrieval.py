@@ -35,7 +35,11 @@ class SqlRetrievalCandidates:
         self, workspace_id: int, scope: RetrievalScope, profile_id: str
     ) -> ScopedCandidates:
         profile = SqlEmbeddingProfiles(self.session).get(profile_id)
-        if profile is None or profile.dimensions != 1024:
+        if profile is None:
+            # 从未登记过该配置就不会有对应向量；返回空候选让回答层明确说“未发现”，
+            # 而不是把“尚未索引/配置未使用过”误报成业务错误。
+            return ScopedCandidates(workspace_id, scope, profile_id, (), ())
+        if profile.dimensions != 1024:
             raise DomainError("检索必须使用已登记的 1024 维向量配置")
         newer = aliased(MaterialVersion)
         has_newer = (
@@ -47,7 +51,7 @@ class SqlRetrievalCandidates:
             .exists()
         )
         statement = (
-            select(Material, MaterialVersion.id, IndexManifest)
+            select(Material, MaterialVersion.id, MaterialVersion.version_no, IndexManifest)
             .join(MaterialVersion, MaterialVersion.material_id == Material.id)
             .join(
                 ProcessingJob,
@@ -80,7 +84,7 @@ class SqlRetrievalCandidates:
         candidates = []
         versions = []
         manifests = SqlIndexManifests(self.session)
-        for material, version_id, manifest in self.session.execute(statement).all():
+        for material, version_id, version_no, manifest in self.session.execute(statement).all():
             try:
                 progress = manifests.summary(workspace_id, manifest.id)
                 rows = self.session.scalars(
@@ -128,16 +132,26 @@ class SqlRetrievalCandidates:
                             manifest.id,
                             block,
                             embedding,
+                            version_no,
                         )
                     )
             except DomainError:
                 # 可识别的数据失效只排除该版本；数据库/程序异常向上传递，不能冒充无资料。
                 versions.append(
                     RetrievalVersion(
-                        material.id, version_id, manifest.id, None, "index_unavailable"
+                        material.id,
+                        version_id,
+                        manifest.id,
+                        None,
+                        "index_unavailable",
+                        material.title,
                     )
                 )
                 continue
             candidates.extend(current)
-            versions.append(RetrievalVersion(material.id, version_id, manifest.id, progress))
+            versions.append(
+                RetrievalVersion(
+                    material.id, version_id, manifest.id, progress, None, material.title
+                )
+            )
         return ScopedCandidates(workspace_id, scope, profile_id, tuple(candidates), tuple(versions))

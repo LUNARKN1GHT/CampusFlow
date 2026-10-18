@@ -529,3 +529,45 @@ class CandidateReviewChange(Base):
     operator: Mapped[str] = mapped_column(String(100))
     reason: Mapped[str | None] = mapped_column(String(500))
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QaConversation(Base):
+    """Q014：有范围的问答会话；范围以工作空间为边界。"""
+
+    __tablename__ = "qa_conversations"
+    __table_args__ = (
+        CheckConstraint("mode IN ('keyword', 'vector', 'hybrid')", name="ck_qa_conversation_mode"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"))
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"))
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    mode: Mapped[str] = mapped_column(String(20), default="hybrid", server_default="hybrid")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class QaTurn(Base):
+    """Q014/Q017：一轮问答的范围、引用与覆盖快照；引用在读取时重新复核。"""
+
+    __tablename__ = "qa_turns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("qa_conversations.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(String(2000))
+    answer: Mapped[str] = mapped_column(String)
+    insufficient: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    intent: Mapped[str] = mapped_column(String(20), default="query", server_default="query")
+    scope: Mapped[dict] = mapped_column(JSONB)
+    citations: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    coverage: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    comparisons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    uncertainties: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

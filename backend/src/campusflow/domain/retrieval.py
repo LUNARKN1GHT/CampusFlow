@@ -37,6 +37,7 @@ class RetrievalCandidate:
     manifest_id: str
     block: RetrievalBlock
     embedding: EmbeddedText
+    version_no: int = 1
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class RetrievalVersion:
     manifest_id: str
     progress: IndexProgressSummary | None
     unavailable_reason: str | None = None
+    title: str = ""
 
 
 @dataclass(frozen=True)

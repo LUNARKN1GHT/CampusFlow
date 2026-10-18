@@ -175,6 +175,8 @@ flowchart LR
 
 **答案示例结构：** 结论 → 适用课程与对象 → 原文依据 → 不确定项或冲突。用户应能从结论直接回到相应原文。
 
+Q006–Q018 已在本整合分支接入带引用的问答闭环：关键词／向量／混合的确定性排序、稳定引用 ID 与候选集校验、删除／归档／范围变更后的引用失效、问答请求响应协议、资料不足与部分覆盖提示、多资料冲突并列、有范围的连续追问、固定意图协议，以及问答页面和引用卡片。服务端先按工作空间与学期／课程／教学班过滤再检索，回答正文、引用、覆盖和冲突分开返回；引用可跳转到资料库对应版本与片段。检索评估与逐样本验收见 [Q006 基线](docs/verification/Q006-baseline.md)、[Q010 评估集](docs/verification/Q010-retrieval-evaluation.md)、[Q011 问答协议](docs/verification/Q011-qa-protocol.md)、[Q014 会话](docs/verification/Q014-conversations.md)、[Q016 页面](docs/verification/Q016-qa-page.md) 与 [Q018 验收](docs/verification/Q018-acceptance.md)。当前检索指标使用确定性假向量、验收使用假生成器，真实模型语义准确率需配置密钥后补跑。
+
 ### 4.5 任务管理
 
 - 从资料提取候选任务，也支持手动创建任务。

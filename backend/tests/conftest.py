@@ -43,6 +43,8 @@ TABLES = ", ".join(
         "embedding_profiles",
         "indexed_blocks",
         "index_manifests",
+        "qa_turns",
+        "qa_conversations",
     )
 )
 

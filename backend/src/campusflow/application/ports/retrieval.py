@@ -2,6 +2,7 @@
 
 from typing import Protocol
 
+from campusflow.domain.citations import Citation, RevalidatedCitation
 from campusflow.domain.retrieval import RetrievalScope, ScopedCandidates
 
 
@@ -9,3 +10,9 @@ class RetrievalCandidates(Protocol):
     def collect(
         self, workspace_id: int, scope: RetrievalScope, profile_id: str
     ) -> ScopedCandidates: ...
+
+
+class CitationSources(Protocol):
+    def revalidate(
+        self, workspace_id: int, citations: tuple[Citation, ...] | list[Citation]
+    ) -> tuple[RevalidatedCitation, ...]: ...

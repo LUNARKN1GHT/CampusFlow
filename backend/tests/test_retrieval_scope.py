@@ -317,8 +317,10 @@ def test_profile_revision_never_mixed_and_unregistered_rejected(client):
     with open_session() as session, session.begin():
         SqlEmbeddingProfiles(session).register(other)
     assert not collect(client, profile=other).candidates
-    with pytest.raises(DomainError):
-        collect(client, profile=replace(other, revision="not-registered"))
+    # 未登记配置没有对应向量；返回空候选且不读取任何旧块，避免误报“没有作业”或混用配置。
+    unregistered = collect(client, profile=replace(other, revision="not-registered"))
+    assert unregistered.candidates == ()
+    assert unregistered.versions == ()
 
 
 def test_only_current_manifest_blocks_and_stable_order(client):
