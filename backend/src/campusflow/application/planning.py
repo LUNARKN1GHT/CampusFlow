@@ -13,14 +13,22 @@ from campusflow.application import schedule as schedule_use_cases
 from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.settings import get_settings
+from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
+    AssumptionOptions,
     AvailabilityRule,
     ExcludedTask,
     FixedEventOccurrence,
     PlanningInput,
     PlanningTask,
+    PlanOutcome,
+    allocate_tasks,
+    build_outcome,
+    detect_overlaps,
+    detect_risks,
     input_fingerprint,
     input_snapshot,
+    resolve_assumptions,
 )
 from campusflow.domain.states import TaskProgress
 
@@ -151,3 +159,202 @@ def collect_inputs(
     return CollectedPlanInput(
         inputs=inputs, snapshot=snapshot, fingerprint=input_fingerprint(snapshot)
     )
+
+
+def _disposition_dict(item) -> dict:
+    return {
+        "task_id": item.task_id,
+        "title": item.title,
+        "status": item.status,
+        "scheduled_minutes": item.scheduled_minutes,
+        "remaining_minutes": item.remaining_minutes,
+        "reason_code": item.reason_code,
+        "message": item.message,
+        "options": list(item.options),
+    }
+
+
+def _excluded_dict(item) -> dict:
+    return {
+        "task_id": item.task_id,
+        "title": item.title,
+        "status": item.status,
+        "scheduled_minutes": 0,
+        "remaining_minutes": 0,
+        "reason_code": item.reason_code,
+        "message": item.message,
+        "options": list(item.options),
+    }
+
+
+def _block_dict(block) -> dict:
+    return {
+        "task_id": block.task_id,
+        "title": block.title,
+        "kind": block.kind,
+        "starts_at": block.starts_at,
+        "ends_at": block.ends_at,
+        "minutes": block.minutes,
+        "seq": block.seq,
+        "locked": block.locked,
+        "reason": block.reason,
+        "constraint_source": list(block.constraint_source),
+    }
+
+
+def _draft_snapshot(draft, blocks: list) -> dict:
+    return {
+        "draft_id": draft.id,
+        "version": draft.version,
+        "status": draft.status,
+        "range_start": draft.range_start.isoformat(),
+        "range_end": draft.range_end.isoformat(),
+        "input_fingerprint": draft.input_fingerprint,
+        "assumptions": draft.assumptions,
+        "gaps": draft.gaps,
+        "unscheduled": draft.unscheduled,
+        "conflicts": draft.conflicts,
+        "coverage": draft.coverage,
+        "blocks": [
+            {
+                "id": block.id,
+                "task_id": block.task_id,
+                "title": block.title,
+                "starts_at": block.starts_at.isoformat(),
+                "ends_at": block.ends_at.isoformat(),
+                "minutes": block.minutes,
+                "locked": block.locked,
+            }
+            for block in blocks
+        ],
+    }
+
+
+def generate_draft(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None,
+    range_start: date,
+    range_end: date,
+    options: AssumptionOptions | None = None,
+    now: datetime | None = None,
+):
+    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。"""
+    if range_end < range_start:
+        raise DomainError("规划结束日期不得早于开始日期")
+    collected = collect_inputs(
+        repos,
+        workspace_id,
+        semester_id=semester_id,
+        range_start=range_start,
+        range_end=range_end,
+        now=now,
+        segment_minutes=(options.segment_minutes if options and options.segment_minutes else 90),
+    )
+    resolved = resolve_assumptions(collected.inputs, options or AssumptionOptions())
+    allocation = allocate_tasks(collected.inputs, resolved)
+    outcome: PlanOutcome = build_outcome(collected.inputs, resolved, allocation)
+    conflicts = detect_overlaps(collected.inputs, outcome.blocks)
+    conflicts.extend(detect_risks(collected.inputs, resolved, outcome))
+    unscheduled = [
+        _disposition_dict(item) for item in outcome.dispositions if item.status != "scheduled"
+    ] + [_excluded_dict(item) for item in outcome.excluded]
+
+    draft = repos.plans.create_draft(
+        workspace_id,
+        semester_id=semester_id,
+        range_start=range_start,
+        range_end=range_end,
+        input_snapshot=collected.snapshot,
+        input_fingerprint=collected.fingerprint,
+        assumptions=list(outcome.assumptions),
+        gaps=list(outcome.gaps),
+        unscheduled=unscheduled,
+        conflicts=conflicts,
+        coverage=outcome.coverage,
+    )
+    blocks = repos.plans.create_blocks(
+        draft.id, [_block_dict(block) for block in outcome.blocks]
+    )
+    repos.plans.add_version(
+        draft.id,
+        version_no=draft.version,
+        change="generated",
+        snapshot=_draft_snapshot(draft, blocks),
+    )
+    repos.uow.commit()
+    draft.blocks = blocks
+    return draft
+
+
+def list_drafts(
+    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
+):
+    return repos.plans.list_drafts(workspace_id, semester_id=semester_id)
+
+
+def get_draft(repos: Repositories, workspace_id: int, draft_id: int):
+    draft = repos.plans.get_draft(draft_id)
+    if draft is None or draft.workspace_id != workspace_id:
+        raise NotFoundError("计划草案不存在")
+    return draft
+
+
+def accept_draft(
+    repos: Repositories,
+    workspace_id: int,
+    draft_id: int,
+    *,
+    expected_version: int,
+    now: datetime | None = None,
+):
+    """接受草案：校验输入版本和草案版本，过期请求不覆盖较新计划（P013）。"""
+    draft = get_draft(repos, workspace_id, draft_id)
+    if draft.status != "draft":
+        raise ConflictError("只有待接受状态的草案可以接受")
+    segment_minutes = int(draft.input_snapshot.get("settings", {}).get("segment_minutes", 90))
+    collected = collect_inputs(
+        repos,
+        workspace_id,
+        semester_id=draft.semester_id,
+        range_start=draft.range_start,
+        range_end=draft.range_end,
+        now=now or datetime.now(UTC),
+        segment_minutes=segment_minutes,
+    )
+    if collected.fingerprint != draft.input_fingerprint:
+        raise ConflictError("排期输入已变化，请重新生成草案后再接受")
+    current = repos.plans.get_current(workspace_id, semester_id=draft.semester_id)
+    if (
+        current is not None
+        and current.id != draft.id
+        and current.accepted_at is not None
+        and current.accepted_at > draft.created_at
+    ):
+        raise ConflictError("已有较新的已接受计划，请重新生成草案后再接受")
+
+    blocks = repos.plans.list_blocks(draft.id)
+    accepted = repos.plans.bump_version(
+        draft.id,
+        expected_version=expected_version,
+        change="accepted",
+        snapshot=_draft_snapshot(draft, blocks),
+        status="accepted",
+        accepted_at=now or datetime.now(UTC),
+    )
+    if accepted is None:
+        raise ConflictError("草案版本已更新，请刷新后重试")
+    repos.plans.supersede_others(
+        workspace_id, semester_id=draft.semester_id, keep_draft_id=draft.id
+    )
+    repos.uow.commit()
+    return repos.plans.get_draft(draft.id)
+
+
+def current_plan(repos: Repositories, workspace_id: int, *, semester_id: int | None = None):
+    return repos.plans.get_current(workspace_id, semester_id=semester_id)
+
+
+def draft_conflicts(repos: Repositories, workspace_id: int, draft_id: int) -> list[dict]:
+    return get_draft(repos, workspace_id, draft_id).conflicts
