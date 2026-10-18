@@ -66,5 +66,66 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
 
   await page.getByRole('link', { name: '总览', exact: true }).click()
   await expect(page.getByText(taskName)).toBeVisible()
+  await page.getByRole('link', { name: taskName }).first().click()
+  await expect(page).toHaveURL(/\/tasks\?task=\d+/)
+  await expect(page.locator('.task-row.is-highlighted')).toContainText(taskName)
   expect(pageErrors).toEqual([])
+})
+
+test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) => {
+  const unique = Date.now().toString().slice(-6)
+  const taskName = `过期草案任务 ${unique}`
+  const today = new Date()
+  const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
+  const dueDate = dateKey(due)
+  const weekday = (due.getDay() + 6) % 7
+
+  await page.goto('/')
+  await page.getByLabel('用户名').fill('student')
+  await page.getByLabel('密码').fill('campusflow-dev')
+  await page.getByLabel('密码').press('Enter')
+  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+
+  const slots = await page.request.get('/api/v1/availability-slots')
+  expect(slots.ok()).toBeTruthy()
+  const slotList = (await slots.json()) as Array<{ day_of_week: number; start_time: string; end_time: string }>
+  const hasWindow = slotList.some(
+    (slot) => slot.day_of_week === weekday && slot.start_time.slice(0, 5) === '10:00' && slot.end_time.slice(0, 5) === '11:00',
+  )
+  if (!hasWindow) {
+    const created = await page.request.post('/api/v1/availability-slots', {
+      data: { day_of_week: weekday, start_time: '10:00', end_time: '11:00' },
+    })
+    expect(created.ok()).toBeTruthy()
+  }
+  const task = await page.request.post('/api/v1/tasks', {
+    data: {
+      title: taskName,
+      due_date: dueDate,
+      due_time: '14:00',
+      priority: 'high',
+      estimated_minutes: 60,
+      remaining_minutes: 60,
+    },
+  })
+  expect(task.ok()).toBeTruthy()
+
+  await page.getByRole('link', { name: '学习计划' }).click()
+  await page.getByRole('button', { name: '生成未来两周草案' }).click()
+  await expect(page.getByText('待接受草案')).toBeVisible()
+
+  const drafts = await page.request.get('/api/v1/plans/drafts')
+  expect(drafts.ok()).toBeTruthy()
+  const latest = (await drafts.json())[0] as { id: number; version: number }
+  const accepted = await page.request.post(`/api/v1/plans/drafts/${latest.id}/accept`, {
+    data: { expected_version: latest.version },
+  })
+  expect(accepted.ok()).toBeTruthy()
+
+  await page.getByRole('button', { name: '接受为当前计划' }).click()
+  await expect(page.getByText('操作未完成')).toBeVisible()
+  await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible()
+
+  await page.getByRole('button', { name: '重新加载' }).click()
+  await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
 })

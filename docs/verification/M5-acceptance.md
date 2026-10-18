@@ -18,12 +18,35 @@
 
 阻断项：真实模型语义复核（Q019 #392）尚未补跑；未做独立人工验收。V001 保持开放。
 
+2026-10-18 复跑覆盖上述八项的自动化证据集合：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_qa_acceptance.py tests/test_qa_api.py \
+  tests/test_deadline_completeness.py tests/test_plans_api.py \
+  tests/test_planning_edges.py tests/test_planning_domain.py \
+  tests/test_material_delete_invalidation.py tests/test_index_orchestration.py -q
+```
+
+结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；不能替代真实模型语义复核与独立人工验收。
+
+
 ## V002 空间隔离与资料内指令边界
 
 - 计划草案跨工作空间不可见：`test_plan_from_another_workspace_is_not_visible`。
 - 意图协议只接受固定枚举与参数白名单；模型返回工具名被 502 拒绝：`test_intent_protocol_returns_boundaries_and_rejects_tools`。
 - 资料内指令不会被当作执行授权：X 系列与 Q015 既有测试；本轮未新增真实样本复验。
-- 结论：计划部分通过；跨模块完整验收仍待 V002 负责人执行。
+- 2026-10-18 复跑空间隔离相关测试集合：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_workspace_scope.py tests/test_plans_api.py \
+  tests/test_qa_api.py tests/test_jobs_api.py tests/test_source_read.py \
+  tests/test_index_orchestration.py -q
+```
+
+结果 `68 passed`。覆盖猜 ID 读取／修改课程、学期、任务、日程与可用时段，跨空间关联创建，列表只返回当前空间数据，错误响应不泄露其他空间名称或编号；同时覆盖计划草案、问答会话、资料读取与索引编排的空间边界。结论：自动化部分通过；跨模块完整验收仍待 V002 负责人执行，V002 保持开放。
+
 
 ## V003 删除与运行中处理的端到端竞态
 
@@ -47,9 +70,11 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - 总览重复空状态；
 - 尚无当前计划时把 404 显示为“加载失败”，现改为正常空状态。
 
-新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。
+新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
 
-在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `7 passed, 1 skipped`（资料库真实队列用例按环境跳过）。未执行屏幕阅读器（VoiceOver／NVDA）与颜色对比度专项检查，也未做独立走查，V004 保持开放。
+在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `9 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+
+语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测与独立走查，V004 保持开放。
 
 
 ## V005 典型样本处理时延与模型成本
@@ -77,7 +102,49 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 ## V007 发布说明与候选版本验收
 
-未开始。依赖 V001–V006 完成；当前不应创建 `v0.5.0` 或 `-rc.N` 标签。
+**状态：草案，未发布。** 不满足发布门槛，未创建 `v0.5.0` 或 `v0.5.0-rc.N` 标签。
+
+### 候选能力
+
+- 手动管理：学期、课程、任务、进度历史、固定日程与可用时间。
+- 资料：PDF／图片／粘贴文本／DOCX／网页导入，原文定位、归档与确认删除，后台解析。
+- 核对：候选列表、详情、逐字段修正与确认后生成正式任务／日程／规则。
+- 问答：有范围检索、引用校验、来源失效、范围会话与问答页面。
+- 计划：未来两周草案、容量缺口与调整选项、冲突与风险、版本化接受、时间块移动／锁定、自然语言入口与今日总览。
+- 本机单用户会话与跨工作空间对象授权。
+
+### 未完成项与发布阻塞
+
+| 项目 | 状态 |
+| --- | --- |
+| V001 八项 MVP 验收 | 真实模型语义复核（Q019 #392）未补跑，未独立验收 |
+| V002 空间隔离与资料内指令边界 | 自动化 68 passed；独立跨模块验收未执行 |
+| V003 删除与运行中处理竞态 | 自动化 27 passed；真实队列复验未执行 |
+| V004 易用性与无障碍 | 键盘全流程与对比度已检查；屏幕阅读器实测与独立走查未执行 |
+| V005 时延与成本 | 本地解析／计划时延已测；模型与队列费用未测 |
+| V006 启动与故障恢复 | 文档与诊断路径已验证；全新机器从零验证未执行 |
+| V008 课程项目 PRE | 依赖 V001、V007，未开始 |
+
+### 迁移
+
+- 新增迁移 `p001_planning_drafts`，依赖 `q014_qa_conversations`，创建 `plan_drafts`、`plan_blocks`、`plan_versions`；不回填既有数据。
+- 启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`；测试库由 pytest 自动迁移。
+- 依赖未变化，无需更新锁文件；Worker 与 API 必须使用同一迁移版本。
+
+### 回滚
+
+1. 停止 API 与 Worker，避免旧代码读取新表。
+2. 部署上一版本 `v0.4.0` 代码。
+3. 如需回滚数据库结构，执行 `uv run --locked alembic downgrade q014_qa_conversations`，该操作删除计划草案、时间块与版本快照；回滚前先备份需要保留的计划数据。
+4. 旧版本不会读取计划表，保留表结构通常不影响运行；数据回滚必须显式执行，不作为自动步骤。
+
+### 候选版本检查（2026-10-18）
+
+- `uv run --locked ruff check .` 通过；后端 CI 全量测试通过。
+- `npm run build` 通过；完整 e2e 为 `7 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+- PR #394–#396 CI 全绿；尚未合并到 `develop`／`main`。
+- 结论：**不满足发布条件**，V007 保持开放。
+
 
 ## 本轮完成范围
 

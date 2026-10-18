@@ -55,9 +55,9 @@
 | P012 截止／负荷风险 | `test_deadline_risk_is_marked_as_estimate_based`、`test_confirmed_shortfall_is_a_conflict_not_an_estimate`、`test_daily_and_weekly_load_risks_are_reported` |
 | P013 版本化接受 | `test_generate_and_accept_plan_without_changing_task_ddl`、`test_stale_version_and_changed_inputs_are_rejected`、`test_newer_accepted_plan_is_not_overwritten_by_old_draft` |
 | P014 移动与锁定 | `test_move_block_updates_schedule_but_not_task_ddl`、`test_move_rejects_overlap_with_fixed_event_and_other_blocks`、`test_lock_and_unlock_accepted_block`、`test_draft_block_cannot_be_moved_before_accepting` |
-| P015／P016 页面 | `frontend/src/views/PlanView.vue`；浏览器走查见下 |
+| P015／P016 页面 | `frontend/src/views/PlanView.vue`；冲突与风险分开展示；操作失败显示“操作未完成”并可刷新最新计划；浏览器走查见下 |
 | P017 自然语言入口 | `tests/test_qa_api.py::test_planning_and_conflict_intents_execute_without_auto_accepting` |
-| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue` |
+| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue`；总览条目跳转 `/tasks?task=` 并高亮对应任务 |
 
 ## 自动化检查
 
@@ -65,7 +65,7 @@
 backend: uv run ruff check src tests        -> All checks passed!
 backend: uv run pytest -q                   -> 1306 passed, 9 warnings
 frontend: npm run build                     -> typecheck 通过，vite build 成功
-frontend: npx playwright test（隔离 8001/5174）-> 6 passed, 1 skipped（M2 队列用例按环境跳过）
+frontend: npx playwright test（清空专用测试库）-> 9 passed, 1 skipped（M2 队列用例按环境跳过）
 ```
 
 `P010` 的边界测试位于 `backend/tests/test_planning_edges.py`，其余计划领域测试位于 `backend/tests/test_planning_domain.py`。
@@ -81,7 +81,7 @@ frontend: npx playwright test（隔离 8001/5174）-> 6 passed, 1 skipped（M2 �
 5. 调整时间到 19:00–19:30，v3 → v4，理由追加“用户手动移动”；
 6. 回到 `/` 总览，显示近期截止任务、未完整排入 1、冲突 1。
 
-新增 `frontend/tests/e2e/plan.spec.ts` 固化同一流程：登录 → 设置可用时段 → 创建任务 → 生成草案 → 接受 → 锁定 → 移动 → 总览读取；同时修正旧 e2e 对首页标题、“任务与计划”导航和“待核对”快捷入口的选择器。
+新增 `frontend/tests/e2e/plan.spec.ts` 固化同一流程：登录 → 设置可用时段 → 创建任务 → 生成草案 → 接受 → 锁定 → 移动 → 总览读取 → 条目跳转任务并高亮；另一个用例验证过期草案被拒绝后显示“操作未完成”并可刷新到最新计划。同时修正旧 e2e 对首页标题、“任务与计划”导航和“待核对”快捷入口的选择器。`frontend/tests/e2e/plan-keyboard.spec.ts` 另以 Tab、Enter 和方向键完成登录、生成、接受、锁定与移动，并验证可见焦点。
 
 走查中发现并修复：
 
@@ -94,5 +94,5 @@ frontend: npx playwright test（隔离 8001/5174）-> 6 passed, 1 skipped（M2 �
 - 真实模型语义复核（Q019）仍未补跑；本记录只覆盖确定性排期与协议校验，不代表 MVP 八项验收全部通过。
 - 冲突列表在草案生成时保存；接受后手动移动时间块不会重新计算已保存的截止／负荷风险列表（移动会校验固定日程与时间块重叠）。局部重排与风险刷新属于 M7 范围。
 - 计划只读取正式任务；未确认候选不参与排期，页面已说明。
-- 浏览器走查未覆盖键盘全流程与屏幕阅读器；V004 无障碍验收仍需独立执行。
+- 键盘全流程与语义色对比度已检查；屏幕阅读器（VoiceOver／NVDA）实测与独立无障碍走查仍未执行。
 - V001–V007 的 MVP 端到端验收、发布说明和候选版本验收尚未完成。
