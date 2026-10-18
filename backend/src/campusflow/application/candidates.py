@@ -306,7 +306,7 @@ class CandidateReviewDetail:
     allowed_transitions: tuple[ReviewStatus, ...]
 
 
-def _evidence_view(
+def evidence_view(
     evidence: FieldEvidence, chunks: dict[int, SourceChunkData]
 ) -> CandidateEvidenceView:
     chunk = chunks.get(evidence.chunk_id)
@@ -322,11 +322,11 @@ def _evidence_view(
     )
 
 
-def _field_view(
+def field_view(
     field: CandidateField, effective: CandidateField, chunks: dict[int, SourceChunkData]
 ) -> CandidateFieldView:
     """原始字段决定引用与可验证状态（沿用 R007 规则）；说明与缺失原因展示生效值。"""
-    evidence = tuple(_evidence_view(item, chunks) for item in field.evidence)
+    evidence = tuple(evidence_view(item, chunks) for item in field.evidence)
     verifiable = all(item.verifiable for item in evidence)
     if (
         field.origin in (FieldOrigin.DOCUMENT, FieldOrigin.INFERRED)
@@ -378,7 +378,7 @@ def review_detail(
         course_name=course_name,
         semester_name=semester_name,
         fields=tuple(
-            _field_view(field, by_name[field.name], chunks) for field in candidate.draft.fields
+            field_view(field, by_name[field.name], chunks) for field in candidate.draft.fields
         ),
         missing_required_fields=missing_required_fields(candidate.draft.kind, effective_fields),
         allowed_transitions=tuple(
