@@ -438,9 +438,7 @@ def test_priority_orders_tasks_without_deadline() -> None:
     result = allocate_tasks(inputs, _resolved(inputs))
     first = min(result.blocks, key=lambda block: block.starts_at)
     assert first.task_id == 2
-    assert any(
-        source["kind"] == "priority" for source in result.blocks[0].constraint_source
-    )
+    assert any(source["kind"] == "priority" for source in result.blocks[0].constraint_source)
 
 
 def test_weekly_capacity_is_respected_across_days() -> None:
@@ -675,8 +673,7 @@ def test_confirmed_duration_does_not_claim_estimate_risk() -> None:
     result = allocate_tasks(inputs, _resolved(inputs))
     assert "估计值" not in result.blocks[0].reason
     assert all(
-        source["kind"] != "estimated_duration"
-        for source in result.blocks[0].constraint_source
+        source["kind"] != "estimated_duration" for source in result.blocks[0].constraint_source
     )
 
 
