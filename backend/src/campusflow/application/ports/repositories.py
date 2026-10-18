@@ -714,6 +714,127 @@ class RuleRepository(Protocol):
 
 
 @dataclass
+class PlanBlockData:
+    """P001：建议时间块。minutes 与起止时间同时保存，便于校验分段总量。"""
+
+    id: int
+    draft_id: int
+    task_id: int | None
+    kind: str
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    minutes: int
+    seq: int
+    locked: bool
+    reason: str
+    constraint_source: list[dict]
+    created_at: datetime
+
+
+@dataclass
+class PlanVersionData:
+    id: int
+    draft_id: int
+    version_no: int
+    change: str
+    snapshot: dict
+    created_at: datetime
+
+
+@dataclass
+class PlanDraftData:
+    id: int
+    workspace_id: int
+    semester_id: int | None
+    range_start: date
+    range_end: date
+    status: str
+    version: int
+    input_snapshot: dict
+    input_fingerprint: str
+    assumptions: list[dict]
+    gaps: list[dict]
+    unscheduled: list[dict]
+    conflicts: list[dict]
+    coverage: dict
+    created_at: datetime
+    updated_at: datetime
+    accepted_at: datetime | None
+    blocks: list[PlanBlockData] = field(default_factory=list)
+
+
+class PlanRepository(Protocol):
+    def create_draft(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        range_start: date,
+        range_end: date,
+        input_snapshot: dict,
+        input_fingerprint: str,
+        assumptions: list[dict],
+        gaps: list[dict],
+        unscheduled: list[dict],
+        conflicts: list[dict],
+        coverage: dict,
+    ) -> PlanDraftData: ...
+
+    def get_draft(self, draft_id: int) -> PlanDraftData | None: ...
+
+    def list_drafts(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[PlanDraftData]: ...
+
+    def get_current(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> PlanDraftData | None:
+        """当前已接受计划；同一空间／学期最多一份 accepted。"""
+        ...
+
+    def create_blocks(self, draft_id: int, blocks: list[dict]) -> list[PlanBlockData]: ...
+
+    def list_blocks(self, draft_id: int) -> list[PlanBlockData]: ...
+
+    def get_block(self, block_id: int) -> PlanBlockData | None: ...
+
+    def update_block(
+        self,
+        block_id: int,
+        *,
+        starts_at: datetime,
+        ends_at: datetime,
+        minutes: int,
+        locked: bool,
+        reason: str,
+    ) -> PlanBlockData | None: ...
+
+    def bump_version(
+        self,
+        draft_id: int,
+        *,
+        expected_version: int,
+        change: str,
+        snapshot: dict,
+        status: str | None = None,
+        accepted_at: datetime | None = None,
+    ) -> PlanDraftData | None:
+        """原子校验版本并递增；版本不匹配返回 None（P013 并发保护）。"""
+        ...
+
+    def supersede_others(
+        self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
+    ) -> None: ...
+
+    def add_version(
+        self, draft_id: int, *, version_no: int, change: str, snapshot: dict
+    ) -> PlanVersionData: ...
+
+    def list_versions(self, draft_id: int) -> list[PlanVersionData]: ...
+
+
+@dataclass
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
@@ -726,4 +847,5 @@ class Repositories:
     jobs: JobRepository
     candidates: CandidateRepository
     rules: RuleRepository
+    plans: PlanRepository
     uow: UnitOfWork
