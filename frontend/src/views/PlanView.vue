@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 
-import { errorMessage } from '../api/client'
+import { ApiError, errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { PlanBlock, PlanConflict, PlanDraft } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
@@ -140,11 +140,17 @@ function prepareMove(block: PlanBlock) {
 async function load() {
   loading.value = true
   error.value = ''
+  actionError.value = ''
   try {
     current.value = await plansApi.current()
     draft.value = current.value
   } catch (caught) {
-    error.value = errorMessage(caught)
+    if (caught instanceof ApiError && caught.status === 404) {
+      current.value = null
+      draft.value = null
+    } else {
+      error.value = errorMessage(caught)
+    }
   } finally {
     loading.value = false
   }
@@ -165,7 +171,7 @@ async function generate() {
       },
     })
   } catch (caught) {
-    error.value = errorMessage(caught)
+    actionError.value = errorMessage(caught)
   } finally {
     generating.value = false
   }
@@ -256,8 +262,8 @@ onMounted(load)
       </div>
     </div>
 
-    <ApiFeedback v-if="error" :message="error" />
-    <ApiFeedback v-if="actionError" :message="actionError" />
+    <ApiFeedback v-if="error" :message="error" @retry="load" />
+    <ApiFeedback v-if="actionError" :message="actionError" title="操作未完成" @retry="load" />
 
     <section class="panel stack-form" aria-label="规划假设">
       <div>
