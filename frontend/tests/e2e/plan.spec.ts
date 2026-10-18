@@ -66,5 +66,8 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
 
   await page.getByRole('link', { name: '总览', exact: true }).click()
   await expect(page.getByText(taskName)).toBeVisible()
+  await page.getByRole('link', { name: taskName }).first().click()
+  await expect(page).toHaveURL(/\/tasks\?task=\d+/)
+  await expect(page.locator('.task-row.is-highlighted')).toContainText(taskName)
   expect(pageErrors).toEqual([])
 })
