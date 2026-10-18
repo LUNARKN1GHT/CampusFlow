@@ -145,7 +145,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 ### 候选版本检查（2026-10-18）
 
-- `uv run --locked ruff check .` 通过；后端全量 `1315 passed`（含 Q019 补跑文件默认跳过），Q019 live 模式 6 passed。
+- `uv run --locked ruff check .` 通过；后端全量 `1309 passed, 6 skipped`（Q019 补跑默认跳过），Q019 live 模式 6 passed。
 - `npm run build` 通过；完整 e2e 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）；资料库真实队列 e2e 在隔离环境下 `1 passed`。
 - PR #394–#396 已合并 `develop`（a3675fa）；Q019 分支（#392）合并后执行 `develop`→`main` 并创建 `v0.5.0`。
 - 结论：发布门槛按作者决定解除；执行记录以 tag 与 GitHub Release 为准。
