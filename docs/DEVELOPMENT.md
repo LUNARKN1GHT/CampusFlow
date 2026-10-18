@@ -155,13 +155,36 @@ Q004 存储检查点增加 pgvector Python 依赖及 `q004_indexed_blocks`、`q0
 
 Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
 
+## M5 两周计划
+
+M5 新增迁移 `p001_planning_drafts`（`plan_drafts`、`plan_blocks`、`plan_versions`）。启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。计划生成完全本地计算，不需要模型密钥。
+
+本地冒烟流程：
+
+1. 在「任务」页创建带 `remaining_minutes` 或 `estimated_minutes` 的任务，并在固定日程区域录入每周可用时间；
+2. 打开 `/plan`，可填写“缺失耗时按”“单段最长”“提交缓冲”假设，点击“生成未来两周草案”；
+3. 页面显示工作空间时区、草案版本、时间块、未排任务、待补充项、假设、冲突与检查覆盖；
+4. 接受后成为当前计划；接受前不会改变任何现有安排；
+5. 已接受计划可锁定／解锁时间块，或调整时间；移动会校验固定日程与时间块重叠，版本冲突返回 409；
+6. `/` 总览读取当前计划、未来 7 天截止任务、未完整排入数量、冲突数量与待核对数量。
+
+接口与验收映射见 [M5 计划实现与验收记录](verification/M5-planning.md)。专项测试：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_planning_domain.py tests/test_planning_edges.py tests/test_plans_api.py
+uv run --locked pytest tests/test_qa_api.py -k intent
+```
+
+接受草案时服务端会重新采集输入并比较指纹；任务、固定日程、可用时间或设置发生变化后，旧草案返回 409，需要重新生成。旧草案也不能覆盖较新接受的计划。
+
 ## 当前限制
 
 Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
 
 Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
 
-- 手动管理前后端与本机单用户会话已实现；本分支已接入空间授权、上传与 Worker；资料页面闭环已有本地真实队列证据；暂无生产身份系统、核对、RAG 和排期实现。
+- 手动管理、资料处理、核对、带引用问答与两周计划已实现；仍无生产身份系统。真实模型语义复核（Q019）、M5 的 V001–V007 独立验收与发布准备尚未完成。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
