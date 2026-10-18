@@ -1,5 +1,11 @@
 """M5 计划草案 API 集成测试（P013）。"""
 
+from datetime import date
+
+from index_helpers import open_session
+
+from campusflow.infrastructure.db.models import PlanDraft, Workspace
+
 
 def _task(client, **overrides):
     payload = {
@@ -330,6 +336,28 @@ def test_overview_reports_today_plan_and_upcoming_tasks(client) -> None:
     assert all(task["due_date"] == "2026-10-19" for task in body["upcoming_tasks"])
     assert body["pending_review_count"] == 0
     assert body["unscheduled_count"] == 0
+
+
+def test_plan_from_another_workspace_is_not_visible(client) -> None:
+    with open_session() as session, session.begin():
+        other = Workspace(name="另一个工作空间", timezone="Asia/Shanghai")
+        session.add(other)
+        session.flush()
+        draft = PlanDraft(
+            workspace_id=other.id,
+            semester_id=None,
+            range_start=date(2026, 10, 19),
+            range_end=date(2026, 11, 1),
+            input_snapshot={},
+            input_fingerprint="0" * 64,
+        )
+        session.add(draft)
+        session.flush()
+        draft_id = draft.id
+
+    response = client.get(f"/api/v1/plans/drafts/{draft_id}")
+    assert response.status_code == 404
+    assert client.get("/api/v1/plans/current").json() is None
 
 
 def test_range_validation(client) -> None:

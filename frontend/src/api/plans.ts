@@ -86,6 +86,7 @@ export type PlanDraft = {
   semester_id: number | null
   range_start: string
   range_end: string
+  timezone: string
   status: 'draft' | 'accepted' | 'superseded'
   version: number
   input_fingerprint: string

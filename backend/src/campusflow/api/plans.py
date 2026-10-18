@@ -89,6 +89,7 @@ class PlanDraftOut(BaseModel):
     semester_id: int | None
     range_start: date
     range_end: date
+    timezone: str
     status: str
     version: int
     input_fingerprint: str
@@ -108,6 +109,7 @@ class PlanDraftOut(BaseModel):
             semester_id=draft.semester_id,
             range_start=draft.range_start,
             range_end=draft.range_end,
+            timezone=str(draft.input_snapshot.get("timezone", "UTC")),
             status=draft.status,
             version=draft.version,
             input_fingerprint=draft.input_fingerprint,

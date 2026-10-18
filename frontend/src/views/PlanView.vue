@@ -41,20 +41,66 @@ const dispositionLabels: Record<string, string> = {
   excluded: '已排除',
 }
 
+const planTimezone = computed(() => draft.value?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone)
+
 const blocksByDay = computed(() => {
-  const groups = new Map<string, PlanBlock[]>()
+  const groups = new Map<string, { label: string; blocks: PlanBlock[] }>()
   for (const block of draft.value?.blocks ?? []) {
-    const key = new Date(block.starts_at).toLocaleDateString('zh-CN', {
-      month: 'long',
-      day: 'numeric',
-      weekday: 'short',
-    })
-    const list = groups.get(key) ?? []
-    list.push(block)
-    groups.set(key, list)
+    const key = dayKey(block.starts_at)
+    const group = groups.get(key) ?? {
+      label: new Intl.DateTimeFormat('zh-CN', {
+        timeZone: planTimezone.value,
+        month: 'long',
+        day: 'numeric',
+        weekday: 'short',
+      }).format(new Date(block.starts_at)),
+      blocks: [],
+    }
+    group.blocks.push(block)
+    groups.set(key, group)
   }
   return [...groups.entries()]
 })
+
+function zonedParts(value: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: planTimezone.value,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(value))
+  const values: Record<string, string> = {}
+  for (const part of parts) values[part.type] = part.value
+  return values
+}
+
+function dayKey(value: string): string {
+  const parts = zonedParts(value)
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+/** 把工作空间时区的墙上时间转成明确时间点，避免浏览器时区与工作空间不一致。 */
+function zonedInputToIso(value: string): string {
+  const [datePart, timePart = '00:00'] = value.split('T')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour, minute] = timePart.split(':').map(Number)
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute)
+  const first = zonedParts(new Date(asUtc).toISOString())
+  const firstWall = Date.UTC(
+    Number(first.year), Number(first.month) - 1, Number(first.day),
+    Number(first.hour), Number(first.minute),
+  )
+  const offset = firstWall - asUtc
+  const second = zonedParts(new Date(asUtc - offset).toISOString())
+  const secondWall = Date.UTC(
+    Number(second.year), Number(second.month) - 1, Number(second.day),
+    Number(second.hour), Number(second.minute),
+  )
+  return new Date(asUtc - (secondWall - (asUtc - offset))).toISOString()
+}
 
 const blockingConflicts = computed(() =>
   (draft.value?.conflicts ?? []).filter((item) => item.severity === 'conflict'),
@@ -63,17 +109,25 @@ const risks = computed(() => (draft.value?.conflicts ?? []).filter((item) => ite
 const adjustOptions = computed(() => draft.value?.coverage.adjustment_options ?? [])
 
 function timeText(value: string): string {
-  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: planTimezone.value,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
 }
 
 function dateTimeText(value: string): string {
-  return new Date(value).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: planTimezone.value,
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date(value))
 }
 
 function toLocalInput(value: string): string {
-  const date = new Date(value)
-  const pad = (part: number) => String(part).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const parts = zonedParts(value)
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
 function prepareMove(block: PlanBlock) {
@@ -154,8 +208,8 @@ async function saveMove(block: PlanBlock) {
   try {
     draft.value = await plansApi.moveBlock(
       block.id,
-      new Date(form.starts_at).toISOString(),
-      new Date(form.ends_at).toISOString(),
+      zonedInputToIso(form.starts_at),
+      zonedInputToIso(form.ends_at),
       draft.value.version,
     )
     if (draft.value.status === 'accepted') current.value = draft.value
@@ -228,6 +282,7 @@ onMounted(load)
           <span>状态</span><strong>{{ statusLabels[draft.status] }}</strong>
           <span>版本</span><strong>v{{ draft.version }}</strong>
           <span>范围</span><strong>{{ draft.range_start }} 至 {{ draft.range_end }}</strong>
+          <span>时区</span><strong>{{ draft.timezone }}</strong>
           <span>容量缺口</span><strong>{{ draft.coverage.capacity_gap_minutes }} 分钟</strong>
         </div>
         <p class="form-help">
@@ -283,9 +338,9 @@ onMounted(load)
           <span class="count-badge">{{ draft.blocks.length }} 段 · {{ draft.blocks.reduce((sum, block) => sum + block.minutes, 0) }} 分钟</span>
         </div>
         <p v-if="!draft.blocks.length" class="compact-empty">本次没有可安排的时间块，原因见未排任务。</p>
-        <div v-for="[day, blocks] in blocksByDay" :key="day" class="day-group">
-          <h3>{{ day }}</h3>
-          <article v-for="block in blocks" :key="block.id" class="block-row">
+        <div v-for="[day, group] in blocksByDay" :key="day" class="day-group">
+          <h3>{{ group.label }}</h3>
+          <article v-for="block in group.blocks" :key="block.id" class="block-row">
             <div class="block-main">
               <div class="task-title-line">
                 <strong>{{ timeText(block.starts_at) }}–{{ timeText(block.ends_at) }}</strong>

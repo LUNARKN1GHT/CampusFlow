@@ -91,7 +91,6 @@ onMounted(load)
               下一段：<strong>{{ timeText(overview.next_block.starts_at) }}–{{ timeText(overview.next_block.ends_at) }}</strong>
               {{ overview.next_block.title }}
             </p>
-            <p v-else class="form-help">今天剩余时间没有已安排的学习时间块。</p>
             <ul class="plain-list">
               <li v-for="block in overview.today_blocks" :key="block.id" class="overview-item">
                 <div class="task-title-line">
