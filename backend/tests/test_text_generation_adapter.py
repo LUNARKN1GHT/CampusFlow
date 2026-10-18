@@ -11,7 +11,7 @@ import pytest
 
 from campusflow.application.ports.generation import GenerationRequest
 from campusflow.core.config import Settings
-from campusflow.domain.errors import PermanentError, TransientError
+from campusflow.domain.errors import ModelOutputError, PermanentError, TransientError
 from campusflow.infrastructure.llm.text import (
     API_URL,
     MAX_RESPONSE_BYTES,
@@ -73,6 +73,9 @@ def test_http_errors_are_classified_without_retry_or_sensitive_body(adapter, sta
         model.generate(REQUEST)
     assert str(status) in str(error.value)
     assert "test-secret" not in str(error.value) and "private" not in str(error.value)
+    if expected is PermanentError:
+        # 4xx 是「请求被拒绝」，不是「模型输出无效」。
+        assert not isinstance(error.value, ModelOutputError)
     assert opener.open.call_count == 1 and body.closed
 
 
@@ -132,7 +135,7 @@ def test_incomplete_or_invalid_response_is_rejected(adapter, case):
     elif case == "oversize":
         data = b"x" * (MAX_RESPONSE_BYTES + 1)
     return_bytes(opener, data)
-    with pytest.raises(PermanentError):
+    with pytest.raises(ModelOutputError):
         model.generate(REQUEST)
 
 

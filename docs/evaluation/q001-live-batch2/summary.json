@@ -1,0 +1,202 @@
+{
+  "mode": "diagnostic_pending_semantic_review",
+  "sample_set_version": "q001-preparation-v2",
+  "groups": [
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "planned_samples": 30,
+      "valid_structure": 30,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 30,
+      "retrieval_expected": 30,
+      "p95_ms_valid_structure_only": 6562.726,
+      "historical_failed_attempts": 0,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "submission-paraphrase",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "answer"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "submission-paraphrase",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "answer"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "planned_samples": 30,
+      "valid_structure": 30,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 30,
+      "retrieval_expected": 30,
+      "p95_ms_valid_structure_only": 19793.997,
+      "historical_failed_attempts": 0,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "conditional-rule",
+          "repeat": 1,
+          "actual": "interrupted",
+          "expected": "answer"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "planned_samples": 30,
+      "valid_structure": 30,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 30,
+      "retrieval_expected": 30,
+      "p95_ms_valid_structure_only": 4964.262,
+      "historical_failed_attempts": 0,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "submission-paraphrase",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "answer"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "submission-paraphrase",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "answer"
+        },
+        {
+          "case_id": "partial-coverage",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "planned_samples": 30,
+      "valid_structure": 30,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 30,
+      "retrieval_expected": 30,
+      "p95_ms_valid_structure_only": 17379.061,
+      "historical_failed_attempts": 0,
+      "answer_disposition_disagreements": [
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 1,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "stat-paper-words",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        },
+        {
+          "case_id": "os-lab2-deadline",
+          "repeat": 2,
+          "actual": "insufficient",
+          "expected": "uncertain"
+        }
+      ]
+    }
+  ],
+  "call_count": 310,
+  "reserved_cny": "0.7536640",
+  "budget_cny": "3",
+  "estimated_known_cny": "0.0015355",
+  "unknown_usage_calls": [
+    107
+  ],
+  "actual_billed_cny": null,
+  "total_sample_attempts": 121,
+  "distinct_samples": 120,
+  "independent_review_complete": false,
+  "model_selection_complete": false
+}

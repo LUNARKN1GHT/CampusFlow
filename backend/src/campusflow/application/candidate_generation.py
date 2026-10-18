@@ -21,13 +21,13 @@ from campusflow.domain.candidates import (
     ReviewReason,
     validate_candidate,
 )
-from campusflow.domain.errors import DomainError, PermanentError
+from campusflow.domain.errors import DomainError, ModelOutputError
 
 MAX_INPUT_BYTES = 256 * 1024
 MAX_OUTPUT_BYTES = 256 * 1024
 
 
-class InvalidModelOutput(PermanentError):
+class InvalidModelOutput(ModelOutputError):
     """格式/证据校验不通过；错误信息不包含模型正文或原文。"""
 
 

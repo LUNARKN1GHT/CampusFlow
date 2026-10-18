@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 
 from campusflow.application.ports.generation import GenerationRequest
-from campusflow.domain.errors import PermanentError, TransientError
+from campusflow.domain.errors import ModelOutputError, PermanentError, TransientError
 
 API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 MAX_RESPONSE_BYTES = 1024 * 1024
@@ -70,7 +70,7 @@ class ZhipuTextGenerator:
         except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException):
             raise TransientError("文字模型连接失败或等待超时，可稍后重试") from None
         if len(data) > MAX_RESPONSE_BYTES:
-            raise PermanentError("文字模型响应超过读取上限")
+            raise ModelOutputError("文字模型响应超过读取上限")
         try:
             raw = json.loads(data.decode("utf-8"))
             choices = raw["choices"]
@@ -88,7 +88,7 @@ class ZhipuTextGenerator:
             if not isinstance(content, str) or not content.strip():
                 raise ValueError
         except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
-            raise PermanentError("文字模型未返回完整有效正文，未接受截断结果或工具调用") from None
+            raise ModelOutputError("文字模型未返回完整有效正文，未接受截断结果或工具调用") from None
         return content
 
 

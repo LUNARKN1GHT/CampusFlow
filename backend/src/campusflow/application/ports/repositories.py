@@ -257,6 +257,10 @@ class ProcessingJobData:
     retryable: bool | None
     created_at: datetime
     updated_at: datetime
+    # Q004：索引作业的清单与心跳；其它阶段保持默认值。
+    heartbeat_at: datetime | None = None
+    manifest_id: str | None = None
+    auto_retry_count: int = 0
 
 
 @dataclass
@@ -311,8 +315,45 @@ class JobRepository(Protocol):
         """按尝试顺序列出终态历史（J005），供状态查询与诊断。"""
         ...
 
-    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
-        """列出领取后超过阈值仍停在处理中的作业（J005 超时回收）。"""
+    def list_stale_running(
+        self,
+        *,
+        timeout_seconds: int,
+        embed_timeout_seconds: int | None = None,
+    ) -> list[ProcessingJobData]:
+        """列出领取后超过阈值仍停在处理中的作业（J005 超时回收）。
+
+        Q004 起按阶段用不同阈值：解析看 started_at，索引看最近心跳，
+        避免按块推进的长作业被误判超时。
+        """
+        ...
+
+    def set_manifest(self, job_id: int, manifest_id: str) -> ProcessingJobData | None:
+        """登记索引作业当前使用的完整清单（Q004）。"""
+        ...
+
+    def heartbeat(self, job_id: int) -> ProcessingJobData | None:
+        """刷新作业心跳（Q004）：索引作业按块推进时调用。"""
+        ...
+
+    def create_or_requeue(
+        self, workspace_id: int, material_id: int, version_id: int, stage: str
+    ) -> ProcessingJobData:
+        """创建或重置同一版本的阶段作业（Q004 索引作业专用）。
+
+        已存在且为终态时重置为待处理（保留已完成的块），已待处理或处理中时
+        不改变状态，保证一份版本最多一个执行者。
+        """
+        ...
+
+    def prepare_auto_retry(self, job_id: int, *, max_auto_retries: int) -> ProcessingJobData | None:
+        """原子准备一次自动重投（Q004），达到上限或不满足条件时返回 None。"""
+        ...
+
+    def list_auto_retryable(
+        self, *, stage: str, max_auto_retries: int, limit: int = 50
+    ) -> list[ProcessingJobData]:
+        """列出还能自动重投的失败/部分成功作业（Q004）。"""
         ...
 
     def list_by_material(self, material_id: int) -> list[ProcessingJobData]:

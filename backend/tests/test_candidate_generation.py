@@ -18,7 +18,7 @@ from campusflow.application.candidate_generation import (
 from campusflow.application.candidates import save_candidates
 from campusflow.application.ports.repositories import SourceChunkData
 from campusflow.domain.candidates import CandidateKind, CandidateScope, FieldOrigin
-from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.errors import DomainError, NotFoundError, TransientError
 from campusflow.domain.states import ReviewStatus
 from campusflow.infrastructure.db.models import ExtractedItem
 from campusflow.infrastructure.llm.text import FakeTextGenerator
@@ -301,3 +301,33 @@ def test_generation_rejects_unavailable_sources_and_writes_nothing(client, mater
             )
         assert len(fake.requests) == (1 if case == "invalid-output" else 0)
         assert session.scalar(select(func.count()).select_from(ExtractedItem)) == 0
+
+
+class _FailingGenerator:
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.requests = []
+
+    def generate(self, request):
+        self.requests.append(request)
+        raise self._error
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (TransientError("上游超时"), TransientError),
+        (InvalidModelOutput("模型返回格式无效"), InvalidModelOutput),
+    ],
+    ids=["transient", "invalid-output"],
+)
+def test_model_failure_returns_no_drafts_and_writes_nothing(client, material, error, expected):
+    """Q009 验收：模型失败时不伪造草稿，也不写任何候选。"""
+    data, wid = material
+    fake = _FailingGenerator(error)
+    with client.app.state.session_factory() as session:
+        repos = build_repositories(session)
+        with pytest.raises(expected):
+            generate_for_version(repos, wid, data["material"]["id"], 1, fake, SPEC)
+        assert session.scalar(select(func.count()).select_from(ExtractedItem)) == 0
+    assert client.get("/api/v1/tasks").json() == []

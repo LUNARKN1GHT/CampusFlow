@@ -1,0 +1,30 @@
+{
+  "version": "q001-preparation-v1",
+  "sample_id": "CF-JSON-001",
+  "license": "project-internal",
+  "scope_fields": ["workspace", "semester", "course", "class"],
+  "corpus": [
+    {"id":"physics-a","scope":["demo","2026-fall","physics","A"],"state":"active","locator":"physics-a:paragraph:1","text":"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。"},
+    {"id":"physics-b","scope":["demo","2026-fall","physics","B"],"state":"active","locator":"physics-b:paragraph:1","text":"大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。"},
+    {"id":"physics-old","scope":["demo","2025-fall","physics","A"],"state":"active","locator":"physics-old:paragraph:1","text":"大学物理A班第一次习题须在2025年10月8日20:00前提交。"},
+    {"id":"physics-foreign","scope":["another","2026-fall","physics","A"],"state":"active","locator":"physics-foreign:paragraph:1","text":"另一个工作空间的大学物理A班作业在2026年10月9日截止。"},
+    {"id":"physics-deleted","scope":["demo","2026-fall","physics","A"],"state":"unavailable","locator":"physics-deleted:paragraph:1","text":"已删除通知曾写10月11日提交，不得继续作为可验证引用。"},
+    {"id":"os-partial-date","scope":["demo","2026-fall","os","A"],"state":"active","locator":"os-notice:paragraph:1","text":"实验一请在10月15日提交到课程平台。正文未写年份和具体时刻。"},
+    {"id":"net-v1","scope":["demo","2026-fall","network","A"],"state":"active","locator":"net-v1:paragraph:1","text":"实验报告截止时间为2026年10月18日18:00。"},
+    {"id":"net-v2","scope":["demo","2026-fall","network","A"],"state":"active","locator":"net-v2:paragraph:1","text":"实验报告截止时间为2026年10月20日20:00。本文件没有替代旧通知的声明。"},
+    {"id":"scan-readable","scope":["demo","2026-fall","database","A"],"state":"active","locator":"synthetic-scan:page:1","text":"实验二为事务隔离级别。第二页未导入，提交格式所在区域无法识别。"},
+    {"id":"lab-rule","scope":["demo","2026-fall","chemistry","A"],"state":"active","locator":"lab-rule:paragraph:1","text":"通过安全培训后才能进入实验室；未通过者不得进入，教师陪同也不例外。"},
+    {"id":"music-archived","scope":["demo","2026-fall","music","A"],"state":"archived","locator":"music-archived:paragraph:1","text":"归档的旧考试通知，不作为当前问答的有效证据。"}
+  ],
+  "cases": [
+    {"id":"deadline-a","scenario":"scope-isolation","input_type":"text","question":"本学期大学物理A班第一次习题最晚什么时候交？","scope":["demo","2026-fall","physics","A"],"top_k":3,"relevant_ids":["physics-a"],"expected_claims":[{"text":"须在2026年10月10日20:00前提交。","evidence":["physics-a"],"support_quote":"2026年10月10日20:00前"}],"expected_uncertainties":[],"expected_disposition":"answer"},
+    {"id":"deadline-b","scenario":"scope-isolation","input_type":"text","question":"大学物理B班第一次习题的截止时间是什么？","scope":["demo","2026-fall","physics","B"],"top_k":3,"relevant_ids":["physics-b"],"expected_claims":[{"text":"须在2026年10月12日18:00前提交。","evidence":["physics-b"],"support_quote":"2026年10月12日18:00前"}],"expected_uncertainties":[],"expected_disposition":"answer"},
+    {"id":"submission-paraphrase","scenario":"chinese-paraphrase","input_type":"text","question":"物理A班的练习应该交到哪儿？","scope":["demo","2026-fall","physics","A"],"top_k":3,"relevant_ids":["physics-a"],"expected_claims":[{"text":"通过课程平台提交。","evidence":["physics-a"],"support_quote":"通过课程平台提交"}],"expected_uncertainties":[],"expected_disposition":"answer"},
+    {"id":"missing-year-time","scenario":"missing-information","input_type":"text","question":"操作系统实验一的准确截止日期和时刻是什么？","scope":["demo","2026-fall","os","A"],"top_k":3,"relevant_ids":["os-partial-date"],"expected_claims":[{"text":"原文仅写10月15日，未明确年份和时刻。","evidence":["os-partial-date"],"support_quote":"10月15日"}],"expected_uncertainties":["missing_year","missing_time"],"expected_disposition":"uncertain"},
+    {"id":"conflicting-notices","scenario":"source-conflict","input_type":"text","question":"网络实验报告到底是18日还是20日截止？","scope":["demo","2026-fall","network","A"],"top_k":3,"relevant_ids":["net-v1","net-v2"],"expected_claims":[{"text":"第一份通知写2026年10月18日18:00。","evidence":["net-v1"],"support_quote":"2026年10月18日18:00"},{"text":"第二份通知写2026年10月20日20:00。","evidence":["net-v2"],"support_quote":"2026年10月20日20:00"}],"expected_uncertainties":["source_conflict"],"expected_disposition":"conflict"},
+    {"id":"partial-coverage","scenario":"partial-coverage","input_type":"manual-transcript","question":"数据库实验二是什么内容，提交格式有哪些要求？","scope":["demo","2026-fall","database","A"],"top_k":3,"relevant_ids":["scan-readable"],"expected_claims":[{"text":"实验二为事务隔离级别。","evidence":["scan-readable"],"support_quote":"实验二为事务隔离级别"}],"expected_uncertainties":["source_incomplete"],"expected_disposition":"uncertain"},
+    {"id":"conditional-rule","scenario":"conditional-rule","input_type":"text","question":"没通过安全培训，有老师陪同就能进入实验室吗？","scope":["demo","2026-fall","chemistry","A"],"top_k":3,"relevant_ids":["lab-rule"],"expected_claims":[{"text":"未通过者不得进入，教师陪同也不例外。","evidence":["lab-rule"],"support_quote":"未通过者不得进入，教师陪同也不例外"}],"expected_uncertainties":[],"expected_disposition":"answer"},
+    {"id":"no-material","scenario":"insufficient-material","input_type":"text","question":"美术课下次作业什么时候交？","scope":["demo","2026-fall","art","A"],"top_k":3,"relevant_ids":[],"expected_claims":[],"expected_uncertainties":["insufficient_material"],"expected_disposition":"insufficient"},
+    {"id":"archived-only","scenario":"unavailable-source","input_type":"text","question":"音乐课当前考试安排是什么？","scope":["demo","2026-fall","music","A"],"top_k":3,"relevant_ids":[],"expected_claims":[],"expected_uncertainties":["insufficient_material"],"expected_disposition":"insufficient"}
+  ]
+}

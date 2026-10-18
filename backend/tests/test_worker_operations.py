@@ -40,6 +40,26 @@ def test_real_worker_requires_key(monkeypatch):
         build_parser_registry(Settings(_env_file=None))
 
 
+def test_real_worker_passes_vision_limits(monkeypatch):
+    """Q009：环境变量里的视觉超时/重试配置必须真正传到适配器。"""
+    from campusflow.workers import main as worker_main
+
+    parser_class = Mock(return_value=Mock())
+    monkeypatch.setattr(worker_main, "ZhipuVisionParser", parser_class)
+    settings = Settings(
+        _env_file=None,
+        database_url=TEST_DATABASE_URL,
+        zhipu_api_key="test-key",
+        vision_timeout_seconds=30,
+        vision_max_retries=1,
+        vision_retry_backoff_seconds=2,
+    )
+    build_parser_registry(settings)
+    parser_class.assert_called_once_with(
+        "test-key", timeout_seconds=30, max_retries=1, backoff_seconds=2
+    )
+
+
 def test_worker_exception_logs_and_redis_record_exclude_raw_error(monkeypatch, caplog):
     # Alembic 测试夹具的 fileConfig 会禁用先前创建的 logger；恢复本次观察对象。
     monkeypatch.setattr(logging.getLogger("rq.worker"), "disabled", False)

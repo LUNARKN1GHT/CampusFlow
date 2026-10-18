@@ -6,6 +6,7 @@ import CoursesView from './views/CoursesView.vue'
 import HealthView from './views/HealthView.vue'
 import LibraryView from './views/LibraryView.vue'
 import LoginView from './views/LoginView.vue'
+import QaView from './views/QaView.vue'
 import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
@@ -33,6 +34,11 @@ const router = createRouter({
           path: 'review',
           name: 'review',
           component: ReviewView,
+        },
+        {
+          path: 'qa',
+          name: 'qa',
+          component: QaView,
         },
         {
           path: 'tasks',

@@ -1,0 +1,280 @@
+{
+  "description": "Q010/Q018 中文课程问答检索与引用支持评估集；全部为合成样本，人工标注 support。",
+  "k": 3,
+  "cases": [
+    {
+      "id": "ddl-course-code",
+      "question": "CS101 第三次作业什么时候截止",
+      "semester_id": 1,
+      "course_id": 10,
+      "class_name": "一班",
+      "support": ["a1"],
+      "documents": [
+        {
+          "id": "a1",
+          "text": "数据库原理（CS101）第三次作业于2026年10月20日23:59前提交。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x1",
+          "text": "实验楼开放时间为每日8:00至22:00。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x2",
+          "text": "课程群二维码见教室公告栏。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x3",
+          "text": "教材为《数据库系统概论》第6版。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x4",
+          "text": "每周四晚安排课程答疑。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "d1",
+          "text": "数据库原理（CS101）第三次作业延期到2026年10月27日。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "deleted"
+        },
+        {
+          "id": "s1",
+          "text": "数据结构（CS102）第三次作业于2026年10月25日截止。",
+          "semester_id": 1,
+          "course_id": 11,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "t1",
+          "text": "数据库原理（CS101）第三次作业于2026年11月1日截止。",
+          "semester_id": 2,
+          "course_id": 20,
+          "class_name": "一班",
+          "state": "active"
+        }
+      ]
+    },
+    {
+      "id": "exam-date",
+      "question": "数据库原理期末考试时间",
+      "semester_id": 1,
+      "course_id": 10,
+      "class_name": "一班",
+      "support": ["a2"],
+      "documents": [
+        {
+          "id": "a2",
+          "text": "数据库原理期末考试安排在2026年12月28日9:00至11:00。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x5",
+          "text": "课程论文于2026年12月15日前提交。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x6",
+          "text": "平时成绩占总评的30%。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x7",
+          "text": "实验报告格式按模板提交。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "a3",
+          "text": "数据库原理实验课考试安排在2026年12月20日。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "二班",
+          "state": "active"
+        },
+        {
+          "id": "s2",
+          "text": "数据结构期末考试安排在2026年12月29日。",
+          "semester_id": 1,
+          "course_id": 11,
+          "class_name": "一班",
+          "state": "active"
+        }
+      ]
+    },
+    {
+      "id": "relative-week",
+      "question": "第三周实验要交什么",
+      "semester_id": 1,
+      "course_id": 10,
+      "class_name": "一班",
+      "support": ["a4"],
+      "documents": [
+        {
+          "id": "a4",
+          "text": "第三周实验提交实验报告一，截止时间为第三周周五。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x8",
+          "text": "第十周实验提交综合实验报告。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x9",
+          "text": "实验课迟到超过十五分钟按缺勤处理。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x10",
+          "text": "实验环境使用 PostgreSQL 16。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "d2",
+          "text": "第三周实验提交实验报告二，截止时间为第三周周四。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "archived"
+        },
+        {
+          "id": "t2",
+          "text": "第三周实验提交实验报告一，截止时间为第三周周五。",
+          "semester_id": 2,
+          "course_id": 20,
+          "class_name": "一班",
+          "state": "active"
+        }
+      ]
+    },
+    {
+      "id": "course-code-only",
+      "question": "CS101A 作业 DDL",
+      "semester_id": 1,
+      "course_id": 10,
+      "class_name": "一班",
+      "support": ["a5"],
+      "documents": [
+        {
+          "id": "a5",
+          "text": "数据库原理（CS101A）课程作业 DDL 为2026年11月5日。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "a6",
+          "text": "数据库原理（CS101）课程作业 DDL 为2026年10月30日。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x11",
+          "text": "课程实验占期末成绩的20%。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x12",
+          "text": "答疑地点为信息楼305。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "s3",
+          "text": "数据库系统（CS201）课程作业 DDL 为2026年10月31日。",
+          "semester_id": 1,
+          "course_id": 11,
+          "class_name": "一班",
+          "state": "active"
+        }
+      ]
+    },
+    {
+      "id": "no-support",
+      "question": "有没有补考安排",
+      "semester_id": 1,
+      "course_id": 10,
+      "class_name": "一班",
+      "support": [],
+      "documents": [
+        {
+          "id": "a7",
+          "text": "数据库原理课程论文于2026年12月15日前提交。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "x13",
+          "text": "课程答疑每周四晚进行。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "active"
+        },
+        {
+          "id": "d3",
+          "text": "补考安排在2027年1月8日。",
+          "semester_id": 1,
+          "course_id": 10,
+          "class_name": "一班",
+          "state": "deleted"
+        }
+      ]
+    }
+  ]
+}
