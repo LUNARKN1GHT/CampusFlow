@@ -54,6 +54,19 @@ class PlanAcceptIn(BaseModel):
     expected_version: int = Field(ge=1)
 
 
+class PlanBlockMoveIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    starts_at: datetime
+    ends_at: datetime
+    expected_version: int = Field(ge=1)
+
+
+class PlanBlockLockIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    locked: bool
+    expected_version: int = Field(ge=1)
+
+
 class PlanBlockOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -179,3 +192,32 @@ def list_plan_conflicts(
     draft_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[dict]:
     return use_cases.draft_conflicts(repos, workspace.id, draft_id)
+
+
+@router.patch("/plans/blocks/{block_id}", response_model=PlanDraftOut)
+def move_plan_block(
+    block_id: int, payload: PlanBlockMoveIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.move_block(
+        repos,
+        workspace.id,
+        block_id,
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        expected_version=payload.expected_version,
+    )
+    return PlanDraftOut.from_data(draft)
+
+
+@router.post("/plans/blocks/{block_id}/lock", response_model=PlanDraftOut)
+def set_plan_block_lock(
+    block_id: int, payload: PlanBlockLockIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.set_block_lock(
+        repos,
+        workspace.id,
+        block_id,
+        locked=payload.locked,
+        expected_version=payload.expected_version,
+    )
+    return PlanDraftOut.from_data(draft)

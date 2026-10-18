@@ -181,6 +181,135 @@ def test_explicit_assumptions_are_echoed(client) -> None:
     assert all(block["minutes"] <= 45 for block in draft["blocks"])
 
 
+def _accepted_plan(client, *, tasks: int = 1) -> dict:
+    for index in range(tasks):
+        _task(client, title=f"任务{index}", due_time=None)
+    _availability(client)
+    draft = _generate(client).json()
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{draft['id']}/accept",
+        json={"expected_version": draft["version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+    return accepted.json()
+
+
+def test_move_block_updates_schedule_but_not_task_ddl(client) -> None:
+    task = _task(client)
+    _availability(client)
+    draft = _generate(client).json()
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{draft['id']}/accept",
+        json={"expected_version": 1},
+    ).json()
+    block = accepted["blocks"][0]
+
+    moved = client.patch(
+        f"/api/v1/plans/blocks/{block['id']}",
+        json={
+            "starts_at": "2026-10-19T20:00:00+08:00",
+            "ends_at": "2026-10-19T21:00:00+08:00",
+            "expected_version": accepted["version"],
+        },
+    )
+    assert moved.status_code == 200, moved.text
+    payload = moved.json()
+    assert payload["version"] == accepted["version"] + 1
+    assert payload["blocks"][0]["starts_at"] == "2026-10-19T20:00:00+08:00"
+    assert "用户手动移动" in payload["blocks"][0]["reason"]
+
+    unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
+    assert unchanged["due_date"] == "2026-10-19"
+    assert unchanged["due_time"] == "19:00:00"
+
+    stale = client.patch(
+        f"/api/v1/plans/blocks/{block['id']}",
+        json={
+            "starts_at": "2026-10-19T18:00:00+08:00",
+            "ends_at": "2026-10-19T19:00:00+08:00",
+            "expected_version": accepted["version"],
+        },
+    )
+    assert stale.status_code == 409
+
+
+def test_move_rejects_overlap_with_fixed_event_and_other_blocks(client) -> None:
+    _task(client, title="甲", due_time=None)
+    _task(client, title="乙", due_time=None)
+    _availability(client)
+    draft = _generate(client).json()
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{draft['id']}/accept",
+        json={"expected_version": 1},
+    ).json()
+    first, second = accepted["blocks"]
+
+    event = client.post(
+        "/api/v1/fixed-events",
+        json={
+            "title": "晚课",
+            "starts_at": "2026-10-19T20:00:00+08:00",
+            "ends_at": "2026-10-19T21:00:00+08:00",
+            "recurrence": "none",
+        },
+    )
+    assert event.status_code == 201, event.text
+    overlap_event = client.patch(
+        f"/api/v1/plans/blocks/{first['id']}",
+        json={
+            "starts_at": "2026-10-19T20:00:00+08:00",
+            "ends_at": "2026-10-19T21:00:00+08:00",
+            "expected_version": accepted["version"],
+        },
+    )
+    assert overlap_event.status_code == 400
+
+    overlap_block = client.patch(
+        f"/api/v1/plans/blocks/{first['id']}",
+        json={
+            "starts_at": second["starts_at"],
+            "ends_at": second["ends_at"],
+            "expected_version": accepted["version"],
+        },
+    )
+    assert overlap_block.status_code == 400
+
+
+def test_lock_and_unlock_accepted_block(client) -> None:
+    accepted = _accepted_plan(client)
+    block = accepted["blocks"][0]
+    locked = client.post(
+        f"/api/v1/plans/blocks/{block['id']}/lock",
+        json={"locked": True, "expected_version": accepted["version"]},
+    )
+    assert locked.status_code == 200, locked.text
+    assert locked.json()["blocks"][0]["locked"] is True
+
+    unlocked = client.post(
+        f"/api/v1/plans/blocks/{block['id']}/lock",
+        json={"locked": False, "expected_version": locked.json()["version"]},
+    )
+    assert unlocked.status_code == 200, unlocked.text
+    assert unlocked.json()["blocks"][0]["locked"] is False
+
+
+def test_draft_block_cannot_be_moved_before_accepting(client) -> None:
+    _task(client)
+    _availability(client)
+    draft = _generate(client).json()
+    block = draft["blocks"][0]
+    response = client.patch(
+        f"/api/v1/plans/blocks/{block['id']}",
+        json={
+            "starts_at": "2026-10-19T20:00:00+08:00",
+            "ends_at": "2026-10-19T21:00:00+08:00",
+            "expected_version": draft["version"],
+        },
+    )
+    assert response.status_code == 400
+    assert "已接受计划" in response.json()["detail"]
+
+
 def test_range_validation(client) -> None:
     response = client.post(
         "/api/v1/plans/drafts",

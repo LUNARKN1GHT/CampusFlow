@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from campusflow.application import schedule as schedule_use_cases
@@ -31,6 +31,7 @@ from campusflow.domain.planning import (
     resolve_assumptions,
 )
 from campusflow.domain.states import TaskProgress
+from campusflow.domain.timezones import in_workspace_timezone
 
 PLANNABLE_PROGRESS = (
     TaskProgress.NOT_STARTED,
@@ -358,3 +359,146 @@ def current_plan(repos: Repositories, workspace_id: int, *, semester_id: int | N
 
 def draft_conflicts(repos: Repositories, workspace_id: int, draft_id: int) -> list[dict]:
     return get_draft(repos, workspace_id, draft_id).conflicts
+
+
+def _snapshot_with_block(draft, target: dict) -> dict:
+    snapshot = _draft_snapshot(draft, draft.blocks)
+    snapshot["blocks"] = [
+        {
+            "id": block.id,
+            "task_id": block.task_id,
+            "title": block.title,
+            "starts_at": (
+                target["starts_at"].isoformat()
+                if block.id == target["id"]
+                else block.starts_at.isoformat()
+            ),
+            "ends_at": (
+                target["ends_at"].isoformat()
+                if block.id == target["id"]
+                else block.ends_at.isoformat()
+            ),
+            "minutes": target["minutes"] if block.id == target["id"] else block.minutes,
+            "locked": target["locked"] if block.id == target["id"] else block.locked,
+        }
+        for block in draft.blocks
+    ]
+    return snapshot
+
+
+def _require_adjustable_block(repos: Repositories, workspace_id: int, block_id: int):
+    block = repos.plans.get_block(block_id)
+    if block is None:
+        raise NotFoundError("时间块不存在")
+    draft = get_draft(repos, workspace_id, block.draft_id)
+    if draft.status != "accepted":
+        raise DomainError("只有已接受计划中的时间块可以调整")
+    return block, draft
+
+
+def move_block(
+    repos: Repositories,
+    workspace_id: int,
+    block_id: int,
+    *,
+    starts_at: datetime,
+    ends_at: datetime,
+    expected_version: int,
+    now: datetime | None = None,
+):
+    """移动已接受计划的时间块：不改变任务 DDL，不占用固定日程或已有时间块（P014）。"""
+    block, draft = _require_adjustable_block(repos, workspace_id, block_id)
+    settings = get_settings(repos, workspace_id)
+    timezone = ZoneInfo(settings.timezone)
+    starts_at = in_workspace_timezone(starts_at, timezone)
+    ends_at = in_workspace_timezone(ends_at, timezone)
+    if ends_at <= starts_at:
+        raise DomainError("结束时间必须晚于开始时间")
+    if now is not None and ends_at <= now:
+        raise DomainError("不能把时间块移动到已经过去的时段")
+
+    range_start = datetime.combine(draft.range_start, time.min, tzinfo=timezone)
+    range_end = datetime.combine(draft.range_end + timedelta(days=1), time.min, tzinfo=timezone)
+    if starts_at < range_start or ends_at > range_end:
+        raise DomainError("时间块必须保留在计划范围内")
+
+    minutes = int((ends_at - starts_at).total_seconds() // 60)
+    for other in draft.blocks:
+        if other.id == block.id:
+            continue
+        if starts_at < other.ends_at and other.starts_at < ends_at:
+            raise DomainError("时间块与已安排时间块重叠，请调整后再保存")
+    events = schedule_use_cases.list_fixed_event_occurrences(
+        repos, workspace_id, draft.range_start, draft.range_end, semester_id=draft.semester_id
+    )
+    for event in events:
+        if starts_at < event.ends_at and event.starts_at < ends_at:
+            raise DomainError("时间块与固定日程重叠，请调整后再保存")
+
+    snapshot = _snapshot_with_block(
+        draft,
+        {"id": block.id, "starts_at": starts_at, "ends_at": ends_at, "minutes": minutes,
+         "locked": block.locked},
+    )
+    updated = repos.plans.bump_version(
+        draft.id,
+        expected_version=expected_version,
+        change="moved",
+        snapshot=snapshot,
+    )
+    if updated is None:
+        raise ConflictError("计划版本已更新，请刷新后重试")
+    reason = (
+        f"{block.reason}；用户手动移动到 "
+        f"{starts_at.astimezone(timezone).strftime('%m-%d %H:%M')}"
+    )
+    repos.plans.update_block(
+        block.id,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        minutes=minutes,
+        locked=block.locked,
+        reason=reason,
+    )
+    repos.uow.commit()
+    return repos.plans.get_draft(draft.id)
+
+
+def set_block_lock(
+    repos: Repositories,
+    workspace_id: int,
+    block_id: int,
+    *,
+    locked: bool,
+    expected_version: int,
+):
+    """锁定或解锁已接受计划的时间块（P014）。"""
+    block, draft = _require_adjustable_block(repos, workspace_id, block_id)
+    snapshot = _snapshot_with_block(
+        draft,
+        {
+            "id": block.id,
+            "starts_at": block.starts_at,
+            "ends_at": block.ends_at,
+            "minutes": block.minutes,
+            "locked": locked,
+        },
+    )
+    updated = repos.plans.bump_version(
+        draft.id,
+        expected_version=expected_version,
+        change="locked" if locked else "unlocked",
+        snapshot=snapshot,
+    )
+    if updated is None:
+        raise ConflictError("计划版本已更新，请刷新后重试")
+    repos.plans.update_block(
+        block.id,
+        starts_at=block.starts_at,
+        ends_at=block.ends_at,
+        minutes=block.minutes,
+        locked=locked,
+        reason=block.reason,
+    )
+    repos.uow.commit()
+    return repos.plans.get_draft(draft.id)
