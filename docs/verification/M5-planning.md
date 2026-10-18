@@ -57,7 +57,7 @@
 | P014 移动与锁定 | `test_move_block_updates_schedule_but_not_task_ddl`、`test_move_rejects_overlap_with_fixed_event_and_other_blocks`、`test_lock_and_unlock_accepted_block`、`test_draft_block_cannot_be_moved_before_accepting` |
 | P015／P016 页面 | `frontend/src/views/PlanView.vue`；浏览器走查见下 |
 | P017 自然语言入口 | `tests/test_qa_api.py::test_planning_and_conflict_intents_execute_without_auto_accepting` |
-| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue` |
+| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue`；总览条目跳转 `/tasks?task=` 并高亮对应任务 |
 
 ## 自动化检查
 
