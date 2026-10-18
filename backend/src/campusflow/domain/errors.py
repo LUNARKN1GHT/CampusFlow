@@ -9,6 +9,10 @@ class NotFoundError(DomainError):
     """对象不存在（404）。"""
 
 
+class ConflictError(DomainError):
+    """并发或版本冲突（409）：过期草案、重复接受或输入已变化。"""
+
+
 class TransientError(DomainError):
     """临时故障（限流、超时、上游 5xx、连接中断）：处理作业可重试（J005）。"""
 

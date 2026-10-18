@@ -239,9 +239,9 @@ def test_intent_protocol_returns_boundaries_and_rejects_tools(client, qa_models)
     assert response.status_code == 200
     body = response.json()
     assert body["intent"] == "planning"
-    assert body["available"] is False
+    assert body["available"] is True
     assert body["executed"] is False
-    assert "尚未上线" in body["boundary"]
+    assert "待确认草案" in body["boundary"]
 
     def malicious(request):
         return json.dumps({"intent": "query", "parameters": {"tool": "delete_material"}})
@@ -253,6 +253,72 @@ def test_intent_protocol_returns_boundaries_and_rejects_tools(client, qa_models)
     )
     assert rejected.status_code == 502
     assert rejected.json()["failure_kind"] == "invalid_output"
+
+
+def test_planning_and_conflict_intents_execute_without_auto_accepting(client, qa_models):
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    client.post(
+        "/api/v1/availability-slots",
+        json={"day_of_week": 0, "start_time": "18:00:00", "end_time": "22:00:00"},
+    )
+    task = client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "自然语言排期任务",
+            "course_id": scope[1],
+            "due_date": "2026-10-19",
+            "due_time": "19:00:00",
+            "priority": "high",
+            "estimated_minutes": 60,
+            "remaining_minutes": 60,
+        },
+    )
+    assert task.status_code == 201, task.text
+
+    def planning(request):
+        return json.dumps({"intent": "planning", "parameters": {"date_range": "未来两周"}})
+
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(planning)
+    response = client.post(
+        "/api/v1/qa/intent",
+        json={
+            "semester_id": scope[0],
+            "course_id": scope[1],
+            "question": "帮我排未来两周",
+            "execute": True,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["executed"] is True
+    assert body["plan"]["status"] == "draft"
+    assert body["plan"]["blocks"]
+    assert client.get("/api/v1/plans/current").json() is None
+
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{body['plan']['id']}/accept",
+        json={"expected_version": body["plan"]["version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    def conflict(request):
+        return json.dumps({"intent": "conflict_check", "parameters": {}})
+
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(conflict)
+    checked = client.post(
+        "/api/v1/qa/intent",
+        json={
+            "semester_id": scope[0],
+            "course_id": scope[1],
+            "question": "检查一下冲突",
+            "execute": True,
+        },
+    )
+    assert checked.status_code == 200, checked.text
+    assert checked.json()["executed"] is True
+    assert isinstance(checked.json()["conflicts"], list)
+    assert client.get("/api/v1/plans/current").status_code == 200
 
 
 def test_conversation_keeps_scope_and_marks_deleted_citation_invalid(client, qa_models):

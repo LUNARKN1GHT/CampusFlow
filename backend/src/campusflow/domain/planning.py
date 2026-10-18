@@ -366,6 +366,155 @@ def subtract_intervals(windows: list[Interval], busy: list[Interval]) -> list[In
     return result
 
 
+def _overlap(start_a: datetime, end_a: datetime, start_b: datetime, end_b: datetime) -> bool:
+    return start_a < end_b and start_b < end_a
+
+
+def detect_overlaps(
+    inputs: PlanningInput, blocks: tuple[BlockSuggestion, ...]
+) -> list[dict[str, Any]]:
+    """检测固定日程之间、时间块与固定日程、时间块之间的重叠（P011）。
+
+    重叠是确定的冲突，不按导入顺序或优先级悄悄忽略任何一方。
+    """
+    conflicts: list[dict[str, Any]] = []
+    events = inputs.fixed_events
+    for index, first in enumerate(events):
+        for second in events[index + 1 :]:
+            if _overlap(first.start, first.end, second.start, second.end):
+                conflicts.append(
+                    {
+                        "type": "time_overlap",
+                        "severity": "conflict",
+                        "participants": [
+                            {"kind": "fixed_event", "id": first.event_id, "title": first.title},
+                            {"kind": "fixed_event", "id": second.event_id, "title": second.title},
+                        ],
+                        "starts_at": max(first.start, second.start).isoformat(),
+                        "ends_at": min(first.end, second.end).isoformat(),
+                        "message": f"固定日程《{first.title}》与《{second.title}》时间重叠",
+                        "suggestion": "核对两个固定日程，确认是否需要调整其中一个",
+                    }
+                )
+    for block in blocks:
+        for event in events:
+            if _overlap(block.starts_at, block.ends_at, event.start, event.end):
+                conflicts.append(
+                    {
+                        "type": "time_overlap",
+                        "severity": "conflict",
+                        "participants": [
+                            {"kind": "plan_block", "id": block.task_id, "title": block.title},
+                            {"kind": "fixed_event", "id": event.event_id, "title": event.title},
+                        ],
+                        "starts_at": max(block.starts_at, event.start).isoformat(),
+                        "ends_at": min(block.ends_at, event.end).isoformat(),
+                        "message": f"学习时间块《{block.title}》占用了固定日程《{event.title}》",
+                        "suggestion": "移动该时间块或调整固定日程",
+                    }
+                )
+    ordered = sorted(blocks, key=lambda block: (block.starts_at, block.ends_at))
+    for index, first in enumerate(ordered):
+        for second in ordered[index + 1 :]:
+            if not _overlap(first.starts_at, first.ends_at, second.starts_at, second.ends_at):
+                continue
+            conflicts.append(
+                {
+                    "type": "time_overlap",
+                    "severity": "conflict",
+                    "participants": [
+                        {"kind": "plan_block", "id": first.task_id, "title": first.title},
+                        {"kind": "plan_block", "id": second.task_id, "title": second.title},
+                    ],
+                    "starts_at": max(first.starts_at, second.starts_at).isoformat(),
+                    "ends_at": min(first.ends_at, second.ends_at).isoformat(),
+                    "message": f"时间块《{first.title}》与《{second.title}》时间重叠",
+                    "suggestion": "移动其中一个时间块",
+                }
+            )
+    return conflicts
+
+
+def detect_risks(
+    inputs: PlanningInput,
+    resolved: ResolvedInput,
+    outcome: PlanOutcome,
+    blocks: tuple[BlockSuggestion, ...] | None = None,
+) -> list[dict[str, Any]]:
+    """截止与负荷风险（P012）：确定缺口与基于耗时估计的风险分开标注。"""
+    risks: list[dict[str, Any]] = []
+    tasks = {task.task_id: task for task in resolved.tasks}
+    for disposition in outcome.dispositions:
+        if disposition.remaining_minutes <= 0:
+            continue
+        task = tasks.get(disposition.task_id)
+        if task is None or task.due_at is None:
+            continue
+        based_on_estimate = task.estimated
+        risks.append(
+            {
+                "type": "deadline_risk",
+                "severity": "risk" if based_on_estimate else "conflict",
+                "task_id": task.task_id,
+                "title": task.title,
+                "shortfall_minutes": disposition.remaining_minutes,
+                "due_at": task.due_at.isoformat(),
+                "estimated": based_on_estimate,
+                "message": (
+                    f"按当前耗时估计，《{task.title}》还差 "
+                    f"{disposition.remaining_minutes} 分钟才能完成"
+                    if based_on_estimate
+                    else f"剩余可用时间不足以完成《{task.title}》，"
+                    f"还差 {disposition.remaining_minutes} 分钟"
+                ),
+                "suggestion": "提前开始、拆分任务或增加可用时间；必要时调整个人计划",
+            }
+        )
+
+    planned = blocks if blocks is not None else outcome.blocks
+    daily: dict[date, int] = {}
+    weekly: dict[tuple[int, int], int] = {}
+    for block in planned:
+        day = block.starts_at.date()
+        daily[day] = daily.get(day, 0) + block.minutes
+        week = day.isocalendar()[:2]
+        weekly[week] = weekly.get(week, 0) + block.minutes
+    for day, minutes in sorted(daily.items()):
+        if minutes > inputs.daily_capacity_minutes:
+            risks.append(
+                {
+                    "type": "load_risk",
+                    "severity": "risk",
+                    "date": day.isoformat(),
+                    "planned_minutes": minutes,
+                    "capacity_minutes": inputs.daily_capacity_minutes,
+                    "message": (
+                        f"{day.isoformat()} 安排了 {minutes} 分钟，"
+                        f"超过每日容量 {inputs.daily_capacity_minutes} 分钟"
+                    ),
+                    "suggestion": "将部分任务分散到其他日期",
+                }
+            )
+    for (year, week), minutes in sorted(weekly.items()):
+        if minutes > inputs.weekly_capacity_minutes:
+            risks.append(
+                {
+                    "type": "load_risk",
+                    "severity": "risk",
+                    "iso_year": year,
+                    "iso_week": week,
+                    "planned_minutes": minutes,
+                    "capacity_minutes": inputs.weekly_capacity_minutes,
+                    "message": (
+                        f"第 {year}-W{week:02d} 周安排了 {minutes} 分钟，"
+                        f"超过每周容量 {inputs.weekly_capacity_minutes} 分钟"
+                    ),
+                    "suggestion": "减少本周安排或将任务移到下周",
+                }
+            )
+    return risks
+
+
 def _priority_label(priority: str) -> str:
     return {"high": "高", "medium": "中", "low": "低"}.get(priority, "普通")
 
@@ -508,6 +657,8 @@ def build_outcome(
             "未确认候选事项不参与排期；需先在待核对中确认后才会成为排期输入",
             "固定日程与可用时间均按工作空间时区解释",
         ],
+        "capacity_gap_minutes": allocation.capacity_gap_minutes,
+        "adjustment_options": [],
     }
 
     adjustment_options: tuple[str, ...] = ()
@@ -518,6 +669,7 @@ def build_outcome(
             "拆分任务或修改耗时估计",
             "接受缺口并保留未排任务",
         )
+    coverage["adjustment_options"] = list(adjustment_options)
 
     return PlanOutcome(
         blocks=allocation.blocks,

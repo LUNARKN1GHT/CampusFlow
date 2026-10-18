@@ -6,11 +6,15 @@ from zoneinfo import ZoneInfo
 from campusflow.domain.planning import (
     AssumptionOptions,
     AvailabilityRule,
+    BlockSuggestion,
     FixedEventOccurrence,
     PlanningInput,
     PlanningTask,
     allocate_tasks,
     build_free_windows,
+    build_outcome,
+    detect_overlaps,
+    detect_risks,
     resolve_assumptions,
 )
 
@@ -148,6 +152,119 @@ def test_planning_does_not_mutate_task_deadline() -> None:
     _allocate(inputs)
     assert task.due_at == due
     assert inputs.tasks[0].due_at == due
+
+
+def _block(task_id: int, start_hour: int, end_hour: int) -> BlockSuggestion:
+    return BlockSuggestion(
+        task_id=task_id,
+        title=f"任务{task_id}",
+        starts_at=datetime(2026, 10, 19, start_hour, tzinfo=TZ),
+        ends_at=datetime(2026, 10, 19, end_hour, tzinfo=TZ),
+        minutes=(end_hour - start_hour) * 60,
+        seq=0,
+        reason="测试",
+        constraint_source=(),
+    )
+
+
+def test_overlapping_fixed_events_are_reported() -> None:
+    first = FixedEventOccurrence(
+        event_id=1,
+        title="课程 A",
+        start=datetime(2026, 10, 19, 18, tzinfo=TZ),
+        end=datetime(2026, 10, 19, 19, tzinfo=TZ),
+    )
+    second = FixedEventOccurrence(
+        event_id=2,
+        title="课程 B",
+        start=datetime(2026, 10, 19, 18, 30, tzinfo=TZ),
+        end=datetime(2026, 10, 19, 19, 30, tzinfo=TZ),
+    )
+    conflicts = detect_overlaps(_input(fixed_events=(first, second)), ())
+    assert len(conflicts) == 1
+    assert conflicts[0]["type"] == "time_overlap"
+    assert conflicts[0]["severity"] == "conflict"
+    assert len(conflicts[0]["participants"]) == 2
+
+
+def test_block_overlapping_fixed_event_is_reported() -> None:
+    event = FixedEventOccurrence(
+        event_id=1,
+        title="课程",
+        start=datetime(2026, 10, 19, 18, 30, tzinfo=TZ),
+        end=datetime(2026, 10, 19, 19, 30, tzinfo=TZ),
+    )
+    conflicts = detect_overlaps(_input(fixed_events=(event,)), (_block(1, 18, 19),))
+    assert len(conflicts) == 1
+    assert conflicts[0]["type"] == "time_overlap"
+
+
+def test_overlapping_blocks_are_reported_and_adjacent_blocks_are_not() -> None:
+    adjacent = detect_overlaps(_input(availability=()), (_block(1, 18, 19), _block(2, 19, 20)))
+    assert adjacent == []
+    overlapping = detect_overlaps(_input(availability=()), (_block(1, 18, 19), _block(2, 18, 20)))
+    assert len(overlapping) == 1
+    assert overlapping[0]["type"] == "time_overlap"
+
+
+def _outcome(inputs: PlanningInput):
+    resolved = resolve_assumptions(inputs, AssumptionOptions())
+    return resolved, build_outcome(inputs, resolved, allocate_tasks(inputs, resolved))
+
+
+def test_deadline_risk_is_marked_as_estimate_based() -> None:
+    inputs = _input(
+        tasks=(
+            _task(
+                1,
+                300,
+                due_at=datetime(2026, 10, 19, 19, tzinfo=TZ),
+                estimated=True,
+            ),
+        )
+    )
+    resolved, outcome = _outcome(inputs)
+    risks = detect_risks(inputs, resolved, outcome)
+    deadline = next(item for item in risks if item["type"] == "deadline_risk")
+    assert deadline["severity"] == "risk"
+    assert deadline["estimated"] is True
+    assert deadline["shortfall_minutes"] == 240
+    assert "估计" in deadline["message"]
+
+
+def test_confirmed_shortfall_is_a_conflict_not_an_estimate() -> None:
+    inputs = _input(
+        tasks=(
+            _task(
+                1,
+                300,
+                due_at=datetime(2026, 10, 19, 19, tzinfo=TZ),
+                estimated=False,
+            ),
+        )
+    )
+    resolved, outcome = _outcome(inputs)
+    risks = detect_risks(inputs, resolved, outcome)
+    deadline = next(item for item in risks if item["type"] == "deadline_risk")
+    assert deadline["severity"] == "conflict"
+    assert deadline["estimated"] is False
+    assert "估计" not in deadline["message"]
+
+
+def test_daily_and_weekly_load_risks_are_reported() -> None:
+    inputs = _input(
+        daily_capacity_minutes=120,
+        weekly_capacity_minutes=120,
+        availability=(),
+    )
+    resolved, outcome = _outcome(inputs)
+    over_capacity = (_block(1, 18, 21),)
+    risks = detect_risks(inputs, resolved, outcome, blocks=over_capacity)
+    types = [item["type"] for item in risks]
+    assert types.count("load_risk") == 2
+    daily = next(item for item in risks if item["type"] == "load_risk" and "date" in item)
+    assert daily["planned_minutes"] == 180
+    assert daily["capacity_minutes"] == 120
 
 
 def test_free_windows_never_contain_fixed_events() -> None:

@@ -401,9 +401,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .app-frame { display: block; }
   .sidebar { position: static; width: 100%; height: auto; padding: 18px; }
   .brand { margin: 0 0 16px; }
-  .sidebar nav { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .sidebar nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 2px; }
   .nav-label, .nav-item-disabled, .sidebar-note { display: none; }
-  .nav-item { flex: none; }
+  .nav-item { flex: 0 0 auto; min-height: 36px; padding: 7px 10px; }
   .topbar { min-height: 72px; }
   .topbar-title { display: none; }
   .page-content { padding-top: 36px; }

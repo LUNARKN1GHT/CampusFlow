@@ -38,10 +38,11 @@ class QaIntentKind(StrEnum):
 
 INTENT_BOUNDARIES = {
     QaIntentKind.PLANNING: (
-        "计划生成尚未上线，本次未执行任何排期或写入操作。请先使用任务与计划功能手动安排。"
+        "已接通计划生成：本次只生成待确认草案，未接受、未改写当前计划。"
+        "请在任务与计划页面核对后再接受。"
     ),
     QaIntentKind.CONFLICT_CHECK: (
-        "冲突检查尚未上线，本次未执行任何排期或写入操作。请先在任务与计划中手动核对。"
+        "已接通冲突检查：只读取当前已接受计划与固定日程，不修改任何安排。"
     ),
 }
 
@@ -59,11 +60,11 @@ class QaIntent:
 
     @property
     def available(self) -> bool:
-        return self.kind is QaIntentKind.QUERY
+        return True
 
     @property
     def boundary(self) -> str | None:
-        return None if self.available else INTENT_BOUNDARIES[self.kind]
+        return INTENT_BOUNDARIES.get(self.kind)
 
 
 @dataclass(frozen=True)
