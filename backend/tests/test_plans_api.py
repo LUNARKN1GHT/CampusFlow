@@ -1,6 +1,6 @@
 """M5 计划草案 API 集成测试（P013）。"""
 
-from datetime import date
+from datetime import date, datetime
 
 from index_helpers import open_session
 
@@ -221,7 +221,10 @@ def test_move_block_updates_schedule_but_not_task_ddl(client) -> None:
     assert moved.status_code == 200, moved.text
     payload = moved.json()
     assert payload["version"] == accepted["version"] + 1
-    assert payload["blocks"][0]["starts_at"] == "2026-10-19T20:00:00+08:00"
+    moved_start = datetime.fromisoformat(
+        payload["blocks"][0]["starts_at"].replace("Z", "+00:00")
+    )
+    assert moved_start == datetime.fromisoformat("2026-10-19T20:00:00+08:00")
     assert "用户手动移动" in payload["blocks"][0]["reason"]
 
     unchanged = client.get(f"/api/v1/tasks/{task['id']}").json()
