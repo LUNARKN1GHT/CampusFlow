@@ -70,9 +70,9 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - 总览重复空状态；
 - 尚无当前计划时把 404 显示为“加载失败”，现改为正常空状态。
 
-新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
+新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义；另覆盖过期草案后的刷新与加载失败后的重试恢复。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
 
-在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `9 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
 
 语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测与独立走查，V004 保持开放。
 
