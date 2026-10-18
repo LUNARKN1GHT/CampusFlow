@@ -438,6 +438,86 @@ def detect_overlaps(
     return conflicts
 
 
+def detect_risks(
+    inputs: PlanningInput,
+    resolved: ResolvedInput,
+    outcome: PlanOutcome,
+    blocks: tuple[BlockSuggestion, ...] | None = None,
+) -> list[dict[str, Any]]:
+    """截止与负荷风险（P012）：确定缺口与基于耗时估计的风险分开标注。"""
+    risks: list[dict[str, Any]] = []
+    tasks = {task.task_id: task for task in resolved.tasks}
+    for disposition in outcome.dispositions:
+        if disposition.remaining_minutes <= 0:
+            continue
+        task = tasks.get(disposition.task_id)
+        if task is None or task.due_at is None:
+            continue
+        based_on_estimate = task.estimated
+        risks.append(
+            {
+                "type": "deadline_risk",
+                "severity": "risk" if based_on_estimate else "conflict",
+                "task_id": task.task_id,
+                "title": task.title,
+                "shortfall_minutes": disposition.remaining_minutes,
+                "due_at": task.due_at.isoformat(),
+                "estimated": based_on_estimate,
+                "message": (
+                    f"按当前耗时估计，《{task.title}》还差 "
+                    f"{disposition.remaining_minutes} 分钟才能完成"
+                    if based_on_estimate
+                    else f"剩余可用时间不足以完成《{task.title}》，"
+                    f"还差 {disposition.remaining_minutes} 分钟"
+                ),
+                "suggestion": "提前开始、拆分任务或增加可用时间；必要时调整个人计划",
+            }
+        )
+
+    planned = blocks if blocks is not None else outcome.blocks
+    daily: dict[date, int] = {}
+    weekly: dict[tuple[int, int], int] = {}
+    for block in planned:
+        day = block.starts_at.date()
+        daily[day] = daily.get(day, 0) + block.minutes
+        week = day.isocalendar()[:2]
+        weekly[week] = weekly.get(week, 0) + block.minutes
+    for day, minutes in sorted(daily.items()):
+        if minutes > inputs.daily_capacity_minutes:
+            risks.append(
+                {
+                    "type": "load_risk",
+                    "severity": "risk",
+                    "date": day.isoformat(),
+                    "planned_minutes": minutes,
+                    "capacity_minutes": inputs.daily_capacity_minutes,
+                    "message": (
+                        f"{day.isoformat()} 安排了 {minutes} 分钟，"
+                        f"超过每日容量 {inputs.daily_capacity_minutes} 分钟"
+                    ),
+                    "suggestion": "将部分任务分散到其他日期",
+                }
+            )
+    for (year, week), minutes in sorted(weekly.items()):
+        if minutes > inputs.weekly_capacity_minutes:
+            risks.append(
+                {
+                    "type": "load_risk",
+                    "severity": "risk",
+                    "iso_year": year,
+                    "iso_week": week,
+                    "planned_minutes": minutes,
+                    "capacity_minutes": inputs.weekly_capacity_minutes,
+                    "message": (
+                        f"第 {year}-W{week:02d} 周安排了 {minutes} 分钟，"
+                        f"超过每周容量 {inputs.weekly_capacity_minutes} 分钟"
+                    ),
+                    "suggestion": "减少本周安排或将任务移到下周",
+                }
+            )
+    return risks
+
+
 def _priority_label(priority: str) -> str:
     return {"high": "高", "medium": "中", "low": "低"}.get(priority, "普通")
 

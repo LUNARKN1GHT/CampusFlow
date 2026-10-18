@@ -12,7 +12,9 @@ from campusflow.domain.planning import (
     PlanningTask,
     allocate_tasks,
     build_free_windows,
+    build_outcome,
     detect_overlaps,
+    detect_risks,
     resolve_assumptions,
 )
 
@@ -215,6 +217,66 @@ def test_overlapping_blocks_are_reported_and_adjacent_blocks_are_not() -> None:
     )
     assert len(overlapping) == 1
     assert overlapping[0]["type"] == "time_overlap"
+
+
+def _outcome(inputs: PlanningInput):
+    resolved = resolve_assumptions(inputs, AssumptionOptions())
+    return resolved, build_outcome(inputs, resolved, allocate_tasks(inputs, resolved))
+
+
+def test_deadline_risk_is_marked_as_estimate_based() -> None:
+    inputs = _input(
+        tasks=(
+            _task(
+                1,
+                300,
+                due_at=datetime(2026, 10, 19, 19, tzinfo=TZ),
+                estimated=True,
+            ),
+        )
+    )
+    resolved, outcome = _outcome(inputs)
+    risks = detect_risks(inputs, resolved, outcome)
+    deadline = next(item for item in risks if item["type"] == "deadline_risk")
+    assert deadline["severity"] == "risk"
+    assert deadline["estimated"] is True
+    assert deadline["shortfall_minutes"] == 240
+    assert "估计" in deadline["message"]
+
+
+def test_confirmed_shortfall_is_a_conflict_not_an_estimate() -> None:
+    inputs = _input(
+        tasks=(
+            _task(
+                1,
+                300,
+                due_at=datetime(2026, 10, 19, 19, tzinfo=TZ),
+                estimated=False,
+            ),
+        )
+    )
+    resolved, outcome = _outcome(inputs)
+    risks = detect_risks(inputs, resolved, outcome)
+    deadline = next(item for item in risks if item["type"] == "deadline_risk")
+    assert deadline["severity"] == "conflict"
+    assert deadline["estimated"] is False
+    assert "估计" not in deadline["message"]
+
+
+def test_daily_and_weekly_load_risks_are_reported() -> None:
+    inputs = _input(
+        daily_capacity_minutes=120,
+        weekly_capacity_minutes=120,
+        availability=(),
+    )
+    resolved, outcome = _outcome(inputs)
+    over_capacity = (_block(1, 18, 21),)
+    risks = detect_risks(inputs, resolved, outcome, blocks=over_capacity)
+    types = [item["type"] for item in risks]
+    assert types.count("load_risk") == 2
+    daily = next(item for item in risks if item["type"] == "load_risk" and "date" in item)
+    assert daily["planned_minutes"] == 180
+    assert daily["capacity_minutes"] == 120
 
 
 def test_free_windows_never_contain_fixed_events() -> None:
