@@ -369,6 +369,33 @@ def subtract_intervals(windows: list[Interval], busy: list[Interval]) -> list[In
     return result
 
 
+def _priority_label(priority: str) -> str:
+    return {"high": "高", "medium": "中", "low": "低"}.get(priority, "普通")
+
+
+def _block_reason(
+    task: PlanningTask,
+    *,
+    window_start: datetime,
+    deadline: datetime | None,
+    buffer_minutes: int,
+) -> str:
+    parts: list[str] = []
+    if deadline is not None:
+        deadline_text = deadline.strftime("%Y-%m-%d %H:%M")
+        if task.due_date_only:
+            deadline_text = f"{deadline.date().isoformat()} 当天结束"
+        parts.append(f"为满足 {deadline_text} 的截止要求")
+        if buffer_minutes > 0:
+            parts.append(f"截止前预留 {buffer_minutes} 分钟提交缓冲")
+    else:
+        parts.append(f"安排在 {window_start.strftime('%m-%d %H:%M')} 起的可用时间内")
+    parts.append(f"按{_priority_label(task.priority)}优先级")
+    if task.estimated:
+        parts.append("耗时为估计值，存在排期风险")
+    return "；".join(parts)
+
+
 def task_order_key(task: PlanningTask) -> tuple:
     """明确截止优先，其次重要性；没有截止的任务排在最后。"""
     priority_rank = {"high": 0, "medium": 1, "low": 2}.get(task.priority, 3)
@@ -601,13 +628,18 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                     window[0] = window_end
                     break
                 block_end = window_start + timedelta(minutes=minutes)
-                reason = (
-                    f"在截止 {deadline.isoformat()} 前安排"
-                    if deadline is not None
-                    else "在可用时间内安排"
+                reason = _block_reason(
+                    task,
+                    window_start=window_start,
+                    deadline=deadline,
+                    buffer_minutes=resolved.buffer_minutes,
                 )
                 constraint_source: list[dict[str, Any]] = [
-                    {"kind": "availability", "text": "使用工作空间可用时间"},
+                    {
+                        "kind": "availability",
+                        "value": window_start.isoformat(),
+                        "text": "使用工作空间可用时间",
+                    },
                     {
                         "kind": "priority",
                         "value": task.priority,
@@ -654,6 +686,15 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                             "value": deadline.isoformat(),
                             "date_only": task.due_date_only,
                             "text": "任务明确截止时间",
+                        }
+                    )
+                if task.estimated:
+                    constraint_source.append(
+                        {
+                            "kind": "estimated_duration",
+                            "value": task.minutes,
+                            "risk": True,
+                            "text": "耗时为估计值，排期结果存在风险",
                         }
                     )
                 blocks.append(
