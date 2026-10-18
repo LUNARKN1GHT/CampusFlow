@@ -15,6 +15,9 @@ from campusflow.application.ports.repositories import (
     MaterialData,
     MaterialVersionData,
     NewSourceChunk,
+    PlanBlockData,
+    PlanDraftData,
+    PlanVersionData,
     ProcessingJobAttemptData,
     ProcessingJobData,
     Repositories,
@@ -42,6 +45,9 @@ from campusflow.infrastructure.db.models import (
     FixedEvent,
     Material,
     MaterialVersion,
+    PlanBlock,
+    PlanDraft,
+    PlanVersion,
     ProcessingJob,
     ProcessingJobAttempt,
     Semester,
@@ -1354,6 +1360,252 @@ class SqlAlchemyJobRepository:
         return [_job_to_data(row) for row in rows]
 
 
+def _plan_draft_to_data(row: PlanDraft) -> PlanDraftData:
+    return PlanDraftData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        semester_id=row.semester_id,
+        range_start=row.range_start,
+        range_end=row.range_end,
+        status=row.status,
+        version=row.version,
+        input_snapshot=row.input_snapshot,
+        input_fingerprint=row.input_fingerprint,
+        assumptions=row.assumptions,
+        gaps=row.gaps,
+        unscheduled=row.unscheduled,
+        conflicts=row.conflicts,
+        coverage=row.coverage,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        accepted_at=row.accepted_at,
+    )
+
+
+def _plan_block_to_data(row: PlanBlock) -> PlanBlockData:
+    return PlanBlockData(
+        id=row.id,
+        draft_id=row.draft_id,
+        task_id=row.task_id,
+        kind=row.kind,
+        title=row.title,
+        starts_at=row.starts_at,
+        ends_at=row.ends_at,
+        minutes=row.minutes,
+        seq=row.seq,
+        locked=row.locked,
+        reason=row.reason,
+        constraint_source=row.constraint_source,
+        created_at=row.created_at,
+    )
+
+
+def _plan_version_to_data(row: PlanVersion) -> PlanVersionData:
+    return PlanVersionData(
+        id=row.id,
+        draft_id=row.draft_id,
+        version_no=row.version_no,
+        change=row.change,
+        snapshot=row.snapshot,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyPlanRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create_draft(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        range_start: date,
+        range_end: date,
+        input_snapshot: dict,
+        input_fingerprint: str,
+        assumptions: list[dict],
+        gaps: list[dict],
+        unscheduled: list[dict],
+        conflicts: list[dict],
+        coverage: dict,
+    ) -> PlanDraftData:
+        row = PlanDraft(
+            workspace_id=workspace_id,
+            semester_id=semester_id,
+            range_start=range_start,
+            range_end=range_end,
+            input_snapshot=input_snapshot,
+            input_fingerprint=input_fingerprint,
+            assumptions=assumptions,
+            gaps=gaps,
+            unscheduled=unscheduled,
+            conflicts=conflicts,
+            coverage=coverage,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _plan_draft_to_data(row)
+
+    def get_draft(self, draft_id: int) -> PlanDraftData | None:
+        row = self._session.get(PlanDraft, draft_id)
+        if row is None:
+            return None
+        data = _plan_draft_to_data(row)
+        data.blocks = self.list_blocks(row.id)
+        return data
+
+    def list_drafts(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[PlanDraftData]:
+        stmt = select(PlanDraft).where(PlanDraft.workspace_id == workspace_id)
+        if semester_id is not None:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        stmt = stmt.order_by(PlanDraft.created_at.desc(), PlanDraft.id.desc())
+        return [_plan_draft_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_current(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> PlanDraftData | None:
+        stmt = select(PlanDraft).where(
+            PlanDraft.workspace_id == workspace_id, PlanDraft.status == "accepted"
+        )
+        if semester_id is None:
+            stmt = stmt.where(PlanDraft.semester_id.is_(None))
+        else:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        row = self._session.scalar(stmt.order_by(PlanDraft.accepted_at.desc(), PlanDraft.id.desc()))
+        if row is None:
+            return None
+        data = _plan_draft_to_data(row)
+        data.blocks = self.list_blocks(row.id)
+        return data
+
+    def create_blocks(self, draft_id: int, blocks: list[dict]) -> list[PlanBlockData]:
+        rows = [
+            PlanBlock(
+                draft_id=draft_id,
+                task_id=block.get("task_id"),
+                kind=block.get("kind", "task"),
+                title=block["title"],
+                starts_at=block["starts_at"],
+                ends_at=block["ends_at"],
+                minutes=block["minutes"],
+                seq=block.get("seq", 0),
+                locked=block.get("locked", False),
+                reason=block["reason"],
+                constraint_source=block.get("constraint_source", []),
+            )
+            for block in blocks
+        ]
+        self._session.add_all(rows)
+        self._session.flush()
+        return [_plan_block_to_data(row) for row in rows]
+
+    def list_blocks(self, draft_id: int) -> list[PlanBlockData]:
+        stmt = (
+            select(PlanBlock)
+            .where(PlanBlock.draft_id == draft_id)
+            .order_by(PlanBlock.starts_at, PlanBlock.seq, PlanBlock.id)
+        )
+        return [_plan_block_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_block(self, block_id: int) -> PlanBlockData | None:
+        row = self._session.get(PlanBlock, block_id)
+        return _plan_block_to_data(row) if row is not None else None
+
+    def update_block(
+        self,
+        block_id: int,
+        *,
+        starts_at: datetime,
+        ends_at: datetime,
+        minutes: int,
+        locked: bool,
+        reason: str,
+    ) -> PlanBlockData | None:
+        row = self._session.get(PlanBlock, block_id)
+        if row is None:
+            return None
+        row.starts_at = starts_at
+        row.ends_at = ends_at
+        row.minutes = minutes
+        row.locked = locked
+        row.reason = reason
+        self._session.flush()
+        return _plan_block_to_data(row)
+
+    def bump_version(
+        self,
+        draft_id: int,
+        *,
+        expected_version: int,
+        change: str,
+        snapshot: dict,
+        status: str | None = None,
+        accepted_at: datetime | None = None,
+    ) -> PlanDraftData | None:
+        values: dict[str, object] = {
+            "version": PlanDraft.version + 1,
+            "updated_at": func.now(),
+        }
+        if status is not None:
+            values["status"] = status
+        if accepted_at is not None:
+            values["accepted_at"] = accepted_at
+        result = self._session.execute(
+            update(PlanDraft)
+            .where(
+                PlanDraft.id == draft_id,
+                PlanDraft.version == expected_version,
+                PlanDraft.status.in_(["draft", "accepted"]),
+            )
+            .values(**values)
+        )
+        if not result.rowcount:
+            return None
+        self._session.flush()
+        row = self._session.get(PlanDraft, draft_id)
+        if row is None:
+            return None
+        self.add_version(
+            draft_id, version_no=row.version, change=change, snapshot=snapshot
+        )
+        return _plan_draft_to_data(row)
+
+    def supersede_others(
+        self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
+    ) -> None:
+        stmt = update(PlanDraft).where(
+            PlanDraft.workspace_id == workspace_id,
+            PlanDraft.status == "accepted",
+            PlanDraft.id != keep_draft_id,
+        )
+        if semester_id is None:
+            stmt = stmt.where(PlanDraft.semester_id.is_(None))
+        else:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        self._session.execute(stmt.values(status="superseded", updated_at=func.now()))
+
+    def add_version(
+        self, draft_id: int, *, version_no: int, change: str, snapshot: dict
+    ) -> PlanVersionData:
+        row = PlanVersion(
+            draft_id=draft_id, version_no=version_no, change=change, snapshot=snapshot
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _plan_version_to_data(row)
+
+    def list_versions(self, draft_id: int) -> list[PlanVersionData]:
+        stmt = (
+            select(PlanVersion)
+            .where(PlanVersion.draft_id == draft_id)
+            .order_by(PlanVersion.version_no)
+        )
+        return [_plan_version_to_data(row) for row in self._session.scalars(stmt)]
+
+
 def build_repositories(session: Session) -> Repositories:
     """装配全部仓储与工作单元（API 装配、Worker、投递补偿共用）。"""
     return Repositories(
@@ -1366,5 +1618,6 @@ def build_repositories(session: Session) -> Repositories:
         jobs=SqlAlchemyJobRepository(session),
         candidates=SqlAlchemyCandidateRepository(session),
         rules=SqlAlchemyRuleRepository(session),
+        plans=SqlAlchemyPlanRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )
