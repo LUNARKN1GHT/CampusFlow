@@ -92,7 +92,12 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 已更新 [DEVELOPMENT.md](../DEVELOPMENT.md)：补充 M5 迁移、启动新代码前步骤、计划冒烟流程、专项测试命令、输入指纹与 409 语义、当前限制，并新增数据库、Redis 与模型服务不可用时的诊断和恢复路径。
 
-本轮按文档在独立端口启动后端（8001，测试库）与前端（5174），完成登录、生成、接受、锁定、移动与总览走查，启动说明可用。2026-10-18 进一步以不可达端口模拟故障：诊断分别输出 `database_or_schema_unavailable` 与 `redis_unavailable`，Worker 在 Redis 不可达时以退出码 1 结束并提示运行诊断。未停用共享 PostgreSQL，未在全新机器或空数据库上从零执行，V006 保持开放。
+本轮按文档在独立端口启动后端（8001，测试库）与前端（5174），完成登录、生成、接受、锁定、移动与总览走查，启动说明可用。2026-10-18 进一步以不可达端口模拟故障：诊断分别输出 `database_or_schema_unavailable` 与 `redis_unavailable`，Worker 在 Redis 不可达时以退出码 1 结束并提示运行诊断。
+
+同日执行空库迁移闭环：在专用测试库删除全部业务表与 `alembic_version`（保留已存在的 vector 扩展）后，从零执行 `alembic upgrade head`，成功到达 `p001_planning_drafts`；在新端口 8002 启动后端，`/api/v1/ready` 返回数据库正常，并完成登录、学期、课程、可用时段、任务、草案生成、接受及当前计划／总览读取。
+
+限制：本机账号没有 CREATEDB 与创建 `vector` 扩展的权限，因此没有新建全新数据库，也未在全新机器或空 PostgreSQL 实例上验证；Worker／Redis 全链路未运行。V006 保持开放。
+
 
 
 ## V007 发布说明与候选版本验收
