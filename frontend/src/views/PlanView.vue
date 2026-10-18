@@ -140,6 +140,7 @@ function prepareMove(block: PlanBlock) {
 async function load() {
   loading.value = true
   error.value = ''
+  actionError.value = ''
   try {
     current.value = await plansApi.current()
     draft.value = current.value
@@ -262,7 +263,7 @@ onMounted(load)
     </div>
 
     <ApiFeedback v-if="error" :message="error" />
-    <ApiFeedback v-if="actionError" :message="actionError" />
+    <ApiFeedback v-if="actionError" :message="actionError" title="操作未完成" @retry="load" />
 
     <section class="panel stack-form" aria-label="规划假设">
       <div>

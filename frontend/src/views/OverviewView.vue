@@ -95,7 +95,8 @@ onMounted(load)
               <li v-for="block in overview.today_blocks" :key="block.id" class="overview-item">
                 <div class="task-title-line">
                   <strong>{{ timeText(block.starts_at) }}–{{ timeText(block.ends_at) }}</strong>
-                  <span>{{ block.title }}</span>
+                  <RouterLink v-if="block.task_id" class="item-link" :to="`/tasks?task=${block.task_id}`">{{ block.title }}</RouterLink>
+                  <span v-else>{{ block.title }}</span>
                   <span class="status-pill">{{ block.minutes }} 分钟</span>
                   <span v-if="block.locked" class="status-pill">已锁定</span>
                 </div>
@@ -117,7 +118,7 @@ onMounted(load)
                 <strong>{{ dueText(task) }}</strong>
                 <span v-if="task.overdue" class="status-pill overdue-pill">逾期</span>
               </div>
-              <p>{{ task.title }}</p>
+              <p><RouterLink class="item-link" :to="`/tasks?task=${task.id}`">{{ task.title }}</RouterLink></p>
               <p class="form-help">优先级 {{ priorityLabels[task.priority] ?? task.priority }} · {{ progressLabels[task.progress] ?? task.progress }}</p>
             </li>
             <li v-if="!overview.upcoming_tasks.length" class="muted">未来 7 天没有带截止日期的待办任务。</li>
@@ -146,6 +147,8 @@ onMounted(load)
 .overview-item { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .overview-item:last-child { padding-bottom: 0; border-bottom: 0; }
 .overview-item p { margin: 3px 0; color: var(--muted); font-size: 13px; }
+.item-link { color: var(--brand); text-underline-offset: 3px; }
+.item-link:hover { color: var(--ink); }
 .next-block { padding: 12px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); }
 .quick-links { display: grid; gap: 12px; }
 .page-actions { display: flex; gap: 10px; flex-wrap: wrap; }

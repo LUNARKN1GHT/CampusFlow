@@ -55,9 +55,9 @@
 | P012 截止／负荷风险 | `test_deadline_risk_is_marked_as_estimate_based`、`test_confirmed_shortfall_is_a_conflict_not_an_estimate`、`test_daily_and_weekly_load_risks_are_reported` |
 | P013 版本化接受 | `test_generate_and_accept_plan_without_changing_task_ddl`、`test_stale_version_and_changed_inputs_are_rejected`、`test_newer_accepted_plan_is_not_overwritten_by_old_draft` |
 | P014 移动与锁定 | `test_move_block_updates_schedule_but_not_task_ddl`、`test_move_rejects_overlap_with_fixed_event_and_other_blocks`、`test_lock_and_unlock_accepted_block`、`test_draft_block_cannot_be_moved_before_accepting` |
-| P015／P016 页面 | `frontend/src/views/PlanView.vue`；浏览器走查见下 |
+| P015／P016 页面 | `frontend/src/views/PlanView.vue`；冲突与风险分开展示；操作失败显示“操作未完成”并可刷新最新计划；浏览器走查见下 |
 | P017 自然语言入口 | `tests/test_qa_api.py::test_planning_and_conflict_intents_execute_without_auto_accepting` |
-| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue` |
+| P018 今日总览 | `test_overview_reports_today_plan_and_upcoming_tasks`；`frontend/src/views/OverviewView.vue`；总览条目跳转 `/tasks?task=` 并高亮对应任务 |
 
 ## 自动化检查
 
