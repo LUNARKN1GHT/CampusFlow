@@ -6,11 +6,13 @@ from zoneinfo import ZoneInfo
 from campusflow.domain.planning import (
     AssumptionOptions,
     AvailabilityRule,
+    ExcludedTask,
     FixedEventOccurrence,
     PlanningInput,
     PlanningTask,
     allocate_tasks,
     build_free_windows,
+    build_outcome,
     input_fingerprint,
     input_snapshot,
     resolve_assumptions,
@@ -550,6 +552,79 @@ def test_explicit_segment_and_buffer_choices_are_echoed_as_assumptions() -> None
     assert {"segment", "buffer"} <= kinds
     assert resolved.segment_minutes == 45
     assert resolved.buffer_minutes == 10
+
+
+def test_every_input_task_has_a_destination() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="可排",
+                course_id=None,
+                priority="medium",
+                minutes=60,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+            PlanningTask(
+                task_id=3,
+                title="缺耗时",
+                course_id=None,
+                priority="medium",
+                minutes=None,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+        excluded_tasks=(ExcludedTask(task_id=2, title="已完成", progress="done"),),
+    )
+    resolved = _resolved(inputs)
+    outcome = build_outcome(inputs, resolved, allocate_tasks(inputs, resolved))
+    assert outcome.all_task_ids == {1, 2, 3}
+    assert outcome.excluded[0].status == "excluded"
+    assert outcome.excluded[0].reason_code == "done"
+    assert any(item.reason_code == "missing_duration" for item in outcome.dispositions)
+    assert outcome.coverage["tasks_considered"] == 2
+    assert outcome.coverage["tasks_excluded"] == 1
+    assert outcome.coverage["not_checked"]
+
+
+def test_capacity_gap_exposes_adjustment_options() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="无法安排",
+                course_id=None,
+                priority="high",
+                minutes=120,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+    )
+    resolved = _resolved(inputs)
+    outcome = build_outcome(inputs, resolved, allocate_tasks(inputs, resolved))
+    assert outcome.capacity_gap_minutes == 120
+    assert outcome.adjustment_options
+    assert outcome.dispositions[0].status == "unscheduled"
+    assert outcome.dispositions[0].options
 
 
 def test_zero_duration_does_not_silently_enter_schedule() -> None:

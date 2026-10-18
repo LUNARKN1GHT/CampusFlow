@@ -412,6 +412,107 @@ class AllocationResult:
     capacity_gap_minutes: int
 
 
+@dataclass(frozen=True)
+class ExcludedTaskDisposition:
+    task_id: int
+    title: str
+    status: str
+    reason_code: str
+    message: str
+    options: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PlanOutcome:
+    blocks: tuple[BlockSuggestion, ...]
+    dispositions: tuple[TaskDisposition, ...]
+    excluded: tuple[ExcludedTaskDisposition, ...]
+    gaps: tuple[dict[str, Any], ...]
+    assumptions: tuple[dict[str, Any], ...]
+    capacity_gap_minutes: int
+    adjustment_options: tuple[str, ...]
+    coverage: dict[str, Any]
+
+    @property
+    def all_task_ids(self) -> set[int]:
+        return {item.task_id for item in self.dispositions} | {
+            item.task_id for item in self.excluded
+        }
+
+
+def build_outcome(
+    inputs: PlanningInput, resolved: ResolvedInput, allocation: AllocationResult
+) -> PlanOutcome:
+    """汇总未排原因、容量缺口与检查覆盖，保证每个输入任务都有去向（P008）。"""
+    excluded = tuple(
+        ExcludedTaskDisposition(
+            task_id=task.task_id,
+            title=task.title,
+            status="excluded",
+            reason_code=task.progress,
+            message=(
+                "任务已完成，不参与本次排期"
+                if task.progress == "done"
+                else "任务已取消，不参与本次排期"
+            ),
+            options=("重新打开任务",) if task.progress == "cancelled" else (),
+        )
+        for task in inputs.excluded_tasks
+    )
+
+    missing_due = [task.title for task in resolved.tasks if task.due_at is None]
+    missing_duration = [task.title for task in resolved.tasks if task.minutes is None]
+    not_checked: list[str] = []
+    if missing_due:
+        not_checked.append(
+            "以下任务没有明确截止日期，未检查截止风险：" + "、".join(missing_due)
+        )
+    if missing_duration:
+        not_checked.append(
+            "以下任务缺少剩余耗时，未检查容量安排：" + "、".join(missing_duration)
+        )
+    coverage = {
+        "tasks_considered": len(resolved.tasks),
+        "tasks_scheduled": sum(item.status == "scheduled" for item in allocation.dispositions),
+        "tasks_partial": sum(item.status == "partial" for item in allocation.dispositions),
+        "tasks_unscheduled": sum(
+            item.status == "unscheduled" for item in allocation.dispositions
+        ),
+        "tasks_excluded": len(excluded),
+        "checks": [
+            "deadline",
+            "fixed_event_overlap",
+            "daily_capacity",
+            "weekly_capacity",
+        ],
+        "not_checked": not_checked,
+        "notes": [
+            "未确认候选事项不参与排期；需先在待核对中确认后才会成为排期输入",
+            "固定日程与可用时间均按工作空间时区解释",
+        ],
+    }
+
+    adjustment_options: tuple[str, ...] = ()
+    if allocation.capacity_gap_minutes > 0:
+        adjustment_options = (
+            "增加每日或每周可用时间",
+            "扩大规划范围或调整任务截止",
+            "拆分任务或修改耗时估计",
+            "接受缺口并保留未排任务",
+        )
+
+    return PlanOutcome(
+        blocks=allocation.blocks,
+        dispositions=allocation.dispositions,
+        excluded=excluded,
+        gaps=resolved.gaps,
+        assumptions=resolved.assumptions,
+        capacity_gap_minutes=allocation.capacity_gap_minutes,
+        adjustment_options=adjustment_options,
+        coverage=coverage,
+    )
+
+
 def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> AllocationResult:
     """按截止与可用时间分配任务；不越过确定截止，也不占用固定日程。
 
