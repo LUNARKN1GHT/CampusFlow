@@ -22,7 +22,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByLabel('用户名').fill('student')
   await page.getByLabel('密码').fill('campusflow-dev')
   await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: '让学习安排，' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
 
   await page.getByRole('link', { name: '课程' }).click()
   await expect(page.getByText('没有进行中的学期')).toBeVisible()
@@ -41,7 +41,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.reload()
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
 
-  await page.getByRole('link', { name: '任务与计划' }).click()
+  await page.getByRole('link', { name: '任务', exact: true }).click()
   await expect(page.getByText('还没有任务')).toBeVisible()
   await page.getByRole('button', { name: '添加任务' }).click()
   await page.getByLabel('任务标题').fill(taskName)
@@ -84,7 +84,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByRole('button', { name: '添加时段' }).click()
   await expect(page.locator('.availability-grid article').filter({ hasText: '周六' })).toBeVisible()
 
-  await page.getByRole('link', { name: '任务与计划' }).click()
+  await page.getByRole('link', { name: '任务', exact: true }).click()
   await page.reload()
   const persistedRow = page.locator('.task-row').filter({ hasText: taskName })
   await expect(persistedRow.getByText('受阻')).toBeVisible()
@@ -113,7 +113,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await expect(page.getByText('正在查看已归档学期')).toBeVisible()
   await page.getByLabel('显示历史学期').uncheck()
   await expect(page.getByRole('heading', { name: courseName })).not.toBeVisible()
-  await page.getByRole('link', { name: '任务与计划' }).click()
+  await page.getByRole('link', { name: '任务', exact: true }).click()
   await page.locator('.filter-bar').getByRole('combobox').first().selectOption({ label: `${semesterName}（已归档）` })
   await expect(page.locator('.task-row').filter({ hasText: taskName }).getByText('受阻')).toBeVisible()
   await page.getByRole('link', { name: '课程' }).click()

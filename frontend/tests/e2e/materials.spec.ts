@@ -122,7 +122,7 @@ test.describe('M2 资料库真实队列闭环', () => {
     const tasks = await (await page.request.get('/api/v1/tasks')).json() as { id: number; source_state: string }[]
     expect(tasks.find((item) => item.id === task.id)?.source_state).toBe('invalidated')
     expect((await page.request.get(`/api/v1/materials/${materialId}/versions/1/file`)).status()).toBe(404)
-    await page.getByRole('link', { name: '任务与计划' }).click()
+    await page.getByRole('link', { name: '任务', exact: true }).click()
     await expect(page.locator('.task-row').filter({ hasText: task.title })).toContainText('来源资料')
     await expect(page.locator('.task-row').filter({ hasText: task.title })).toContainText('引用不可用')
   })
