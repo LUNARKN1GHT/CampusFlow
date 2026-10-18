@@ -65,7 +65,7 @@
 backend: uv run ruff check src tests        -> All checks passed!
 backend: uv run pytest -q                   -> 1306 passed, 9 warnings
 frontend: npm run build                     -> typecheck 通过，vite build 成功
-frontend: npx playwright test（清空专用测试库）-> 9 passed, 1 skipped（M2 队列用例按环境跳过）
+frontend: npx playwright test（清空专用测试库）-> 10 passed, 1 skipped（M2 队列用例按环境跳过）
 ```
 
 `P010` 的边界测试位于 `backend/tests/test_planning_edges.py`，其余计划领域测试位于 `backend/tests/test_planning_domain.py`。
@@ -81,7 +81,7 @@ frontend: npx playwright test（清空专用测试库）-> 9 passed, 1 skipped�
 5. 调整时间到 19:00–19:30，v3 → v4，理由追加“用户手动移动”；
 6. 回到 `/` 总览，显示近期截止任务、未完整排入 1、冲突 1。
 
-新增 `frontend/tests/e2e/plan.spec.ts` 固化同一流程：登录 → 设置可用时段 → 创建任务 → 生成草案 → 接受 → 锁定 → 移动 → 总览读取 → 条目跳转任务并高亮；另一个用例验证过期草案被拒绝后显示“操作未完成”并可刷新到最新计划。同时修正旧 e2e 对首页标题、“任务与计划”导航和“待核对”快捷入口的选择器。`frontend/tests/e2e/plan-keyboard.spec.ts` 另以 Tab、Enter 和方向键完成登录、生成、接受、锁定与移动，并验证可见焦点。
+新增 `frontend/tests/e2e/plan.spec.ts` 固化同一流程：登录 → 设置可用时段 → 创建任务 → 生成草案 → 接受 → 锁定 → 移动 → 总览读取 → 条目跳转任务并高亮；另覆盖过期草案拒绝后的刷新，以及加载失败后的重试恢复。同时修正旧 e2e 对首页标题、“任务与计划”导航和“待核对”快捷入口的选择器。`frontend/tests/e2e/plan-keyboard.spec.ts` 另以 Tab、Enter 和方向键完成登录、生成、接受、锁定与移动，并验证可见焦点。
 
 走查中发现并修复：
 

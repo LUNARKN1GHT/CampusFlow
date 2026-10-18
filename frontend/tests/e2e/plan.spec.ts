@@ -129,3 +129,20 @@ test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) 
   await page.getByRole('button', { name: '重新加载' }).click()
   await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
 })
+
+test('计划加载失败后可点击重试恢复', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('用户名').fill('student')
+  await page.getByLabel('密码').fill('campusflow-dev')
+  await page.getByLabel('密码').press('Enter')
+  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+
+  await page.route('**/api/v1/plans/current', (route) => route.abort('failed'))
+  await page.getByRole('link', { name: '学习计划' }).click()
+  await expect(page.getByText('加载失败')).toBeVisible()
+
+  await page.unroute('**/api/v1/plans/current')
+  await page.getByRole('button', { name: '重新加载' }).click()
+  await expect(page.getByText('加载失败')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '生成未来两周草案' })).toBeVisible()
+})

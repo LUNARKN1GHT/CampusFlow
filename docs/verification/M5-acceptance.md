@@ -1,20 +1,20 @@
 # M5 MVP 验收检查表（进行中）
 
 日期：2026-10-18
-结论：**未通过完整验收。** 计划功能实现与自动化／浏览器走查已完成；V001、V002、V004、V005、V006、V007 仍缺少真实模型复跑、全新环境验证或独立走查，不能把代码完成等同于阶段验收。
+结论：**未通过完整验收。** 计划功能实现与自动化／浏览器走查已完成；V001、V002、V003、V004、V005、V006、V007 仍缺少真实模型复跑、真实队列、全新环境验证或独立走查，不能把代码完成等同于阶段验收。
 
 ## V001 八项 MVP 端到端验收
 
-| # | 验收项 | 证据 | 状态 |
+| 用例 | 验收项 | 证据 | 状态 |
 | --- | --- | --- | --- |
-| 1 | DDL 答案与引用一致 | Q018 确定性生成器与协议校验；真实模型语义复跑仍待 Q019 | 未完成 |
-| 2 | 日期不完整时不补造事实 | X003、Q018 验证；日期精度与待核对字段测试 | 自动化通过，待真实模型复核 |
-| 3 | 资料不足时明确说明 | Q011／Q012 固定文案与无候选路径测试 | 自动化通过 |
-| 4 | 两周计划符合已知约束并列出未排任务 | `test_plans_api.py`、`test_planning_edges.py`；浏览器走查 | 自动化与走查通过 |
-| 5 | 时间不足时展示缺口 | `test_capacity_gap_exposes_adjustment_options`、计划页面容量缺口与调整选项 | 自动化与走查通过 |
-| 6 | 调整时间块不修改原始 DDL | `test_move_block_updates_schedule_but_not_task_ddl` | 自动化通过 |
-| 7 | 部分解析失败可见 | X008、Q011 覆盖提示测试 | 自动化通过 |
-| 8 | 删除后引用状态正确 | Q008、Q014 旧轮次引用复核测试 | 自动化通过 |
+| MVP-01 | DDL 答案与引用一致 | Q018 确定性生成器与协议校验；真实模型语义复跑仍待 Q019 | 未完成 |
+| MVP-02 | 日期不完整时不补造事实 | X003、Q018 验证；日期精度与待核对字段测试 | 自动化通过，待真实模型复核 |
+| MVP-03 | 资料不足时明确说明 | Q011／Q012 固定文案与无候选路径测试 | 自动化通过 |
+| MVP-04 | 两周计划符合已知约束并列出未排任务 | `test_plans_api.py`、`test_planning_edges.py`；计划页 e2e | 自动化与走查通过 |
+| MVP-05 | 时间不足时展示缺口 | `test_capacity_gap_exposes_adjustment_options`、计划页面容量缺口与调整选项 | 自动化与走查通过 |
+| MVP-06 | 调整时间块不修改原始 DDL | `test_move_block_updates_schedule_but_not_task_ddl`；计划页 e2e | 自动化与走查通过 |
+| MVP-07 | 部分解析失败可见 | X008、Q011 覆盖提示测试 | 自动化通过，待真实样本复核 |
+| MVP-08 | 删除后引用状态正确 | Q008、Q014 旧轮次引用复核测试 | 自动化通过 |
 
 阻断项：真实模型语义复核（Q019 #392）尚未补跑；未做独立人工验收。V001 保持开放。
 
@@ -29,6 +29,8 @@ uv run --locked pytest tests/test_qa_acceptance.py tests/test_qa_api.py \
 ```
 
 结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；不能替代真实模型语义复核与独立人工验收。
+
+八项用例定义另经 `backend/.venv/bin/python scripts/validate_mvp_acceptance_cases.py` 校验通过：`8 MVP acceptance cases are complete and valid`。
 
 
 ## V002 空间隔离与资料内指令边界
@@ -70,9 +72,9 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - 总览重复空状态；
 - 尚无当前计划时把 404 显示为“加载失败”，现改为正常空状态。
 
-新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
+新增 `frontend/tests/e2e/plan-keyboard.spec.ts`，仅用 Tab、Enter、方向键完成登录、导航到学习计划、生成草案、接受、锁定、调整时间与保存，并断言键盘焦点仍有可见轮廓；移动时间块使用原生日期时间控件的分段方向键编辑。`frontend/tests/e2e/plan.spec.ts` 同步改为精确匹配“当前计划”，避免与“查看当前计划”按钮歧义；另覆盖过期草案后的刷新与加载失败后的重试恢复。`frontend/tests/e2e/responsive.spec.ts` 在 390px 宽度下验证八个导航项完整可见、计划页可操作且页面无横向溢出。
 
-在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `9 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
 
 语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测与独立走查，V004 保持开放。
 
@@ -143,7 +145,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 ### 候选版本检查（2026-10-18）
 
 - `uv run --locked ruff check .` 通过；后端 CI 全量测试通过。
-- `npm run build` 通过；完整 e2e 为 `7 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
+- `npm run build` 通过；完整 e2e 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
 - PR #394–#396 CI 全绿；尚未合并到 `develop`／`main`。
 - 结论：**不满足发布条件**，V007 保持开放。
 
