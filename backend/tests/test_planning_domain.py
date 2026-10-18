@@ -6,8 +6,10 @@ from zoneinfo import ZoneInfo
 from campusflow.domain.planning import (
     AssumptionOptions,
     AvailabilityRule,
+    FixedEventOccurrence,
     PlanningInput,
     PlanningTask,
+    build_free_windows,
     input_fingerprint,
     input_snapshot,
     resolve_assumptions,
@@ -140,6 +142,73 @@ def test_user_selected_assumptions_are_applied_and_echoed() -> None:
     assert kinds == {"duration", "due_date"}
     assert all("假设" in item["text"] for item in resolved.assumptions)
     assert resolved.gaps == ()
+
+
+def _window_minutes(windows) -> int:
+    return sum(window.minutes for window in windows)
+
+
+def test_adjacent_availability_boundaries_do_not_overlap() -> None:
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=ZoneInfo("Asia/Shanghai")),
+        availability=(
+            AvailabilityRule(0, time(18), time(20)),
+            AvailabilityRule(0, time(20), time(22)),
+        ),
+    )
+    windows = build_free_windows(inputs)
+    assert len(windows) == 1
+    assert _window_minutes(windows) == 240
+
+
+def test_overlapping_availability_is_counted_once() -> None:
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=ZoneInfo("Asia/Shanghai")),
+        availability=(
+            AvailabilityRule(0, time(18), time(21)),
+            AvailabilityRule(0, time(20), time(22)),
+        ),
+    )
+    windows = build_free_windows(inputs)
+    assert _window_minutes(windows) == 240
+
+
+def test_fixed_event_is_subtracted_and_duplicate_events_not_double_counted() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    event = FixedEventOccurrence(
+        event_id=1,
+        title="晚课",
+        start=datetime(2026, 10, 19, 19, tzinfo=tz),
+        end=datetime(2026, 10, 19, 20, tzinfo=tz),
+    )
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        fixed_events=(event, event),
+    )
+    windows = build_free_windows(inputs)
+    assert [(w.start.hour, w.end.hour) for w in windows] == [(18, 19), (20, 22)]
+    assert _window_minutes(windows) == 180
+
+
+def test_past_part_of_today_is_not_available() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 19, 30, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+    )
+    windows = build_free_windows(inputs)
+    assert len(windows) == 1
+    assert windows[0].start == datetime(2026, 10, 19, 19, 30, tzinfo=tz)
+    assert _window_minutes(windows) == 150
 
 
 def test_zero_duration_does_not_silently_enter_schedule() -> None:
