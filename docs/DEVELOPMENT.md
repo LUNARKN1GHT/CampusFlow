@@ -112,6 +112,16 @@ X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_draft
 
 X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
 
+Q019 为文字生成增加供应方切换：`CAMPUSFLOW_TEXT_PROVIDER=zhipu|deepseek`（默认 `zhipu`）；`deepseek` 使用 `DEEPSEEK_API_KEY` 与 `deepseek-chat` 等型号，适配器固定地址、禁止跳转，与智谱同样不在适配器内自动重试。真实模型语义补跑默认跳过，只在显式开启时运行（仅合成样本，护栏最多 10 次生成调用）：
+
+```bash
+cd backend
+CAMPUSFLOW_Q018_LIVE=1 CAMPUSFLOW_TEXT_PROVIDER=deepseek CAMPUSFLOW_TEXT_MODEL=deepseek-chat \
+  uv run --locked pytest tests/test_qa_acceptance_live.py -q -s
+```
+
+结果与限制见 [Q018 说明](verification/Q018-acceptance.md) 的 Q019 节。
+
 X007 的 `course_matching.match_candidate_course` 接受所选学期及带证据的课程/班级原文字段，返回待核对匹配建议，不修改候选 scope。调用方按需显式使用 `save_candidates` 保存；无新增依赖或配置。专项测试：`uv run --locked pytest tests/test_course_matching.py -q`；契约见 [X007 说明](verification/X007-course-matching.md)。
 
 X006 的 `relative_dates.resolve_task_deadline` 为 X003 草稿附加日期换算结果，不额外调用模型。需显式提供当前版本内的依据片段及来源时区，输出再按需调用 `save_candidates` 保存。无新增配置或依赖；专项测试为 `uv run --locked pytest tests/test_relative_dates.py -q`，输入和限制见 [X006 说明](verification/X006-relative-dates.md)。

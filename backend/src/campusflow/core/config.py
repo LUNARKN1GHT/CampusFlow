@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     embed_job_max_auto_retries: int = Field(default=3, ge=0)
     # 智谱文字/视觉模型共用密钥（ZHIPU_API_KEY；未配置时不得调用真实模型）
     zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
+    # Q019：文字生成供应方；deepseek 使用 DEEPSEEK_API_KEY 与 OpenAI 兼容接口
+    deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
+    text_provider: str = Field(default="zhipu", validation_alias="CAMPUSFLOW_TEXT_PROVIDER")
     # X002：用户选择的文字模型，与视觉模型独立配置。
     text_model: str = "glm-4-flash-250414"
     text_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)

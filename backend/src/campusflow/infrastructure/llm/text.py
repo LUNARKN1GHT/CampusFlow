@@ -10,6 +10,7 @@ from campusflow.application.ports.generation import GenerationRequest
 from campusflow.domain.errors import ModelOutputError, PermanentError, TransientError
 
 API_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
 MAX_RESPONSE_BYTES = 1024 * 1024
 
 
@@ -18,12 +19,17 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-class ZhipuTextGenerator:
+class _OpenAiCompatibleTextGenerator:
+    """OpenAI 兼容的 JSON 文字生成基类；供应商只通过地址和密钥区分。"""
+
+    api_url = ""
+    key_label = "模型"
+
     def __init__(
         self, api_key: str, *, model: str, timeout_seconds: float = 60, max_tokens: int = 4096
     ):
         if not api_key or not api_key.strip() or any(c.isspace() for c in api_key):
-            raise ValueError("缺少有效的智谱密钥")
+            raise ValueError(f"缺少有效的{self.key_label}密钥")
         if not model or len(model) > 100 or any(c.isspace() for c in model):
             raise ValueError("文字模型名称无效")
         if not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 120:
@@ -48,7 +54,7 @@ class ZhipuTextGenerator:
             ],
         }
         http_request = urllib.request.Request(
-            API_URL,
+            self.api_url,
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Authorization": f"Bearer {self._api_key}",
@@ -90,6 +96,18 @@ class ZhipuTextGenerator:
         except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
             raise ModelOutputError("文字模型未返回完整有效正文，未接受截断结果或工具调用") from None
         return content
+
+
+class ZhipuTextGenerator(_OpenAiCompatibleTextGenerator):
+    api_url = API_URL
+    key_label = "智谱"
+
+
+class DeepSeekTextGenerator(_OpenAiCompatibleTextGenerator):
+    """Q019：DeepSeek OpenAI 兼容文字适配器；不在适配器内自动重试或降级。"""
+
+    api_url = DEEPSEEK_API_URL
+    key_label = "DeepSeek"
 
 
 class FakeTextGenerator:

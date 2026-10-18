@@ -1,22 +1,22 @@
-# M5 MVP 验收检查表（进行中）
+# M5 MVP 验收检查表
 
 日期：2026-10-18
-结论：**未通过完整验收。** 计划功能实现与自动化／浏览器走查已完成；V001、V002、V003、V004、V005、V006、V007 仍缺少真实模型复跑、真实队列、全新环境验证或独立走查，不能把代码完成等同于阶段验收。
+结论：**按作者决定放行发布 v0.5.0（2026-10-18 更新）。** 计划功能实现、自动化、浏览器走查、真实队列与真实模型补跑均已完成；作者明确独立验收不阻塞发布，全新机器验证暂缓。各 V 项残留限制见对应章节。
 
 ## V001 八项 MVP 端到端验收
 
 | 用例 | 验收项 | 证据 | 状态 |
 | --- | --- | --- | --- |
-| MVP-01 | DDL 答案与引用一致 | Q018 确定性生成器与协议校验；真实模型语义复跑仍待 Q019 | 未完成 |
-| MVP-02 | 日期不完整时不补造事实 | X003、Q018 验证；日期精度与待核对字段测试 | 自动化通过，待真实模型复核 |
-| MVP-03 | 资料不足时明确说明 | Q011／Q012 固定文案与无候选路径测试 | 自动化通过 |
+| MVP-01 | DDL 答案与引用一致 | Q018 确定性生成器与协议校验；Q019 DeepSeek 真实模型补跑（`test_qa_acceptance_live.py`，6 passed） | 通过 |
+| MVP-02 | 日期不完整时不补造事实 | X003、Q018 验证；Q019 真实模型不补造年份并标注不确定 | 通过 |
+| MVP-03 | 资料不足时明确说明 | Q011／Q012 固定文案与无候选路径测试；Q019 无候选 0 次模型调用 | 通过 |
 | MVP-04 | 两周计划符合已知约束并列出未排任务 | `test_plans_api.py`、`test_planning_edges.py`；计划页 e2e | 自动化与走查通过 |
 | MVP-05 | 时间不足时展示缺口 | `test_capacity_gap_exposes_adjustment_options`、计划页面容量缺口与调整选项 | 自动化与走查通过 |
 | MVP-06 | 调整时间块不修改原始 DDL | `test_move_block_updates_schedule_but_not_task_ddl`；计划页 e2e | 自动化与走查通过 |
-| MVP-07 | 部分解析失败可见 | X008、Q011 覆盖提示测试 | 自动化通过，待真实样本复核 |
-| MVP-08 | 删除后引用状态正确 | Q008、Q014 旧轮次引用复核测试 | 自动化通过 |
+| MVP-07 | 部分解析失败可见 | X008、Q011 覆盖提示测试；Q019 部分覆盖真实模型复核 | 通过（合成样本） |
+| MVP-08 | 删除后引用状态正确 | Q008、Q014 旧轮次引用复核测试；Q019 来源删除后 0 次模型调用 | 通过 |
 
-阻断项：真实模型语义复核（Q019 #392）尚未补跑；未做独立人工验收。V001 保持开放。
+2026-10-18 补齐项：Q019 真实模型语义复核已补跑（详见 [Q018-acceptance.md](Q018-acceptance.md) 的 Q019 节）；独立人工验收按作者决定豁免。
 
 2026-10-18 复跑覆盖上述八项的自动化证据集合：
 
@@ -28,7 +28,7 @@ uv run --locked pytest tests/test_qa_acceptance.py tests/test_qa_api.py \
   tests/test_material_delete_invalidation.py tests/test_index_orchestration.py -q
 ```
 
-结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；不能替代真实模型语义复核与独立人工验收。
+结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；真实模型语义复核由 Q019 补跑补齐（见上），独立人工验收按作者决定豁免。
 
 八项用例定义另经 `backend/.venv/bin/python scripts/validate_mvp_acceptance_cases.py` 校验通过：`8 MVP acceptance cases are complete and valid`。
 
@@ -47,7 +47,7 @@ uv run --locked pytest tests/test_workspace_scope.py tests/test_plans_api.py \
   tests/test_index_orchestration.py -q
 ```
 
-结果 `68 passed`。覆盖猜 ID 读取／修改课程、学期、任务、日程与可用时段，跨空间关联创建，列表只返回当前空间数据，错误响应不泄露其他空间名称或编号；同时覆盖计划草案、问答会话、资料读取与索引编排的空间边界。结论：自动化部分通过；跨模块完整验收仍待 V002 负责人执行，V002 保持开放。
+结果 `68 passed`。覆盖猜 ID 读取／修改课程、学期、任务、日程与可用时段，跨空间关联创建，列表只返回当前空间数据，错误响应不泄露其他空间名称或编号；同时覆盖计划草案、问答会话、资料读取与索引编排的空间边界。结论：自动化通过；独立验收按作者决定豁免，V002 不再作为发布阻塞。
 
 
 ## V003 删除与运行中处理的端到端竞态
@@ -61,7 +61,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 相关用例：`test_conversation_keeps_scope_and_marks_deleted_citation_invalid`、`test_job_write_guard.py` 中删除后写入被拒绝的用例、`test_material_delete_invalidation.py` 中来源失效用例。
 
-本轮执行结果：`27 passed`（2026-10-18）。结论：自动化通过；真实队列与独立复验仍按 V003 记录执行。
+本轮执行结果：`27 passed`（2026-10-18）。同日另完成两次真实队列复验：资料库真实队列 e2e 在隔离测试库 + Redis DB1 + 独立存储目录下 `1 passed`（7.6s）；人工竞态脚本（上传资料 → 关联任务 → 删除资料 → 再运行 Worker）结果为 `deleted_before_worker=true`、`material_resurrected=false`、任务来源状态 `invalidated`、作业在被删除后仍被处理。结论：自动化与真实队列均通过，V003 覆盖完成。
 
 ## V004 页面易用性与无障碍走查
 
@@ -76,7 +76,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 在清空后的专用测试库上执行完整套件：`npm run build` 通过，`npx playwright test` 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
 
-语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测与独立走查，V004 保持开放。
+语义色 token 的 WCAG 对比度计算（浅色／深色）：正文 `ink/paper` 14.45／13.79，次要文字 `muted/paper` 4.94／6.69，品牌文字 `brand/paper` 9.36／9.32，按钮文字 `on-brand-fill/brand-fill` 9.45／4.71，风险与提示文字均不低于 5.78；侧栏禁用项 `sidebar-disabled/sidebar-bg` 为 3.94／4.58，属不可交互的“尚未开放”标签，按 WCAG 非活动组件豁免。未执行屏幕阅读器（VoiceOver／NVDA）实测；按作者决定不作为发布阻塞，作为已知限制保留。
 
 
 ## V005 典型样本处理时延与模型成本
@@ -87,7 +87,8 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - 普通 DOCX（`samples/synthetic/n001/word-notice-paragraph.docx`，36.3 KiB，9 个片段）：17.2–19.5 ms。
 - 表格 DOCX（`samples/synthetic/n001/word-notice-table.docx`，36.3 KiB，19 个片段）：18.4–19.7 ms。
 - 计划功能不产生模型费用；问答与嵌入成本仍以 Q001 账本为准。
-- 未测量：视觉识别、嵌入与生成的端到端时延和费用（本机未配置模型密钥，Redis 队列未运行）；大文件与并发场景同样未覆盖。V005 的模型用量部分仍不完整，不能据此宣称典型样本全链路达标。
+- 2026-10-18 Q019 补跑使用 DeepSeek 真实生成：4 次调用均为合成样本，按输入千级 token／输出百余 token 保守估算总费用低于 0.01 元，未超 10 元预算；6 个用例连同迁移与清库共 24.9s（含 4 次真实网络调用）。
+- 未测量：视觉识别与 Embedding 的端到端时延和费用（本机未配置智谱密钥）；大文件与并发场景同样未覆盖。V005 的嵌入部分仍不完整。
 
 
 ## V006 本地整套启动与故障恢复说明
@@ -100,13 +101,13 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 另在 8003 端口以不可达数据库启动后端，`/api/v1/ready` 返回 503 与 `{"detail":"数据库不可用"}`；切回可用数据库重启后返回 200 与 `database:"ok"`，验证了停机后的恢复路径。
 
-限制：本机账号没有 CREATEDB 与创建 `vector` 扩展的权限，因此没有新建全新数据库，也未在全新机器或空 PostgreSQL 实例上验证；Worker／Redis 全链路未运行。V006 保持开放。
+限制：本机账号没有 CREATEDB 与创建 `vector` 扩展的权限，因此没有新建全新数据库，也未在全新机器或空 PostgreSQL 实例上验证（2026-10-18 按作者决定暂缓，不作为发布阻塞）；Worker／Redis 全链路已由资料库真实队列 e2e 单独复验（见 V003）。
 
 
 
 ## V007 发布说明与候选版本验收
 
-**状态：草案，未发布。** 不满足发布门槛，未创建 `v0.5.0` 或 `v0.5.0-rc.N` 标签。
+**状态：按作者决定发布 v0.5.0（2026-10-18 更新）。** 不创建 `-rc.N` 候选标签，合并 `develop`→`main` 后直接创建 `v0.5.0`；发布执行记录以 GitHub tag 与 Release 为准。
 
 ### 候选能力
 
@@ -121,12 +122,12 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 | 项目 | 状态 |
 | --- | --- |
-| V001 八项 MVP 验收 | 真实模型语义复核（Q019 #392）未补跑，未独立验收 |
-| V002 空间隔离与资料内指令边界 | 自动化 68 passed；独立跨模块验收未执行 |
-| V003 删除与运行中处理竞态 | 自动化 27 passed；真实队列复验未执行 |
-| V004 易用性与无障碍 | 键盘全流程与对比度已检查；屏幕阅读器实测与独立走查未执行 |
-| V005 时延与成本 | 本地解析／计划时延已测；模型与队列费用未测 |
-| V006 启动与故障恢复 | 文档与诊断路径已验证；全新机器从零验证未执行 |
+| V001 八项 MVP 验收 | Q019 真实模型补跑完成（6 passed）；独立验收按作者决定豁免 |
+| V002 空间隔离与资料内指令边界 | 自动化 68 passed；独立验收按作者决定豁免 |
+| V003 删除与运行中处理竞态 | 自动化 27 passed；真实队列 e2e 与人工竞态复验通过 |
+| V004 易用性与无障碍 | 键盘全流程与对比度已检查；屏幕阅读器实测未执行（作者豁免） |
+| V005 时延与成本 | 本地解析／计划时延已测；Q019 生成费用远低于预算；真实嵌入费用未测 |
+| V006 启动与故障恢复 | 文档与诊断路径已验证；全新机器验证按作者决定暂缓 |
 | V008 课程项目 PRE | 依赖 V001、V007，未开始 |
 
 ### 迁移
@@ -144,12 +145,12 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 
 ### 候选版本检查（2026-10-18）
 
-- `uv run --locked ruff check .` 通过；后端 CI 全量测试通过。
-- `npm run build` 通过；完整 e2e 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）。
-- PR #394–#396 CI 全绿；尚未合并到 `develop`／`main`。
-- 结论：**不满足发布条件**，V007 保持开放。
+- `uv run --locked ruff check .` 通过；后端全量 `1309 passed, 6 skipped`（Q019 补跑默认跳过），Q019 live 模式 6 passed。
+- `npm run build` 通过；完整 e2e 为 `10 passed, 1 skipped`（资料库真实队列用例按环境跳过）；资料库真实队列 e2e 在隔离环境下 `1 passed`。
+- PR #394–#396 已合并 `develop`（a3675fa）；Q019 分支（#392）合并后执行 `develop`→`main` 并创建 `v0.5.0`。
+- 结论：发布门槛按作者决定解除；执行记录以 tag 与 GitHub Release 为准。
 
 
 ## 本轮完成范围
 
-P001–P018 的代码、测试、页面与文档见 [M5-planning.md](M5-planning.md)。M5 里程碑保持 open，等待 V 系列独立验收。
+P001–P018 的代码、测试、页面与文档见 [M5-planning.md](M5-planning.md)。M5 里程碑随 v0.5.0 发布收口；V008 课程项目 PRE（#389）按作者决定最后收尾，保持开放。
