@@ -9,6 +9,7 @@ from campusflow.domain.planning import (
     FixedEventOccurrence,
     PlanningInput,
     PlanningTask,
+    allocate_tasks,
     build_free_windows,
     input_fingerprint,
     input_snapshot,
@@ -209,6 +210,134 @@ def test_past_part_of_today_is_not_available() -> None:
     assert len(windows) == 1
     assert windows[0].start == datetime(2026, 10, 19, 19, 30, tzinfo=tz)
     assert _window_minutes(windows) == 150
+
+
+def _resolved(inputs: PlanningInput, options: AssumptionOptions | None = None):
+    return resolve_assumptions(inputs, options or AssumptionOptions())
+
+
+def test_allocation_respects_earlier_deadline_first() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 20),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="先交",
+                course_id=None,
+                priority="low",
+                minutes=90,
+                due_at=datetime(2026, 10, 19, 19, 30, tzinfo=tz),
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+            PlanningTask(
+                task_id=2,
+                title="后交",
+                course_id=None,
+                priority="high",
+                minutes=60,
+                due_at=datetime(2026, 10, 20, 23, 59, tzinfo=tz),
+                due_date_only=True,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    first = [block for block in result.blocks if block.task_id == 1]
+    assert len(first) == 1
+    assert first[0].minutes == 90
+    assert first[0].ends_at <= datetime(2026, 10, 19, 19, 30, tzinfo=tz)
+    assert all(item.remaining_minutes == 0 for item in result.dispositions)
+    assert result.capacity_gap_minutes == 0
+
+
+def test_allocation_never_crosses_deadline_and_keeps_shortfall_reason() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="大作业",
+                course_id=None,
+                priority="high",
+                minutes=180,
+                due_at=datetime(2026, 10, 19, 19, 0, tzinfo=tz),
+                due_date_only=False,
+                target_date=None,
+                estimated=True,
+            ),
+        ),
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert len(result.blocks) == 1
+    assert result.blocks[0].minutes == 60
+    disposition = result.dispositions[0]
+    assert disposition.status == "partial"
+    assert disposition.reason_code == "insufficient_capacity_before_due"
+    assert disposition.remaining_minutes == 120
+    assert result.capacity_gap_minutes == 120
+
+
+def test_passed_deadline_is_not_scheduled() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 20, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="逾期",
+                course_id=None,
+                priority="high",
+                minutes=60,
+                due_at=datetime(2026, 10, 19, 19, tzinfo=tz),
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert result.blocks == ()
+    assert result.dispositions[0].reason_code == "due_passed"
+
+
+def test_no_availability_keeps_unscheduled_reason() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="作业",
+                course_id=None,
+                priority="medium",
+                minutes=60,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert result.dispositions[0].status == "unscheduled"
+    assert result.dispositions[0].reason_code == "no_available_time"
 
 
 def test_zero_duration_does_not_silently_enter_schedule() -> None:
