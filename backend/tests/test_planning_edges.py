@@ -202,9 +202,7 @@ def test_block_overlapping_fixed_event_is_reported() -> None:
 def test_overlapping_blocks_are_reported_and_adjacent_blocks_are_not() -> None:
     adjacent = detect_overlaps(_input(availability=()), (_block(1, 18, 19), _block(2, 19, 20)))
     assert adjacent == []
-    overlapping = detect_overlaps(
-        _input(availability=()), (_block(1, 18, 19), _block(2, 18, 20))
-    )
+    overlapping = detect_overlaps(_input(availability=()), (_block(1, 18, 19), _block(2, 18, 20)))
     assert len(overlapping) == 1
     assert overlapping[0]["type"] == "time_overlap"
 

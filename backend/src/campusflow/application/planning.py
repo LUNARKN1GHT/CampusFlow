@@ -275,9 +275,7 @@ def generate_draft(
         conflicts=conflicts,
         coverage=outcome.coverage,
     )
-    blocks = repos.plans.create_blocks(
-        draft.id, [_block_dict(block) for block in outcome.blocks]
-    )
+    blocks = repos.plans.create_blocks(draft.id, [_block_dict(block) for block in outcome.blocks])
     repos.plans.add_version(
         draft.id,
         version_no=draft.version,
@@ -289,9 +287,7 @@ def generate_draft(
     return draft
 
 
-def list_drafts(
-    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
-):
+def list_drafts(repos: Repositories, workspace_id: int, *, semester_id: int | None = None):
     return repos.plans.list_drafts(workspace_id, semester_id=semester_id)
 
 
@@ -432,9 +428,7 @@ def overview(
     unscheduled = 0
     if current is not None:
         unscheduled = sum(
-            1
-            for item in current.unscheduled
-            if item.get("status") in {"partial", "unscheduled"}
+            1 for item in current.unscheduled if item.get("status") in {"partial", "unscheduled"}
         )
     return {
         "today": today.isoformat(),
@@ -527,8 +521,13 @@ def move_block(
 
     snapshot = _snapshot_with_block(
         draft,
-        {"id": block.id, "starts_at": starts_at, "ends_at": ends_at, "minutes": minutes,
-         "locked": block.locked},
+        {
+            "id": block.id,
+            "starts_at": starts_at,
+            "ends_at": ends_at,
+            "minutes": minutes,
+            "locked": block.locked,
+        },
     )
     updated = repos.plans.bump_version(
         draft.id,
@@ -539,8 +538,7 @@ def move_block(
     if updated is None:
         raise ConflictError("计划版本已更新，请刷新后重试")
     reason = (
-        f"{block.reason}；用户手动移动到 "
-        f"{starts_at.astimezone(timezone).strftime('%m-%d %H:%M')}"
+        f"{block.reason}；用户手动移动到 {starts_at.astimezone(timezone).strftime('%m-%d %H:%M')}"
     )
     repos.plans.update_block(
         block.id,
