@@ -52,7 +52,7 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
   await expect(block).toContainText('提交缓冲')
 
   await page.getByRole('button', { name: '接受为当前计划' }).click()
-  await expect(page.getByText('当前计划')).toBeVisible()
+  await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
 
   await block.getByRole('button', { name: '锁定' }).click()
   await expect(block.getByText('已锁定')).toBeVisible()
