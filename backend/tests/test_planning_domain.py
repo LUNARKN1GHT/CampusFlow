@@ -340,6 +340,130 @@ def test_no_availability_keeps_unscheduled_reason() -> None:
     assert result.dispositions[0].reason_code == "no_available_time"
 
 
+def _sixty_minute_task(task_id: int, priority: str = "medium") -> PlanningTask:
+    return PlanningTask(
+        task_id=task_id,
+        title=f"任务{task_id}",
+        course_id=None,
+        priority=priority,
+        minutes=60,
+        due_at=None,
+        due_date_only=False,
+        target_date=None,
+        estimated=False,
+    )
+
+
+def test_daily_capacity_limits_total_planned_minutes() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="甲",
+                course_id=None,
+                priority="high",
+                minutes=90,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+            PlanningTask(
+                task_id=2,
+                title="乙",
+                course_id=None,
+                priority="medium",
+                minutes=90,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+        daily_capacity_minutes=120,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert sum(block.minutes for block in result.blocks) == 120
+    assert result.dispositions[0].scheduled_minutes == 90
+    assert result.dispositions[1].status == "partial"
+    assert result.dispositions[1].reason_code == "insufficient_capacity_in_range"
+    assert result.capacity_gap_minutes == 60
+
+
+def test_break_is_kept_between_blocks() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(_sixty_minute_task(1), _sixty_minute_task(2)),
+        break_minutes=15,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    first, second = sorted(result.blocks, key=lambda block: block.starts_at)
+    assert first.ends_at == datetime(2026, 10, 19, 19, 0, tzinfo=tz)
+    assert second.starts_at == datetime(2026, 10, 19, 19, 15, tzinfo=tz)
+    assert (second.starts_at - first.ends_at).total_seconds() == 15 * 60
+
+
+def test_priority_orders_tasks_without_deadline() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(_sixty_minute_task(1, "low"), _sixty_minute_task(2, "high")),
+        break_minutes=0,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    first = min(result.blocks, key=lambda block: block.starts_at)
+    assert first.task_id == 2
+    assert any(
+        source["kind"] == "priority" for source in result.blocks[0].constraint_source
+    )
+
+
+def test_weekly_capacity_is_respected_across_days() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 20),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(
+            AvailabilityRule(0, time(18), time(22)),
+            AvailabilityRule(1, time(18), time(22)),
+        ),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="周任务",
+                course_id=None,
+                priority="high",
+                minutes=90,
+                due_at=None,
+                due_date_only=False,
+                target_date=None,
+                estimated=False,
+            ),
+        ),
+        weekly_capacity_minutes=60,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert sum(block.minutes for block in result.blocks) == 60
+    assert result.dispositions[0].remaining_minutes == 30
+    assert all(
+        any(source["kind"] == "weekly_capacity" for source in block.constraint_source)
+        for block in result.blocks
+    )
+
+
 def test_zero_duration_does_not_silently_enter_schedule() -> None:
     resolved = resolve_assumptions(_input(tasks=(_task(minutes=0),)), AssumptionOptions())
     assert resolved.tasks[0].minutes == 0

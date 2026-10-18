@@ -405,6 +405,9 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
     ]
     blocks: list[BlockSuggestion] = []
     dispositions: list[TaskDisposition] = []
+    daily_used: dict[date, int] = {}
+    weekly_used: dict[tuple[int, int], int] = {}
+    day_last_end: dict[date, datetime] = {}
 
     for task in sorted(resolved.tasks, key=task_order_key):
         if task.minutes is None:
@@ -446,11 +449,29 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             window_start, window_end = window
             if deadline is not None and window_start >= deadline:
                 break
+
+            day = window_start.date()
+            day_end = day_last_end.get(day)
+            if day_end is not None:
+                earliest = day_end + timedelta(minutes=inputs.break_minutes)
+                if earliest > window_start:
+                    window_start = earliest
+                    window[0] = earliest
+            daily_remaining = inputs.daily_capacity_minutes - daily_used.get(day, 0)
+            week = day.isocalendar()[:2]
+            weekly_remaining = inputs.weekly_capacity_minutes - weekly_used.get(week, 0)
+            if daily_remaining <= 0 or weekly_remaining <= 0:
+                window[0] = window_end
+                continue
+
             latest_end = min(window_end, deadline) if deadline is not None else window_end
             available = int((latest_end - window_start).total_seconds() // 60)
             if available <= 0:
                 continue
-            minutes = min(remaining, available)
+            minutes = min(remaining, available, daily_remaining, weekly_remaining)
+            if minutes <= 0:
+                window[0] = window_end
+                continue
             block_end = window_start + timedelta(minutes=minutes)
             reason = (
                 f"在截止 {deadline.isoformat()} 前安排"
@@ -459,7 +480,30 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             constraint_source: list[dict[str, Any]] = [
                 {"kind": "availability", "text": "使用工作空间可用时间"},
+                {
+                    "kind": "priority",
+                    "value": task.priority,
+                    "text": "按任务重要性与截止顺序安排",
+                },
+                {
+                    "kind": "daily_capacity",
+                    "value": inputs.daily_capacity_minutes,
+                    "text": "不超过每日学习容量",
+                },
+                {
+                    "kind": "weekly_capacity",
+                    "value": inputs.weekly_capacity_minutes,
+                    "text": "不超过每周学习容量",
+                },
             ]
+            if inputs.break_minutes > 0:
+                constraint_source.append(
+                    {
+                        "kind": "break",
+                        "value": inputs.break_minutes,
+                        "text": "同一任务段之间保留休息",
+                    }
+                )
             if deadline is not None:
                 constraint_source.append(
                     {
@@ -485,6 +529,9 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             remaining -= minutes
             scheduled += minutes
             seq += 1
+            daily_used[day] = daily_used.get(day, 0) + minutes
+            weekly_used[week] = weekly_used.get(week, 0) + minutes
+            day_last_end[day] = block_end
 
         if remaining == 0:
             status = "scheduled"
@@ -493,9 +540,14 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             options: tuple[str, ...] = ()
         elif scheduled > 0:
             status = "partial"
-            reason_code = "insufficient_capacity_before_due"
-            message = f"已排 {scheduled} 分钟，仍有 {remaining} 分钟无法在截止前安排"
-            options = ("拆分任务", "增加可用时间", "调整截止日期", "接受缺口")
+            if deadline is not None:
+                reason_code = "insufficient_capacity_before_due"
+                message = f"已排 {scheduled} 分钟，仍有 {remaining} 分钟无法在截止前安排"
+                options = ("拆分任务", "增加可用时间", "调整截止日期", "接受缺口")
+            else:
+                reason_code = "insufficient_capacity_in_range"
+                message = f"已排 {scheduled} 分钟，仍有 {remaining} 分钟超出本次范围容量"
+                options = ("增加可用时间", "扩大规划范围", "降低其他任务安排", "接受缺口")
         elif deadline is not None and deadline <= inputs.now:
             status = "unscheduled"
             reason_code = "due_passed"
