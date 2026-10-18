@@ -46,7 +46,7 @@ uv run --locked pytest tests/test_job_write_guard.py tests/test_material_delete_
 - ≤760px 导航横向截断；
 - 总览重复空状态。
 
-走查快照显示主要区域有角色与可读名称（navigation、region、heading、form label、button 文本）。未执行键盘全流程、屏幕阅读器和颜色对比度专项检查，V004 保持开放。
+走查快照显示主要区域有角色与可读名称（navigation、region、heading、form label、button 文本）。新增 `frontend/tests/e2e/plan.spec.ts` 覆盖生成、接受、锁定、移动与总览，并修复了因首页改版而失效的旧选择器；隔离端口下 e2e 为 `6 passed, 1 skipped`。未执行键盘全流程、屏幕阅读器和颜色对比度专项检查，V004 保持开放。
 
 ## V005 典型样本处理时延与模型成本
 
