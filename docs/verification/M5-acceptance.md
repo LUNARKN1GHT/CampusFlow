@@ -18,6 +18,19 @@
 
 阻断项：真实模型语义复核（Q019 #392）尚未补跑；未做独立人工验收。V001 保持开放。
 
+2026-10-18 复跑覆盖上述八项的自动化证据集合：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_qa_acceptance.py tests/test_qa_api.py \
+  tests/test_deadline_completeness.py tests/test_plans_api.py \
+  tests/test_planning_edges.py tests/test_planning_domain.py \
+  tests/test_material_delete_invalidation.py tests/test_index_orchestration.py -q
+```
+
+结果 `120 passed`。该集合使用确定性生成器与协议校验，验证引用、日期完整性、资料不足、计划约束、容量缺口、移动不改 DDL、部分覆盖与删除后引用状态；不能替代真实模型语义复核与独立人工验收。
+
+
 ## V002 空间隔离与资料内指令边界
 
 - 计划草案跨工作空间不可见：`test_plan_from_another_workspace_is_not_visible`。
