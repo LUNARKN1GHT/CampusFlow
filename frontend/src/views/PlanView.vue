@@ -171,7 +171,7 @@ async function generate() {
       },
     })
   } catch (caught) {
-    error.value = errorMessage(caught)
+    actionError.value = errorMessage(caught)
   } finally {
     generating.value = false
   }
@@ -262,7 +262,7 @@ onMounted(load)
       </div>
     </div>
 
-    <ApiFeedback v-if="error" :message="error" />
+    <ApiFeedback v-if="error" :message="error" @retry="load" />
     <ApiFeedback v-if="actionError" :message="actionError" title="操作未完成" @retry="load" />
 
     <section class="panel stack-form" aria-label="规划假设">
