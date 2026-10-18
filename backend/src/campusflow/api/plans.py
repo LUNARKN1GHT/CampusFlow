@@ -199,9 +199,7 @@ def get_current_plan(
 
 
 @router.get("/plans/drafts/{draft_id}/conflicts", response_model=list[dict])
-def list_plan_conflicts(
-    draft_id: int, workspace: CurrentWorkspace, repos: Repos
-) -> list[dict]:
+def list_plan_conflicts(draft_id: int, workspace: CurrentWorkspace, repos: Repos) -> list[dict]:
     return use_cases.draft_conflicts(repos, workspace.id, draft_id)
 
 
