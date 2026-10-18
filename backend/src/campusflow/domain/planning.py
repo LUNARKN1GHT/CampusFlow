@@ -352,6 +352,179 @@ def subtract_intervals(windows: list[Interval], busy: list[Interval]) -> list[In
     return result
 
 
+def task_order_key(task: PlanningTask) -> tuple:
+    """明确截止优先，其次重要性；没有截止的任务排在最后。"""
+    priority_rank = {"high": 0, "medium": 1, "low": 2}.get(task.priority, 3)
+    due_key = task.due_at.timestamp() if task.due_at is not None else float("inf")
+    target_key = (
+        task.target_date.toordinal() if task.target_date is not None else date.max.toordinal()
+    )
+    return (due_key, priority_rank, target_key, task.task_id)
+
+
+@dataclass(frozen=True)
+class BlockSuggestion:
+    task_id: int | None
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    minutes: int
+    seq: int
+    reason: str
+    constraint_source: tuple[dict[str, Any], ...]
+    kind: str = "task"
+    locked: bool = False
+
+
+@dataclass(frozen=True)
+class TaskDisposition:
+    task_id: int
+    title: str
+    status: str
+    scheduled_minutes: int
+    remaining_minutes: int
+    reason_code: str | None
+    message: str
+    options: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class AllocationResult:
+    blocks: tuple[BlockSuggestion, ...]
+    dispositions: tuple[TaskDisposition, ...]
+    capacity_gap_minutes: int
+
+
+def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> AllocationResult:
+    """按截止与可用时间分配任务；不越过确定截止，也不占用固定日程。
+
+    这里只处理硬约束；每日／每周容量、休息与分段在后续规则中叠加。
+    """
+    windows = [
+        [window.start, window.end] for window in build_free_windows(inputs)
+    ]
+    blocks: list[BlockSuggestion] = []
+    dispositions: list[TaskDisposition] = []
+
+    for task in sorted(resolved.tasks, key=task_order_key):
+        if task.minutes is None:
+            dispositions.append(
+                TaskDisposition(
+                    task_id=task.task_id,
+                    title=task.title,
+                    status="unscheduled",
+                    scheduled_minutes=0,
+                    remaining_minutes=0,
+                    reason_code="missing_duration",
+                    message="缺少剩余耗时，暂未排入",
+                    options=("补充剩余耗时", "选择耗时假设后重新生成"),
+                )
+            )
+            continue
+        if task.minutes == 0:
+            dispositions.append(
+                TaskDisposition(
+                    task_id=task.task_id,
+                    title=task.title,
+                    status="unscheduled",
+                    scheduled_minutes=0,
+                    remaining_minutes=0,
+                    reason_code="no_remaining_work",
+                    message="剩余耗时为 0，不需要排期",
+                    options=(),
+                )
+            )
+            continue
+
+        remaining = task.minutes
+        scheduled = 0
+        seq = 0
+        deadline = task.due_at
+        for window in windows:
+            if remaining <= 0:
+                break
+            window_start, window_end = window
+            if deadline is not None and window_start >= deadline:
+                break
+            latest_end = min(window_end, deadline) if deadline is not None else window_end
+            available = int((latest_end - window_start).total_seconds() // 60)
+            if available <= 0:
+                continue
+            minutes = min(remaining, available)
+            block_end = window_start + timedelta(minutes=minutes)
+            reason = (
+                f"在截止 {deadline.isoformat()} 前安排"
+                if deadline is not None
+                else "在可用时间内安排"
+            )
+            constraint_source: list[dict[str, Any]] = [
+                {"kind": "availability", "text": "使用工作空间可用时间"},
+            ]
+            if deadline is not None:
+                constraint_source.append(
+                    {
+                        "kind": "deadline",
+                        "value": deadline.isoformat(),
+                        "date_only": task.due_date_only,
+                        "text": "任务明确截止时间",
+                    }
+                )
+            blocks.append(
+                BlockSuggestion(
+                    task_id=task.task_id,
+                    title=task.title,
+                    starts_at=window_start,
+                    ends_at=block_end,
+                    minutes=minutes,
+                    seq=seq,
+                    reason=reason,
+                    constraint_source=tuple(constraint_source),
+                )
+            )
+            window[0] = block_end
+            remaining -= minutes
+            scheduled += minutes
+            seq += 1
+
+        if remaining == 0:
+            status = "scheduled"
+            reason_code = None
+            message = "已完整排入"
+            options: tuple[str, ...] = ()
+        elif scheduled > 0:
+            status = "partial"
+            reason_code = "insufficient_capacity_before_due"
+            message = f"已排 {scheduled} 分钟，仍有 {remaining} 分钟无法在截止前安排"
+            options = ("拆分任务", "增加可用时间", "调整截止日期", "接受缺口")
+        elif deadline is not None and deadline <= inputs.now:
+            status = "unscheduled"
+            reason_code = "due_passed"
+            message = "截止时间已过，未安排新的时间块"
+            options = ("更新截止日期", "取消或重新打开任务", "接受逾期")
+        else:
+            status = "unscheduled"
+            reason_code = "no_available_time"
+            message = "没有可用的学习时间"
+            options = ("增加可用时间", "调整截止日期", "降低其他任务安排")
+        dispositions.append(
+            TaskDisposition(
+                task_id=task.task_id,
+                title=task.title,
+                status=status,
+                scheduled_minutes=scheduled,
+                remaining_minutes=remaining,
+                reason_code=reason_code,
+                message=message,
+                options=options,
+            )
+        )
+
+    gap = sum(item.remaining_minutes for item in dispositions)
+    return AllocationResult(
+        blocks=tuple(blocks), dispositions=tuple(dispositions), capacity_gap_minutes=gap
+    )
+
+
 def build_free_windows(inputs: PlanningInput) -> list[FreeWindow]:
     """按工作空间时区展开可用时段，扣除固定日程并裁掉已过去的时间。"""
     timezone = _zone(inputs.timezone)
