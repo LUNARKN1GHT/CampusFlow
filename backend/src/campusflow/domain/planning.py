@@ -666,6 +666,8 @@ def build_outcome(
             "未确认候选事项不参与排期；需先在待核对中确认后才会成为排期输入",
             "固定日程与可用时间均按工作空间时区解释",
         ],
+        "capacity_gap_minutes": allocation.capacity_gap_minutes,
+        "adjustment_options": [],
     }
 
     adjustment_options: tuple[str, ...] = ()
@@ -676,6 +678,7 @@ def build_outcome(
             "拆分任务或修改耗时估计",
             "接受缺口并保留未排任务",
         )
+    coverage["adjustment_options"] = list(adjustment_options)
 
     return PlanOutcome(
         blocks=allocation.blocks,

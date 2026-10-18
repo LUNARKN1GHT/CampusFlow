@@ -11,6 +11,7 @@ from campusflow.api import candidates as candidates_api
 from campusflow.api import courses as courses_api
 from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
+from campusflow.api import plans as plans_api
 from campusflow.api import qa as qa_api
 from campusflow.api import rules as rules_api
 from campusflow.api import schedule as schedule_api
@@ -25,7 +26,7 @@ from campusflow.application.jobs import (
 )
 from campusflow.application.ports.repositories import Repositories
 from campusflow.core.config import Settings
-from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.infrastructure.db.engine import create_db_engine
 from campusflow.infrastructure.db.session import create_session_factory
 from campusflow.infrastructure.queue.rq_queue import RQJobQueue
@@ -158,6 +159,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         candidates_api.router,
         rules_api.router,
         qa_api.router,
+        plans_api.router,
     ):
         app.include_router(
             router,
@@ -168,6 +170,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(NotFoundError)
     async def handle_not_found(request: Request, exc: NotFoundError) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ConflictError)
+    async def handle_conflict_error(request: Request, exc: ConflictError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(DomainError)
     async def handle_domain_error(request: Request, exc: DomainError) -> JSONResponse:
