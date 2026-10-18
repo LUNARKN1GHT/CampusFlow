@@ -303,3 +303,78 @@ def _zone(name: str):
     from zoneinfo import ZoneInfo
 
     return ZoneInfo(name)
+
+
+@dataclass(frozen=True)
+class FreeWindow:
+    start: datetime
+    end: datetime
+
+    @property
+    def minutes(self) -> int:
+        return int((self.end - self.start).total_seconds() // 60)
+
+
+def merge_intervals(intervals: list[Interval]) -> list[Interval]:
+    """合并重叠区间；首尾相接（end == 下个 start）不算重叠，但可安全合并为连续区间。"""
+    if not intervals:
+        return []
+    ordered = sorted(intervals, key=lambda item: (item.start, item.end))
+    merged = [ordered[0]]
+    for current in ordered[1:]:
+        previous = merged[-1]
+        if current.start <= previous.end:
+            if current.end > previous.end:
+                merged[-1] = Interval(previous.start, current.end)
+        else:
+            merged.append(current)
+    return merged
+
+
+def subtract_intervals(windows: list[Interval], busy: list[Interval]) -> list[Interval]:
+    """从可用区间扣除忙碌区间；重叠的忙碌输入只扣一次。"""
+    result: list[Interval] = []
+    merged_busy = merge_intervals(busy)
+    for window in windows:
+        segments = [window]
+        for blocker in merged_busy:
+            next_segments: list[Interval] = []
+            for segment in segments:
+                if blocker.end <= segment.start or blocker.start >= segment.end:
+                    next_segments.append(segment)
+                    continue
+                if blocker.start > segment.start:
+                    next_segments.append(Interval(segment.start, blocker.start))
+                if blocker.end < segment.end:
+                    next_segments.append(Interval(blocker.end, segment.end))
+            segments = next_segments
+        result.extend(segment for segment in segments if segment.end > segment.start)
+    return result
+
+
+def build_free_windows(inputs: PlanningInput) -> list[FreeWindow]:
+    """按工作空间时区展开可用时段，扣除固定日程并裁掉已过去的时间。"""
+    timezone = _zone(inputs.timezone)
+    availability: list[Interval] = []
+    current_date = inputs.range_start
+    while current_date <= inputs.range_end:
+        for rule in inputs.availability:
+            if rule.day_of_week != current_date.weekday():
+                continue
+            availability.append(
+                Interval(
+                    datetime.combine(current_date, rule.start_time, tzinfo=timezone),
+                    datetime.combine(current_date, rule.end_time, tzinfo=timezone),
+                )
+            )
+        current_date += timedelta(days=1)
+
+    busy = [Interval(event.start, event.end) for event in inputs.fixed_events]
+    free = subtract_intervals(merge_intervals(availability), busy)
+    floor = inputs.now
+    clipped: list[Interval] = []
+    for window in free:
+        start = max(window.start, floor)
+        if window.end > start:
+            clipped.append(Interval(start, window.end))
+    return [FreeWindow(start=window.start, end=window.end) for window in clipped]
