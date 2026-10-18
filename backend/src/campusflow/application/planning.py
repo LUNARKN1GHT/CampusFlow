@@ -361,6 +361,96 @@ def draft_conflicts(repos: Repositories, workspace_id: int, draft_id: int) -> li
     return get_draft(repos, workspace_id, draft_id).conflicts
 
 
+def overview(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None = None,
+    now: datetime | None = None,
+) -> dict:
+    """近期任务与今日安排总览（P018）；只读，不修改计划。"""
+    from campusflow.application import tasks as task_use_cases
+    from campusflow.domain.states import ReviewStatus
+
+    settings = get_settings(repos, workspace_id)
+    timezone = ZoneInfo(settings.timezone)
+    moment = (now or datetime.now(UTC)).astimezone(timezone)
+    today = moment.date()
+    current = current_plan(repos, workspace_id, semester_id=semester_id)
+
+    today_blocks = []
+    next_block = None
+    if current is not None:
+        for block in current.blocks:
+            local_start = block.starts_at.astimezone(timezone)
+            local_end = block.ends_at.astimezone(timezone)
+            if local_start.date() != today:
+                continue
+            item = {
+                "id": block.id,
+                "title": block.title,
+                "task_id": block.task_id,
+                "starts_at": local_start.isoformat(),
+                "ends_at": local_end.isoformat(),
+                "minutes": block.minutes,
+                "locked": block.locked,
+                "reason": block.reason,
+            }
+            today_blocks.append(item)
+            if local_start >= moment and next_block is None:
+                next_block = item
+        today_blocks.sort(key=lambda item: item["starts_at"])
+
+    horizon = today + timedelta(days=7)
+    tasks = task_use_cases.list_tasks(repos, workspace_id, semester_id=semester_id)
+    active = [
+        task
+        for task in tasks
+        if task.progress.value not in {"done", "cancelled"}
+        and task.due_date is not None
+        and task.due_date <= horizon
+    ]
+    active.sort(key=lambda task: (task.due_date or date.max, task.id))
+    upcoming = [
+        {
+            "id": task.id,
+            "title": task.title,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
+            "due_time": task.due_time.isoformat() if task.due_time else None,
+            "priority": task.priority.value,
+            "progress": task.progress.value,
+            "overdue": task.overdue,
+        }
+        for task in active[:8]
+    ]
+
+    pending_reviews = len(
+        repos.candidates.list_for_review(
+            workspace_id, review_statuses=(ReviewStatus.PENDING,), semester_id=semester_id
+        )
+    )
+    unscheduled = 0
+    if current is not None:
+        unscheduled = sum(
+            1
+            for item in current.unscheduled
+            if item.get("status") in {"partial", "unscheduled"}
+        )
+    return {
+        "today": today.isoformat(),
+        "timezone": settings.timezone,
+        "has_plan": current is not None,
+        "plan_status": current.status if current is not None else None,
+        "plan_version": current.version if current is not None else None,
+        "today_blocks": today_blocks,
+        "next_block": next_block,
+        "upcoming_tasks": upcoming,
+        "pending_review_count": pending_reviews,
+        "unscheduled_count": unscheduled,
+        "conflict_count": len(current.conflicts) if current is not None else 0,
+    }
+
+
 def _snapshot_with_block(draft, target: dict) -> dict:
     snapshot = _draft_snapshot(draft, draft.blocks)
     snapshot["blocks"] = [
