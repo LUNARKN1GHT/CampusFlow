@@ -66,24 +66,14 @@ def test_zero_availability_schedules_nothing_and_explains() -> None:
 
 
 def test_tight_deadline_at_window_start_cannot_be_scheduled() -> None:
-    result = _allocate(
-        _input(
-            tasks=(
-                _task(1, 60, due_at=datetime(2026, 10, 19, 18, tzinfo=TZ)),
-            )
-        )
-    )
+    result = _allocate(_input(tasks=(_task(1, 60, due_at=datetime(2026, 10, 19, 18, tzinfo=TZ)),)))
     assert result.blocks == ()
     assert result.dispositions[0].status == "unscheduled"
 
 
 def test_block_can_end_exactly_at_deadline_but_never_after() -> None:
     result = _allocate(
-        _input(
-            tasks=(
-                _task(1, 90, due_at=datetime(2026, 10, 19, 19, 30, tzinfo=TZ)),
-            )
-        )
+        _input(tasks=(_task(1, 90, due_at=datetime(2026, 10, 19, 19, 30, tzinfo=TZ)),))
     )
     block = result.blocks[0]
     deadline = datetime(2026, 10, 19, 19, 30, tzinfo=TZ)

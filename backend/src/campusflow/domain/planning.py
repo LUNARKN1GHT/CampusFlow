@@ -215,9 +215,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
                     "task_id": task.task_id,
                     "title": task.title,
                     "value": minutes,
-                    "text": (
-                        f"按用户选择的默认假设，任务《{task.title}》需要 {minutes} 分钟"
-                    ),
+                    "text": (f"按用户选择的默认假设，任务《{task.title}》需要 {minutes} 分钟"),
                 }
             )
 
@@ -267,8 +265,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
                     "task_id": task.task_id,
                     "title": task.title,
                     "message": (
-                        f"任务《{task.title}》没有明确截止日期；将按优先级安排，"
-                        "但不校验截止风险"
+                        f"任务《{task.title}》没有明确截止日期；将按优先级安排，但不校验截止风险"
                     ),
                 }
             )
@@ -491,20 +488,14 @@ def build_outcome(
     missing_duration = [task.title for task in resolved.tasks if task.minutes is None]
     not_checked: list[str] = []
     if missing_due:
-        not_checked.append(
-            "以下任务没有明确截止日期，未检查截止风险：" + "、".join(missing_due)
-        )
+        not_checked.append("以下任务没有明确截止日期，未检查截止风险：" + "、".join(missing_due))
     if missing_duration:
-        not_checked.append(
-            "以下任务缺少剩余耗时，未检查容量安排：" + "、".join(missing_duration)
-        )
+        not_checked.append("以下任务缺少剩余耗时，未检查容量安排：" + "、".join(missing_duration))
     coverage = {
         "tasks_considered": len(resolved.tasks),
         "tasks_scheduled": sum(item.status == "scheduled" for item in allocation.dispositions),
         "tasks_partial": sum(item.status == "partial" for item in allocation.dispositions),
-        "tasks_unscheduled": sum(
-            item.status == "unscheduled" for item in allocation.dispositions
-        ),
+        "tasks_unscheduled": sum(item.status == "unscheduled" for item in allocation.dispositions),
         "tasks_excluded": len(excluded),
         "checks": [
             "deadline",
@@ -545,9 +536,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
 
     这里只处理硬约束；每日／每周容量、休息与分段在后续规则中叠加。
     """
-    windows = [
-        [window.start, window.end] for window in build_free_windows(inputs)
-    ]
+    windows = [[window.start, window.end] for window in build_free_windows(inputs)]
     blocks: list[BlockSuggestion] = []
     dispositions: list[TaskDisposition] = []
     daily_used: dict[date, int] = {}

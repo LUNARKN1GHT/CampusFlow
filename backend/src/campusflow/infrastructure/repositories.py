@@ -1568,9 +1568,7 @@ class SqlAlchemyPlanRepository:
         row = self._session.get(PlanDraft, draft_id)
         if row is None:
             return None
-        self.add_version(
-            draft_id, version_no=row.version, change=change, snapshot=snapshot
-        )
+        self.add_version(draft_id, version_no=row.version, change=change, snapshot=snapshot)
         return _plan_draft_to_data(row)
 
     def supersede_others(
