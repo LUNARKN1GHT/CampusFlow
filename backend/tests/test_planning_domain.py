@@ -627,6 +627,59 @@ def test_capacity_gap_exposes_adjustment_options() -> None:
     assert outcome.dispositions[0].options
 
 
+def test_block_reason_matches_real_constraints_and_marks_estimates() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(
+            PlanningTask(
+                task_id=1,
+                title="提交论文",
+                course_id=None,
+                priority="high",
+                minutes=60,
+                due_at=datetime(2026, 10, 19, 21, tzinfo=tz),
+                due_date_only=False,
+                target_date=None,
+                estimated=True,
+            ),
+        ),
+        buffer_minutes=30,
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    block = result.blocks[0]
+    assert "截止" in block.reason
+    assert "高优先级" in block.reason
+    assert "估计值" in block.reason
+    assert "提交缓冲" in block.reason
+    kinds = {source["kind"] for source in block.constraint_source}
+    assert {"availability", "priority", "deadline", "buffer", "estimated_duration"} <= kinds
+    estimated = next(
+        source for source in block.constraint_source if source["kind"] == "estimated_duration"
+    )
+    assert estimated["risk"] is True
+
+
+def test_confirmed_duration_does_not_claim_estimate_risk() -> None:
+    tz = ZoneInfo("Asia/Shanghai")
+    inputs = _input(
+        range_start=date(2026, 10, 19),
+        range_end=date(2026, 10, 19),
+        now=datetime(2026, 10, 19, 0, tzinfo=tz),
+        availability=(AvailabilityRule(0, time(18), time(22)),),
+        tasks=(_sixty_minute_task(1),),
+    )
+    result = allocate_tasks(inputs, _resolved(inputs))
+    assert "估计值" not in result.blocks[0].reason
+    assert all(
+        source["kind"] != "estimated_duration"
+        for source in result.blocks[0].constraint_source
+    )
+
+
 def test_zero_duration_does_not_silently_enter_schedule() -> None:
     resolved = resolve_assumptions(_input(tasks=(_task(minutes=0),)), AssumptionOptions())
     assert resolved.tasks[0].minutes == 0
