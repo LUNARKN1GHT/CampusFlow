@@ -17,7 +17,10 @@ from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.version_relations import VersionRelations
+from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError
+from campusflow.infrastructure.calendar.tokens import TokenCipher
+from campusflow.infrastructure.calendar_store import SqlCalendarStore
 from campusflow.infrastructure.index_manifests import SqlIndexManifests
 from campusflow.infrastructure.repositories import build_repositories
 from campusflow.infrastructure.version_relations import SqlVersionRelations
@@ -37,6 +40,24 @@ def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repos
 
 def get_version_relations(session: Annotated[Session, Depends(get_session)]) -> VersionRelations:
     return SqlVersionRelations(session)
+
+
+def get_calendar_store(
+    session: Annotated[Session, Depends(get_session)],
+) -> SqlCalendarStore:
+    return SqlCalendarStore(session)
+
+
+def get_calendar_provider(request: Request):
+    return request.app.state.calendar_provider
+
+
+def get_token_cipher(request: Request) -> TokenCipher:
+    return request.app.state.token_cipher
+
+
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
 
 
 def get_current_workspace(

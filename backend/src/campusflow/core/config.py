@@ -59,3 +59,16 @@ class Settings(BaseSettings):
     # 仅用于本机单用户开发。共享部署前必须通过环境变量替换默认凭据。
     local_username: str = "student"
     local_password: str = "campusflow-dev"
+    # M9：外部日历。local 只用于自动化验收与显式本地演示，生产使用 google。
+    calendar_provider: str = "google"
+    calendar_token_key: str | None = None
+    google_calendar_client_id: str | None = Field(
+        default=None, validation_alias="GOOGLE_CALENDAR_CLIENT_ID"
+    )
+    google_calendar_client_secret: str | None = Field(
+        default=None, validation_alias="GOOGLE_CALENDAR_CLIENT_SECRET"
+    )
+    google_calendar_redirect_uri: str = Field(
+        default="http://127.0.0.1:8000/api/v1/calendar/oauth/callback",
+        validation_alias="GOOGLE_CALENDAR_REDIRECT_URI",
+    )

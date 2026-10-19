@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from campusflow.api import auth as auth_api
+from campusflow.api import calendar as calendar_api
 from campusflow.api import candidates as candidates_api
 from campusflow.api import courses as courses_api
 from campusflow.api import exports as exports_api
@@ -31,6 +32,8 @@ from campusflow.application.jobs import (
 from campusflow.application.ports.repositories import Repositories
 from campusflow.core.config import Settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
+from campusflow.infrastructure.calendar.factory import build_calendar_provider
+from campusflow.infrastructure.calendar.tokens import TokenCipher
 from campusflow.infrastructure.db.engine import create_db_engine
 from campusflow.infrastructure.db.session import create_session_factory
 from campusflow.infrastructure.queue.rq_queue import RQJobQueue
@@ -150,6 +153,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.auth_tokens = set()
     app.state.file_storage = LocalFileStorage(settings.storage_dir)
     app.state.job_queue = RQJobQueue(settings.redis_url)
+    app.state.calendar_provider = build_calendar_provider(settings)
+    app.state.token_cipher = TokenCipher(settings.calendar_token_key)
 
     for router in (health_router, auth_api.router):
         app.include_router(router, prefix="/api/v1")
@@ -168,6 +173,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         plans_api.router,
         reminders_api.router,
         exports_api.router,
+        calendar_api.router,
     ):
         app.include_router(
             router,

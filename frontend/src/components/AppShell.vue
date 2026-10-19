@@ -17,6 +17,7 @@ const availableItems = [
   { label: '学习计划', to: '/plan' },
   { label: '提醒', to: '/reminders' },
   { label: '导出', to: '/export' },
+  { label: '外部日历', to: '/calendar' },
   { label: '设置', to: '/settings' },
 ]
 
