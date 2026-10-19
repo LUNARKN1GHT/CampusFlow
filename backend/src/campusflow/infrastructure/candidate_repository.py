@@ -177,6 +177,17 @@ class SqlAlchemyCandidateRepository:
         )
         return [self._to_data(row) for row in rows]
 
+    def list_all(self, workspace_id: int, kind: CandidateKind) -> list[CandidateData]:
+        rows = self._session.scalars(
+            select(ExtractedItem)
+            .where(
+                ExtractedItem.workspace_id == workspace_id,
+                ExtractedItem.kind == kind.value,
+            )
+            .order_by(ExtractedItem.id)
+        )
+        return [self._to_data(row) for row in rows]
+
     def ids_by_material(self, workspace_id: int, material_id: int) -> list[int]:
         return list(
             self._session.scalars(
