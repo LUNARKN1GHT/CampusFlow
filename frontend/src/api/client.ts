@@ -102,6 +102,43 @@ export async function apiRequestBlob(path: string, timeoutMs = 20000): Promise<B
   return response.blob()
 }
 
+export type RequestedFile = { blob: Blob; filename: string | null }
+
+/** 从 Content-Disposition 读取建议文件名；不支持的写法返回 null，由调用方给出兜底名。 */
+function filenameFromDisposition(value: string | null): string | null {
+  if (!value) return null
+  const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(value)
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1].trim().replace(/^"|"$/g, ''))
+    } catch {
+      // 编码损坏时继续尝试普通 filename。
+    }
+  }
+  const quoted = /filename\s*=\s*"([^"]+)"/i.exec(value)
+  if (quoted?.[1]) return quoted[1].trim()
+  const plain = /filename\s*=\s*([^;]+)/i.exec(value)
+  return plain?.[1]?.trim() || null
+}
+
+/** POST 下载文件并读取响应头中的文件名；非 2xx 仍按 apiRequest 的规则抛出 ApiError。 */
+export async function apiRequestFile(
+  path: string,
+  init: RequestInit = {},
+  timeoutMs = 30000,
+): Promise<RequestedFile> {
+  const headers = new Headers(init.headers)
+  headers.set('Accept', '*/*')
+  if (init.body !== undefined && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const response = await performRequest(path, init, headers, timeoutMs)
+  return {
+    blob: await response.blob(),
+    filename: filenameFromDisposition(response.headers.get('Content-Disposition')),
+  }
+}
+
 export function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : '操作没有完成，请重试。'
 }
