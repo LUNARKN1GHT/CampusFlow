@@ -70,6 +70,13 @@ class PlanRescheduleIn(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class AdjustmentDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    semester_id: int | None = Field(default=None, ge=1)
+    task_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class PlanBlockLockIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     locked: bool
@@ -167,6 +174,28 @@ def reschedule_plan(
         semester_id=payload.semester_id,
         range_start=payload.start_date,
         range_end=payload.end_date,
+        task_ids=payload.task_ids,
+    )
+    return PlanDraftOut.from_data(draft)
+
+
+@router.get("/plans/adjustments", response_model=dict)
+def get_plan_adjustments(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict:
+    return use_cases.adjustment_suggestions(repos, workspace.id, semester_id=semester_id)
+
+
+@router.post("/plans/adjustments/draft", response_model=PlanDraftOut, status_code=201)
+def create_plan_adjustment_draft(
+    payload: AdjustmentDraftIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.create_adjustment_draft(
+        repos,
+        workspace.id,
+        semester_id=payload.semester_id,
         task_ids=payload.task_ids,
     )
     return PlanDraftOut.from_data(draft)
