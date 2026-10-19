@@ -13,6 +13,7 @@ from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
+from campusflow.application import change_impact
 from campusflow.application import conversion as conversions
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
@@ -506,6 +507,83 @@ def get_candidate_diff(
     """只读新旧差异：candidate_id 为基准/旧，other_candidate_id 为待比较/新。"""
     return _diff_out(
         diffs.compare_candidates(repos, workspace.id, candidate_id, other_candidate_id)
+    )
+
+
+class ImpactedBlockOut(BaseModel):
+    id: int
+    draft_id: int
+    draft_status: str
+    title: str
+    starts_at: str
+    ends_at: str
+    locked: bool
+
+
+class ImpactedTaskOut(BaseModel):
+    id: int
+    title: str
+    progress: str
+    completed: bool
+    due_date: str | None
+    due_time: str | None
+    source_state: str
+    plan_blocks: list[ImpactedBlockOut]
+
+
+class ImpactedEventOut(BaseModel):
+    id: int
+    title: str
+    starts_at: str
+    ends_at: str
+    location: str | None
+
+
+class ImpactedRuleOut(BaseModel):
+    id: int
+    title: str
+
+
+class ChangeImpactOut(BaseModel):
+    summary: dict
+    unsupported: list[dict]
+    tasks: list[ImpactedTaskOut]
+    fixed_events: list[ImpactedEventOut]
+    rules: list[ImpactedRuleOut]
+    diff: CandidateDiffOut
+
+
+@router.get(
+    "/candidates/{candidate_id}/diff/{other_candidate_id}/impact",
+    response_model=ChangeImpactOut,
+)
+def get_candidate_change_impact(
+    candidate_id: int,
+    other_candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> ChangeImpactOut:
+    """N013：只读列出旧候选已转换的任务、日程、规则及计划时间块。"""
+    result = change_impact.collect_impact(repos, workspace.id, candidate_id, other_candidate_id)
+    return ChangeImpactOut(
+        summary=result.summary,
+        unsupported=result.unsupported,
+        tasks=[
+            ImpactedTaskOut(
+                id=item.id,
+                title=item.title,
+                progress=item.progress,
+                completed=item.completed,
+                due_date=item.due_date,
+                due_time=item.due_time,
+                source_state=item.source_state,
+                plan_blocks=[ImpactedBlockOut(**block.__dict__) for block in item.plan_blocks],
+            )
+            for item in result.tasks
+        ],
+        fixed_events=[ImpactedEventOut(**item.__dict__) for item in result.fixed_events],
+        rules=[ImpactedRuleOut(**item.__dict__) for item in result.rules],
+        diff=_diff_out(result.diff),
     )
 
 
