@@ -19,6 +19,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     Time,
     UniqueConstraint,
     func,
@@ -1073,3 +1074,190 @@ class ReminderTrigger(Base):
     )
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CalendarConnection(Base):
+    """M9：一个工作空间与外部日历账户的连接。令牌只保存加密密文。"""
+
+    __tablename__ = "calendar_connections"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'revoked', 'expired')", name="ck_calendar_connection_status"
+        ),
+        UniqueConstraint(
+            "workspace_id", "provider", "account_email", name="uq_calendar_connection_account"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(50))
+    account_email: Mapped[str] = mapped_column(String(320))
+    calendar_id: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
+    scopes: Mapped[str] = mapped_column(String(1000), default="", server_default="")
+    access_token_ciphertext: Mapped[str | None] = mapped_column(Text)
+    refresh_token_ciphertext: Mapped[str | None] = mapped_column(Text)
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CalendarOAuthState(Base):
+    """一次性 OAuth state；只保存哈希，绑定工作空间与回调地址。"""
+
+    __tablename__ = "calendar_oauth_states"
+    __table_args__ = (UniqueConstraint("state_hash", name="uq_calendar_oauth_state_hash"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(50))
+    state_hash: Mapped[str] = mapped_column(String(128))
+    redirect_uri: Mapped[str] = mapped_column(String(1000))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CalendarDraft(Base):
+    """外部操作草案；确认指纹绑定连接、内容与选中条目。"""
+
+    __tablename__ = "calendar_drafts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'confirmed', 'executing', 'completed', 'partial', "
+            "'failed', 'unknown', 'cancelled', 'expired')",
+            name="ck_calendar_draft_status",
+        ),
+        CheckConstraint("version >= 1", name="ck_calendar_draft_version"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_connections.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    content_fingerprint: Mapped[str] = mapped_column(String(64))
+    confirmed_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    confirmed_item_ids: Mapped[list[int]] = mapped_column(JSONB, default=list, server_default="[]")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    excluded: Mapped[list[dict]] = mapped_column(JSONB, default=list, server_default="[]")
+    warnings: Mapped[list[dict]] = mapped_column(JSONB, default=list, server_default="[]")
+    note: Mapped[str | None] = mapped_column(String(1000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CalendarDraftItem(Base):
+    """草案中的一条外部操作；条目指纹与草案内容指纹分开保存。"""
+
+    __tablename__ = "calendar_draft_items"
+    __table_args__ = (
+        CheckConstraint(
+            "operation_type IN ('create', 'update', 'delete')",
+            name="ck_calendar_draft_item_operation",
+        ),
+        CheckConstraint(
+            "source_type IN ('task', 'plan_block')", name="ck_calendar_draft_item_source"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_drafts.id", ondelete="CASCADE"), index=True
+    )
+    operation_type: Mapped[str] = mapped_column(String(20))
+    source_type: Mapped[str] = mapped_column(String(20))
+    source_id: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(500))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    timezone: Mapped[str] = mapped_column(String(64))
+    date_only: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    location: Mapped[str | None] = mapped_column(String(500))
+    target_calendar_id: Mapped[str] = mapped_column(String(500))
+    external_event_id: Mapped[str | None] = mapped_column(String(500))
+    external_etag: Mapped[str | None] = mapped_column(String(500))
+    item_fingerprint: Mapped[str] = mapped_column(String(64))
+    content_fingerprint: Mapped[str] = mapped_column(String(64))
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class CalendarOperation(Base):
+    """一次实际外部执行；idempotency_key 唯一，失败与未知都保留。"""
+
+    __tablename__ = "calendar_operations"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'success', 'failed', 'unknown', 'skipped')",
+            name="ck_calendar_operation_status",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_calendar_operation_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_drafts.id", ondelete="CASCADE"), index=True
+    )
+    item_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_draft_items.id", ondelete="CASCADE"), index=True
+    )
+    operation_type: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    idempotency_key: Mapped[str] = mapped_column(String(128))
+    external_event_id: Mapped[str | None] = mapped_column(String(500))
+    external_etag: Mapped[str | None] = mapped_column(String(500))
+    error_category: Mapped[str | None] = mapped_column(String(30))
+    error_message: Mapped[str | None] = mapped_column(String(1000))
+    attempt: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    result_payload: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CalendarEventLink(Base):
+    """内部对象与外部事件的映射；删除或外部缺失后保留历史状态。"""
+
+    __tablename__ = "calendar_event_links"
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('task', 'plan_block')", name="ck_calendar_link_source_type"
+        ),
+        CheckConstraint(
+            "state IN ('active', 'deleted', 'external_missing')", name="ck_calendar_link_state"
+        ),
+        UniqueConstraint(
+            "connection_id",
+            "source_type",
+            "source_id",
+            name="uq_calendar_link_source",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("calendar_connections.id", ondelete="CASCADE"), index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(20))
+    source_id: Mapped[int] = mapped_column(Integer)
+    external_event_id: Mapped[str] = mapped_column(String(500))
+    external_etag: Mapped[str | None] = mapped_column(String(500))
+    content_fingerprint: Mapped[str] = mapped_column(String(64))
+    source_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    state: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
