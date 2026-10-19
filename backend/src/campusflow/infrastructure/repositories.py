@@ -25,6 +25,7 @@ from campusflow.application.ports.repositories import (
     SemesterData,
     SourceChunkData,
     TaskData,
+    TaskDependencyData,
     TaskProgressChangeData,
     WorkspaceData,
 )
@@ -54,6 +55,7 @@ from campusflow.infrastructure.db.models import (
     Semester,
     SourceChunk,
     Task,
+    TaskDependency,
     TaskProgressChange,
     Workspace,
 )
@@ -138,6 +140,17 @@ def _task_to_data(row: Task) -> TaskData:
         created_at=row.created_at,
         updated_at=row.updated_at,
         source_candidate_id=row.source_candidate_id,
+        parent_task_id=row.parent_task_id,
+    )
+
+
+def _dependency_to_data(row: TaskDependency) -> TaskDependencyData:
+    return TaskDependencyData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        task_id=row.task_id,
+        depends_on_task_id=row.depends_on_task_id,
+        created_at=row.created_at,
     )
 
 
@@ -708,10 +721,12 @@ class SqlAlchemyTaskRepository:
         *,
         source_material_id: int | None = None,
         source_candidate_id: int | None = None,
+        parent_task_id: int | None = None,
     ) -> TaskData:
         row = Task(
             workspace_id=workspace_id,
             course_id=course_id,
+            parent_task_id=parent_task_id,
             source_material_id=source_material_id,
             source_candidate_id=source_candidate_id,
             title=title,
@@ -794,6 +809,67 @@ class SqlAlchemyTaskRepository:
             .order_by(TaskProgressChange.changed_at.desc(), TaskProgressChange.id.desc())
         )
         return [_progress_change_to_data(row) for row in self._session.scalars(stmt)]
+
+    def set_parent(self, task_id: int, parent_task_id: int | None) -> TaskData | None:
+        row = self._session.get(Task, task_id)
+        if row is None:
+            return None
+        row.parent_task_id = parent_task_id
+        self._session.flush()
+        return _task_to_data(row)
+
+    def list_subtasks(self, parent_task_id: int) -> list[TaskData]:
+        stmt = select(Task).where(Task.parent_task_id == parent_task_id).order_by(Task.id)
+        return [_task_to_data(row) for row in self._session.scalars(stmt)]
+
+    def list_dependencies(self, task_id: int) -> list[TaskDependencyData]:
+        stmt = (
+            select(TaskDependency)
+            .where(TaskDependency.task_id == task_id)
+            .order_by(TaskDependency.id)
+        )
+        return [_dependency_to_data(row) for row in self._session.scalars(stmt)]
+
+    def list_dependents(self, depends_on_task_id: int) -> list[TaskDependencyData]:
+        stmt = (
+            select(TaskDependency)
+            .where(TaskDependency.depends_on_task_id == depends_on_task_id)
+            .order_by(TaskDependency.id)
+        )
+        return [_dependency_to_data(row) for row in self._session.scalars(stmt)]
+
+    def list_workspace_dependencies(self, workspace_id: int) -> list[TaskDependencyData]:
+        stmt = (
+            select(TaskDependency)
+            .where(TaskDependency.workspace_id == workspace_id)
+            .order_by(TaskDependency.id)
+        )
+        return [_dependency_to_data(row) for row in self._session.scalars(stmt)]
+
+    def add_dependency(
+        self, workspace_id: int, task_id: int, depends_on_task_id: int
+    ) -> TaskDependencyData:
+        row = TaskDependency(
+            workspace_id=workspace_id,
+            task_id=task_id,
+            depends_on_task_id=depends_on_task_id,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _dependency_to_data(row)
+
+    def remove_dependency(self, task_id: int, depends_on_task_id: int) -> bool:
+        row = self._session.scalar(
+            select(TaskDependency).where(
+                TaskDependency.task_id == task_id,
+                TaskDependency.depends_on_task_id == depends_on_task_id,
+            )
+        )
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
 
     def list_by_source_material(self, material_id: int) -> list[TaskData]:
         stmt = select(Task).where(Task.source_material_id == material_id).order_by(Task.id)

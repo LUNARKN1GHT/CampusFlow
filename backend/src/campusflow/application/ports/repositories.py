@@ -81,6 +81,8 @@ class TaskData:
     updated_at: datetime
     # R004：由候选核对转换而来的任务保留候选关联，用于幂等与来源详情
     source_candidate_id: int | None = None
+    # A001：包含关系。子任务仍保留自己的来源关联，不被父任务覆盖。
+    parent_task_id: int | None = None
     # 读取时按工作空间时区派生，不落库
     overdue: bool = False
 
@@ -105,6 +107,15 @@ class TaskProgressChangeData:
     previous_remaining_minutes: int | None
     new_remaining_minutes: int | None
     changed_at: datetime
+
+
+@dataclass
+class TaskDependencyData:
+    id: int
+    workspace_id: int
+    task_id: int
+    depends_on_task_id: int
+    created_at: datetime
 
 
 @dataclass
@@ -514,6 +525,23 @@ class TaskRepository(Protocol):
     def delete(self, task_id: int) -> bool: ...
 
     def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
+
+    # A001：包含关系与依赖关系分开维护
+    def set_parent(self, task_id: int, parent_task_id: int | None) -> TaskData | None: ...
+
+    def list_subtasks(self, parent_task_id: int) -> list[TaskData]: ...
+
+    def list_dependencies(self, task_id: int) -> list[TaskDependencyData]: ...
+
+    def list_dependents(self, depends_on_task_id: int) -> list[TaskDependencyData]: ...
+
+    def list_workspace_dependencies(self, workspace_id: int) -> list[TaskDependencyData]: ...
+
+    def add_dependency(
+        self, workspace_id: int, task_id: int, depends_on_task_id: int
+    ) -> TaskDependencyData: ...
+
+    def remove_dependency(self, task_id: int, depends_on_task_id: int) -> bool: ...
 
 
 class MaterialRepository(Protocol):
