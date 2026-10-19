@@ -153,8 +153,12 @@ def test_reschedule_subrange_keeps_blocks_outside_range(client: TestClient) -> N
     assert draft["range_end"] == "2026-10-19"
 
     kept = next(block for block in draft["blocks"] if block["task_id"] == second["id"])
-    assert kept["starts_at"] == outside["starts_at"]
-    assert kept["ends_at"] == outside["ends_at"]
+
+    def instant(value: str) -> datetime:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+    assert instant(kept["starts_at"]) == instant(outside["starts_at"])
+    assert instant(kept["ends_at"]) == instant(outside["ends_at"])
     assert len([block for block in draft["blocks"] if block["task_id"] == second["id"]]) == 1
     assert {block["task_id"] for block in draft["blocks"]} == {first["id"], second["id"]}
 
