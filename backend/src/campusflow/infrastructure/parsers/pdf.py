@@ -26,6 +26,7 @@ def _classify_empty_page(page: Any) -> str:
     try:
         images = page.images
     except Exception:
+        # 图片列表读不出来时按空白页处理，不让整份 PDF 因单页元数据失败而中断。
         images = []
     if images:
         return "扫描页无文字层，需要图像识别回退"
@@ -36,6 +37,8 @@ class PdfDocumentParser:
     """pypdf 文本层解析。扫描页不伪造文字，进入部分失败列表。"""
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+        """解析 PDF 文本层；加密或无法打开时拒绝，单页失败带页码进入 failures。"""
+
         if mime_type != PDF_MIME_TYPE:
             raise ValueError(f"PDF 解析器不支持的类型：{mime_type}")
         try:
@@ -43,6 +46,7 @@ class PdfDocumentParser:
         except Exception as exc:
             raise ValueError(f"无法解析 PDF 文件：{exc}") from exc
         if reader.is_encrypted:
+            # 只要存在加密字典就拒绝，不采用 pypdf 可能的空密码自动解密结果。
             raise ValueError("PDF 已加密，无法解析")
 
         fragments: list[ParsedFragment] = []
@@ -64,6 +68,7 @@ class PdfDocumentParser:
                 )
                 continue
             if not text:
+                # 空白页与扫描页都保留页码；只有扫描页会由回退解析器转视觉识别。
                 failures.append(
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page_no),

@@ -19,6 +19,7 @@ MAX_LOCATOR_SUMMARY = 430
 MAX_LISTED_RANGES = 20
 MAX_REASON_LENGTH = 500
 
+# 定位类型的展示模板；未收录的类型由 describe_range 退回“类型 值”，不丢范围。
 _LOCATOR_TEMPLATES = {
     "page": "第 {} 页",
     "paragraph": "第 {} 段",

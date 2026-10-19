@@ -1,4 +1,7 @@
-"""Q004 阶段存储：显式登记、原子保存结果；事务由调用方控制，尚未接 Worker。"""
+"""Q004 块级索引存储：显式登记、凭证领取与原子保存；事务由调用方控制。
+
+``embedding`` 列另有余弦 HNSW 索引（Q004）；本层只负责写入与来源校验。
+"""
 
 import math
 import struct
@@ -40,6 +43,8 @@ def _validate_max_attempts(max_attempts: int) -> None:
 
 
 class SqlIndexedBlocks:
+    """索引块状态机：pending → running（租约）→ done/failed，写入必须持有未过期凭证。"""
+
     def __init__(self, session: Session):
         self.session = session
 
@@ -106,11 +111,13 @@ class SqlIndexedBlocks:
         )
 
     def register(self, workspace_id: int, profile_id: str, block: RetrievalBlock) -> None:
+        """幂等登记块；空白文本直接标记 skipped，不产生向量请求。"""
         profile = self._profile(profile_id)
         block.validate_against(self._source(workspace_id, block.source_chunk_id))
         if len(block.text.encode("utf-8")) > profile.max_input_bytes:
             raise DomainError("分块超过当前向量配置输入上限")
         blank = not block.text.strip()
+        # 同一配置与块重复登记不覆盖既有状态，避免重跑清单重置进度。
         self.session.execute(
             insert(IndexedBlock)
             .values(
@@ -170,9 +177,11 @@ class SqlIndexedBlocks:
         *,
         token: str,
     ) -> bool:
+        """校验配置与单精度可存储后写入；凭证过期或被替换返回 False。"""
         profile = self._profile(profile_id)
         result.validate_for(profile)
         try:
+            # 先按单精度往返转换，避免入库时静默丢精度或溢出。
             format_string = f"!{profile.dimensions}f"
             values = struct.unpack(format_string, struct.pack(format_string, *result.values))
         except (struct.error, OverflowError):
@@ -309,6 +318,7 @@ class SqlIndexedBlocks:
         token: str,
         max_attempts: int = MAX_BLOCK_ATTEMPTS,
     ) -> bool:
+        """只接受安全失败码；租约有效才写入，次数用尽记为终态失败。"""
         _validate_max_attempts(max_attempts)
         if code not in FAILURE_CODES:
             raise DomainError("失败原因必须使用安全代码，不能写入原始异常或密钥")
@@ -329,6 +339,7 @@ class SqlIndexedBlocks:
     def progress(
         self, workspace_id: int, profile_id: str, version_id: int
     ) -> tuple[BlockIndexProgress, ...]:
+        """按来源片段与偏移返回稳定顺序的块进度。"""
         rows = self.session.scalars(
             select(IndexedBlock)
             .where(

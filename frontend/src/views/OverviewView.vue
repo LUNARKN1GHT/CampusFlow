@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 今日总览：只读汇总当日时间块、下一段安排、未来 7 天截止、待核对数量、未排入与冲突风险。
+ * 数据来自最近一次已接受计划与任务／候选统计；没有已接受计划时提示先生成并接受草案。
+ * 页面不提供写操作，各入口只跳转到任务、计划、待核对或问答页。
+ */
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
@@ -18,10 +23,12 @@ const progressLabels: Record<string, string> = {
   blocked: '受阻',
 }
 
+// 时间按浏览器本地时区格式化；页面日期 overview.today 由服务端按工作空间时区计算。
 function timeText(value: string): string {
   return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+// 仅日期 DDL 只显示日期并标注，有时刻才追加 HH:mm，不补造时刻。
 function dueText(task: { due_date: string | null; due_time: string | null }): string {
   if (!task.due_date) return '未设置 DDL'
   return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
@@ -54,6 +61,7 @@ onMounted(load)
     <section v-else-if="loading" class="panel compact-empty">正在读取今日安排…</section>
 
     <template v-else-if="overview">
+      <!-- 未排入与冲突／风险数量只统计最近一次已接受计划，不包含未接受草案。 -->
       <section class="panel overview-metrics" aria-label="关键状态">
         <div>
           <span>今日时间块</span>

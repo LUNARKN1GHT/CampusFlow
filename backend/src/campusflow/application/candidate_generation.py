@@ -1,4 +1,8 @@
-"""X002：受控生成请求及供应商无关的候选结构校验。"""
+"""X002：受控生成请求及供应商无关的候选结构校验。
+
+模型只负责产出待核对草稿；出处、证据与确认状态均由代码校验，任何
+不合法的输出整批拒绝，不保存部分结果，也不把模型正文当作事实。
+"""
 
 import json
 import re
@@ -31,6 +35,7 @@ from campusflow.domain.candidates import (
 )
 from campusflow.domain.errors import DomainError, ModelOutputError
 
+# 输入与输出均按 UTF-8 字节限制，防止超长提示或截断输出被误当成完整结果。
 MAX_INPUT_BYTES = 256 * 1024
 MAX_OUTPUT_BYTES = 256 * 1024
 
@@ -41,6 +46,8 @@ class InvalidModelOutput(ModelOutputError):
 
 @dataclass(frozen=True)
 class FieldDefinition:
+    """一个可提取字段的约定：类型、是否允许缺失以及模型可声明的出处。"""
+
     name: str
     description: str
     value_type: Literal["text", "integer", "number"] = "text"
@@ -50,12 +57,15 @@ class FieldDefinition:
 
 @dataclass(frozen=True)
 class ExtractionSpec:
+    """一次提取的类型、指令与字段集合；字段名与数量会写入请求契约。"""
+
     kind: CandidateKind
     instruction: str
     fields: tuple[FieldDefinition, ...]
 
 
 class _StrictModel(BaseModel):
+    # 禁止额外字段与类型强转：模型只能按已声明的协议输出，不能悄悄扩大结构。
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
@@ -109,6 +119,7 @@ def _validate_spec(spec: ExtractionSpec) -> None:
 def _source_map(chunks: list[SourceChunkData]) -> dict[int, SourceChunkData]:
     if not 1 <= len(chunks) <= 100:
         raise DomainError("每次生成需要 1 至 100 个已授权原文片段")
+    # 一次生成只能使用同一版本的片段；混用版本会让引用无法回到确定的原文。
     if len({c.version_id for c in chunks}) != 1 or len({c.id for c in chunks}) != len(chunks):
         raise DomainError("原文片段不能重复或混用不同版本")
     if any(type(c.id) is not int or c.id < 1 or not c.text.strip() for c in chunks):
@@ -117,6 +128,7 @@ def _source_map(chunks: list[SourceChunkData]) -> dict[int, SourceChunkData]:
 
 
 def build_request(spec: ExtractionSpec, chunks: list[SourceChunkData]) -> GenerationRequest:
+    """组装供应商无关的提取请求；资料片段只作为数据，不得改变任务或触发操作。"""
     _validate_spec(spec)
     _source_map(chunks)
     contract = {
@@ -154,6 +166,7 @@ def build_request(spec: ExtractionSpec, chunks: list[SourceChunkData]) -> Genera
 
 
 def _unique_object(pairs):
+    # 重复键会让同一字段出现两个取值，直接拒绝，不用后者覆盖前者。
     result = {}
     for key, value in pairs:
         if key in result:
@@ -163,6 +176,7 @@ def _unique_object(pairs):
 
 
 def _reject_constant(value):
+    # NaN / Infinity 不是合法 JSON 数值，也不能作为候选字段值。
     raise ValueError("non-finite number")
 
 
@@ -172,6 +186,11 @@ def validate_output(
     chunks: list[SourceChunkData],
     scope: CandidateScope,
 ) -> list[CandidateDraft]:
+    """校验模型输出并转换为待核对草稿；任何一项不合法都整批拒绝。
+
+    事项类型、字段集合、取值类型、出处与证据摘录都必须与本次请求一致；
+    模型不能决定确认状态、课程编号或用户补充出处。
+    """
     _validate_spec(spec)
     sources = _source_map(chunks)
     try:
@@ -241,6 +260,7 @@ def generate_candidates(
     *,
     scope: CandidateScope | None = None,
 ) -> list[CandidateDraft]:
+    """生成入口：返回草稿但不保存；scope 缺失时使用空范围，不猜测学期或课程。"""
     request = build_request(spec, chunks)
     return validate_output(generator.generate(request), spec, chunks, scope or CandidateScope())
 
@@ -265,6 +285,7 @@ def generate_for_version(
     if material.archived:
         raise DomainError("资料已归档，请恢复后再提取")
     chunks = list_version_chunks(repos, workspace_id, material_id, version_no)
+    # 范围取自资料自身标注，不由模型填写；模型输出无法把候选挪到别的学期或课程。
     scope = CandidateScope(
         material.semester_id,
         material.course_id,

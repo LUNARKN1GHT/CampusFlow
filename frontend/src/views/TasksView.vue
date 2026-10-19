@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/*
+ * 任务页：维护手动任务、执行进度、必要依赖与子任务，并展示全空间的依赖检查结果。
+ * 流程：筛任务 → 编辑 DDL／优先级／剩余投入 → 单独更新执行进度；依赖与子任务面板负责关系、拆分建议与创建。
+ * 约束：核对状态来自候选事项，与执行进度分开维护；完成／取消会把剩余耗时归零，重开按原始估计恢复并保留历史。
+ * 写操作失败只在当前面板显示错误并保留已填内容，不关闭面板，也不显示成功提示。
+ */
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -56,6 +62,7 @@ const courseMap = computed(() => new Map(courses.value.map((course) => [course.i
 const filteredCourses = computed(() => filters.semesterId
   ? courses.value.filter((course) => course.semester_id === Number(filters.semesterId))
   : courses.value)
+// 学期筛选按任务的课程归属判断；未关联课程的任务在选定学期时一律隐藏，需切回“全部学期”。
 const visibleTasks = computed(() => tasks.value.filter((task) => {
   if (filters.courseId && task.course_id !== Number(filters.courseId)) return false
   if (filters.progress && task.progress !== filters.progress) return false
@@ -96,6 +103,7 @@ async function load() {
     try {
       dependencyCheck.value = await tasksApi.dependencyCheck()
     } catch {
+      // 依赖检查是辅助信息：读取失败时隐藏该面板，不阻塞任务列表和筛选。
       dependencyCheck.value = null
     }
   } catch (caught) {
@@ -118,6 +126,7 @@ function openEditor(task?: Task) {
   })
 }
 
+// 只有填写了 DDL 日期才提交时刻；仅日期任务保持原精度，不补 00:00 或 23:59。
 function payload(): TaskInput {
   return {
     title: form.title,
@@ -134,6 +143,7 @@ function payload(): TaskInput {
   }
 }
 
+// 编辑成功替换列表中的同一项，新建成功追加到列表；失败不关闭面板，避免输入丢失。
 async function saveTask() {
   saving.value = true
   formError.value = ''
@@ -170,6 +180,7 @@ async function openProgress(task: Task) {
   }
 }
 
+// 进度与核对状态相互独立；保存成功后重新读取历史，失败时保留当前状态和已填原因。
 async function saveProgress() {
   if (!progressTask.value) return
   progressSaving.value = true
@@ -221,6 +232,7 @@ async function openRelations(task: Task) {
   }
 }
 
+// 后端校验空间、自依赖与成环；成功后重新读取关系并刷新全空间依赖检查。
 async function addDependency() {
   const task = selectedTask.value
   if (!task) return
@@ -253,6 +265,7 @@ async function removeDependency(dependsOn: number) {
   }
 }
 
+// 拆分建议只读且可编辑：加载后填入表单，用户可修改标题和剩余耗时后再创建。
 async function loadSplitSuggestion() {
   if (!selectedTask.value) return
   subtaskError.value = ''
@@ -271,6 +284,7 @@ function addSubtaskRow() {
   subtaskRows.value.push({ title: '', remaining_minutes: null })
 }
 
+// 空标题行会被丢弃；创建成功后重新加载任务、父任务汇总和依赖检查。
 async function saveSubtasks() {
   const task = selectedTask.value
   if (!task) return
@@ -337,6 +351,7 @@ onMounted(load)
       <section class="panel">
         <p v-if="loading" class="muted">正在加载任务…</p>
         <div v-else-if="visibleTasks.length" class="task-list">
+          <!-- 从核对页跳转时带 ?task=编号，用于滚动定位并高亮对应任务。 -->
           <article v-for="task in visibleTasks" :key="task.id" class="task-row" :class="{ 'is-highlighted': task.id === highlightedTaskId }" :data-task-id="task.id">
             <div class="priority-marker" :data-priority="task.priority"></div>
             <div class="task-main">
@@ -377,6 +392,7 @@ onMounted(load)
             <label>调整原因<textarea v-model.trim="progressForm.reason" rows="3" maxlength="500" placeholder="例如：依赖的实验数据尚未提供"></textarea></label>
             <p class="form-help">完成或取消会将剩余耗时记为 0；重新打开时按原始估计恢复，历史记录不会删除。</p>
             <p v-if="progressError" class="form-error" role="alert">{{ progressError }}</p>
+            <!-- 与当前状态相同时禁用提交，避免生成没有变化的历史记录。 -->
             <button type="submit" :disabled="progressSaving || progressForm.progress === progressTask.progress">{{ progressSaving ? '正在保存…' : '更新进度' }}</button>
           </form>
           <div>

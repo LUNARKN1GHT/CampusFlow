@@ -1,4 +1,8 @@
-"""资料导入 HTTP 路由（D004 起）。"""
+"""资料导入与原文读取 HTTP 路由（D004 起）。
+
+发布信息、原文版本与解析状态分开保存：抓取时间不冒充发布时间，只有日期
+的发布时间不补造时刻。删除属于敏感操作，必须先用影响预览换取确认令牌。
+"""
 
 from dataclasses import replace
 from datetime import datetime
@@ -57,6 +61,7 @@ class TextImportIn(BaseModel):
     @field_validator("published_at")
     @classmethod
     def assume_local(cls, value: datetime | None) -> datetime | None:
+        # 无偏移的发布时间按本地时区补齐，保留用户填写的墙上时间。
         if value is None:
             return None
         return value if value.tzinfo is not None else value.replace(tzinfo=LOCAL_TZ)
@@ -64,6 +69,7 @@ class TextImportIn(BaseModel):
     @field_validator("published_at", mode="before")
     @classmethod
     def reject_date_only(cls, value):
+        # 10 位字符串就是纯日期；补零点会伪造发布时刻，因此要求写入正文。
         if isinstance(value, str) and len(value.strip()) == 10:
             raise ValueError("发布时间缺少时刻，请将原始日期保留在正文，不补造零点")
         return value
@@ -139,6 +145,7 @@ def import_text(
     storage: Storage,
     text_parser: TextParser,
 ) -> TextImportOut:
+    """保存粘贴文本为不可变版本并切分片段；不会自动建立索引作业。"""
     material, chunks = use_cases.import_pasted_text(
         repos,
         storage,
@@ -168,6 +175,7 @@ def list_materials(
     status: Annotated[MaterialStatus | None, Query()] = None,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[MaterialOut]:
+    """默认不含已归档资料；归档资料同时退出检索与问答范围。"""
     return [
         MaterialOut.model_validate(m)
         for m in use_cases.list_materials(
@@ -210,6 +218,7 @@ class DeleteConfirmIn(BaseModel):
 def delete_impact(
     material_id: int, workspace: CurrentWorkspace, repos: Repos, request: Request
 ) -> DeleteImpactOut:
+    """删除前影响预览并签发 confirm_token；令牌绑定当前影响内容。"""
     impact = use_cases.preview_delete_impact(repos, workspace.id, material_id)
     days = request.app.state.settings.backup_retention_days
     return DeleteImpactOut(
@@ -238,6 +247,11 @@ def delete_material(
     repos: Repos,
     storage: Storage,
 ) -> Response:
+    """必须携带最近一次预览的令牌；影响内容变化后旧令牌失效，返回 400。
+
+    keep_tasks=False 会在删除资料时一并删除由其派生的个人任务；日程与规则
+    始终保留并标记来源已失效。
+    """
     use_cases.delete_material(
         repos,
         storage,
@@ -288,6 +302,7 @@ def read_original_file(
     repos: Repos,
     storage: Storage,
 ) -> Response:
+    """下载指定版本原文；网页快照按不可信内容处理，强制附件下载并加沙箱 CSP。"""
     content, storage_key = use_cases.read_original_file(
         repos, storage, workspace.id, material_id, version_no
     )
@@ -353,6 +368,10 @@ def import_web(
     queue: JobQueueDep,
     fetcher: Annotated[WebFetcher, Depends(get_web_fetcher)],
 ) -> WebImportOut:
+    """只有显式请求才联网抓取；失败不落库，抓取时间不冒充发布时间。
+
+    原文快照与解析作业同事务保存；未识别的登录页会由后续处理显示为未覆盖。
+    """
     material, version, job_id = import_requested_webpage(
         repos,
         storage,
@@ -382,6 +401,7 @@ def get_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) ->
 
 @router.post("/{material_id}/archive", response_model=MaterialOut)
 def archive_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    """归档只是标记：原文、版本与引用保留，但退出检索、问答与默认列表。"""
     return MaterialOut.model_validate(
         use_cases.set_material_archived(repos, workspace.id, material_id, archived=True)
     )
@@ -389,6 +409,7 @@ def archive_material(material_id: int, workspace: CurrentWorkspace, repos: Repos
 
 @router.post("/{material_id}/restore", response_model=MaterialOut)
 def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
+    """恢复归档后资料与既有引用重新进入有效范围。"""
     return MaterialOut.model_validate(
         use_cases.set_material_archived(repos, workspace.id, material_id, archived=False)
     )
@@ -398,6 +419,10 @@ def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos
 def update_material(
     material_id: int, payload: MaterialMetadataUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> MaterialOut:
+    """修订发布方、发布时间与适用范围；传 null 表示清空可选字段。
+
+    已导入的原文与历史版本不会被改写；范围变化影响后续检索与筛选。
+    """
     current = use_cases.get_material(repos, workspace.id, material_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
     material = use_cases.update_material_metadata(
@@ -443,6 +468,11 @@ def upload_files(
     allow_duplicate: Annotated[bool, Query()] = False,
     queue: JobQueueDep = None,
 ) -> UploadOut:
+    """多文件逐项返回成功、重复与失败；单个文件失败不影响其他文件。
+
+    默认拒绝内容完全重复的上传并返回既有资料；只有显式 allow_duplicate
+    才会重复建档。
+    """
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
         from campusflow.domain.errors import DomainError

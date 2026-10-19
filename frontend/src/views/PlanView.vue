@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/*
+ * 学习计划页：按今天／本周／未来两周／自定义区间生成排期草案，显式接受后才成为当前计划。
+ * 草案与当前计划分开保存；预览区展示假设、冲突风险、未排任务与保留／新安排统计，接受时服务端重新校验输入指纹和版本。
+ * 时间块按计划时区展示并分组；锁定块在局部重排时保留，移动时间块不会改写任务原始 DDL。
+ * 输入或版本过期时只显示错误，草案保持不变，不会静默覆盖已接受计划。
+ */
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import { ApiError, errorMessage } from '../api/client'
@@ -6,6 +12,7 @@ import { plansApi } from '../api/plans'
 import type { AdjustmentSummary, PlanBlock, PlanConflict, PlanDraft, PlanRangeType } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
 
+// draft 是当前预览对象（可能是草案或当前计划）；current 只保留最近一次已接受计划，用于计算保留块与回退查看。
 const draft = ref<PlanDraft | null>(null)
 const current = ref<PlanDraft | null>(null)
 const loading = ref(true)
@@ -23,6 +30,7 @@ const rangeForm = reactive({
 const busyBlockId = ref<number | null>(null)
 const error = ref('')
 const actionError = ref('')
+// 本页只补充缺失耗时、分段与提交缓冲；每日／每周容量和休息间隔沿用设置页的偏好。
 const assumptions = reactive({
   default_duration_minutes: '',
   segment_minutes: '',
@@ -52,8 +60,10 @@ const dispositionLabels: Record<string, string> = {
   excluded: '已排除',
 }
 
+// 展示与分组统一使用计划时区（生成时取工作空间时区）；没有计划时才退回浏览器时区。
 const planTimezone = computed(() => draft.value?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone)
 
+// 按计划时区的自然日分组，避免浏览器时区把跨午夜的块归到不同日期。
 const blocksByDay = computed(() => {
   const groups = new Map<string, { label: string; blocks: PlanBlock[] }>()
   for (const block of draft.value?.blocks ?? []) {
@@ -93,7 +103,10 @@ function dayKey(value: string): string {
   return `${parts.year}-${parts.month}-${parts.day}`
 }
 
-/** 把工作空间时区的墙上时间转成明确时间点，避免浏览器时区与工作空间不一致。 */
+/**
+ * 把工作空间时区的墙上时间转成明确时间点，避免浏览器时区与工作空间不一致。
+ * 先按 UTC 估算偏移，再用换算后的墙钟回算校正，以覆盖夏令时偏移变化。
+ */
 function zonedInputToIso(value: string): string {
   const [datePart, timePart = '00:00'] = value.split('T')
   const [year, month, day] = datePart.split('-').map(Number)
@@ -117,7 +130,9 @@ const currentBlockKeys = computed(() => new Set(
   (current.value?.blocks ?? []).map((block) => `${block.task_id}|${block.starts_at}|${block.ends_at}`),
 ))
 
-/** 与当前计划相同的时间块标为保留；其余标为新安排或移动。 */
+/**
+ * 与当前计划坐标相同的时间块标为保留；服务端标记为 preserved 的块同样保留，其余标为新安排或移动。
+ */
 function blockState(block: PlanBlock): 'preserved' | 'moved' {
   if (block.constraint_source.some((source) => source.kind === 'preserved')) return 'preserved'
   return currentBlockKeys.value.has(`${block.task_id}|${block.starts_at}|${block.ends_at}`)
@@ -163,6 +178,7 @@ function prepareMove(block: PlanBlock) {
   }
 }
 
+// 没有已接受计划时接口返回 null（兼容 404），按空状态处理，不当作加载失败。
 async function load() {
   loading.value = true
   error.value = ''
@@ -208,6 +224,7 @@ function assumptionsPayload() {
   }
 }
 
+// 假设留空表示不假设缺失信息；自定义区间必须同时给起止，否则本地拦截、不请求后端。
 async function generate() {
   generating.value = true
   error.value = ''
@@ -232,6 +249,7 @@ async function generate() {
   }
 }
 
+// 两者都基于当前已接受计划生成新的待接受草案，不直接改当前计划：前者按变化建议范围，后者保留锁定块整体重排。
 async function createAdjustmentDraft() {
   rescheduling.value = true
   actionError.value = ''
@@ -246,6 +264,7 @@ async function createAdjustmentDraft() {
   }
 }
 
+// 局部重排只产出新草案；已锁定的块由服务端原样带回。
 async function reschedulePlan() {
   rescheduling.value = true
   actionError.value = ''
@@ -260,6 +279,7 @@ async function reschedulePlan() {
   }
 }
 
+// 提交草案版本号；服务端重新收集输入比对指纹，输入变化、已有更新的已接受计划或版本过期都会拒绝，草案保持不变。
 async function accept() {
   if (!draft.value) return
   accepting.value = true
@@ -277,6 +297,7 @@ async function accept() {
   }
 }
 
+// 锁定与移动只作用于已接受计划的块，请求带版本号防止并发覆盖；成功后同步更新 current。
 async function toggleLock(block: PlanBlock) {
   if (!draft.value) return
   busyBlockId.value = block.id
@@ -291,6 +312,7 @@ async function toggleLock(block: PlanBlock) {
   }
 }
 
+// 移动提交按计划时区换算后的时间点；后端会拒绝越出计划范围、与其他块或固定日程重叠的时段。
 async function saveMove(block: PlanBlock) {
   const form = moveForms[block.id]
   if (!draft.value || !form) return
@@ -344,6 +366,7 @@ onMounted(load)
         <button v-if="current" type="button" class="button-secondary" :disabled="rescheduling" @click="reschedulePlan">
           {{ rescheduling ? '重排中…' : '保留锁定块重排' }}
         </button>
+        <!-- 预览草案与当前计划不同时提供一键回退，避免把未接受的草案误认为已生效。 -->
         <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" @click="showCurrentPlan">
           查看当前计划
         </button>
@@ -370,6 +393,7 @@ onMounted(load)
       </div>
       <div>
         <p class="eyebrow">可选假设</p>
+        <!-- 假设只作用于本次生成，并会在草案的“本次使用的假设”中逐条回显。 -->
         <p class="form-help">留空表示不假设缺失信息；选择后的假设会随草案明确展示。</p>
       </div>
       <div class="form-grid form-grid-3">
@@ -398,6 +422,7 @@ onMounted(load)
           部分排入 {{ draft.coverage.tasks_partial }}，未排入 {{ draft.coverage.tasks_unscheduled }}，
           不参与 {{ draft.coverage.tasks_excluded }}。
         </p>
+        <!-- 仅待接受草案显示保留／新安排统计；接受前不会改动当前计划。 -->
         <p v-if="draft.status === 'draft'" class="inline-notice">
           预览：保留 {{ preservedBlocks.length }} 段时间块，新安排或移动 {{ movedBlocks.length }} 段。接受后当前计划将与本预览一致。
         </p>
@@ -512,6 +537,7 @@ onMounted(load)
       </section>
 
       <section v-if="draft.unscheduled.length" class="panel" aria-label="未排任务">
+        <!-- 未完整排入与已排除的任务都列在这里，并给出原因和可选处理，不隐藏。 -->
         <h2>未完整排入的任务</h2>
         <ul class="conflict-list">
           <li v-for="item in draft.unscheduled" :key="item.task_id" class="conflict-item">

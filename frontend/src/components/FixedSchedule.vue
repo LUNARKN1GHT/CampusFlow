@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/*
+ * 固定日程周视图：读取日程定义与按周展开的实例，编辑只作用于定义（每周重复由定义展开）。
+ * 所有时刻按工作空间时区解释与展示；这里的时间块不可被计划移动，也不改写任务 DDL。
+ */
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -23,6 +27,7 @@ const weekStart = ref(startOfWeek(new Date()))
 let weekInitialized = false
 const form = reactive({ course_id: '', title: '', starts_at: '', ends_at: '', location: '', recurrence: 'none' as 'none' | 'weekly', repeat_until: '' })
 
+// 周视图以周一为起点：getDay() 的周日为 0，换算成 (day + 6) % 7 的偏移。
 function startOfWeek(value: Date): Date {
   const date = new Date(value.getFullYear(), value.getMonth(), value.getDate())
   const offset = (date.getDay() + 6) % 7
@@ -37,6 +42,7 @@ function dateKey(value: Date): string {
   return `${year}-${month}-${day}`
 }
 
+// 把接口返回的时间点换算成工作空间本地的 YYYY-MM-DDTHH:mm，供 datetime-local 与按日切分使用。
 function workspaceInput(value: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone.value, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -88,6 +94,7 @@ async function load() {
   error.value = ''
   try {
     timezone.value = (await settingsApi.get()).timezone
+    // 只在首次加载时把本周定位到工作空间的"今天"，之后翻周或刷新不回到当周。
     if (!weekInitialized) {
       weekStart.value = startOfWeek(new Date(`${workspaceInput(new Date().toISOString()).slice(0, 10)}T12:00:00`))
       weekInitialized = true
@@ -104,6 +111,7 @@ async function load() {
 }
 
 function changeWeek(offset: number) {
+  // 以周为单位移动，随后按新起止日期重新拉取展开后的实例。
   const next = new Date(weekStart.value)
   next.setDate(next.getDate() + offset * 7)
   weekStart.value = next
@@ -122,6 +130,7 @@ function openEditor(event?: FixedEvent) {
 }
 
 function payload(): FixedEventInput {
+  // 时间未改动时直接回传原始 ISO，避免 datetime-local 的分钟精度往返改变时间点。
   return {
     course_id: form.course_id ? Number(form.course_id) : null, title: form.title,
     starts_at: editing.value && form.starts_at === workspaceInput(editing.value.starts_at) ? editing.value.starts_at : form.starts_at,
@@ -147,6 +156,7 @@ async function saveEvent() {
 }
 
 async function deleteEvent(event: FixedEvent) {
+  // 删除的是定义本身，每周重复的实例会一并消失；调用前先明确告知。
   if (!window.confirm(`删除固定日程“${event.title}”？它的每周重复实例也会一并移除。`)) return
   try {
     await scheduleApi.deleteEvent(event.id)
@@ -156,6 +166,7 @@ async function deleteEvent(event: FixedEvent) {
   }
 }
 
+// 跨天实例在当天显示为 00:00／24:00 边界，保证每天的时间段看起来连续。
 function timeRange(item: FixedEventOccurrence, day: string): string {
   const start = workspaceInput(item.starts_at)
   const end = workspaceInput(item.ends_at)

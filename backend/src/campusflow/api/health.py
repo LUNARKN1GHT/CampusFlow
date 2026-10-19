@@ -1,3 +1,9 @@
+"""存活与就绪检查。
+
+存活只代表 API 进程可响应；就绪额外验证数据库连接。两者都不代表
+模型、队列或外部日历等依赖已经可用，不能用健康状态代替业务结果。
+"""
+
 from typing import Literal
 
 from fastapi import APIRouter, Request
@@ -21,7 +27,7 @@ class ReadyResponse(HealthResponse):
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    """Report process liveness only, not database or model readiness."""
+    """仅报告进程存活，不检查数据库、模型或外部同步状态。"""
     return HealthResponse()
 
 
@@ -31,12 +37,13 @@ def health() -> HealthResponse:
     responses={503: {"description": "数据库不可用"}},
 )
 def ready(request: Request) -> ReadyResponse | JSONResponse:
-    """Report database readiness via a short-timeout connection check.
+    """用短超时连接检查数据库；不可达时返回 503。
 
-    数据库不可达时返回 503，响应不包含连接串或口令；就绪同样不代表
-    模型等尚未接入的能力可用。
+    响应只给固定中文文案，不包含连接串、主机名或异常原文。数据库就绪也
+    不代表模型、队列等尚未接入的能力可用。
     """
     settings = request.app.state.settings
+    # 每次请求单独建引擎并设置连接超时，避免就绪探针被数据库卡住。
     engine = create_engine(
         settings.database_url,
         connect_args={"connect_timeout": DB_CONNECT_TIMEOUT_SECONDS},

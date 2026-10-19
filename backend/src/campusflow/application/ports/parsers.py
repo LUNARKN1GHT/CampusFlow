@@ -92,8 +92,15 @@ class ParseOutcome:
 
 
 class DocumentParser(Protocol):
-    """文档解析适配器接口。PDF（pypdf）、粘贴文本、图片 OCR 均实现本协议。"""
+    """文档解析适配器接口。PDF（pypdf）、粘贴文本、图片 OCR 均实现本协议。
+
+    适配器只读入字节、不联网、不执行文件内容；定位信息只描述原片段位置，
+    版本归属由应用层持久化时绑定，不能在这里伪造页码或网页位置。
+    """
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
-        """解析文件内容为片段序列；无法识别的页/区域进入 failures 而不是静默丢弃。"""
+        """解析文件内容为片段序列；无法识别的页/区域进入 failures 而不是静默丢弃。
+
+        格式不支持时抛错；临时故障应抛可重试错误，不能返回空结果冒充成功。
+        """
         ...

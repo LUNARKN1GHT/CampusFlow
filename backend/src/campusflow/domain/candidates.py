@@ -30,12 +30,20 @@ class FieldOrigin(StrEnum):
 
 @dataclass(frozen=True)
 class FieldEvidence:
+    """一条原文证据：指向具体片段，并保存能逐字找回的摘录。"""
+
     chunk_id: int
     quote: str
 
 
 @dataclass(frozen=True)
 class CandidateField:
+    """候选字段的原始提取值；用户修正另存为 FieldRevision，不回写这里。
+
+    ``origin`` 决定证据要求：原文规定与系统推断必须带证据，推断与规划建议必须写说明；
+    ``value`` 为空表示缺失，此时必须给出 ``missing_reason``。
+    """
+
     name: str
     value: JsonValue
     origin: FieldOrigin
@@ -46,6 +54,8 @@ class CandidateField:
 
 @dataclass(frozen=True)
 class CandidateScope:
+    """适用范围；未标清的维度保留 None，表示“尚不清楚”，不是通配所有对象。"""
+
     semester_id: int | None = None
     course_id: int | None = None
     class_name: str | None = None
@@ -62,6 +72,8 @@ class ReviewReason:
 
 @dataclass(frozen=True)
 class CandidateDraft:
+    """尚未落库的提取草稿；须通过 validate_candidate 才能保存，保存后固定为待核对。"""
+
     kind: CandidateKind
     fields: tuple[CandidateField, ...]
     scope: CandidateScope = CandidateScope()
@@ -76,6 +88,7 @@ def _text(value: str | None, limit: int, label: str, *, required: bool = False) 
 
 
 def _json_value(value: JsonValue, depth: int = 0) -> None:
+    """递归确认字段值只含可保存的 JSON 标量/容器，且嵌套不超过 8 层。"""
     if depth > 8:
         raise DomainError("字段值嵌套过深")
     if type(value) is dict:
@@ -93,6 +106,7 @@ def _json_value(value: JsonValue, depth: int = 0) -> None:
 
 
 def _validate_field(field: CandidateField, names: set[str]) -> None:
+    """校验单个字段的出处与证据；同时把字段名登记到 ``names`` 以发现重名。"""
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field.name) or field.name in names:
         raise DomainError("候选字段名无效或重复")
     names.add(field.name)
@@ -126,6 +140,11 @@ def _validate_field(field: CandidateField, names: set[str]) -> None:
 
 
 def validate_candidate(draft: CandidateDraft) -> None:
+    """提取结果唯一的准入校验：字段出处、证据、适用范围与待核对原因必须自洽。
+
+    这里只判断结构是否可信，不判断语义是否正确；不合规时直接拒绝，
+    避免把没有依据的取值保存成“原文规定”。
+    """
     if not isinstance(draft.kind, CandidateKind):
         raise DomainError("候选类型必须是任务、日程或规则")
     if not 1 <= len(draft.fields) <= 64:
@@ -198,7 +217,10 @@ def validate_field_revision(field: CandidateField, revision: FieldRevision) -> N
 
 
 def apply_revisions(field: CandidateField, revisions: Sequence[FieldRevision]) -> CandidateField:
-    """按先后顺序叠加同一字段的修正，得到当前生效字段。"""
+    """按先后顺序叠加同一字段的修正，得到当前生效字段。
+
+    修正值由用户给出，不继承原文证据；每叠加一次都重新走字段出处校验。
+    """
     current = field
     for revision in revisions:
         current = _field_after_revision(current, revision)
@@ -208,7 +230,10 @@ def apply_revisions(field: CandidateField, revisions: Sequence[FieldRevision]) -
 def effective_fields(
     fields: Sequence[CandidateField], revisions: Sequence[FieldRevision]
 ) -> tuple[CandidateField, ...]:
-    """原始字段叠加修正后的生效取值，供核对界面展示。"""
+    """原始字段叠加修正后的生效取值，供核对界面展示。
+
+    只读视图：不改写原始字段或证据，返回顺序与 ``fields`` 一致。
+    """
     by_name: dict[str, list[FieldRevision]] = {}
     for revision in revisions:
         by_name.setdefault(revision.field_name, []).append(revision)
@@ -253,6 +278,7 @@ class ReviewChange:
 
 
 def validate_review_change(change: ReviewChange) -> None:
+    """只校验核对状态轴上的转换；任务执行进度独立维护，两种状态不能互相套用。"""
     if not isinstance(change.from_status, ReviewStatus) or not isinstance(
         change.to_status, ReviewStatus
     ):

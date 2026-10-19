@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 候选核对详情面板：并列展示每个字段的原始提取值、叠加修正后的生效值、出处与逐条原文引用。
+ * 操作：按后端 allowed_transitions 执行核对转换；逐字段修正只追加留痕；已确认候选可生成任务／日程／规则。
+ * 约束：失败时只显示错误、不出成功提示并保留已填说明；引用能否验证以当前原文为准，失效引用会标注不可验证。
+ */
 import { onMounted, ref, watch } from 'vue'
 
 import { errorMessage } from '../api/client'
@@ -173,6 +178,7 @@ async function submitCorrection() {
   let value: unknown = null
   if (raw !== '') {
     if (typeof field?.effective_value === 'number') {
+      // 原值是数字时按数字回写，保持字段类型一致；无法解析的数字在前端拦下，避免提交后才发现。
       const parsed = Number(raw)
       if (!Number.isFinite(parsed)) {
         correctionError.value = `${fieldLabel(fieldName)}需要数字取值；请填写数字，或留空并填写说明来清空它。`
@@ -217,6 +223,7 @@ async function convertCandidate() {
   convertError.value = ''
   convertMessage.value = ''
   try {
+    // 转换接口幂等：同一来源候选重复转换会返回既有事项（created=false），不会重复创建。
     const result = await candidatesApi.convert(props.candidateId)
     const converted = { kind: result.kind, object_id: result.object_id, title: result.title }
     try {
@@ -338,6 +345,7 @@ watch(() => props.candidateId, loadDetail)
         <p v-if="actionError" class="form-error" role="alert">{{ actionError }}</p>
         <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
         <div class="lifecycle-actions">
+          <!-- 按钮集合完全由后端 allowed_transitions 决定；缺少必须字段时确认需勾选并填写说明。 -->
           <button
             v-for="next in detail.allowed_transitions"
             :key="next"

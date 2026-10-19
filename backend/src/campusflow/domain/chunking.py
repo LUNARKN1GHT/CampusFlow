@@ -19,6 +19,8 @@ def _digest(value: dict) -> str:
 
 @dataclass(frozen=True)
 class SourceLocation:
+    """原文定位；只描述解析器实际给出的位置，不推断页码或合并单元格。"""
+
     kind: str
     value: str
     page: int | None = None
@@ -29,6 +31,8 @@ class SourceLocation:
 
 @dataclass(frozen=True)
 class ChunkSource:
+    """已保存的片段快照；fingerprint 绑定编号、文本与定位，任一项被改写都会换身份。"""
+
     id: int
     version_id: int
     seq: int
@@ -64,6 +68,8 @@ class ChunkSource:
 
 @dataclass(frozen=True)
 class ChunkingConfig:
+    """分块上限（UTF-8 字节）与重叠字符数；重叠上限取字节上限的 1/8，避免碎块与重复内容。"""
+
     max_bytes: int = 3000
     overlap_chars: int = 0
 
@@ -82,6 +88,8 @@ DEFAULT_CHUNKING = ChunkingConfig()
 
 @dataclass(frozen=True)
 class RetrievalBlock:
+    """原片段的一段字符切片；ID 由来源指纹与范围确定，可重复生成且不变。"""
+
     id: str
     source_chunk_id: int
     version_id: int
@@ -110,6 +118,7 @@ class RetrievalBlock:
 
 
 def _block_id(fingerprint: str, start: int, end: int) -> str:
+    """块身份 = 来源指纹 + 字符范围 + 算法版本；换原文或改范围都会得到新 ID。"""
     return _digest(
         {"source": fingerprint, "start": start, "end": end, "algorithm": CHUNKER_VERSION}
     )
@@ -118,6 +127,10 @@ def _block_id(fingerprint: str, start: int, end: int) -> str:
 def split_source(
     source: ChunkSource, config: ChunkingConfig = DEFAULT_CHUNKING
 ) -> list[RetrievalBlock]:
+    """把单个片段切成不超过字节上限的块，过长时优先在句末或换行处结束。
+
+    块只是原文切片：不清理、不改写、不合并相邻段落，所有坐标都指回同一原片段。
+    """
     source.validate()
     if not source.text:
         return []
@@ -161,6 +174,7 @@ def split_source(
 def split_sources(
     sources: list[ChunkSource], config: ChunkingConfig = DEFAULT_CHUNKING
 ) -> list[RetrievalBlock]:
+    """一次只处理同一资料版本：重复编号必须完全一致，片段顺序不得指向不同片段。"""
     unique: dict[int, ChunkSource] = {}
     sequences: dict[int, int] = {}
     version_id = None

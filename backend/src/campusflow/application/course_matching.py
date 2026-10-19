@@ -1,4 +1,7 @@
-"""X007：授权范围内的候选课程匹配，结果可保存但不自动绑定。"""
+"""X007：授权范围内的候选课程匹配，结果可保存但不自动绑定。
+
+匹配严格按课程名和教学班；唯一结果也只是待核对建议，候选 scope 不会被改写。
+"""
 
 from dataclasses import replace
 
@@ -15,7 +18,9 @@ from campusflow.domain.candidates import (
 from campusflow.domain.course_matching import CourseMatch, CourseOption, match_course
 from campusflow.domain.errors import DomainError, NotFoundError
 
+# 本用例重算的字段：先移除旧值再写入，避免重复字段或残留过期匹配。
 _OWN_FIELDS = {"course_name_text", "class_name_text", "course_match"}
+# 仅限制返回的选项数量；唯一性与计数始终使用完整集合。
 _OPTION_LIMIT = 20
 
 
@@ -46,6 +51,7 @@ def match_candidate_course(
         raise DomainError("学期编号无效")
     original = {field.name: field for field in draft.fields}
     texts = []
+    # 只接受约定名称的原文字段；课程名与教学班长度上限不同，超长直接拒绝。
     for name, supplied in (("course_name_text", course_name), ("class_name_text", class_name)):
         field = (
             supplied
@@ -90,6 +96,7 @@ def match_candidate_course(
         scope_semesters.add(bound_course.semester_id)
     if len(scope_semesters) > 1:
         raise DomainError("候选学期、课程与资料范围不一致")
+    # 资料、候选与已绑定课程声明的学期必须统一，且每个学期都属于当前空间。
     for sid in scope_semesters | ({semester_id} if semester_id is not None else set()):
         if type(sid) is not int or sid < 1:
             raise DomainError("学期编号无效")
@@ -157,6 +164,7 @@ def match_candidate_course(
     evidence = tuple(dict.fromkeys(e for f in texts for e in f.evidence))
     # 无原文字段时结果只表示“需选择”，并非有来源的推断事实。
     origin = FieldOrigin.INFERRED if evidence else FieldOrigin.SUGGESTION
+    # 始终追加待核对原因；草稿中同名字段的旧原因由本用例覆盖，不能标成已确认。
     output = replace(
         checked,
         fields=checked.fields

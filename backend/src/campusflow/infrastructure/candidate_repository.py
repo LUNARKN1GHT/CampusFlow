@@ -1,4 +1,8 @@
-"""X001 候选事项仓储：按事项、字段、证据分表持久化。"""
+"""X001 候选事项仓储：按事项、字段、证据分表持久化。
+
+候选绑定具体资料版本，随版本级联删除；字段修正与核对状态变更只追加历史，
+不改写原始提取值与证据。所有读写都带 workspace_id 限定，避免跨空间访问。
+"""
 
 from dataclasses import asdict
 
@@ -41,6 +45,10 @@ class SqlAlchemyCandidateRepository:
         self._session = session
 
     def _to_data(self, row: ExtractedItem) -> CandidateData:
+        """拼装候选详情：字段、逐条证据、修正记录与状态变更分四次读取。
+
+        证据只返回片段编号与摘录，是否仍可定位由应用层读取片段后判断。
+        """
         fields = self._session.scalars(
             select(ExtractedField)
             .where(ExtractedField.candidate_id == row.id)
@@ -131,6 +139,7 @@ class SqlAlchemyCandidateRepository:
         )
 
     def create(self, workspace_id: int, version_id: int, draft: CandidateDraft) -> CandidateData:
+        """新建候选固定为待核对，字段与证据分表追加；不写任务执行进度。"""
         row = ExtractedItem(
             workspace_id=workspace_id,
             source_version_id=version_id,
@@ -219,6 +228,7 @@ class SqlAlchemyCandidateRepository:
         semester_id: int | None = None,
         material_id: int | None = None,
     ) -> list[CandidateSummaryData]:
+        """待核对列表的最小字段视图；按状态、类型、课程、学期或来源资料筛选。"""
         stmt = (
             select(ExtractedItem, MaterialVersion.material_id, MaterialVersion.version_no)
             .join(MaterialVersion, MaterialVersion.id == ExtractedItem.source_version_id)
@@ -240,6 +250,7 @@ class SqlAlchemyCandidateRepository:
         rows = self._session.execute(stmt).all()
         if not rows:
             return []
+        # 列表只补标题类字段，不加载完整字段与证据；关系候选用两端课程名拼出标题
         label_fields: dict[int, dict[str, object]] = {}
         for row in self._session.execute(
             select(ExtractedField.candidate_id, ExtractedField.name, ExtractedField.value).where(
@@ -282,6 +293,7 @@ class SqlAlchemyCandidateRepository:
     def add_field_revision(
         self, workspace_id: int, candidate_id: int, revision: FieldRevision
     ) -> FieldRevisionRecord:
+        """追加字段修正记录，不更新原始字段行；空间不符时按字段不存在处理。"""
         field_row = self._session.scalar(
             select(ExtractedField)
             .join(ExtractedItem, ExtractedItem.id == ExtractedField.candidate_id)
@@ -309,6 +321,7 @@ class SqlAlchemyCandidateRepository:
     def set_review_status(
         self, workspace_id: int, candidate_id: int, change: ReviewChange
     ) -> ReviewChangeRecord:
+        """更新核对状态并追加变更历史；转换合法性由应用层在调用前校验。"""
         row = self._session.scalar(
             select(ExtractedItem).where(
                 ExtractedItem.id == candidate_id, ExtractedItem.workspace_id == workspace_id
@@ -335,6 +348,7 @@ class SqlAlchemyCandidateRepository:
         course_id: int | None,
         class_name: str | None,
     ) -> list[CandidateData]:
+        # 三个维度都按“指定值精确匹配、未指定则要求为空”处理，不从空范围回退到整个空间
         rows = self._session.scalars(
             select(ExtractedItem)
             .where(
@@ -370,6 +384,7 @@ class SqlAlchemyCandidateRepository:
     def find_merge(
         self, workspace_id: int, target_candidate_id: int, source_candidate_id: int
     ) -> MergeRecordData | None:
+        """按（目标、来源）查既有合并记录，供重复请求直接返回，保证重试幂等。"""
         row = self._session.scalar(
             select(CandidateMerge).where(
                 CandidateMerge.workspace_id == workspace_id,
@@ -393,6 +408,7 @@ class SqlAlchemyCandidateRepository:
         reason: str,
         operator: str,
     ) -> MergeRecordData:
+        """追加合并记录；唯一键兜底并发，调用方应先 find_merge 避免撞唯一约束。"""
         row = CandidateMerge(
             workspace_id=workspace_id,
             target_candidate_id=target_candidate_id,

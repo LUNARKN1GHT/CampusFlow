@@ -19,6 +19,7 @@ def require_in_workspace(
 def require_course_in_workspace(
     repos: Repositories, workspace_id: int, course_id: int | None
 ) -> None:
+    """课程编号为空表示未限定；提供编号时必须是当前空间的课程。"""
     if course_id is None:
         return
     course = repos.courses.get(course_id)
@@ -30,6 +31,7 @@ def require_course_in_workspace(
 def require_semester_in_workspace(
     repos: Repositories, workspace_id: int, semester_id: int | None
 ) -> None:
+    """学期编号为空表示未限定；提供编号时必须是当前空间的学期。"""
     if semester_id is None:
         return
     semester = repos.semesters.get(semester_id)

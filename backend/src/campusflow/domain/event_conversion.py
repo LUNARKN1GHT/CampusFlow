@@ -44,6 +44,7 @@ def _value_of(field: CandidateField | None) -> JsonValue:
 def _text_field(
     by_name: dict[str, CandidateField], name: str, limit: int, label: str
 ) -> str | None:
+    """取文本字段；空串视为缺失，超长直接拒绝而不是截断原文。"""
     value = _value_of(by_name.get(name))
     if not isinstance(value, str) or not value.strip():
         return None
@@ -64,6 +65,7 @@ def build_event_conversion(
         raise DomainError("日程候选缺少标题，无法转换为固定日程")
     starts_at = parse_event_time(_value_of(by_name.get(START_FIELD)))
     ends_at = parse_event_time(_value_of(by_name.get(END_FIELD)))
+    # 这里只解析原文；按工作空间时区换算与固定日程校验由应用层完成后才落库。
     if starts_at is None or ends_at is None:
         raise DomainError("日程候选缺少可确定的开始或结束时间，无法创建固定日程")
     return EventConversion(

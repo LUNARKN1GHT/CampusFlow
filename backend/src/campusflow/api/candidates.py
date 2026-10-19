@@ -1,6 +1,8 @@
 """待核对事项 HTTP 路由。
 
-包含 R001 列表、R008 核对详情与状态转换、R009 修正与生成入口、N011 新旧差异。
+包含 R001 列表、R008 核对详情与状态转换、R009 修正与生成入口、N011 新旧差异
+以及后续的变更影响、生效判断、重复建议、接受与合并。核对状态（待核对/已确认/
+已忽略/已失效）与任务执行进度是两套枚举，传错会因校验失败返回 422。
 """
 
 from datetime import datetime
@@ -101,6 +103,7 @@ def list_candidates(
     material_id: Annotated[int | None, Query(description="按来源资料筛选")] = None,
     reason: Annotated[str | None, Query(description="缺失原因代码")] = None,
 ) -> list[CandidateSummaryOut]:
+    """默认只列待核对；核对状态与任务进度混传会被枚举校验拒绝（422）。"""
     return [
         _to_out(item)
         for item in use_cases.list_review_candidates(
@@ -125,6 +128,7 @@ def candidate_summary(
     semester_id: Annotated[int | None, Query()] = None,
     material_id: Annotated[int | None, Query()] = None,
 ) -> ReviewCountsOut:
+    """同一候选的多个原因只计一次；计数范围与列表筛选保持一致。"""
     counts = use_cases.review_counts(
         repos,
         workspace.id,
@@ -503,6 +507,7 @@ def _diff_out(diff: diffs.CandidateDiff) -> CandidateDiffOut:
 def get_candidate_detail(
     candidate_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> CandidateReviewDetailOut:
+    """并列返回原始提取值与修正后的生效值；只有仍能定位原文的引用可验证。"""
     return _detail_out(repos, workspace.id, candidate_id)
 
 
@@ -601,7 +606,10 @@ def get_candidate_change_impact(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> ChangeImpactOut:
-    """N013：只读列出旧候选已转换的任务、日程、规则及计划时间块。"""
+    """N013：只读列出旧候选已转换的任务、日程、规则及计划时间块。
+
+    已完成任务与锁定时间块照常列出；提醒与外部日历未接入，放在 unsupported。
+    """
     result = change_impact.collect_impact(repos, workspace.id, candidate_id, other_candidate_id)
     return ChangeImpactOut(
         summary=result.summary,
@@ -636,7 +644,11 @@ def get_candidate_applicability(
     repos: Repos,
     relations: Relations,
 ) -> VersionApplicabilityOut:
-    """N012：只判定生效候选或冲突；不写库，接受变更由 N014 处理。"""
+    """N012：只判定生效候选或冲突；不写库，接受变更由 N014 处理。
+
+    只有替代声明、适用范围与发布时间都满足才推荐新候选；响应里的 applied
+    恒为 false，review_required 表示仍需人工核对。
+    """
     result = version_applicability.assess_applicability(
         repos, relations, workspace.id, candidate_id, other_candidate_id
     )
@@ -770,7 +782,11 @@ def post_version_acceptance(
     operator: Annotated[str, Depends(require_session)],
     response: Response,
 ) -> VersionAcceptanceOut:
-    """N014：接受具体字段差异；事务内失效旧候选并保存证据历史。"""
+    """N014：接受具体字段差异；事务内失效旧候选并保存证据历史。
+
+    幂等键是基准候选、新候选与字段集合，重复提交返回既有记录（200）。
+    判定为冲突或需核对时必须显式 acknowledge_conflict，否则拒绝。
+    """
     result = version_acceptance.accept_change(
         repos,
         relations,
@@ -796,6 +812,7 @@ def get_version_acceptances(
     repos: Repos,
     relations: Relations,
 ) -> list[VersionAcceptanceOut]:
+    """只读历史：旧候选、接受字段、原因与逐字段证据快照。"""
     use_cases.get_candidate(repos, workspace.id, candidate_id)
     return [
         _acceptance_out(
@@ -876,6 +893,7 @@ def get_merge_preview(
     repos: Repos,
     source_ids: Annotated[list[int] | None, Query()] = None,
 ) -> MergePreviewOut:
+    """只读预览；令牌绑定目标、来源集合与进度，合并时必须原样回传。"""
     return _merge_preview_out(
         candidate_merge.preview_merge(repos, workspace.id, candidate_id, tuple(source_ids or []))
     )
@@ -889,6 +907,10 @@ def post_merge_candidates(
     repos: Repos,
     operator: Annotated[str, Depends(require_session)],
 ) -> MergeResultOut:
+    """合并必须携带与当前范围一致的预览令牌，范围或进度变化返回 409。
+
+    全部来源已有合并记录时按重试处理，直接返回既有结果，不重复迁移。
+    """
     result = candidate_merge.execute_merge(
         repos,
         workspace.id,
@@ -909,6 +931,7 @@ def post_merge_candidates(
 def get_candidate_merges(
     candidate_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[MergeRecordOut]:
+    """合并留痕：保留来源快照、迁入的时间块数量与进度，事后可追溯。"""
     return [
         MergeRecordOut(**record.__dict__)
         for record in candidate_merge.list_merges(repos, workspace.id, candidate_id)
@@ -923,7 +946,10 @@ def patch_candidate_review_status(
     repos: Repos,
     operator: Annotated[str, Depends(require_session)],
 ) -> CandidateReviewDetailOut:
-    """确认守卫仍由应用层负责：缺必需字段且未显式确认时返回 400 与中文原因。"""
+    """确认守卫仍由应用层负责：缺必需字段且未显式确认时返回 400 与中文原因。
+
+    allowed_transitions 由后端计算，前端按它渲染可选项，不应自行推断。
+    """
     use_cases.set_candidate_review_status(
         repos,
         workspace.id,

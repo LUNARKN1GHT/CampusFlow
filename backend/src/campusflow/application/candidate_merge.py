@@ -1,4 +1,8 @@
-"""N016：合并用户选定的候选，迁移时间块并保留来源、进度和历史。"""
+"""N016：合并用户选定的候选，迁移时间块并保留来源、进度和历史。
+
+合并保留目标字段，不把来源字段覆盖到目标；来源候选失效、来源任务取消，
+已接受的进度只向更靠前的方向迁移。执行必须携带预览令牌，重试幂等。
+"""
 
 import hashlib
 import json
@@ -26,6 +30,8 @@ class MergeSourcePreview:
 
 @dataclass(frozen=True)
 class MergePreview:
+    """合并预览：目标保留字段、来源进度与时间块数，以及绑定这些内容的令牌。"""
+
     target_candidate_id: int
     kind: str
     target_title: str | None
@@ -45,6 +51,7 @@ class MergeResult:
 
 
 def _fields(candidate) -> dict:
+    # 只取生效值中的非空字段，来源的空值不会覆盖目标已有取值。
     return {
         field.name: field.value
         for field in candidate.effective_draft().fields
@@ -53,6 +60,7 @@ def _fields(candidate) -> dict:
 
 
 def _formal(repos: Repositories, candidate) -> tuple[str, int | None, str | None, int]:
+    # 正式事项只按来源候选关联查找，不用标题或日期猜测对应关系。
     kind = candidate.draft.kind.value
     if kind == "task":
         item = repos.tasks.get_by_source_candidate(candidate.id)
@@ -70,6 +78,7 @@ def _formal(repos: Repositories, candidate) -> tuple[str, int | None, str | None
 
 
 def _block_count(repos: Repositories, workspace_id: int, task_id: int) -> int:
+    # 草案（含未接受）的时间块也会被迁移，预览如实展示数量，不只统计当前计划。
     return sum(
         1
         for draft in repos.plans.list_drafts(workspace_id)
@@ -81,6 +90,11 @@ def _block_count(repos: Repositories, workspace_id: int, task_id: int) -> int:
 def preview_merge(
     repos: Repositories, workspace_id: int, target_candidate_id: int, source_ids: tuple[int, ...]
 ) -> MergePreview:
+    """只读预览；令牌绑定目标/来源的正式事项、进度与时间块数。
+
+    任一项在预览后变化，令牌都会失效，用户必须重新查看影响再确认。
+    auto_merge 恒为 false，这里不会自动执行合并。
+    """
     if not source_ids:
         raise DomainError("请选择要合并的来源候选")
     if len(set(source_ids)) != len(source_ids) or target_candidate_id in source_ids:
@@ -94,6 +108,7 @@ def preview_merge(
         for field in ("semester_id", "course_id", "class_name"):
             left = getattr(target.draft.scope, field)
             right = getattr(source.draft.scope, field)
+            # 只有双方都标了且不同才拒绝；范围缺失留待人工核对，不自动视为相同。
             if left and right and left != right:
                 raise DomainError("学期、课程或教学班不同，不能合并为同一事项")
         kind, formal_id, progress, block_count = _formal(repos, source)
@@ -150,6 +165,12 @@ def execute_merge(
     reason: str,
     operator: str,
 ) -> MergeResult:
+    """执行合并；必须携带与当前范围匹配的预览令牌。
+
+    全部来源已有合并记录时直接返回既有结果，视为重试而不重复迁移；
+    令牌不匹配返回冲突，要求重新预览。事务内完成状态变更、时间块迁移、
+    任务取消与历史写入，任一步失败整体回滚。
+    """
     if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1000:
         raise DomainError("请填写 1 至 1000 字的合并原因")
     preview = preview_merge(repos, workspace_id, target_candidate_id, source_ids)
@@ -157,6 +178,7 @@ def execute_merge(
         repos.candidates.find_merge(workspace_id, target_candidate_id, source_id)
         for source_id in source_ids
     ]
+    # 幂等检查放在令牌校验之前：已完成的合并重试时不需要用户重新预览。
     if all(record is not None for record in existing_records):
         return MergeResult(tuple(existing_records), False, preview)
     if preview_token != preview.token:
@@ -175,6 +197,7 @@ def execute_merge(
                 records.append(existing)
                 continue
             source_candidate = get_candidate(repos, workspace_id, source.candidate_id)
+            # 已忽略或已失效的候选保留用户原决定，只把待核对/已确认的来源标记为失效。
             if source_candidate.review_status is ReviewStatus.PENDING or (
                 source_candidate.review_status is ReviewStatus.CONFIRMED
             ):
@@ -192,6 +215,7 @@ def execute_merge(
                 and target_formal_id is not None
             ):
                 repos.plans.reassign_task(source.formal_id, target_formal_id)
+                # 只把更靠前的进度带到目标；目标已有进度时不回退，也不丢来源记录。
                 if target_progress == TaskProgress.NOT_STARTED.value and source.progress in {
                     TaskProgress.IN_PROGRESS.value,
                     TaskProgress.DONE.value,
@@ -213,6 +237,7 @@ def execute_merge(
                 target_formal_kind=target_kind,
                 target_formal_id=target_formal_id,
                 source_formal_id=source.formal_id,
+                # 来源快照保存合并前的版本、标题与进度，事后仍可追溯合并依据。
                 preserved_progress={
                     "target_progress": target_progress,
                     "source_progress": source.progress,
@@ -237,5 +262,6 @@ def execute_merge(
 
 
 def list_merges(repos: Repositories, workspace_id: int, candidate_id: int) -> list[MergeRecordData]:
+    """只读合并历史；先确认候选属于当前空间，再返回其合并记录。"""
     get_candidate(repos, workspace_id, candidate_id)
     return repos.candidates.list_merges(workspace_id, candidate_id)

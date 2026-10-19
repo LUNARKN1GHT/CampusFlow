@@ -1,4 +1,9 @@
-"""SQLAlchemy 仓储实现。ORM 模型只在本层使用，向外返回端口 DTO。"""
+"""SQLAlchemy 仓储实现。ORM 模型只在本层使用，向外返回端口 DTO。
+
+面向工作空间的查询在 SQL 里显式带 workspace_id；按父对象（版本、草案、候选）
+展开的查询依赖应用层已校验父对象的空间归属。仓储方法只 flush，提交与回滚
+统一由工作单元负责。
+"""
 
 from __future__ import annotations
 
@@ -78,6 +83,8 @@ def _row_missing(session: Session, model: type, row_id: int) -> bool:
 
 
 class SqlAlchemyUnitOfWork:
+    """事务边界：应用层完成全部校验与写入后统一提交，异常时整体回滚。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -278,6 +285,8 @@ class SqlAlchemyMaterialRepository:
         return _material_to_data(row) if row is not None else None
 
     def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
+        """删除前锁住资料行：与版本关系创建共用同一把锁，预览确认到删除之间
+        不允许插入新关系绕过影响检查。返回 False 表示资料不存在或不在本空间。"""
         return (
             self._session.scalar(
                 select(Material.id)
@@ -291,6 +300,7 @@ class SqlAlchemyMaterialRepository:
         )
 
     def version_relation_ids(self, material_id: int) -> list[int]:
+        """列出与该资料任一版本相关的关系（任一端），用于删除影响预览与确认指纹。"""
         versions = select(MaterialVersion.id).where(MaterialVersion.material_id == material_id)
         return list(
             self._session.scalars(
@@ -356,6 +366,7 @@ class SqlAlchemyMaterialRepository:
         course_id: int | None,
         class_name: str | None,
     ) -> MaterialData | None:
+        """只改资料级元数据（标题、来源、归类），已导入版本的原文与片段不动。"""
         row = self._session.get(Material, material_id)
         if row is None:
             return None
@@ -428,6 +439,7 @@ class SqlAlchemyMaterialRepository:
         return _material_version_to_data(row)
 
     def merge_version_metadata(self, version_id: int, values: dict[str, object]) -> None:
+        """合并版本元数据：只补充给定键，解析覆盖范围等既有键保留。"""
         row = self._session.get(MaterialVersion, version_id)
         if row is None:
             return
@@ -457,6 +469,11 @@ class SqlAlchemyMaterialRepository:
         return _material_to_data(row)
 
     def delete(self, material_id: int) -> bool:
+        """删除资料行；版本、片段、候选、索引与作业随外键级联消失。
+
+        任务/日程/规则的来源失效留痕由应用层在调用本方法前写入，删除后不再有
+        来源关联可查。返回 False 表示资料已不存在。
+        """
         row = self._session.get(Material, material_id)
         if row is None:
             return False
@@ -465,6 +482,7 @@ class SqlAlchemyMaterialRepository:
         return True
 
     def find_material_by_checksum(self, workspace_id: int, checksum: str) -> MaterialData | None:
+        """在当前空间按文件指纹找已有资料（重复导入检测），不跨空间。"""
         stmt = (
             select(Material)
             .join(MaterialVersion, MaterialVersion.material_id == Material.id)
@@ -785,6 +803,10 @@ class SqlAlchemyTaskRepository:
     def set_progress(
         self, task_id: int, progress: TaskProgress, reason: str | None
     ) -> TaskData | None:
+        """变更执行进度并追加一条历史记录，不改写候选核对状态。
+
+        完成或取消把剩余耗时归零；从完成/取消重新打开时恢复为预估耗时。
+        """
         row = self._session.get(Task, task_id)
         if row is None:
             return None
@@ -854,6 +876,7 @@ class SqlAlchemyTaskRepository:
     def add_dependency(
         self, workspace_id: int, task_id: int, depends_on_task_id: int
     ) -> TaskDependencyData:
+        """只插入必要先后关系；成环检测由应用层在写入前完成。"""
         row = TaskDependency(
             workspace_id=workspace_id,
             task_id=task_id,
@@ -881,12 +904,14 @@ class SqlAlchemyTaskRepository:
         return [_task_to_data(row) for row in self._session.scalars(stmt)]
 
     def get_by_source_candidate(self, candidate_id: int) -> TaskData | None:
+        """按来源候选查已转换的任务；唯一约束保证一个候选只对应一个任务。"""
         row = self._session.scalar(select(Task).where(Task.source_candidate_id == candidate_id))
         return _task_to_data(row) if row is not None else None
 
     def unlink_source_material(
         self, material_id: int, *, invalidated_at: datetime, note: str
     ) -> int:
+        """保留任务、解除资料来源并写入失效留痕（删除资料时选择保留任务）。"""
         rows = list(
             self._session.scalars(select(Task).where(Task.source_material_id == material_id))
         )
@@ -921,6 +946,7 @@ class SqlAlchemyScheduleRepository:
             .order_by(FixedEvent.starts_at)
         )
         if semester_id is not None:
+            # 按学期筛选走课程；未关联课程的日程只在未筛选学期时返回
             stmt = stmt.join(Course, FixedEvent.course_id == Course.id).where(
                 Course.workspace_id == workspace_id, Course.semester_id == semester_id
             )
@@ -931,6 +957,7 @@ class SqlAlchemyScheduleRepository:
         return _fixed_event_to_data(row) if row is not None else None
 
     def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
+        """按来源候选查已转换的固定日程；唯一约束保证重复转换不会新建第二条。"""
         row = self._session.scalar(
             select(FixedEvent).where(FixedEvent.source_candidate_id == candidate_id)
         )
@@ -1096,6 +1123,7 @@ class SqlAlchemyRuleRepository:
         return _rule_to_data(row) if row is not None else None
 
     def get_by_source_candidate(self, candidate_id: int) -> RuleData | None:
+        """按来源候选查已转换的规则；唯一约束保证重复转换返回既有规则。"""
         row = self._session.scalar(
             select(CourseRule).where(CourseRule.source_candidate_id == candidate_id)
         )
@@ -1204,6 +1232,10 @@ class SqlAlchemyJobRepository:
         return _job_to_data(row) if row is not None else None
 
     def claim(self, job_id: int) -> bool:
+        """以状态条件更新独占领取：只有 pending 的作业能被领走。
+
+        返回 False 表示已被其它 Worker 领取或作业已不存在，调用方不得继续执行。
+        """
         from campusflow.domain.states import JobStatus
 
         result = self._session.execute(
@@ -1223,6 +1255,7 @@ class SqlAlchemyJobRepository:
         error_reason: str | None,
         retryable: bool | None = None,
     ) -> ProcessingJobData | None:
+        """记录一次作业结果：更新状态与覆盖范围，终态尝试另存一条历史。"""
         from campusflow.domain.jobs import TERMINAL_JOB_STATUSES, sanitize_error_reason
         from campusflow.domain.states import JobStatus
 
@@ -1344,6 +1377,7 @@ class SqlAlchemyJobRepository:
     def list_undelivered(
         self, *, limit: int = 100, workspace_id: int | None = None
     ) -> list[ProcessingJobData]:
+        """Outbox 补偿扫描：尚未成功投递且仍待处理的作业，可被重新投递。"""
         from campusflow.domain.states import JobStatus
 
         query = select(ProcessingJob).where(
@@ -1421,6 +1455,7 @@ class SqlAlchemyJobRepository:
     def prepare_auto_retry(self, job_id: int, *, max_auto_retries: int) -> ProcessingJobData | None:
         from campusflow.domain.states import JobStage, JobStatus
 
+        # 条件更新一次完成“校验可重试 + 递增次数”：并发扫描不会把同一作业重置两次
         result = self._session.execute(
             update(ProcessingJob)
             .where(
@@ -1609,6 +1644,11 @@ class SqlAlchemyPlanRepository:
     def get_current(
         self, workspace_id: int, *, semester_id: int | None = None
     ) -> PlanDraftData | None:
+        """当前已接受计划按接受时间取最新。
+
+        接受新计划时应用层把同学期其它 accepted 草案标为已被替代，这里通常只有一行；
+        semester_id 为空表示不属于具体学期的计划，不能用空参数回退成任意学期。
+        """
         stmt = select(PlanDraft).where(
             PlanDraft.workspace_id == workspace_id, PlanDraft.status == "accepted"
         )
@@ -1678,6 +1718,7 @@ class SqlAlchemyPlanRepository:
         return _plan_block_to_data(row)
 
     def reassign_task(self, source_task_id: int, target_task_id: int) -> int:
+        """合并候选时把来源任务的时间块迁到目标任务；时间与锁定状态不变。"""
         rows = self._session.scalars(
             select(PlanBlock).where(PlanBlock.task_id == source_task_id)
         ).all()
@@ -1708,6 +1749,7 @@ class SqlAlchemyPlanRepository:
             update(PlanDraft)
             .where(
                 PlanDraft.id == draft_id,
+                # 乐观并发：版本号不匹配说明他人已改动或草案已进入终态，不覆盖
                 PlanDraft.version == expected_version,
                 PlanDraft.status.in_(["draft", "accepted"]),
             )
@@ -1725,6 +1767,10 @@ class SqlAlchemyPlanRepository:
     def supersede_others(
         self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
     ) -> None:
+        """接受新计划后，把同空间同学期的其它 accepted 草案标记为已被替代。
+
+        只改状态，不删除旧草案、时间块或版本历史。
+        """
         stmt = update(PlanDraft).where(
             PlanDraft.workspace_id == workspace_id,
             PlanDraft.status == "accepted",
@@ -1760,6 +1806,7 @@ class SqlAlchemyReminderRepository:
         self._session = session
 
     def list_rules(self, workspace_id: int) -> list[ReminderRuleData]:
+        # 默认规则（task_id 为空）排在最前，界面先展示全局设置再看任务规则
         stmt = (
             select(ReminderRule)
             .where(ReminderRule.workspace_id == workspace_id)
@@ -1827,6 +1874,7 @@ class SqlAlchemyReminderRepository:
         row.repeat_minutes = repeat_minutes
         row.paused = paused
         row.enabled = enabled
+        # 规则版本参与提醒去重键：规则变化后旧窗口的触发不会与新规则混用
         row.version += 1
         self._session.flush()
         return _reminder_rule_to_data(row)
@@ -1862,6 +1910,7 @@ class SqlAlchemyReminderRepository:
         return _reminder_trigger_to_data(row) if row is not None else None
 
     def upsert_triggers(self, rows: list[dict]) -> list[ReminderTriggerData]:
+        """按 dedupe_key 幂等写入提醒：重试、重复周期与并发同步只保留一条。"""
         if not rows:
             return []
         insert_stmt = pg_insert(ReminderTrigger).values(rows)
@@ -1919,6 +1968,7 @@ class SqlAlchemyReminderRepository:
     def cancel_pending_not_in_keys(
         self, workspace_id: int, task_id: int, keep_keys: set[str]
     ) -> int:
+        """只撤销本次期望集合之外的待发送提醒；已发送、已读或已忽略的不动。"""
         stmt = update(ReminderTrigger).where(
             ReminderTrigger.workspace_id == workspace_id,
             ReminderTrigger.task_id == task_id,
@@ -1945,6 +1995,7 @@ class SqlAlchemyReminderRepository:
         return result.rowcount or 0
 
     def restore_future_cancelled(self, workspace_id: int, task_id: int, now: datetime) -> int:
+        """重开任务时恢复仍有效的已取消提醒，只恢复未到期的窗口。"""
         result = self._session.execute(
             update(ReminderTrigger)
             .where(
@@ -1959,6 +2010,7 @@ class SqlAlchemyReminderRepository:
         return result.rowcount or 0
 
     def mark_due_sent(self, workspace_id: int, now: datetime) -> int:
+        """读取时同步：把已到期的待发送提醒标记为已发送，系统没有独立推送进程。"""
         result = self._session.execute(
             update(ReminderTrigger)
             .where(

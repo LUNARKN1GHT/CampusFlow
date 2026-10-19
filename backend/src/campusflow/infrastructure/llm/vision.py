@@ -36,6 +36,8 @@ MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """禁止 urllib 跟随跳转：带 Authorization 的请求不能转发到其它主机。"""
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
@@ -90,6 +92,8 @@ PROMPT = (
 
 
 class ZhipuVisionParser:
+    """调用智谱视觉模型识别单张图片；只接受 PNG/JPEG，输出转为片段与失败项，不当作事实。"""
+
     def __init__(
         self,
         api_key: str,
@@ -99,6 +103,8 @@ class ZhipuVisionParser:
         max_retries: int = 2,
         backoff_seconds: float = 1.0,
     ) -> None:
+        """校验密钥、超时与重试上限；重试只覆盖临时故障，共最多 max_retries+1 次调用。"""
+
         if not api_key:
             raise ValueError("缺少智谱 API 密钥")
         if not math.isfinite(timeout_seconds) or not 0 < timeout_seconds <= 120:
@@ -115,6 +121,8 @@ class ZhipuVisionParser:
         self._opener = urllib.request.build_opener(_NoRedirect())
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+        """识别一张图片；不支持的类型在联网前拒绝，结构异常统一转为可报告错误。"""
+
         if mime_type not in SUPPORTED_MIME_TYPES:
             raise ValueError(f"视觉识别不支持的类型：{mime_type}")
         payload = self._build_payload(content, mime_type)
@@ -122,6 +130,7 @@ class ZhipuVisionParser:
         return self._to_outcome(raw)
 
     def _build_payload(self, content: bytes, mime_type: str) -> dict:
+        # 图片以 data URL 内联发送，不提供外链，模型无法另行读取其它地址。
         image_b64 = base64.b64encode(content).decode()
         return {
             "model": self._model,
@@ -140,9 +149,12 @@ class ZhipuVisionParser:
         }
 
     def _post_with_retry(self, payload: dict) -> dict:
+        """只重试临时故障；请求被拒绝与输出无效直接抛出，不做无意义重试。"""
+
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             if attempt > 0:
+                # 线性退避：等待时间随尝试次数增加，避免连续冲击上游。
                 time.sleep(self._backoff * attempt)
             try:
                 return self._post(payload)
@@ -153,6 +165,8 @@ class ZhipuVisionParser:
         ) from last_error
 
     def _post(self, payload: dict) -> dict:
+        """发起一次 HTTP 调用；408/429/5xx 转临时错误，其余 4xx 拒绝，响应读取上限 1 MiB。"""
+
         request = urllib.request.Request(
             API_URL,
             data=json.dumps(payload).encode(),
@@ -197,6 +211,7 @@ class ZhipuVisionParser:
         if not isinstance(message, str):
             raise VisionInvalidOutput("识别内容不是文本")
         try:
+            # 只剥掉模型包裹的 Markdown 代码块标记，不修复或补全 JSON 内容。
             parsed = json.loads(
                 message.strip().removeprefix("```json").removeprefix("```").removesuffix("```")
             )
@@ -215,6 +230,7 @@ class ZhipuVisionParser:
 
         fragments: list[ParsedFragment] = []
         for seq, item in enumerate(raw_items):
+            # 空文本项直接跳过：模型可能对空白区域返回空字符串，不应作为片段。
             text = str(item.get("text") or "").strip()
             if not text:
                 continue

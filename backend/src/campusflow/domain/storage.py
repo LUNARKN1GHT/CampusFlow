@@ -12,6 +12,7 @@ def sanitize_extension(raw: str) -> str:
     """把用户输入（文件名或扩展名）净化为白名单内的扩展名。
 
     输入可以是 "作业.PDF"、"pdf" 或 ".pdf"；不在白名单内抛出 ValueError。
+    只取最后一个点后的扩展名，文件名其余部分不参与存储路径。
     """
     candidate = raw.rsplit(".", 1)[-1] if "." in raw else raw
     candidate = candidate.strip().lower()

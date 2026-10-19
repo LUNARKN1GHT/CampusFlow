@@ -1,6 +1,8 @@
 """M5 两周排期的纯领域规则。
 
 输入统一按工作空间时区解释；计划时间块只引用任务，不修改任务截止。
+本模块不读写存储、不调用模型，同一输入可以得到可复现的结果与指纹，
+便于接受计划前重新核对输入是否变化。
 """
 
 from __future__ import annotations
@@ -23,11 +25,18 @@ class Interval:
 
     @property
     def minutes(self) -> int:
+        """区间分钟数，不足一分钟的尾部向下取整。"""
         return int((self.end - self.start).total_seconds() // 60)
 
 
 @dataclass(frozen=True)
 class AvailabilityRule:
+    """按星期几重复的可用时段。
+
+    day_of_week 以周一为 0；时间按工作空间时区解释，不跨午夜
+    （跨日时段由用户拆成两天分别录入，避免容量重复累加）。
+    """
+
     day_of_week: int
     start_time: time
     end_time: time
@@ -35,7 +44,11 @@ class AvailabilityRule:
 
 @dataclass(frozen=True)
 class PlanningTask:
-    """参与排期的任务。minutes 为 None 表示耗时未知，不能静默按 0 处理。"""
+    """参与排期的任务。minutes 为 None 表示耗时未知，不能静默按 0 处理。
+
+    due_at 已按工作空间时区解释；due_date_only 为真时只代表当天结束。
+    estimated 标记耗时来自估计或假设；locked_minutes 是保留块占用的分钟数。
+    """
 
     task_id: int
     title: str
@@ -57,8 +70,8 @@ class PlanningTask:
 class PlanningDependency:
     """A003：排期使用的依赖边。
 
-    state 由应用层按工作空间数据判定：planned（前置也在本次排期中）、done（已完成）、
-    cancelled / out_of_scope / missing（不可满足）。
+    state 由应用层判定：planned 参与拓扑排序与先后约束；done 已完成，
+    不再推迟后续任务；cancelled／out_of_scope／missing 不可满足。
     """
 
     task_id: int
@@ -69,6 +82,12 @@ class PlanningDependency:
 
 @dataclass(frozen=True)
 class ExcludedTask:
+    """不进入排期的任务：进度为已完成／已取消，或是带子任务的父容器。
+
+    父容器不排期是为了避免父任务与子任务重复计入耗时；它仍会出现在
+    计划结果的排除清单里，不会被静默丢弃。
+    """
+
     task_id: int
     title: str
     progress: str
@@ -78,6 +97,8 @@ class ExcludedTask:
 
 @dataclass(frozen=True)
 class FixedEventOccurrence:
+    """固定日程在规划区间内的单个实例；每周重复已由调用方按墙上时间展开。"""
+
     event_id: int
     title: str
     start: datetime
@@ -98,14 +119,22 @@ class PreservedBlock:
 
     @property
     def seq(self) -> int:
+        """保留块不是本次生成的分段，统一返回 0 以复用时间块结构。"""
         return 0
 
 
 @dataclass(frozen=True)
 class PlanningInput:
+    """一次排期的全部输入，所有时间点均已按工作空间时区解释。
+
+    daily／weekly 只限制本次新分配的时间块；break 在同日相邻时间块之间插入休息；
+    buffer 在截止前预留提交缓冲；segment 限制单段长度；保留块已占用可用时间。
+    """
+
     timezone: str
     range_start: date
     range_end: date
+    # now 用作可安排时间的下界，也用于判断截止是否已经过去。
     now: datetime
     tasks: tuple[PlanningTask, ...]
     excluded_tasks: tuple[ExcludedTask, ...]
@@ -127,7 +156,11 @@ def _iso(value: datetime | date | time | None) -> str | None:
 def input_snapshot(
     inputs: PlanningInput, raw_tasks: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    """保存生成输入的快照：接受计划时用同一输入重新核对版本。"""
+    """保存生成输入的快照：接受计划时用同一输入重新核对版本。
+
+    raw_tasks 优先于排期字段：它包含进度、更新时间等非排期字段，让这些
+    变化也进入指纹；不传时退回可排期字段的最小快照。
+    """
     return {
         "timezone": inputs.timezone,
         "range_start": inputs.range_start.isoformat(),
@@ -205,6 +238,7 @@ def input_snapshot(
 
 
 def input_fingerprint(snapshot: dict[str, Any]) -> str:
+    """对规范化 JSON 取 SHA-256；键排序保证同一输入得到同一指纹。"""
     canonical = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -224,10 +258,12 @@ def resolve_planning_range(
     """A007：把今天/本周/两周/自定义解析为闭区间日期。
 
     所有边界都由工作空间时区的"今天"推导；自定义区间必须同时给出起止。
+    返回的起止日期都是含在区间内的边界，调用方据此展开每日可用时间。
     """
     if kind == "today":
         return today, today
     if kind == "this_week":
+        # 周一至周日，可跨月；weekday() 以周一为 0。
         monday = today - timedelta(days=today.weekday())
         return monday, monday + timedelta(days=6)
     if kind == "two_weeks":
@@ -243,7 +279,11 @@ def resolve_planning_range(
 
 @dataclass(frozen=True)
 class AssumptionOptions:
-    """用户显式选择的规划假设；为空时不补任何值（P003）。"""
+    """用户显式选择的规划假设；为空时不补任何值（P003）。
+
+    task_durations 优先于 default_duration_minutes；task_due_dates 只用于
+    原本没有截止日期的任务，不会覆盖已有截止。
+    """
 
     default_duration_minutes: int | None = None
     task_durations: Mapping[int, int] = field(default_factory=dict)
@@ -254,6 +294,12 @@ class AssumptionOptions:
 
 @dataclass(frozen=True)
 class ResolvedInput:
+    """叠加假设后的排期输入。
+
+    tasks 已填入可用的耗时与截止；gaps 列出仍缺失、不能排期的字段；
+    assumptions 逐条记录用户假设，供界面展示而不冒充原文事实。
+    """
+
     tasks: tuple[PlanningTask, ...]
     gaps: tuple[dict[str, Any], ...]
     assumptions: tuple[dict[str, Any], ...]
@@ -267,6 +313,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
     未提供假设时保持 minutes=None 并列入 gaps；候选事项不在此处读取，
     因此不会被当作已确认约束。
     """
+    # 先整体校验假设，避免处理到一半才因非法值失败而留下不一致的结果。
     if options.default_duration_minutes is not None and options.default_duration_minutes <= 0:
         raise DomainError("默认耗时假设必须大于 0 分钟")
     if options.segment_minutes is not None and options.segment_minutes <= 0:
@@ -282,6 +329,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
     for task in inputs.tasks:
         minutes = task.minutes
         duration_assumed = task.duration_assumed
+        # 单任务假设优先；elif 保证同一任务只记录一条假设，不会叠加默认值。
         if minutes is None and task.task_id in options.task_durations:
             minutes = options.task_durations[task.task_id]
             if minutes <= 0:
@@ -313,6 +361,8 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
         due_assumed = task.due_assumed
         if due_at is None and task.task_id in options.task_due_dates:
             assumed_date = options.task_due_dates[task.task_id]
+            # 假设只给到日期：用当天结束作为排期上限，并把 due_date_only 置真，
+            # 展示时仍写"当天结束"而不是一个具体时刻。
             due_at = datetime.combine(assumed_date, time.max, tzinfo=timezone)
             due_assumed = True
             assumptions.append(
@@ -327,6 +377,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
                 }
             )
 
+        # 缺口与假设分开：有缺口的任务仍返回，但后续会被列为未排入并说明原因。
         if minutes is None:
             gaps.append(
                 {
@@ -367,8 +418,10 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
                 priority=task.priority,
                 minutes=minutes,
                 due_at=due_at,
+                # 用户假设的截止只有日期，必须保持"当天结束"的精度。
                 due_date_only=task.due_date_only if not due_assumed else True,
                 target_date=task.target_date,
+                # 耗时来自估计或假设都算估计值，相关风险不能标成确定冲突。
                 estimated=task.estimated or duration_assumed,
                 due_assumed=due_assumed,
                 duration_assumed=duration_assumed,
@@ -412,16 +465,23 @@ def _zone(name: str):
 
 @dataclass(frozen=True)
 class FreeWindow:
+    """扣除固定日程与保留块、并裁掉已过去时间后的连续可用区间。"""
+
     start: datetime
     end: datetime
 
     @property
     def minutes(self) -> int:
+        """区间分钟数，不足一分钟的尾部向下取整。"""
         return int((self.end - self.start).total_seconds() // 60)
 
 
 def merge_intervals(intervals: list[Interval]) -> list[Interval]:
-    """合并重叠区间；首尾相接（end == 下个 start）不算重叠，但可安全合并为连续区间。"""
+    """合并重叠区间；首尾相接（end == 下个 start）不算重叠，但可安全合并为连续区间。
+
+    先按起点、终点排序，再单向扫描；输入列表不被修改。合并也保证同一段
+    忙碌时间只扣一次，不会因重复输入而重复占用可用时间。
+    """
     if not intervals:
         return []
     ordered = sorted(intervals, key=lambda item: (item.start, item.end))
@@ -437,7 +497,10 @@ def merge_intervals(intervals: list[Interval]) -> list[Interval]:
 
 
 def subtract_intervals(windows: list[Interval], busy: list[Interval]) -> list[Interval]:
-    """从可用区间扣除忙碌区间；重叠的忙碌输入只扣一次。"""
+    """从可用区间扣除忙碌区间；重叠的忙碌输入只扣一次。
+
+    输出可能首尾相邻而不合并；零长度片段会被丢弃。
+    """
     result: list[Interval] = []
     merged_busy = merge_intervals(busy)
     for window in windows:
@@ -466,7 +529,8 @@ def detect_overlaps(
 ) -> list[dict[str, Any]]:
     """检测固定日程之间、时间块与固定日程、时间块之间的重叠（P011）。
 
-    重叠是确定的冲突，不按导入顺序或优先级悄悄忽略任何一方。
+    重叠是确定的冲突，不按导入顺序或优先级忽略任何一方；固定日程应为
+    规划区间内已展开的实例，冲突列表按排序后的时间块稳定输出。
     """
     conflicts: list[dict[str, Any]] = []
     events = inputs.fixed_events
@@ -532,7 +596,11 @@ def detect_risks(
     outcome: PlanOutcome,
     blocks: tuple[BlockSuggestion, ...] | None = None,
 ) -> list[dict[str, Any]]:
-    """截止与负荷风险（P012）：确定缺口与基于耗时估计的风险分开标注。"""
+    """截止与负荷风险（P012）：确定缺口与基于耗时估计的风险分开标注。
+
+    只对仍有未排分钟且有截止的任务报告截止风险；缺字段由 gaps 说明。
+    负荷风险按传入的全部时间块（含保留块）统计，可能发现分配时未超容量的日期。
+    """
     risks: list[dict[str, Any]] = []
     tasks = {task.task_id: task for task in resolved.tasks}
     for disposition in outcome.dispositions:
@@ -541,6 +609,7 @@ def detect_risks(
         task = tasks.get(disposition.task_id)
         if task is None or task.due_at is None:
             continue
+        # 耗时是估计值时为 risk；确定耗时仍排不下则是确定的 conflict。
         based_on_estimate = task.estimated
         risks.append(
             {
@@ -617,6 +686,7 @@ def _block_reason(
     deadline: datetime | None,
     buffer_minutes: int,
 ) -> str:
+    """生成时间块的可读安排理由；仅日期的截止不写成具体时刻。"""
     parts: list[str] = []
     if deadline is not None:
         deadline_text = deadline.strftime("%Y-%m-%d %H:%M")
@@ -634,7 +704,11 @@ def _block_reason(
 
 
 def task_order_key(task: PlanningTask) -> tuple:
-    """明确截止优先，其次重要性；没有截止的任务排在最后。"""
+    """明确截止优先，其次重要性；没有截止的任务排在最后。
+
+    仅日期的截止已由调用方换算成当天结束；截止相同时再按优先级与目标日期，
+    最后以任务编号兜底，保证排序结果稳定可复现。
+    """
     priority_rank = {"high": 0, "medium": 1, "low": 2}.get(task.priority, 3)
     due_key = task.due_at.timestamp() if task.due_at is not None else float("inf")
     target_key = (
@@ -645,6 +719,12 @@ def task_order_key(task: PlanningTask) -> tuple:
 
 @dataclass(frozen=True)
 class BlockSuggestion:
+    """草案中的单个学习时间块。
+
+    seq 是同一任务内的分段序号；保留块固定为 0。locked 标记这些块是否
+    已锁定保留，reason 说明保留原因。时间点均带工作空间时区。
+    """
+
     task_id: int | None
     title: str
     starts_at: datetime
@@ -659,6 +739,13 @@ class BlockSuggestion:
 
 @dataclass(frozen=True)
 class TaskDisposition:
+    """任务在本次计划中的去向。
+
+    status 为 scheduled／partial／unscheduled；remaining_minutes 是未排入的
+    分钟数，汇总成容量缺口。reason_code 覆盖缺耗时、无可用时间、截止已过、
+    容量不足、依赖不可满足／成环／截止冲突等，供前端稳定映射提示与选项。
+    """
+
     task_id: int
     title: str
     status: str
@@ -671,6 +758,8 @@ class TaskDisposition:
 
 @dataclass(frozen=True)
 class AllocationResult:
+    """分配阶段的原始结果；容量缺口等于所有任务未排入分钟数之和。"""
+
     blocks: tuple[BlockSuggestion, ...]
     dispositions: tuple[TaskDisposition, ...]
     capacity_gap_minutes: int
@@ -678,6 +767,8 @@ class AllocationResult:
 
 @dataclass(frozen=True)
 class ExcludedTaskDisposition:
+    """不参与排期的任务去向：已完成、已取消或带子任务的父容器。"""
+
     task_id: int
     title: str
     status: str
@@ -688,6 +779,12 @@ class ExcludedTaskDisposition:
 
 @dataclass(frozen=True)
 class PlanOutcome:
+    """一份完整草案：时间块、逐任务去向、缺口、假设与检查覆盖。
+
+    dispositions 与 excluded 合起来必须覆盖全部输入任务；coverage 说明
+    实际检查了哪些约束、哪些因信息缺失没有检查，避免把"未发现"当成"没问题"。
+    """
+
     blocks: tuple[BlockSuggestion, ...]
     dispositions: tuple[TaskDisposition, ...]
     excluded: tuple[ExcludedTaskDisposition, ...]
@@ -699,6 +796,7 @@ class PlanOutcome:
 
     @property
     def all_task_ids(self) -> set[int]:
+        """本次计划涉及的全部任务编号，用于核对没有任务被静默丢弃。"""
         return {item.task_id for item in self.dispositions} | {
             item.task_id for item in self.excluded
         }
@@ -707,7 +805,10 @@ class PlanOutcome:
 def build_outcome(
     inputs: PlanningInput, resolved: ResolvedInput, allocation: AllocationResult
 ) -> PlanOutcome:
-    """汇总未排原因、容量缺口与检查覆盖，保证每个输入任务都有去向（P008）。"""
+    """汇总未排原因、容量缺口与检查覆盖，保证每个输入任务都有去向（P008）。
+
+    排除项也给出可执行入口（如重新打开或查看子任务），不能只从结果中消失。
+    """
     excluded = tuple(
         ExcludedTaskDisposition(
             task_id=task.task_id,
@@ -735,6 +836,7 @@ def build_outcome(
     missing_due = [task.title for task in resolved.tasks if task.due_at is None]
     missing_duration = [task.title for task in resolved.tasks if task.minutes is None]
     not_checked: list[str] = []
+    # 缺字段时只说明"未检查"，不能把跳过当成通过。
     if missing_due:
         not_checked.append("以下任务没有明确截止日期，未检查截止风险：" + "、".join(missing_due))
     if missing_duration:
@@ -750,6 +852,7 @@ def build_outcome(
             "fixed_event_overlap",
             "daily_capacity",
             "weekly_capacity",
+            # 没有依赖时如实不声明检查过依赖。
             *(["task_dependencies"] if inputs.dependencies else []),
         ],
         "not_checked": not_checked,
@@ -764,6 +867,7 @@ def build_outcome(
 
     adjustment_options: tuple[str, ...] = ()
     if allocation.capacity_gap_minutes > 0:
+        # 有缺口时给出可选调整方向，但不替用户隐藏未排任务或自动改变截止。
         adjustment_options = (
             "增加每日或每周可用时间",
             "扩大规划范围或调整任务截止",
@@ -785,6 +889,11 @@ def build_outcome(
 
 
 def _planned_edges(inputs: PlanningInput, task_ids: set[int]) -> list[tuple[int, int]]:
+    """只保留两端都在本次排期内的 planned 边。
+
+    done 前置不再产生时间约束；cancelled／out_of_scope／missing 由 unmet
+    单独处理，越出范围的前置不参与拓扑排序。
+    """
     return [
         (link.task_id, link.depends_on_task_id)
         for link in inputs.dependencies
@@ -797,7 +906,11 @@ def _planned_edges(inputs: PlanningInput, task_ids: set[int]) -> list[tuple[int,
 def _topological_order(
     tasks: tuple[PlanningTask, ...], edges: list[tuple[int, int]]
 ) -> list[PlanningTask]:
-    """按依赖先后排序；同一批可执行任务仍按截止与优先级排序，结果确定。"""
+    """按依赖先后排序；同一批可执行任务仍按截止与优先级排序，结果确定。
+
+    Kahn 算法：排序结果只包含能释放的任务；成环节点及其下游不会出现，
+    由 allocate_tasks 统一标记为阻塞，不能伪造一个"完整顺序"。
+    """
     by_id = {task.task_id: task for task in tasks}
     indegree = {task_id: 0 for task_id in by_id}
     outgoing: dict[int, list[int]] = {task_id: [] for task_id in by_id}
@@ -807,6 +920,7 @@ def _topological_order(
     ready = [task for task in tasks if indegree[task.task_id] == 0]
     order: list[PlanningTask] = []
     while ready:
+        # 每轮重排就绪队列，保证同一优先级的任务按稳定键取用。
         ready.sort(key=task_order_key)
         task = ready.pop(0)
         order.append(task)
@@ -822,8 +936,9 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
 
     依赖先于优先级：后续任务只能安排在前置任务完成之后。前置取消、缺失、
     越出范围或未能排入时，依赖不可满足，后续任务直接列为未排入。
-    这里只处理硬约束；每日／每周容量、休息与分段在后续规则中叠加。
+    这里同时执行每日／每周容量、段间休息与单段上限，并在截止前预留提交缓冲。
     """
+    # 每个窗口用可变列表保存，循环中把 [0] 推到下一段起点，避免重复扫描。
     windows = [[window.start, window.end] for window in build_free_windows(inputs)]
     blocks: list[BlockSuggestion] = []
     dispositions: list[TaskDisposition] = []
@@ -833,12 +948,14 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
 
     by_id = {task.task_id: task for task in resolved.tasks}
     planned_edges = _planned_edges(inputs, set(by_id))
+    # 先用强连通分量找出成环任务；环内任务不会进入拓扑顺序，循环结束后统一处理。
     cycle_edges: dict[int, set[int]] = {}
     for task_id, prerequisite in planned_edges:
         cycle_edges.setdefault(task_id, set()).add(prerequisite)
     cycle_members = {
         task_id for component in cyclic_components(cycle_edges) for task_id in component
     }
+    # 前置不可满足时直接阻塞本任务；状态由应用层判定，这里只消费结论。
     unmet: dict[int, list[PlanningDependency]] = {}
     for link in inputs.dependencies:
         if link.task_id in by_id and link.state in {"cancelled", "out_of_scope", "missing"}:
@@ -857,6 +974,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
     for block in inputs.preserved_blocks:
         if block.task_id is None:
             continue
+        # 同一任务可能有多个保留块，以最晚结束者作为其完成时间下界。
         current_end = preserved_end.get(block.task_id)
         if current_end is None or block.end > current_end:
             preserved_end[block.task_id] = block.end
@@ -868,6 +986,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
         message: str,
         options: tuple[str, ...],
     ) -> None:
+        """记录阻塞任务；satisfied=False 会让依赖它的后续任务也停止排期。"""
         satisfied[task.task_id] = False
         dispositions.append(
             TaskDisposition(
@@ -900,6 +1019,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
         if task.minutes is None:
+            # 耗时未知不能按 0 处理；同时标记不可满足，下游任务不会被误排。
             satisfied[task.task_id] = False
             dispositions.append(
                 TaskDisposition(
@@ -915,6 +1035,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
         if task.minutes == 0:
+            # 没有剩余工作即视为已完成，后续依赖可以从当前时刻开始。
             satisfied[task.task_id] = True
             completed[task.task_id] = inputs.now
             dispositions.append(
@@ -934,6 +1055,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
         links = prerequisite_links.get(task.task_id, [])
         earliest_start: datetime | None = None
         blocked_by_unscheduled: PlanningDependency | None = None
+        # 多个前置取最晚完成时间作为开始下界；只要有一个未能排入就整体阻塞。
         for link in links:
             if satisfied.get(link.depends_on_task_id) is False:
                 blocked_by_unscheduled = link
@@ -956,6 +1078,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 options=("增加可用时间", "调整前置任务截止", "接受未排入"),
             )
             continue
+        # 开始下界已进入截止前的缓冲区间：即使立刻开始也无法留足缓冲，直接阻塞。
         if (
             earliest_start is not None
             and task.due_at is not None
@@ -969,6 +1092,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
 
+        # 保留块已占用的耗时先从剩余工时扣除；任务耗时变小时按总量封顶，避免负数。
         preserved_minutes = min(task.minutes, task.locked_minutes)
         remaining = task.minutes - preserved_minutes
         scheduled = preserved_minutes
@@ -991,6 +1115,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 )
             )
             continue
+        # 窗口按时间顺序使用；有依赖时把起点推后到前置完成之后。
         for window in windows:
             if earliest_start is not None:
                 if window[1] <= earliest_start:
@@ -1005,6 +1130,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 day = window_start.date()
                 day_end = day_last_end.get(day)
                 if day_end is not None:
+                    # 同一天相邻时间块之间插入休息；休息不占任务容量但占用窗口。
                     earliest = day_end + timedelta(minutes=inputs.break_minutes)
                     if earliest > window_start:
                         window_start = earliest
@@ -1013,11 +1139,13 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 week = day.isocalendar()[:2]
                 weekly_remaining = inputs.weekly_capacity_minutes - weekly_used.get(week, 0)
                 if daily_remaining <= 0 or weekly_remaining <= 0:
+                    # 当天或当周容量已满：放弃当前窗口，继续尝试其它日期。
                     window[0] = window_end
                     break
 
                 latest_end = window_end
                 if deadline is not None:
+                    # 截止前的提交缓冲从可用区间末端扣除，时间块不得侵占。
                     latest_end = min(
                         window_end, deadline - timedelta(minutes=resolved.buffer_minutes)
                     )
@@ -1025,6 +1153,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 if available <= 0:
                     window[0] = window_end
                     break
+                # 单块时长同时受剩余工时、窗口、日／周容量与分段上限约束。
                 minutes = min(
                     remaining,
                     available,
@@ -1140,6 +1269,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             if remaining <= 0:
                 break
 
+        # 按完成程度给出去向：完整排入、部分排入或未排入；部分排入仍算缺口。
         if remaining == 0:
             status = "scheduled"
             reason_code = None
@@ -1156,6 +1286,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 message = f"已排 {scheduled} 分钟，仍有 {remaining} 分钟超出本次范围容量"
                 options = ("增加可用时间", "扩大规划范围", "降低其他任务安排", "接受缺口")
         elif deadline is not None and deadline <= inputs.now:
+            # 完全没有排入时区分"截止已过"与"可用时间不足"，给出不同调整入口。
             status = "unscheduled"
             reason_code = "due_passed"
             message = "截止时间已过，未安排新的时间块"
@@ -1177,6 +1308,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 options=options,
             )
         )
+        # 只有完整排入才算满足依赖；部分排入的任务不能让下游提前开始。
         satisfied[task.task_id] = remaining == 0
         if remaining == 0 and last_end is not None:
             completed[task.task_id] = last_end
@@ -1193,6 +1325,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 options=("删除其中一条依赖", "调整任务顺序"),
             )
         else:
+            # 不在环内却未被释放，说明它的某个前置位于环中。
             record_blocked(
                 task,
                 reason_code="dependency_unmet",
@@ -1207,7 +1340,11 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
 
 
 def build_free_windows(inputs: PlanningInput) -> list[FreeWindow]:
-    """按工作空间时区展开可用时段，扣除固定日程并裁掉已过去的时间。"""
+    """按工作空间时区展开可用时段，扣除固定日程并裁掉已过去的时间。
+
+    可用规则按星期几逐日展开；固定日程与保留块都算忙碌，保留块不能重排；
+    起点不早于 inputs.now，避免把新时间块放进已经过去的时段。
+    """
     timezone = _zone(inputs.timezone)
     availability: list[Interval] = []
     current_date = inputs.range_start
@@ -1226,6 +1363,7 @@ def build_free_windows(inputs: PlanningInput) -> list[FreeWindow]:
     busy = [Interval(event.start, event.end) for event in inputs.fixed_events]
     busy.extend(Interval(block.start, block.end) for block in inputs.preserved_blocks)
     free = subtract_intervals(merge_intervals(availability), busy)
+    # 用输入时刻作为地板裁掉过去时间；边界相等时窗口为空，直接丢弃。
     floor = inputs.now
     clipped: list[Interval] = []
     for window in free:

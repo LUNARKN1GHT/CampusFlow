@@ -9,6 +9,10 @@ from campusflow.infrastructure.calendar.local import LocalCalendarProvider
 
 
 def build_calendar_provider(settings: Settings) -> CalendarProvider:
+    """按 ``CAMPUSFLOW_CALENDAR_PROVIDER`` 返回适配器，未知取值直接报错。
+
+    google 缺少 OAuth 客户端配置时在首次调用才报错；local 仅供验收与本地演示。
+    """
     if settings.calendar_provider == "local":
         return LocalCalendarProvider()
     if settings.calendar_provider == "google":

@@ -1,4 +1,8 @@
-"""候选保存、核对列表与核对详情边界：核对空间、真实片段与摘录后原子保存，按核对状态和缺失原因列出，详情给出逐字段原始值与生效值及引用可验证状态。"""
+"""候选保存、核对列表与核对详情边界。
+
+保存时先核对空间、真实片段与摘录再整批原子写入；列表按核对状态和缺失原因
+筛选；详情分开给出原始提取值、叠加修正后的生效值与引用可验证状态。
+"""
 
 from dataclasses import dataclass
 
@@ -33,6 +37,11 @@ def save_candidates(
     version_no: int,
     drafts: list[CandidateDraft],
 ) -> list[CandidateData]:
+    """整批保存候选：空间、适用范围与证据全部核对通过后才写入。
+
+    任一项不合法即整批回滚，不留半成品；新候选固定为待核对，确认仍由
+    用户显式操作。资料归档后拒绝继续保存，避免把旧版本当成当前依据。
+    """
     material = get_material(repos, workspace_id, material_id)
     if material.archived:
         raise DomainError("资料已归档，请恢复后再提取候选事项")
@@ -109,7 +118,11 @@ def revise_candidate_field(
     operator: str,
     note: str | None = None,
 ) -> CandidateData:
-    """追加一条字段修正，保留原始提取与证据，返回叠加修正后的候选。"""
+    """追加一条字段修正，保留原始提取与证据，返回叠加修正后的候选。
+
+    修正只能追加、不能覆盖原记录；用户填写的值由领域层限制为
+    用户补充或规划建议，不能声明为原文规定。
+    """
     candidate = get_candidate(repos, workspace_id, candidate_id)
     field = next((item for item in candidate.draft.fields if item.name == field_name), None)
     if field is None:
@@ -137,6 +150,7 @@ def revise_candidate_field(
 def _require_confirmation_ready(
     candidate: CandidateData, acknowledge_missing: bool, reason: str | None
 ) -> None:
+    """缺少必须字段时默认拒绝；显式确认时必须写明原因，才允许进入已确认。"""
     missing = missing_required_fields(candidate.draft.kind, candidate.effective_draft().fields)
     if not missing:
         return
@@ -158,7 +172,11 @@ def set_candidate_review_status(
     reason: str | None = None,
     acknowledge_missing: bool = False,
 ) -> CandidateData:
-    """按合法转换更新候选核对状态并留痕；确认前检查必须字段。"""
+    """按合法转换更新候选核对状态并留痕；确认前检查必须字段。
+
+    转换方向由领域规则校验，每次变更写入状态记录（方向、操作者、原因）；
+    核对状态与任务执行进度是两套状态，这里不接受任务进度值。
+    """
     candidate = get_candidate(repos, workspace_id, candidate_id)
     change = ReviewChange(candidate.review_status, status, operator, reason)
     validate_review_change(change)
@@ -184,6 +202,7 @@ def _require_review_filters_in_workspace(
     semester_id: int | None,
     material_id: int | None,
 ) -> None:
+    """筛选条件涉及的学期、课程与资料也必须属于当前空间。"""
     _require_associations(repos, workspace_id, semester_id, course_id)
     if material_id is not None:
         get_material(repos, workspace_id, material_id)
@@ -217,6 +236,7 @@ def list_review_candidates(
         material_id=material_id,
     )
     if reason_code is not None:
+        # 原因代码存在 review_reasons JSON 列，在应用层过滤，避免 SQL 硬编码代码集合。
         summaries = [
             item
             for item in summaries
@@ -258,6 +278,7 @@ def review_counts(
     by_reason: dict[str, int] = {}
     for item in summaries:
         by_status[item.review_status.value] = by_status.get(item.review_status.value, 0) + 1
+        # 同一候选重复出现同一种原因时只计一次，计数反映候选数而不是原因条数。
         for code in {reason_code for reason_code, _, _ in item.review_reasons}:
             by_reason[code] = by_reason.get(code, 0) + 1
     return ReviewCounts(len(summaries), by_status, by_reason)
@@ -313,6 +334,7 @@ class CandidateReviewDetail:
 def evidence_view(
     evidence: FieldEvidence, chunks: dict[int, SourceChunkData]
 ) -> CandidateEvidenceView:
+    """单条证据的定位与可验证状态；片段不存在时不返回定位信息。"""
     chunk = chunks.get(evidence.chunk_id)
     return CandidateEvidenceView(
         chunk_id=evidence.chunk_id,

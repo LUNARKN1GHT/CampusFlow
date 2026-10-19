@@ -11,6 +11,8 @@ from campusflow.domain.errors import DomainError
 
 @dataclass(frozen=True)
 class EmbeddingProfile:
+    """模型配置身份；供应商、型号、本地代次、维度与生成设置共同决定可否互相比较。"""
+
     provider: str = "zhipu"
     model: str = "embedding-3"
     # 本地索引代次，不冒充供应商的内部模型版本；升级/重建时显式变更。
@@ -41,6 +43,7 @@ class EmbeddingProfile:
 
     @property
     def id(self) -> str:
+        """全部身份字段的稳定哈希；改维度、预处理或输入上限都会产生新的配置编号。"""
         identity = {
             "schema": 1,
             "provider": self.provider,
@@ -53,6 +56,7 @@ class EmbeddingProfile:
         return hashlib.sha256(data).hexdigest()
 
     def validate_text(self, text: str) -> None:
+        """输入为空或超过配置字节上限时拒绝；不能靠静默截断来迁就模型窗口。"""
         if not isinstance(text, str) or not text.strip():
             raise DomainError("向量输入不能为空")
         try:
@@ -65,11 +69,14 @@ class EmbeddingProfile:
 
 @dataclass(frozen=True)
 class EmbeddedText:
+    """一次向量化结果；携带配置编号与供应商回显型号，用于发现跨配置混用。"""
+
     profile_id: str
     values: tuple[float, ...]
     model_returned: str
 
     def validate_for(self, profile: EmbeddingProfile) -> None:
+        # 供应商回显型号必须与配置一致；本地代次 revision 不参与这项比较。
         if self.profile_id != profile.id or self.model_returned != profile.model:
             raise DomainError("向量模型或配置版本不一致，禁止混用")
         if not isinstance(self.values, tuple) or len(self.values) != profile.dimensions:

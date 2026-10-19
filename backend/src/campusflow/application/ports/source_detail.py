@@ -8,7 +8,10 @@ from campusflow.domain.candidates import FieldOrigin, JsonValue
 
 @dataclass(frozen=True)
 class SourceCitation:
-    """可验证的原文引用：片段编号、逐字摘录与定位方式。"""
+    """可验证的原文引用：片段编号、逐字摘录与定位方式。
+
+    quote 必须仍能在该片段原文中逐字找到；定位取自片段保存时的原始坐标。
+    """
 
     chunk_id: int
     quote: str
@@ -18,7 +21,10 @@ class SourceCitation:
 
 @dataclass(frozen=True)
 class SourceField:
-    """一条候选字段及其出处；verifiable 表示引用当前是否仍可验证。"""
+    """一条候选字段及其出处；verifiable 表示引用当前是否仍可验证。
+
+    value 是原始提取值，不叠加用户修正；修正另见 corrections。
+    """
 
     name: str
     value: JsonValue
@@ -43,7 +49,10 @@ class SourceCorrection:
 
 @dataclass(frozen=True)
 class SourceDetail:
-    """任务或日程的来源详情；手动事项没有候选字段与引用。"""
+    """任务或日程的来源详情；手动事项没有候选字段与引用。
+
+    source_state 区分“仍有来源／来源已失效／本来无来源”，来源失效后仍保留说明。
+    """
 
     object_type: str
     object_id: int

@@ -1,4 +1,8 @@
-"""R004/R005/R006：把已确认的任务、日程或规则候选转换为正式事项，关联候选与来源资料。"""
+"""R004/R005/R006：把已确认的任务、日程或规则候选转换为正式事项。
+
+只有已确认候选可以转换；每次都先查来源候选关联，命中即返回既有事项，
+因此重试与重复点击不会重复创建。每个转换在独立事务内提交，失败回滚。
+"""
 
 from dataclasses import dataclass
 from zoneinfo import ZoneInfo
@@ -87,8 +91,8 @@ def convert_candidate(
 ) -> tuple[CandidateConversion, bool]:
     """按类型把已确认候选转换为正式事项，返回 (事项, 本次是否新建)。
 
-    重复点击或请求重试命中既有的来源候选关联，返回同一事项并把 created 置为
-    false，界面据此提示「已存在」而不是再造一条。
+    未确认候选直接拒绝；重复点击或请求重试命中既有的来源候选关联，返回同一
+    事项并把 created 置为 false，界面据此提示「已存在」而不是再造一条。
     """
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
@@ -136,6 +140,7 @@ def convert_candidate_to_task(
     if version is None:
         raise NotFoundError("候选来源版本不存在")
     conversion = build_task_conversion(candidate.draft.kind, candidate.effective_draft().fields)
+    # 截止保持原精度：只有日期就不补时刻，解析不出的写法只留原文备注。
     try:
         task = repos.tasks.create(
             workspace_id,
@@ -172,6 +177,7 @@ def convert_candidate_to_event(
     course_id = candidate.draft.scope.course_id
     require_course_in_workspace(repos, workspace_id, course_id)
     conversion = build_event_conversion(candidate.draft.kind, candidate.effective_draft().fields)
+    # 无偏移的本地时间按工作空间时区解释；夏令时缺失或歧义时刻会在此明确报错。
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     starts_at = in_workspace_timezone(conversion.starts_at, timezone)
     ends_at = in_workspace_timezone(conversion.ends_at, timezone)
@@ -198,6 +204,7 @@ def convert_candidate_to_event(
 
 
 def _plan_scope(repos: Repositories, workspace_id: int, candidate) -> int:
+    # 课程与课程关系只能写入当前空间的培养方案，未绑定方案的候选不能转换。
     plan_id = candidate.draft.scope.curriculum_plan_id
     if plan_id is None:
         raise DomainError("候选未绑定培养方案，不能转换为正式课程数据")
@@ -278,6 +285,7 @@ def _match_course(
         raise DomainError(
             f"{label}“{name}”在方案内无法唯一匹配（{result.status}），请先核对课程或别名"
         )
+    # 只有唯一匹配才落库；同名多班等情况保留候选待核对，不猜课程。
     return result.matches[0]
 
 

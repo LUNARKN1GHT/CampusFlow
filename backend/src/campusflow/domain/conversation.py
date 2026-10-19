@@ -21,6 +21,8 @@ from campusflow.domain.retrieval import RetrievalScope
 
 @dataclass(frozen=True)
 class QaConversationData:
+    """会话本身只保存当前范围与模式；每一轮的实际范围以轮次快照为准。"""
+
     id: int
     workspace_id: int
     scope: RetrievalScope
@@ -31,6 +33,8 @@ class QaConversationData:
 
 @dataclass(frozen=True)
 class QaTurnData:
+    """一轮问答的完整快照：问题、协议正文、范围、引用与各类提示，读取时不再重新检索。"""
+
     id: int
     conversation_id: int
     question: str
@@ -46,6 +50,7 @@ class QaTurnData:
     created_at: datetime
 
 
+# 快照序列化：写入时固化范围与引用，读取时按保存内容重建并重新校验，不重新检索。
 def scope_to_dict(scope: RetrievalScope) -> dict:
     return {
         "semester_id": scope.semester_id,
@@ -55,6 +60,7 @@ def scope_to_dict(scope: RetrievalScope) -> dict:
 
 
 def scope_from_dict(data: object) -> RetrievalScope:
+    """反序列化范围；字段非法时统一成“会话范围无效”，不把原始异常抛给上层。"""
     if not isinstance(data, dict):
         raise DomainError("保存的会话范围无效")
     try:
@@ -137,6 +143,8 @@ def conflict_from_dict(data: object) -> ConflictNotice:
 
 @dataclass(frozen=True)
 class NewQaTurn:
+    """待保存的一轮问答：问题、已校验的回答对象与本轮范围，一次性转成列值。"""
+
     question: str
     answer: QaAnswer
     intent: QaIntentKind = QaIntentKind.QUERY
@@ -158,6 +166,7 @@ class NewQaTurn:
 
 
 def turn_from_columns(row) -> QaTurnData:
+    """从保存列重建一问一答；结构损坏视为领域错误，不返回残缺轮次。"""
     try:
         intent = QaIntentKind(row.intent)
         return QaTurnData(

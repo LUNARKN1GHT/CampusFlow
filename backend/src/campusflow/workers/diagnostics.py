@@ -20,6 +20,11 @@ from campusflow.infrastructure.repositories import build_repositories
 
 
 def collect_diagnostics(settings: Settings, *, job_id: int | None = None) -> dict:
+    """汇总数据库迁移头、队列连通、存储可写与可选作业状态。
+
+    全程只读：不领取/回收作业、不重投消息、不调用模型，也不输出连接串、
+    资料文本或异常原文；任何检查失败都折算成受控错误码。
+    """
     report = {"database": {"ok": False}, "redis": {"ok": False}}
     engine = create_db_engine(settings)
     try:
@@ -30,6 +35,7 @@ def collect_diagnostics(settings: Settings, *, job_id: int | None = None) -> dic
             config = Config(str(backend / "alembic.ini"))
             config.set_main_option("script_location", str(backend / "migrations"))
             expected = set(ScriptDirectory.from_config(config).get_heads())
+            # 只有数据库迁移头与代码期望完全一致才算就绪，落后或领先都不冒充可用。
             report["database"] = {
                 "ok": current == expected,
                 "schema_current": current == expected,
@@ -37,6 +43,7 @@ def collect_diagnostics(settings: Settings, *, job_id: int | None = None) -> dic
             if job_id is not None:
                 with Session(bind=connection) as session:
                     job = build_repositories(session).jobs.get(job_id)
+                    # 只回显作业编号与状态字段，不返回负载、错误详情或资料内容。
                     report["job"] = {"id": job_id, "found": job is not None}
                     if job is not None:
                         report["job"].update(
@@ -66,6 +73,7 @@ def collect_diagnostics(settings: Settings, *, job_id: int | None = None) -> dic
             connection.close()
 
     storage = Path(settings.storage_dir)
+    # 只检查目录可读写，不创建目录、不写入探针文件，避免诊断改变运行状态。
     report["storage"] = {
         "ok": storage.is_dir() and os.access(storage, os.R_OK | os.W_OK),
     }
@@ -84,6 +92,7 @@ def main() -> None:
     try:
         report = collect_diagnostics(Settings(), job_id=args.job_id)
     except Exception:
+        # 配置解析失败时不回显 Settings 内容，防止把密钥带进终端或日志。
         report = {"ready": False, "code": "configuration_invalid"}
     print(json.dumps(report, ensure_ascii=False))
     raise SystemExit(0 if report["ready"] else 1)

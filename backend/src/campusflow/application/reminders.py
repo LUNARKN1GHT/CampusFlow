@@ -1,7 +1,8 @@
 """M7 应用内提醒：规则、生成、幂等与状态联动（A010–A014）。
 
-规则和触发记录分开保存。提醒时间一律按工作空间时区解释。
+规则和触发记录分开保存；提醒时间一律按工作空间时区解释。
 默认策略：工作空间默认规则提前 1440 分钟、不重复、不暂停。
+读取提醒时才同步生成，没有独立推送进程；sync_reminders 不提交事务，由调用方提交。
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ MAX_ADVANCE_MINUTES = 10080
 
 @dataclass(frozen=True)
 class EffectiveRule:
+    """某任务最终生效的规则；任务级规则存在即优先，禁用时不回退到默认规则。"""
+
     rule_id: int | None
     version: int
     advance_minutes: int
@@ -73,6 +76,7 @@ def _validate_rule(advance_minutes: int, repeat_minutes: int | None) -> None:
 
 
 def list_rules(repos: Repositories, workspace_id: int) -> list[dict]:
+    """列出规则；尚未保存默认规则时补一条仅用于展示的内置默认（id 为 None）。"""
     default_rule = repos.reminders.get_default_rule(workspace_id)
     rules = repos.reminders.list_rules(workspace_id)
     return [
@@ -124,6 +128,10 @@ def create_rule(
     paused: bool,
     enabled: bool,
 ) -> ReminderRuleData:
+    """创建默认或任务级规则；同一范围只允许一条，重复创建返回冲突。
+
+    任务级规则停用时不回退到默认规则；默认规则停用则未单独设置规则的任务不再提醒。
+    """
     _validate_rule(advance_minutes, repeat_minutes)
     _validate_task(repos, workspace_id, task_id)
     existing = (
@@ -156,6 +164,7 @@ def update_rule(
     paused: bool,
     enabled: bool,
 ) -> ReminderRuleData:
+    """更新规则并递增版本；规则版本进入幂等键，后续同步会替换旧窗口的待发送提醒。"""
     rule = repos.reminders.get_rule(rule_id)
     if rule is None or rule.workspace_id != workspace_id:
         raise NotFoundError("提醒规则不存在")
@@ -176,6 +185,7 @@ def update_rule(
 
 
 def delete_rule(repos: Repositories, workspace_id: int, rule_id: int) -> None:
+    """删除规则；任务级规则先撤消该任务的待发送提醒，删除默认规则后回退内置默认。"""
     rule = repos.reminders.get_rule(rule_id)
     if rule is None or rule.workspace_id != workspace_id:
         raise NotFoundError("提醒规则不存在")
@@ -196,6 +206,7 @@ def _deadline_rows(
     if task.due_date is None:
         return [], []
     date_only = task.due_time is None
+    # 来源失效且截止并非用户补充时，不再发送确定截止提醒，改为待核对提醒。
     if task.source_invalidated_at is not None and task.due_source != DueSourceType.USER:
         due_text = (
             f"{task.due_date.isoformat()}（未指定具体时刻）"
@@ -229,6 +240,7 @@ def _deadline_rows(
         task.due_time if task.due_time is not None else time(9, 0),
         tzinfo=timezone,
     )
+    # 仅日期 DDL 以当天 09:00 作为窗口锚点计算提前量，但正文只说日期、不出现该时刻。
     first_window = due_at - timedelta(minutes=rule.advance_minutes)
     windows: list[datetime] = [first_window]
     if rule.repeat_minutes:
@@ -238,6 +250,7 @@ def _deadline_rows(
             repeat_at += timedelta(minutes=rule.repeat_minutes)
     rows: list[dict] = []
     for scheduled in sorted(set(windows)):
+        # 跳过超过一天的历史窗口，避免补发过期提醒；最近一天的窗口仍保留。
         if scheduled < now - timedelta(days=1):
             continue
         key = deadline_dedupe_key(
@@ -286,7 +299,9 @@ def sync_reminders(
 ) -> dict:
     """按最新任务与规则生成提醒，并撤消失效触发（A011/A012/A014）。
 
-    dedupe_key 唯一约束保证同一事项、规则版本和触发窗口只保留一条记录。
+    sync 不提交事务，由调用方提交；dedupe_key 唯一约束保证同一事项、规则版本和窗口只一条。
+    完成/取消、规则暂停或停用会撤消待发送提醒；仍需要的已取消记录在 upsert 时恢复。
+    task_ids 为空列表时只同步工作空间级待核对提醒。
     """
     moment = _now(repos, workspace_id, now)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
@@ -321,6 +336,7 @@ def sync_reminders(
 
     default_rule = _effective_rule(repos, workspace_id, task_id=-1)
     if task_ids is None or not task_ids:
+        # 全量或默认规则变更时刷新工作空间级待核对提醒；单任务同步不重复刷新。
         pending_reviews = len(
             repos.candidates.list_for_review(workspace_id, review_statuses=(ReviewStatus.PENDING,))
         )
@@ -343,6 +359,7 @@ def sync_reminders(
             ]
             created += len(repos.reminders.upsert_triggers(rows))
 
+    # 没有独立推送进程：同步时把已到窗口的待发送记录直接标记为已发送。
     repos.reminders.mark_due_sent(workspace_id, moment)
     return {"created": created, "cancelled": cancelled, "scheduled_for": moment.isoformat()}
 
@@ -354,6 +371,7 @@ def list_reminders(
     unread_only: bool = False,
     statuses: tuple[str, ...] | None = None,
 ) -> list[dict]:
+    """读取前先同步并提交（本系统没有推送进程）；未读筛选只看已发送且未读的记录。"""
     sync_reminders(repos, workspace_id)
     repos.uow.commit()
     triggers = repos.reminders.list_triggers(
@@ -376,6 +394,7 @@ def list_reminders(
 
 
 def reminder_summary(repos: Repositories, workspace_id: int) -> dict:
+    """读取前同步并提交；计数基于最近触发记录，空提醒不代表没有待办或冲突。"""
     sync_reminders(repos, workspace_id)
     repos.uow.commit()
     triggers = repos.reminders.list_triggers(workspace_id, limit=500)
@@ -398,6 +417,7 @@ def set_trigger_action(
     action: str,
     now: datetime | None = None,
 ) -> dict:
+    """把提醒标为已读或忽略；只接受 read/dismiss，其他动作返回领域错误。"""
     trigger = repos.reminders.get_trigger(trigger_id)
     if trigger is None or trigger.workspace_id != workspace_id:
         raise NotFoundError("提醒不存在")

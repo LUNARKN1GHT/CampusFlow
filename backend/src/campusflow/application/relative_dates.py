@@ -1,4 +1,8 @@
-"""X006：为 X003 任务草稿附加可保存的日期换算结果与版本内证据。"""
+"""X006：为 X003 任务草稿附加可保存的日期换算结果与版本内证据。
+
+只在调用方给出当前版本内完整发布日期或校历声明、并显式指定来源时区时换算；
+缺依据、条件句或超出学期范围都保留原因，不猜年份、时刻或第一教学周。
+"""
 
 import re
 from dataclasses import replace
@@ -47,6 +51,7 @@ def resolve_task_deadline(
     validate_candidate(draft)
     if draft.kind != CandidateKind.TASK:
         raise DomainError("日期换算入口只接受任务候选")
+    # 候选范围必须与资料当前范围一致，避免把其他学期或班级的依据套用过来。
     if (draft.scope.semester_id, draft.scope.course_id, draft.scope.class_name) != (
         material.semester_id,
         material.course_id,
@@ -66,6 +71,7 @@ def resolve_task_deadline(
             raise DomainError("日期证据不属于当前原文版本或摘录不存在")
         return text
 
+    # 草稿字段与选定依据都只能引用当前版本片段，旧版本摘录不能复用。
     for field in draft.fields:
         for evidence in field.evidence:
             check_evidence(evidence)
@@ -102,6 +108,7 @@ def resolve_task_deadline(
     semester = None
     if material.semester_id is not None:
         semester = repos.semesters.get(material.semester_id)
+        # 学期用于限定换算范围；不存在、跨空间或已归档都不能作为依据。
         if semester is None or semester.workspace_id != workspace_id or semester.archived:
             raise DomainError("适用学期不存在或已归档")
     try:
@@ -110,6 +117,7 @@ def resolve_task_deadline(
             if publication_evidence
             else None
         )
+        # 教学周起点只来自显式校历声明，不用学期开始日冒充第一教学周。
         week_one = (
             parse_date_anchor(calendar_evidence.quote, "teaching_week", source_timezone)
             if calendar_evidence
@@ -124,13 +132,17 @@ def resolve_task_deadline(
             semester_end=semester.end_date if semester else None,
         )
         if uncertain_context:
+            # 命中条件、暂定或变更措辞时丢弃换算结果，只保留待核对原因。
             result = DateResolution(reason="截止所在原文含条件、暂定或变更说明，需人工核对")
         if result.day and semester and not semester.start_date <= result.day <= semester.end_date:
+            # 越界通常意味着依据或学期选错，宁可留待核对，不强行采用。
             result = DateResolution(reason="换算日期超出资料适用学期，需核对来源与学期")
     except DomainError as error:
+        # 换算失败只返回空结果和原因，不中断候选生成，也不写库。
         result = DateResolution(reason=str(error))
 
     value = None
+    # 只有实际得到日期或范围才写入值；仅有 reason 时保留为缺失原因。
     if result.day or result.range_start:
         value = {
             "date": result.day.isoformat() if result.day else None,
@@ -144,6 +156,7 @@ def resolve_task_deadline(
             "relation": result.relation,
         }
     evidence = tuple(dict.fromkeys((*due.evidence, *anchors)))
+    # 换算值属于系统推断，证据保留原始截止与依据；确认仍由核对用例负责。
     resolution = CandidateField(
         "due_resolution",
         value,
@@ -153,6 +166,7 @@ def resolve_task_deadline(
         missing_reason=result.reason if value is None else None,
     )
     reasons = [r for r in draft.review_reasons if r.field != "due_resolution"]
+    # 换算结果无论成功与否都进入待核对，不能自动确认截止时间。
     reasons.append(
         ReviewReason(
             "date_conversion_review",

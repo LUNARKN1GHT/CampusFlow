@@ -3,7 +3,8 @@
 核对状态（M2 的 ExtractedItem）与任务执行进度相互独立；
 手动任务只维护执行进度。update_task 接收"合并后的最终值"（由 API 层
 把补丁与当前值合并后传入），None 表示该字段确实要清空。
-所有按 ID 的操作校验对象归属当前空间（W006）。
+所有按 ID 的操作校验对象归属当前空间（W006）；创建、更新与进度变更会在同一事务内
+同步提醒，逾期标记按工作空间时区派生，不写入任务记录。
 """
 
 from dataclasses import dataclass, replace
@@ -22,6 +23,8 @@ from campusflow.domain.task_dependencies import cyclic_components, dependency_cy
 
 @dataclass(frozen=True)
 class SubtaskDraft:
+    """用户确认后用于批量创建子任务的可编辑草案（A004）。"""
+
     title: str
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = None
@@ -33,6 +36,7 @@ def _apply_overdue(repos: Repositories, workspace_id: int, tasks: list[TaskData]
     workspace = repos.workspaces.get(workspace_id)
     if workspace is None:
         return tasks
+    # 逾期由截止时间与完成情况实时派生，不落库；仅日期 DDL 在当天内不算逾期。
     now = datetime.now(ZoneInfo(workspace.timezone))
     return [
         replace(task, overdue=is_overdue(task.due_date, task.due_time, task.progress, now))
@@ -50,6 +54,11 @@ def list_tasks(
     due_from: date | None = None,
     due_to: date | None = None,
 ) -> list[TaskData]:
+    """按课程、进度、学期或截止区间筛选任务，并补上按空间时区派生的逾期标记。
+
+    按学期筛选只返回关联该学期课程的任务；未关联课程的个人任务仅在未指定学期时出现。
+    学期归档不改变任务查询结果，历史记录仍可读取。
+    """
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
     if due_from is not None and due_to is not None and due_from > due_to:
@@ -102,6 +111,11 @@ def create_task(
     remaining_minutes: int | None,
     parent_task_id: int | None = None,
 ) -> TaskData:
+    """创建任务，并在同一事务内生成对应提醒（A013）。
+
+    指定父任务时只建立一层包含关系，不创建先后依赖；未指定课程则继承父任务课程。
+    只有日期的截止保持日期精度，不补造具体时刻。
+    """
     error = validate_due(due_date, due_time)
     if error:
         raise DomainError(error)
@@ -150,6 +164,7 @@ def update_task(
     estimated_minutes: int | None,
     remaining_minutes: int | None,
 ) -> TaskData:
+    """写入任务的合并后最终值，并同步提醒；None 表示清空该字段而非保持不变。"""
     _require_task_in_workspace(repos, workspace_id, task_id)
     error = validate_due(due_date, due_time)
     if error:
@@ -178,6 +193,11 @@ def update_task(
 def set_progress(
     repos: Repositories, workspace_id: int, task_id: int, progress: TaskProgress, reason: str | None
 ) -> TaskData:
+    """更新执行进度并追加进度历史，不触碰候选事项的核对状态。
+
+    完成或取消会把剩余耗时归零并撤消待发送提醒；重新打开按预计耗时恢复剩余耗时，
+    提醒同步可恢复仍未失效的已取消记录，但不会重发已读或已忽略的提醒。
+    """
     _require_task_in_workspace(repos, workspace_id, task_id)
     task = repos.tasks.set_progress(task_id, progress, reason)
     sync_reminders(repos, workspace_id, task_ids=[task_id])
@@ -305,6 +325,7 @@ def create_subtasks(
         if draft.remaining_minutes is not None and draft.remaining_minutes < 0:
             raise DomainError("子任务剩余耗时不能为负数")
 
+    # 预计与剩余耗时互相兜底，避免只填一侧的子任务被当成耗时未知。
     created = [
         repos.tasks.create(
             workspace_id,
@@ -442,8 +463,8 @@ def dependency_check(
 ) -> dict:
     """检查依赖成环、范围外/缺失前置与已取消前置（A002）。
 
-    成环基于整个工作空间；缺失与取消按本次选择的任务范围判断。
-    不修改任何任务或依赖。
+    成环基于整个工作空间，环在所选学期外也会报告；缺失、越界与取消只针对范围内任务。
+    只读，不修改任务或依赖，也不自动解除成环边。
     """
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
@@ -542,6 +563,7 @@ def dependency_check(
 def remove_dependency(
     repos: Repositories, workspace_id: int, task_id: int, depends_on_task_id: int
 ) -> None:
+    """解除一条必要依赖；关系不存在时按 404 处理，不静默成功。"""
     _require_task_in_workspace(repos, workspace_id, task_id)
     if not repos.tasks.remove_dependency(task_id, depends_on_task_id):
         raise NotFoundError("依赖关系不存在")

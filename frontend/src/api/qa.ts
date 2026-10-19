@@ -1,5 +1,8 @@
 import { apiRequest } from './client'
 
+// 有范围问答：一次性提问与持久会话两种入口。
+// 范围（学期／课程／教学班）由服务端校验一致性；回答、引用、覆盖、对照与冲突分开返回，不合并成一段结论。
+
 export type QaMode = 'keyword' | 'vector' | 'hybrid'
 
 export type QaScope = {
@@ -20,12 +23,14 @@ export type QaCitation = {
   page: number | null
   paragraph: number | null
   excerpt: string
+  // valid=false 表示读取时重新核对失败（已删除、已归档、版本被替代或原文改写），不能再当可验证引用。
   valid: boolean
   status: string
   message: string | null
 }
 
 export type QaCoverage = {
+  // partial 部分解析失败；unavailable 当前不可读；unindexed 尚未完成解析或索引，未参与本次回答。
   kind: 'partial' | 'unavailable' | 'unindexed'
   material_id: number
   title: string
@@ -93,6 +98,7 @@ export type QaIntent = {
   parameters: Record<string, string | number>
 }
 
+// mode 只在提问／建会话时显式传递；追问沿用会话已保存的范围与排序方式。
 function scopePayload(scope: QaScope, mode?: QaMode) {
   return {
     semester_id: scope.semester_id,
@@ -103,11 +109,13 @@ function scopePayload(scope: QaScope, mode?: QaMode) {
 }
 
 export const qaApi = {
+  // 一次性提问不建会话；无候选时由后端返回固定"未找到"文案，不调用模型。
   ask: (question: string, scope: QaScope, mode: QaMode) =>
     apiRequest<QaAnswer>('/qa/query', {
       method: 'POST',
       body: JSON.stringify({ question, ...scopePayload(scope, mode) }),
     }),
+  // 只做意图识别；available=false 表示该意图尚未上线，不执行任意工具。
   interpret: (question: string, scope: QaScope) =>
     apiRequest<QaIntent>('/qa/intent', {
       method: 'POST',
@@ -119,13 +127,16 @@ export const qaApi = {
       method: 'POST',
       body: JSON.stringify(scopePayload(scope, mode)),
     }),
+  // 每轮保存范围与引用快照；读取旧轮次时服务端会重新核对来源是否仍可验证。
   getConversation: (id: number) =>
     apiRequest<QaConversationDetail>(`/qa/conversations/${id}`),
+  // 切换范围必须显式操作，之后追问不会跨学期或跨课程混合资料。
   switchScope: (id: number, scope: QaScope) =>
     apiRequest<QaConversation>(`/qa/conversations/${id}/scope`, {
       method: 'PATCH',
       body: JSON.stringify(scopePayload(scope)),
     }),
+  // 追问只提交问题，范围取自会话当前快照。
   sendMessage: (id: number, question: string) =>
     apiRequest<QaAnswer>(`/qa/conversations/${id}/messages`, {
       method: 'POST',

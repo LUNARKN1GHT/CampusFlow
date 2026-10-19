@@ -14,7 +14,11 @@ TEXT_MIME_TYPES = frozenset({"text/plain", "text/markdown"})
 
 
 class TextDocumentParser:
+    """纯文本/Markdown 解析；段落号从 1 开始，与 split_paragraphs 的固定规则一致。"""
+
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+        """按空行切分段落并输出 paragraph 定位；不做编码猜测，非 UTF-8 直接失败。"""
+
         if mime_type not in TEXT_MIME_TYPES:
             raise ValueError(f"文本解析器不支持的类型：{mime_type}")
         paragraphs = split_paragraphs(content.decode("utf-8"))

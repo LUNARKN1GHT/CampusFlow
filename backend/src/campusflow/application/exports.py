@@ -125,6 +125,8 @@ class ExportEvent:
 
 @dataclass(frozen=True)
 class ExportPreview:
+    """预览结果：范围、计数、排除与警告，以及下载必须回传的范围指纹。"""
+
     mode: str
     format: str
     timezone: str
@@ -215,8 +217,8 @@ def _require_workspace_timezone(repos: Repositories, workspace_id: int) -> Works
 def _source_hint(repos: Repositories, task: TaskData) -> _SourceHint:
     """解析任务的来源提示；只有仍可核对的来源才给出标题、版本与定位。
 
-    来源已删除、归档或引用无法逐字定位时统一标为 invalidated，且整体省略
-    来源提示，不能输出旧标题或脱离原文的定位（A017 §2）。
+    来源已删除、归档，或没有任何引用还能逐字定位时统一标为 invalidated，
+    并整体省略来源提示，不能输出旧标题或脱离原文的定位（A017 §2）。
     """
     if task.source_material_id is None:
         state = source_state(task.source_material_id, task.source_invalidated_at)
@@ -236,6 +238,8 @@ def _source_hint(repos: Repositories, task: TaskData) -> _SourceHint:
     chunks = {chunk.id: chunk for chunk in repos.materials.list_chunks(version.id)}
     locator: str | None = None
     unverifiable = False
+    # 只有仍能逐字定位的引用才提供定位；存在失配引用且没有任何可定位证据时，
+    # 整条来源提示作废，不能拿旧版本号或脱离原文的位置冒充可核对。
     for candidate_field in candidate.draft.fields:
         for evidence in candidate_field.evidence:
             chunk = chunks.get(evidence.chunk_id)
@@ -262,6 +266,11 @@ def _source_hint_text(hint: _SourceHint) -> str | None:
 
 
 def _validate_supported(request: ExportRequest) -> None:
+    """校验模式与格式的组合，并强制显式范围。
+
+    任务模式必须给出 task_ids、计划模式必须给出 plan_id；两者互斥，
+    避免把“没选”解释成“全部”，也避免一次请求同时绑定两种范围。
+    """
     if request.mode == "tasks":
         if request.plan_id is not None:
             raise DomainError("任务清单导出不接受计划标识")
@@ -304,6 +313,11 @@ def _build_items(
     *,
     include_source_hints: bool,
 ) -> list[ExportItem]:
+    """构造导出字段白名单：不含描述、截止备注、原文、教师与联系方式。
+
+    来源提示仅在用户开启且来源仍可核对时给出；已取消任务保留在预览里
+    并标记 excluded，方便用户知道为什么少了一行。
+    """
     course_names: dict[int, str | None] = {}
     items: list[ExportItem] = []
     for task in tasks:
@@ -486,6 +500,8 @@ def _task_events(
                 )
             )
             continue
+        # 带时刻的截止先按工作空间时区解释，再换算成 UTC 时间点；
+        # 只有日期的截止保持上面 DATE 全天形式，不补造 00:00 或具体时刻。
         starts_at = in_workspace_timezone(
             datetime.combine(item.due_date, item.due_time), zone
         ).astimezone(UTC)
@@ -504,6 +520,10 @@ def _task_events(
 
 
 def _preview_tasks(repos: Repositories, workspace_id: int, request: ExportRequest) -> ExportPreview:
+    """任务模式预览：统计日期精度、来源失效与取消数量，并生成范围指纹。
+
+    预览只读数据库，不写文件；是否可下载取决于是否有纳入导出的任务或事件。
+    """
     workspace = _require_workspace_timezone(repos, workspace_id)
     tasks, unique_ids = _load_tasks(repos, workspace_id, request.task_ids)
     items = _build_items(
@@ -654,6 +674,10 @@ def _plan_fingerprint(
     hints: dict[int, _SourceHint],
     fixed_snapshot: list[dict[str, object]],
 ) -> str:
+    """计划模式的范围指纹：覆盖计划版本/状态、全部时间块、来源任务与固定日程快照。
+
+    计划被替代、任务改期或固定日程发生项变化都会令旧指纹失效，下载必须重新预览。
+    """
     canonical = {
         "mode": request.mode,
         "format": request.format,
@@ -715,6 +739,11 @@ def _build_plan_export(
     draft: PlanDraftData,
     timezone: str,
 ) -> _PlanExport:
+    """展开已接受计划的时间块：缓冲、孤立、取消与未排入项显式计数后排除。
+
+    固定日程默认不导出，只有用户勾选时才按计划区间展开为独立事件；
+    所有排除与警告都进入预览，不静默丢条目。
+    """
     blocks = sorted(draft.blocks, key=lambda block: (block.starts_at, block.seq, block.id))
     tasks_by_id: dict[int, TaskData] = {}
     hints: dict[int, _SourceHint] = {}
@@ -847,6 +876,7 @@ def _build_plan_export(
 
 
 def _preview_plan(repos: Repositories, workspace_id: int, request: ExportRequest) -> ExportPreview:
+    """计划模式预览：只接受当前已接受计划，时区取自接受时的输入快照。"""
     workspace = _require_workspace_timezone(repos, workspace_id)
     draft = _require_accepted_plan(repos, workspace_id, request.plan_id)
     timezone = _plan_timezone(draft)
@@ -877,6 +907,7 @@ def _preview_plan(repos: Repositories, workspace_id: int, request: ExportRequest
 
 
 def preview_export(repos: Repositories, workspace_id: int, request: ExportRequest) -> ExportPreview:
+    """生成导出预览；只读，不产生文件，也不接受未显式给出的范围。"""
     _validate_supported(request)
     if request.mode == "tasks":
         return _preview_tasks(repos, workspace_id, request)
@@ -997,7 +1028,11 @@ def render_ics(
 
 
 def export_file(repos: Repositories, workspace_id: int, request: ExportRequest) -> ExportFile:
-    """生成下载文件；范围指纹与预览不一致时要求重新预览。"""
+    """生成下载文件；必须携带预览指纹，且与重新计算的结果一致。
+
+    重新预览是故意的：预览之后任务、计划或来源可能已变化，指纹不一致返回 409，
+    避免下载到用户没看过的内容。文件名日期按预览时区生成。
+    """
     preview = preview_export(repos, workspace_id, request)
     if not request.scope_fingerprint:
         raise DomainError("缺少导出范围指纹，请先预览后再下载")
@@ -1016,6 +1051,7 @@ def export_file(repos: Repositories, workspace_id: int, request: ExportRequest) 
             content=render_ics(preview.events, timezone=preview.timezone, now=now),
             media_type=_ICS_MEDIA_TYPE,
         )
+    # 预览 items 含被排除项（供界面解释），下载只写纳入导出的行。
     rows = [item for item in preview.items if item.included]
     return ExportFile(
         filename=f"campusflow-tasks-{local_now:%Y%m%d}.csv",

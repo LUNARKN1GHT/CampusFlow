@@ -298,6 +298,10 @@ def _turn_out(turn: QaTurnData, states: tuple[RevalidatedCitation, ...]) -> Turn
 
 
 def _failure_response(error: DomainError) -> JSONResponse:
+    """模型失败转固定文案：临时故障 503，输出无效或请求被拒 502。
+
+    非模型领域错误原样抛出（通常由全局处理器转成 400）；响应不暴露异常原文。
+    """
     failure = classify_model_failure(error)
     if failure is None:
         raise error
@@ -334,6 +338,10 @@ def query(
     embedder: EmbedderDep,
     generator: GeneratorDep,
 ):
+    """单次问答：先校验范围并读取候选，结束读取事务后再调用模型。
+
+    没有候选或模型判定资料不足时返回固定文案与覆盖提示，不生成引用。
+    """
     prepared = _prepare(repos, session, workspace, payload.to_scope(), payload.question, embedder)
     # Q005：读取事务在外部模型调用前结束，不能持锁等待生成。
     session.commit()
@@ -352,6 +360,10 @@ def interpret_intent(
     session: SessionDep,
     generator: GeneratorDep,
 ) -> IntentOut:
+    """只接受固定意图枚举；execute 仅对计划与冲突检查生效。
+
+    计划意图只生成待接受草案，冲突检查只读当前已接受计划；不会执行任意工具。
+    """
     scope = payload.to_scope()
     validate_retrieval_scope(repos, workspace.id, scope)
     session.commit()
@@ -377,6 +389,7 @@ def interpret_intent(
         executed = True
         boundary = intent.boundary
     elif payload.execute and intent.kind is QaIntentKind.CONFLICT_CHECK:
+        # 没有已接受计划时不执行检查，避免把空结果说成“没有冲突”。
         current = planning_use_cases.current_plan(
             repos, workspace.id, semester_id=scope.semester_id
         )
@@ -412,6 +425,7 @@ def create_conversation(
     repos: Repos,
     session: SessionDep,
 ) -> ConversationOut:
+    """创建前重新校验学期/课程/教学班范围；校验失败不会建立会话。"""
     conversation = conversation_use_cases.create_conversation(
         repos,
         SqlConversations(session),
@@ -431,6 +445,7 @@ def switch_scope(
     repos: Repos,
     session: SessionDep,
 ) -> ConversationOut:
+    """切换范围必须显式调用本接口；校验失败时不改动原会话范围。"""
     conversation = conversation_use_cases.switch_conversation_scope(
         repos,
         SqlConversations(session),
@@ -452,6 +467,7 @@ def ask_in_conversation(
     embedder: EmbedderDep,
     generator: GeneratorDep,
 ):
+    """沿用会话既有范围与排序方式；模型失败时不记录这一轮，避免污染历史。"""
     conversation = conversation_use_cases.get_conversation(
         SqlConversations(session), workspace.id, conversation_id
     )
@@ -480,6 +496,10 @@ def get_conversation(
     repos: Repos,
     session: SessionDep,
 ) -> ConversationDetailOut:
+    """读取旧轮次时逐条重新核对引用；已删除或失效来源不再标记为可验证。
+
+    覆盖提示跨轮去重，pending_conflict_count 只统计会话范围内仍待核对的来源冲突。
+    """
     detail = conversation_use_cases.read_conversation(
         repos,
         SqlConversations(session),

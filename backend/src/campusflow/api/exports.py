@@ -22,6 +22,7 @@ Repos = Annotated[Repositories, Depends(get_repositories)]
 
 class ExportOptionsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # 来源提示只到标题、版本号与定位；固定日程仅计划模式展开，且不写 RRULE。
     include_source_hints: bool = False
     include_fixed_events: bool = False
 
@@ -122,6 +123,7 @@ def _to_request(payload: ExportRequestIn) -> use_cases.ExportRequest:
 def preview_export(
     payload: ExportRequestIn, workspace: CurrentWorkspace, repos: Repos
 ) -> ExportPreviewOut:
+    """只读预览并返回范围指纹；items 含被排除项，供界面解释排除原因。"""
     preview = use_cases.preview_export(repos, workspace.id, _to_request(payload))
     return ExportPreviewOut(
         mode=preview.mode,
@@ -156,6 +158,10 @@ def preview_export(
 def download_export(
     payload: ExportRequestIn, workspace: CurrentWorkspace, repos: Repos
 ) -> Response:
+    """下载必须携带预览指纹；重新计算后不一致返回 409，避免导出未看过的范围。
+
+    范围只来自显式选择的任务或一个当前已接受计划，不会回退整空间。
+    """
     export = use_cases.export_file(repos, workspace.id, _to_request(payload))
     return Response(
         content=export.content,

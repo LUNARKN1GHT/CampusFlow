@@ -1,4 +1,8 @@
-"""M8 课程路径 HTTP 路由：培养方案与个人方案（C002 起）。"""
+"""M8 课程路径 HTTP 路由：培养方案与个人方案（C002 起）。
+
+方案按专业、年级与版本隔离，课程、三类关系、别名和修读记录分别保存。
+图分析、顺序、下一步与学期建议都只读；模型提取结果先保存为待核对候选。
+"""
 
 from datetime import datetime
 from typing import Annotated
@@ -389,6 +393,7 @@ def list_plans(workspace: CurrentWorkspace, repos: Repos) -> list[CurriculumPlan
 def create_plan(
     payload: CurriculumPlanCreate, workspace: CurrentWorkspace, repos: Repos
 ) -> CurriculumPlanOut:
+    """方案按专业、年级与版本标识；同名课程在不同方案中不会混接。"""
     plan = use_cases.create_plan(repos, workspace.id, **payload.model_dump())
     return CurriculumPlanOut.model_validate(plan)
 
@@ -445,6 +450,7 @@ def update_plan_course(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> CurriculumCourseOut:
+    # PATCH 语义：区分“未提交”和“显式 null”，未提交的字段保持原值。
     current = use_cases.get_course(repos, workspace.id, plan_id, course_id)
     merged = {
         "name": payload.name if payload.name is not None else current.name,
@@ -492,6 +498,7 @@ def create_plan_relation(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> CourseRelationOut:
+    """关系类型只接受 prerequisite/corequisite/recommended，两端须同属该方案。"""
     relation = use_cases.create_relation(repos, workspace.id, plan_id, **payload.model_dump())
     return CourseRelationOut.model_validate(relation)
 
@@ -563,6 +570,7 @@ def resolve_plan_alias(
     semester_id: Annotated[int | None, Query(ge=1)] = None,
     class_name: Annotated[str | None, Query(max_length=100)] = None,
 ) -> AliasResolveOut:
+    """唯一匹配也只是建议，不自动合并；同名多班或无法唯一确定时返回 ambiguous。"""
     resolved = use_cases.resolve_course_name(
         repos,
         workspace.id,
@@ -581,6 +589,10 @@ def resolve_plan_alias(
 
 @router.get("/curriculum-plans/{plan_id}/graph", response_model=CourseGraphOut)
 def get_plan_graph(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> CourseGraphOut:
+    """只把已确认关系放入图；成环、缺项、来源矛盾与待核对分别列出。
+
+    complete=false 表示当前资料不足以给出完整顺序，而不是“没有依赖”。
+    """
     view = use_cases.build_plan_graph(repos, workspace.id, plan_id)
     graph = view.graph
     return CourseGraphOut(
@@ -639,7 +651,10 @@ def get_plan_order(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> C
 
 @router.get("/curriculum-plans/{plan_id}/next", response_model=NextCoursesOut)
 def get_next_courses(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> NextCoursesOut:
-    """C013：按已修/在修状态列出下一步；建议先学单独返回，不当作硬阻塞。"""
+    """C013：按已修/在修状态列出下一步；建议先学单独返回，不当作硬阻塞。
+
+    available 只由强制先修与并修条件决定，recommended 中的课程不阻塞。
+    """
     analysis = use_cases.analyze_plan(repos, workspace.id, plan_id)
     return NextCoursesOut(
         plan_id=analysis.plan.id,
@@ -668,7 +683,11 @@ def get_semester_plan(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> SemesterPlanOut:
-    """C014：按已知开课季节与学分上限辅助排学期；不代替选课或毕业审核。"""
+    """C014：按已知开课季节与学分上限辅助排学期；不代替选课或毕业审核。
+
+    credit_limit 缺省取方案设置；开课季节或学分缺失时降级并写入 assumptions，
+    graduation_audit 恒为 false。
+    """
     analysis = use_cases.analyze_plan(
         repos,
         workspace.id,
@@ -715,7 +734,10 @@ def extract_curriculum(
     repos: Repos,
     generator: Generator,
 ) -> CurriculumExtractionOut:
-    """显式请求才调用模型；结果全部保存为待核对候选，不直接写正式课程或关系。"""
+    """显式请求才调用模型；结果全部保存为待核对候选，不直接写正式课程或关系。
+
+    include_courses/include_relations 可只提取其中一类；未确认的候选不参与图分析。
+    """
     drafts = curriculum_extraction.extract_curriculum_drafts(
         repos,
         workspace.id,
@@ -767,6 +789,7 @@ def create_plan_study_record(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> StudyRecordOut:
+    """修读状态只接受 completed/in_progress/planned；成绩与学分不由课程学分推断。"""
     view = use_cases.create_study_record(repos, workspace.id, plan_id, **payload.model_dump())
     return _study_record_out(view)
 
@@ -815,6 +838,7 @@ def delete_plan_study_record(
 def get_plan_study_status(
     plan_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> StudyStatusOut:
+    """同一课程可有多条修读记录（重修）；汇总状态由全部记录聚合，重复记录单独计数。"""
     summary = use_cases.get_study_status(repos, workspace.id, plan_id)
     return StudyStatusOut(
         plan_id=summary.plan_id,
@@ -844,6 +868,7 @@ def get_plan_study_status(
 
 @router.get("/learning-profile", response_model=LearnerProfileOut)
 def get_profile(workspace: CurrentWorkspace, repos: Repos) -> LearnerProfileOut:
+    """缺失的专业、年级或方案列在 missing_fields，不自动猜测当前方案。"""
     return _profile_out(use_cases.get_profile(repos, workspace.id))
 
 
@@ -851,6 +876,7 @@ def get_profile(workspace: CurrentWorkspace, repos: Repos) -> LearnerProfileOut:
 def update_profile(
     payload: LearnerProfileUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> LearnerProfileOut:
+    """专业/年级与所选方案不一致时拒绝，避免跨年级混用课程关系。"""
     return _profile_out(use_cases.update_profile(repos, workspace.id, **payload.model_dump()))
 
 
@@ -860,6 +886,7 @@ def preview_switch(
     repos: Repos,
     plan_id: Annotated[int, Query(ge=1)],
 ) -> SwitchPreviewOut:
+    """只读展示切换影响；原方案数据不删除、不迁移，真正切换走 PUT /learning-profile。"""
     preview = use_cases.preview_switch_plan(repos, workspace.id, plan_id)
     return SwitchPreviewOut(
         current_plan=(

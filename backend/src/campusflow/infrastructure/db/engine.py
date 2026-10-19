@@ -14,6 +14,7 @@ def create_db_engine(settings: Settings) -> Engine:
     """
     return create_engine(
         settings.database_url,
+        # 长驻 Worker 的连接可能已被数据库或网络中间层断开，取用前先探活
         pool_pre_ping=True,
         connect_args={"connect_timeout": DB_CONNECT_TIMEOUT_SECONDS},
     )

@@ -6,6 +6,7 @@ import unicodedata
 from campusflow.domain.candidates import ReviewReason
 from campusflow.domain.errors import DomainError
 
+# 截止类动词与活动类动词分开匹配：同句同时命中说明是混合要求，交回人工拆分。
 _DEADLINE = re.compile(r"截止|截至|提交|上交|交付|交作业|交报告|报名|预约|完成|(?:之?前|以前)\s*交")
 _EVENT = re.compile(
     r"举行|举办|召开|开考|开讲|开课|上课|考试|测验|讲座|研讨会|答辩|"
