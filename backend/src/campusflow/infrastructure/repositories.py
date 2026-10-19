@@ -1562,6 +1562,15 @@ class SqlAlchemyPlanRepository:
         self._session.flush()
         return _plan_block_to_data(row)
 
+    def reassign_task(self, source_task_id: int, target_task_id: int) -> int:
+        rows = self._session.scalars(
+            select(PlanBlock).where(PlanBlock.task_id == source_task_id)
+        ).all()
+        for row in rows:
+            row.task_id = target_task_id
+        self._session.flush()
+        return len(rows)
+
     def bump_version(
         self,
         draft_id: int,

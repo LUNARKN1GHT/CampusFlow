@@ -814,6 +814,10 @@ class PlanRepository(Protocol):
         reason: str,
     ) -> PlanBlockData | None: ...
 
+    def reassign_task(self, source_task_id: int, target_task_id: int) -> int:
+        """N016：把来源任务的计划时间块迁移到目标任务，返回迁移数量。"""
+        ...
+
     def bump_version(
         self,
         draft_id: int,

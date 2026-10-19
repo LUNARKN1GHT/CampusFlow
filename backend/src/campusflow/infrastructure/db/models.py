@@ -721,3 +721,34 @@ class VersionChangeAcceptance(Base):
     evidence_snapshot: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     previous_review_status: Mapped[str] = mapped_column(String(20))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CandidateMerge(Base):
+    """N016：候选合并记录；保留来源、进度与正式事项快照，重试幂等。"""
+
+    __tablename__ = "candidate_merges"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "target_candidate_id",
+            "source_candidate_id",
+            name="uq_candidate_merge",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    target_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    target_formal_kind: Mapped[str | None] = mapped_column(String(20))
+    target_formal_id: Mapped[int | None] = mapped_column(Integer)
+    source_formal_id: Mapped[int | None] = mapped_column(Integer)
+    preserved_progress: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    source_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    reason: Mapped[str] = mapped_column(String(1000))
+    operator: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

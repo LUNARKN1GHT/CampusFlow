@@ -12,13 +12,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories, get_version_relations
 from campusflow.application import candidate_diff as diffs
-from campusflow.application import candidates as use_cases
 from campusflow.application import (
+    candidate_merge,
     change_impact,
     duplicates,
     version_acceptance,
     version_applicability,
 )
+from campusflow.application import candidates as use_cases
 from campusflow.application import conversion as conversions
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
@@ -798,6 +799,115 @@ def get_version_acceptances(
             created=False,
         )
         for record in version_acceptance.list_acceptances(relations, workspace.id, candidate_id)
+    ]
+
+
+class MergeSourceOut(BaseModel):
+    candidate_id: int
+    version_id: int
+    title: str | None
+    review_status: str
+    formal_kind: str
+    formal_id: int | None
+    progress: str | None
+    plan_block_count: int
+
+
+class MergePreviewOut(BaseModel):
+    target_candidate_id: int
+    kind: str
+    target_title: str | None
+    target_formal_id: int | None
+    target_progress: str | None
+    kept_fields: dict
+    sources: list[MergeSourceOut]
+    token: str
+    auto_merge: Literal[False] = False
+
+
+class MergeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_candidate_ids: list[int] = Field(min_length=1)
+    preview_token: str = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class MergeRecordOut(BaseModel):
+    id: int
+    target_candidate_id: int
+    source_candidate_id: int
+    target_formal_kind: str | None
+    target_formal_id: int | None
+    source_formal_id: int | None
+    preserved_progress: dict
+    source_snapshot: dict
+    reason: str
+    operator: str
+    created_at: datetime
+
+
+class MergeResultOut(BaseModel):
+    records: list[MergeRecordOut]
+    created: bool
+    preview: MergePreviewOut
+
+
+def _merge_preview_out(preview) -> MergePreviewOut:
+    return MergePreviewOut(
+        target_candidate_id=preview.target_candidate_id,
+        kind=preview.kind,
+        target_title=preview.target_title,
+        target_formal_id=preview.target_formal_id,
+        target_progress=preview.target_progress,
+        kept_fields=preview.kept_fields,
+        sources=[MergeSourceOut(**item.__dict__) for item in preview.sources],
+        token=preview.token,
+    )
+
+
+@router.get("/candidates/{candidate_id}/merge-preview", response_model=MergePreviewOut)
+def get_merge_preview(
+    candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    source_ids: Annotated[list[int] | None, Query()] = None,
+) -> MergePreviewOut:
+    return _merge_preview_out(
+        candidate_merge.preview_merge(repos, workspace.id, candidate_id, tuple(source_ids or []))
+    )
+
+
+@router.post("/candidates/{candidate_id}/merge", response_model=MergeResultOut)
+def post_merge_candidates(
+    candidate_id: int,
+    payload: MergeIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    operator: Annotated[str, Depends(require_session)],
+) -> MergeResultOut:
+    result = candidate_merge.execute_merge(
+        repos,
+        workspace.id,
+        target_candidate_id=candidate_id,
+        source_ids=tuple(payload.source_candidate_ids),
+        preview_token=payload.preview_token,
+        reason=payload.reason,
+        operator=operator,
+    )
+    return MergeResultOut(
+        records=[MergeRecordOut(**record.__dict__) for record in result.records],
+        created=result.created,
+        preview=_merge_preview_out(result.preview),
+    )
+
+
+@router.get("/candidates/{candidate_id}/merges", response_model=list[MergeRecordOut])
+def get_candidate_merges(
+    candidate_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[MergeRecordOut]:
+    return [
+        MergeRecordOut(**record.__dict__)
+        for record in candidate_merge.list_merges(repos, workspace.id, candidate_id)
     ]
 
 
