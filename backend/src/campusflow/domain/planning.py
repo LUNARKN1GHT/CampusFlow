@@ -214,6 +214,33 @@ def two_week_range(today: date) -> tuple[date, date]:
     return today, today + timedelta(days=13)
 
 
+def resolve_planning_range(
+    kind: str,
+    today: date,
+    *,
+    start: date | None = None,
+    end: date | None = None,
+) -> tuple[date, date]:
+    """A007：把今天/本周/两周/自定义解析为闭区间日期。
+
+    所有边界都由工作空间时区的"今天"推导；自定义区间必须同时给出起止。
+    """
+    if kind == "today":
+        return today, today
+    if kind == "this_week":
+        monday = today - timedelta(days=today.weekday())
+        return monday, monday + timedelta(days=6)
+    if kind == "two_weeks":
+        return two_week_range(today)
+    if kind == "custom":
+        if start is None or end is None:
+            raise DomainError("自定义规划区间需要同时提供开始和结束日期")
+        if end < start:
+            raise DomainError("规划结束日期不得早于开始日期")
+        return start, end
+    raise DomainError("不支持的规划区间类型")
+
+
 @dataclass(frozen=True)
 class AssumptionOptions:
     """用户显式选择的规划假设；为空时不补任何值（P003）。"""

@@ -1,7 +1,7 @@
 """M5 计划草案 HTTP 路由（P013）。"""
 
-from datetime import UTC, date, datetime, timedelta
-from typing import Annotated
+from datetime import UTC, date, datetime
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
@@ -15,7 +15,8 @@ from campusflow.application.ports.repositories import (
     WorkspaceData,
 )
 from campusflow.application.settings import get_settings
-from campusflow.domain.planning import AssumptionOptions
+from campusflow.domain.errors import DomainError
+from campusflow.domain.planning import AssumptionOptions, resolve_planning_range
 
 router = APIRouter(tags=["plans"])
 
@@ -44,6 +45,7 @@ class PlanAssumptionsIn(BaseModel):
 class PlanDraftCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     semester_id: int | None = Field(default=None, ge=1)
+    range_type: Literal["today", "this_week", "two_weeks", "custom"] | None = None
     start_date: date | None = None
     end_date: date | None = None
     assumptions: PlanAssumptionsIn = Field(default_factory=PlanAssumptionsIn)
@@ -143,9 +145,16 @@ class PlanDraftOut(BaseModel):
 def _default_range(workspace: WorkspaceData, repos: Repositories, payload: PlanDraftCreate):
     settings = get_settings(repos, workspace.id)
     today = datetime.now(UTC).astimezone(ZoneInfo(settings.timezone)).date()
-    start = payload.start_date or today
-    end = payload.end_date or (start + timedelta(days=13))
-    return start, end
+    kind = payload.range_type
+    if kind is None:
+        kind = (
+            "custom"
+            if payload.start_date is not None or payload.end_date is not None
+            else "two_weeks"
+        )
+    if kind != "custom" and (payload.start_date is not None or payload.end_date is not None):
+        raise DomainError("预设规划区间不接受自定义起止日期；如需指定日期请使用 custom")
+    return resolve_planning_range(kind, today, start=payload.start_date, end=payload.end_date)
 
 
 @router.post("/plans/drafts", response_model=PlanDraftOut, status_code=201)

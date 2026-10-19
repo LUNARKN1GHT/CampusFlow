@@ -481,6 +481,11 @@ def reschedule_plan(
     current = current_plan(repos, workspace_id, semester_id=semester_id)
     if current is None:
         raise NotFoundError("当前没有已接受的计划，无法局部重排")
+    effective_start = range_start or current.range_start
+    effective_end = range_end or current.range_end
+    if effective_end < effective_start:
+        raise DomainError("规划结束日期不得早于开始日期")
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     scope: set[int] | None = None
     if task_ids is not None:
         scope = set(task_ids)
@@ -493,8 +498,13 @@ def reschedule_plan(
 
     preserved: list[PreservedBlock] = []
     for block in current.blocks:
-        keep = block.locked or (
-            scope is not None and (block.task_id is None or block.task_id not in scope)
+        block_start = block.starts_at.astimezone(timezone).date()
+        block_end = block.ends_at.astimezone(timezone).date()
+        outside_range = block_start < effective_start or block_end > effective_end
+        keep = (
+            block.locked
+            or outside_range
+            or (scope is not None and (block.task_id is None or block.task_id not in scope))
         )
         if keep:
             preserved.append(
@@ -513,8 +523,8 @@ def reschedule_plan(
         repos,
         workspace_id,
         semester_id=semester_id,
-        range_start=range_start or current.range_start,
-        range_end=range_end or current.range_end,
+        range_start=effective_start,
+        range_end=effective_end,
         now=now,
         preserved_blocks=tuple(preserved),
         change="rescheduled",
