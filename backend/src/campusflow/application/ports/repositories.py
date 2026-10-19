@@ -519,6 +519,10 @@ class TaskRepository(Protocol):
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
 
+    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool: ...
+
+    def version_relation_ids(self, material_id: int) -> list[int]: ...
+
     def get_version(self, version_id: int) -> MaterialVersionData | None:
         """按版本编号取版本，供来源关联使用（R004）。"""
         ...
@@ -809,6 +813,10 @@ class PlanRepository(Protocol):
         locked: bool,
         reason: str,
     ) -> PlanBlockData | None: ...
+
+    def reassign_task(self, source_task_id: int, target_task_id: int) -> int:
+        """N016：把来源任务的计划时间块迁移到目标任务，返回迁移数量。"""
+        ...
 
     def bump_version(
         self,

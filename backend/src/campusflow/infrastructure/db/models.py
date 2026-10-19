@@ -316,6 +316,38 @@ class MaterialVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class MaterialVersionRelation(Base):
+    """用户声明的版本关系；原文件、片段及正式事项保持原位。"""
+
+    __tablename__ = "material_version_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "source_version_id",
+            "target_version_id",
+            "kind",
+            name="uq_material_version_relation",
+        ),
+        CheckConstraint("source_version_id <> target_version_id"),
+        CheckConstraint("kind IN ('same_source', 'replacement_claim')"),
+        CheckConstraint("kind <> 'same_source' OR source_version_id < target_version_id"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    source_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    target_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(30))
+    statement: Mapped[str] = mapped_column(String(1000))
+    actor: Mapped[str] = mapped_column(String(200))
+    source_snapshot: Mapped[dict] = mapped_column(JSONB)
+    target_snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SourceChunk(Base):
     """来源片段：资料版本中的最小定位单元（D004/D017）。
 
@@ -652,4 +684,71 @@ class QaTurn(Base):
     comparisons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     uncertainties: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class VersionChangeAcceptance(Base):
+    """N014：用户接受的具体字段差异；追加保存，旧候选在事务内标记失效。"""
+
+    __tablename__ = "version_change_acceptances"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "baseline_candidate_id",
+            "comparison_candidate_id",
+            "accepted_fields",
+            name="uq_version_change_acceptance",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    baseline_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    comparison_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    baseline_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE")
+    )
+    comparison_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE")
+    )
+    accepted_fields: Mapped[list] = mapped_column(JSONB)
+    reason: Mapped[str] = mapped_column(String(1000))
+    operator: Mapped[str] = mapped_column(String(100))
+    evidence_snapshot: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    previous_review_status: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CandidateMerge(Base):
+    """N016：候选合并记录；保留来源、进度与正式事项快照，重试幂等。"""
+
+    __tablename__ = "candidate_merges"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "target_candidate_id",
+            "source_candidate_id",
+            name="uq_candidate_merge",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    target_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    source_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    target_formal_kind: Mapped[str | None] = mapped_column(String(20))
+    target_formal_id: Mapped[int | None] = mapped_column(Integer)
+    source_formal_id: Mapped[int | None] = mapped_column(Integer)
+    preserved_progress: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    source_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    reason: Mapped[str] = mapped_column(String(1000))
+    operator: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

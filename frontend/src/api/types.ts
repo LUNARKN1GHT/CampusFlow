@@ -173,6 +173,23 @@ export type MaterialUploadItem = {
   job_id: number | null
 }
 
+export type WebImportInput = {
+  url: string
+  title: string
+  publisher: string | null
+  published_at: string | null
+  published_text: string | null
+  semester_id: number | null
+  course_id: number | null
+  class_name: string | null
+}
+
+export type WebImportResult = {
+  material: Material
+  version: MaterialVersion
+  job_id: number
+}
+
 export type MaterialDeleteImpact = {
   material: Material
   version_count: number
@@ -182,6 +199,7 @@ export type MaterialDeleteImpact = {
   candidate_count: number
   linked_fixed_event_ids: number[]
   linked_rule_ids: number[]
+  version_relation_ids: number[]
   confirm_token: string
   backup_note: string
 }
@@ -308,4 +326,169 @@ export type CandidateReviewDetail = {
   missing_required_fields: string[]
   allowed_transitions: ReviewStatus[]
   converted: CandidateConversion | null
+}
+
+export type DiffEvidence = {
+  chunk_id: number
+  quote: string
+  locator_type: string
+  locator_value: string
+  verifiable: boolean
+}
+
+export type DiffFieldSide = {
+  candidate_id: number
+  source_version_id: number
+  present: boolean
+  value: unknown
+  effective_value: unknown
+  origin: FieldOrigin | null
+  effective_origin: FieldOrigin | null
+  verifiable: boolean
+  evidence: DiffEvidence[]
+}
+
+export type DiffField = {
+  name: string
+  category: string
+  status: 'unchanged' | 'changed' | 'added' | 'missing' | 'explicitly_removed'
+  left: DiffFieldSide
+  right: DiffFieldSide
+}
+
+export type DiffScope = {
+  semester_id: number | null
+  semester_name: string | null
+  course_id: number | null
+  course_name: string | null
+  class_name: string | null
+}
+
+export type DiffSource = {
+  candidate_id: number
+  source_version_id: number
+  material_id: number
+  material_title: string
+  version_no: number
+  material_archived: boolean
+  kind: CandidateKind
+  review_status: ReviewStatus
+  scope: DiffScope
+}
+
+export type CandidateDiff = {
+  left: DiffSource
+  right: DiffSource
+  scope: { left: DiffScope; right: DiffScope; differences: { component: string; status: string }[] }
+  fields: DiffField[]
+  summary: { total: number; unchanged: number; changed: number; added: number; missing: number; explicitly_removed: number }
+}
+
+export type VersionApplicability = {
+  status: 'applicable' | 'conflict' | 'requires_review'
+  recommended_candidate_id: number | null
+  review_required: boolean
+  applied: false
+  relation_id: number | null
+  relation_kind: string | null
+  scope_comparison: 'same' | 'different' | 'unknown'
+  publication: Record<string, { material_id: number; version_id: number; publisher: string | null; published_at: string | null; published_text: string | null }>
+  reasons: { code: string; message: string }[]
+  diff: CandidateDiff
+}
+
+export type ImpactedBlock = {
+  id: number
+  draft_id: number
+  draft_status: string
+  title: string
+  starts_at: string
+  ends_at: string
+  locked: boolean
+}
+
+export type ChangeImpact = {
+  summary: Record<string, number>
+  unsupported: { code: string; message: string }[]
+  tasks: { id: number; title: string; progress: string; completed: boolean; due_date: string | null; source_state: string; plan_blocks: ImpactedBlock[] }[]
+  fixed_events: { id: number; title: string; starts_at: string; ends_at: string; location: string | null }[]
+  rules: { id: number; title: string }[]
+}
+
+export type VersionAcceptance = {
+  id: number
+  baseline_candidate_id: number
+  comparison_candidate_id: number
+  baseline_version_id: number
+  comparison_version_id: number
+  accepted_fields: string[]
+  reason: string
+  operator: string
+  evidence_snapshot: { name: string; status: string; left: DiffFieldSide; right: DiffFieldSide }[]
+  previous_review_status: string
+  created_at: string
+  baseline_review_status: string
+  created: boolean
+}
+
+export type DuplicateSuggestion = {
+  candidate_id: number
+  source_version_id: number
+  title: string | null
+  score: number
+  reasons: string[]
+  matched_fields: string[]
+  review_status: ReviewStatus
+  scope_same: boolean
+}
+
+export type DuplicateReport = {
+  candidate_id: number
+  kind: CandidateKind
+  suggestions: DuplicateSuggestion[]
+  excluded: { candidate_id: number; code: string; message: string }[]
+  auto_merge: false
+}
+
+export type MergeSource = {
+  candidate_id: number
+  version_id: number
+  title: string | null
+  review_status: ReviewStatus
+  formal_kind: string
+  formal_id: number | null
+  progress: string | null
+  plan_block_count: number
+}
+
+export type MergePreview = {
+  target_candidate_id: number
+  kind: CandidateKind
+  target_title: string | null
+  target_formal_id: number | null
+  target_progress: string | null
+  kept_fields: Record<string, unknown>
+  sources: MergeSource[]
+  token: string
+  auto_merge: false
+}
+
+export type MergeRecord = {
+  id: number
+  target_candidate_id: number
+  source_candidate_id: number
+  target_formal_kind: string | null
+  target_formal_id: number | null
+  source_formal_id: number | null
+  preserved_progress: Record<string, unknown>
+  source_snapshot: Record<string, unknown>
+  reason: string
+  operator: string
+  created_at: string
+}
+
+export type MergeResult = {
+  records: MergeRecord[]
+  created: boolean
+  preview: MergePreview
 }

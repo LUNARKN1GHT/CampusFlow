@@ -1,11 +1,19 @@
 import { apiRequest } from './client'
 import type {
   CandidateConversionResult,
+  CandidateDiff,
   CandidateKind,
   CandidateReviewDetail,
   CandidateSummary,
+  ChangeImpact,
+  DuplicateReport,
   FieldOrigin,
+  MergePreview,
+  MergeRecord,
+  MergeResult,
   ReviewStatus,
+  VersionAcceptance,
+  VersionApplicability,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -68,4 +76,19 @@ export const candidatesApi = {
     method: 'PATCH',
     body: JSON.stringify(input),
   }),
+  diff: (baselineId: number, comparisonId: number) => apiRequest<CandidateDiff>(`/candidates/${baselineId}/diff/${comparisonId}`),
+  applicability: (baselineId: number, comparisonId: number) => apiRequest<VersionApplicability>(`/candidates/${baselineId}/diff/${comparisonId}/applicability`),
+  impact: (baselineId: number, comparisonId: number) => apiRequest<ChangeImpact>(`/candidates/${baselineId}/diff/${comparisonId}/impact`),
+  accept: (baselineId: number, comparisonId: number, input: { field_names: string[]; reason: string; acknowledge_conflict: boolean }) => apiRequest<VersionAcceptance>(`/candidates/${baselineId}/diff/${comparisonId}/accept`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  acceptances: (candidateId: number) => apiRequest<VersionAcceptance[]>(`/candidates/${candidateId}/acceptances`),
+  duplicates: (candidateId: number) => apiRequest<DuplicateReport>(`/candidates/${candidateId}/duplicates`),
+  mergePreview: (candidateId: number, sourceIds: number[]) => apiRequest<MergePreview>(`/candidates/${candidateId}/merge-preview?${sourceIds.map((id) => `source_ids=${id}`).join('&')}`),
+  merge: (candidateId: number, input: { source_candidate_ids: number[]; preview_token: string; reason: string }) => apiRequest<MergeResult>(`/candidates/${candidateId}/merge`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  merges: (candidateId: number) => apiRequest<MergeRecord[]>(`/candidates/${candidateId}/merges`),
 }

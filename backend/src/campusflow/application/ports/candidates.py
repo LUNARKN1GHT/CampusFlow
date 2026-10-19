@@ -6,6 +6,7 @@ from typing import Protocol
 
 from campusflow.domain.candidates import (
     CandidateDraft,
+    CandidateKind,
     FieldRevision,
     ReviewChange,
     ReviewReason,
@@ -81,6 +82,21 @@ class CandidateSummaryData:
     created_at: datetime
 
 
+@dataclass(frozen=True)
+class MergeRecordData:
+    id: int
+    target_candidate_id: int
+    source_candidate_id: int
+    target_formal_kind: str | None
+    target_formal_id: int | None
+    source_formal_id: int | None
+    preserved_progress: dict
+    source_snapshot: dict
+    reason: str
+    operator: str
+    created_at: datetime
+
+
 class CandidateRepository(Protocol):
     def create(
         self, workspace_id: int, version_id: int, draft: CandidateDraft
@@ -89,6 +105,10 @@ class CandidateRepository(Protocol):
     def get(self, workspace_id: int, candidate_id: int) -> CandidateData | None: ...
 
     def list_by_version(self, workspace_id: int, version_id: int) -> list[CandidateData]: ...
+
+    def list_all(self, workspace_id: int, kind: CandidateKind) -> list[CandidateData]:
+        """同一空间内指定类型的全部候选，供重复建议只读比较。"""
+        ...
 
     def list_for_review(
         self,
@@ -132,3 +152,24 @@ class CandidateRepository(Protocol):
     ) -> None:
         """只替换核对原因，不改动字段、证据与核对状态（X008 冲突原因刷新）。"""
         ...
+
+    def find_merge(
+        self, workspace_id: int, target_candidate_id: int, source_candidate_id: int
+    ) -> MergeRecordData | None: ...
+
+    def create_merge(
+        self,
+        workspace_id: int,
+        *,
+        target_candidate_id: int,
+        source_candidate_id: int,
+        target_formal_kind: str | None,
+        target_formal_id: int | None,
+        source_formal_id: int | None,
+        preserved_progress: dict,
+        source_snapshot: dict,
+        reason: str,
+        operator: str,
+    ) -> MergeRecordData: ...
+
+    def list_merges(self, workspace_id: int, candidate_id: int) -> list[MergeRecordData]: ...
