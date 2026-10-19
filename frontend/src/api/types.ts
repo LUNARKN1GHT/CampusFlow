@@ -173,6 +173,23 @@ export type MaterialUploadItem = {
   job_id: number | null
 }
 
+export type WebImportInput = {
+  url: string
+  title: string
+  publisher: string | null
+  published_at: string | null
+  published_text: string | null
+  semester_id: number | null
+  course_id: number | null
+  class_name: string | null
+}
+
+export type WebImportResult = {
+  material: Material
+  version: MaterialVersion
+  job_id: number
+}
+
 export type MaterialDeleteImpact = {
   material: Material
   version_count: number

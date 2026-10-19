@@ -29,14 +29,18 @@ const loading = ref(true)
 const error = ref('')
 
 const importOpen = ref(false)
-const importMode = ref<'text' | 'files'>('text')
+const importMode = ref<'text' | 'files' | 'web'>('text')
 const importing = ref(false)
 const importError = ref('')
+const fallbackNotice = ref('')
 const successMessage = ref('')
 const uploadResults = ref<MaterialUploadItem[] | null>(null)
 
 const textForm = reactive({
   title: '', content: '', publisher: '', published_at: '', semester_id: '', course_id: '', class_name: '',
+})
+const webForm = reactive({
+  url: '', title: '', publisher: '', published_at: '', published_text: '', semester_id: '', course_id: '', class_name: '',
 })
 const uploadForm = reactive({ semester_id: '', course_id: '', class_name: '', allow_duplicate: false })
 const selectedFiles = ref<File[]>([])
@@ -76,7 +80,20 @@ const uploadCourses = computed(() => uploadForm.semester_id
 const textCourses = computed(() => textForm.semester_id
   ? courses.value.filter((course) => course.semester_id === Number(textForm.semester_id))
   : courses.value)
+const webCourses = computed(() => webForm.semester_id
+  ? courses.value.filter((course) => course.semester_id === Number(webForm.semester_id))
+  : courses.value)
 const visibleMaterials = computed(() => materials.value)
+const uploadSummary = computed(() => {
+  if (!uploadResults.value) return ''
+  const succeeded = uploadResults.value.filter((item) => item.material).length
+  const duplicated = uploadResults.value.filter((item) => item.duplicate_of).length
+  const failed = uploadResults.value.filter((item) => item.error).length
+  const parts = [`成功 ${succeeded} 份`]
+  if (duplicated) parts.push(`重复 ${duplicated} 份`)
+  if (failed) parts.push(`失败 ${failed} 份`)
+  return `本次导入：${parts.join('，')}。${failed ? '失败文件未建档，不影响其它文件。' : ''}`
+})
 
 function jobFor(material: Material): ProcessingJob | null {
   const jobId = jobByMaterial[material.id]
@@ -257,7 +274,7 @@ function onFilesChosen(event: Event) {
 
 async function submitUpload() {
   if (!selectedFiles.value.length) {
-    importError.value = '请先选择要导入的 PDF 或图片文件。'
+    importError.value = '请先选择要导入的 PDF、Word（DOCX）或图片文件。'
     return
   }
   importing.value = true
@@ -271,6 +288,7 @@ async function submitUpload() {
       allow_duplicate: uploadForm.allow_duplicate,
     })
     uploadResults.value = result.results
+    fallbackNotice.value = ''
     result.results.forEach((item) => {
       if (item.material && item.job_id) {
         jobByMaterial[item.material.id] = item.job_id
@@ -306,6 +324,7 @@ async function submitText() {
       class_name: textForm.class_name.trim() || null,
     })
     successMessage.value = `已导入「${result.material.title}」，切分 ${result.chunks.length} 个段落。`
+    fallbackNotice.value = ''
     Object.assign(textForm, { title: '', content: '', publisher: '', published_at: '', class_name: '' })
     await refresh()
   } catch (caught) {
@@ -315,10 +334,89 @@ async function submitText() {
   }
 }
 
-function switchImportMode(mode: 'text' | 'files') {
+async function submitWeb() {
+  if (!webForm.url.trim() || !webForm.title.trim()) {
+    importError.value = '网页网址与标题都不能为空。'
+    return
+  }
+  importing.value = true
+  importError.value = ''
+  successMessage.value = ''
+  uploadResults.value = null
+  try {
+    const result = await materialsApi.importWeb({
+      url: webForm.url.trim(),
+      title: webForm.title.trim(),
+      publisher: webForm.publisher.trim() || null,
+      published_at: webForm.published_at.trim() || null,
+      published_text: webForm.published_text.trim() || null,
+      semester_id: webForm.semester_id ? Number(webForm.semester_id) : null,
+      course_id: webForm.course_id ? Number(webForm.course_id) : null,
+      class_name: webForm.class_name.trim() || null,
+    })
+    jobByMaterial[result.material.id] = result.job_id
+    successMessage.value = `已保存「${result.material.title}」的网页快照，解析作业 #${result.job_id} 已创建。`
+    fallbackNotice.value = ''
+    Object.assign(webForm, { url: '', title: '', publisher: '', published_at: '', published_text: '', class_name: '' })
+    await refresh()
+  } catch (caught) {
+    importError.value = errorMessage(caught)
+    // 失败时后端不会保存网页快照；明确未覆盖范围，并提供粘贴/上传入口。
+    fallbackNotice.value = `网页正文未导入：${importError.value}。可粘贴可访问的原文或上传已保存的文件；未覆盖内容不会被当作“没有要求”。`
+  } finally {
+    importing.value = false
+  }
+}
+
+function useWebFallback(target: 'text' | 'files') {  const notice = fallbackNotice.value
+  if (target === 'text') {
+    Object.assign(textForm, {
+      title: webForm.title,
+      publisher: webForm.publisher,
+      published_at: webForm.published_at,
+      semester_id: webForm.semester_id,
+      course_id: webForm.course_id,
+      class_name: webForm.class_name,
+    })
+  } else {
+    Object.assign(uploadForm, {
+      semester_id: webForm.semester_id,
+      course_id: webForm.course_id,
+      class_name: webForm.class_name,
+    })
+  }
+  importMode.value = target
+  importError.value = ''
+  successMessage.value = ''
+  uploadResults.value = null
+  fallbackNotice.value = notice
+}
+
+function useMaterialFallback(material: Material, target: 'text' | 'files') {
+  if (target === 'text') {
+    Object.assign(textForm, {
+      title: material.title,
+      publisher: material.publisher ?? '',
+      published_at: material.published_at ?? '',
+      class_name: material.class_name ?? '',
+    })
+  } else {
+    Object.assign(uploadForm, { class_name: material.class_name ?? '' })
+  }
+  importOpen.value = true
+  importMode.value = target
+  importError.value = ''
+  successMessage.value = ''
+  uploadResults.value = null
+  const reason = jobFor(material)?.error_reason ?? '未返回失败原因，请刷新查询处理详情'
+  fallbackNotice.value = `「${material.title}」的网页正文未识别：${reason}。可粘贴原文或上传已保存的文件；未覆盖内容不会被当作“没有要求”。`
+}
+
+function switchImportMode(mode: 'text' | 'files' | 'web') {
   importMode.value = mode
   importError.value = ''
   successMessage.value = ''
+  fallbackNotice.value = ''
   uploadResults.value = null
 }
 
@@ -346,12 +444,15 @@ onBeforeUnmount(stopPolling)
     <template v-else>
       <section v-if="importOpen" class="panel editor-panel">
         <div class="section-heading">
-          <div><p class="eyebrow">导入资料</p><h2>粘贴文本或上传文件</h2></div>
+          <div><p class="eyebrow">导入资料</p><h2>粘贴文本、上传文件或读取网页</h2></div>
           <div class="segmented" role="tablist" aria-label="导入方式">
             <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'text' }" :aria-pressed="importMode === 'text'" @click="switchImportMode('text')">粘贴文本</button>
-            <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'files' }" :aria-pressed="importMode === 'files'" @click="switchImportMode('files')">上传 PDF / 图片</button>
+            <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'files' }" :aria-pressed="importMode === 'files'" @click="switchImportMode('files')">上传文件</button>
+            <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'web' }" :aria-pressed="importMode === 'web'" @click="switchImportMode('web')">公开网页</button>
           </div>
         </div>
+
+        <p v-if="fallbackNotice" class="inline-notice" role="status">{{ fallbackNotice }}</p>
 
         <form v-if="importMode === 'text'" class="stack-form" @submit.prevent="submitText">
           <div class="form-grid">
@@ -371,9 +472,34 @@ onBeforeUnmount(stopPolling)
           <button type="submit" :disabled="importing">{{ importing ? '正在导入…' : '导入文本' }}</button>
         </form>
 
+        <form v-else-if="importMode === 'web'" class="stack-form" @submit.prevent="submitWeb">
+          <div class="form-grid">
+            <label>网页网址<input v-model.trim="webForm.url" type="url" required maxlength="500" placeholder="https://example.edu/notice" /></label>
+            <label>标题<input v-model.trim="webForm.title" required maxlength="300" placeholder="例如：数据结构课程通知" /></label>
+          </div>
+          <div class="form-grid form-grid-3">
+            <label>学期<select v-model="webForm.semester_id" @change="webForm.course_id = ''"><option value="">未指定</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
+            <label>课程<select v-model="webForm.course_id"><option value="">未关联课程</option><option v-for="course in webCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
+            <label>教学班<input v-model.trim="webForm.class_name" maxlength="100" placeholder="可选" /></label>
+          </div>
+          <div class="form-grid">
+            <label>发布方<input v-model.trim="webForm.publisher" maxlength="200" placeholder="可选" /></label>
+            <label>发布时间（含时区，可选）<input v-model.trim="webForm.published_at" placeholder="例如：2026-10-13T10:30:00+08:00" /></label>
+          </div>
+          <label>发布日期原文（可选）<input v-model.trim="webForm.published_text" maxlength="200" placeholder="例如：2026-11-20" /></label>
+          <p class="form-help">只读取公开页面，不会自动登录教务系统、提交表单或绕过登录/反爬验证。只有日期时填写原文，不补造时刻；读取失败可改用粘贴或上传。</p>
+          <p v-if="importError" class="form-error" role="alert">{{ importError }}</p>
+          <p v-if="successMessage" class="success-message" role="status">{{ successMessage }}</p>
+          <div v-if="fallbackNotice" class="material-actions">
+            <button type="button" class="button-secondary" @click="useWebFallback('text')">改为粘贴原文</button>
+            <button type="button" class="button-secondary" @click="useWebFallback('files')">改为上传文件</button>
+          </div>
+          <button type="submit" :disabled="importing">{{ importing ? '正在读取…' : '读取网页并处理' }}</button>
+        </form>
+
         <form v-else class="stack-form" @submit.prevent="submitUpload">
-          <label>选择文件<input ref="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" multiple @change="onFilesChosen" /></label>
-          <p class="form-help">支持 PDF、PNG、JPG/JPEG。完全相同的文件默认提示复用已有资料，避免重复建档。</p>
+          <label>选择文件<input ref="fileInput" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" multiple @change="onFilesChosen" /></label>
+          <p class="form-help">支持 PDF、Word（DOCX）、PNG、JPG/JPEG。旧版 DOC 或宏文档请先另存为普通 DOCX；网页通知可使用“公开网页”入口。完全相同的文件默认提示复用已有资料，避免重复建档。</p>
           <div class="form-grid form-grid-3">
             <label>学期<select v-model="uploadForm.semester_id" @change="uploadForm.course_id = ''"><option value="">未指定</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
             <label>课程<select v-model="uploadForm.course_id"><option value="">未关联课程</option><option v-for="course in uploadCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
@@ -384,6 +510,7 @@ onBeforeUnmount(stopPolling)
           <button type="submit" :disabled="importing">{{ importing ? '正在上传…' : '上传并处理' }}</button>
         </form>
 
+        <p v-if="uploadResults" :class="uploadResults.some((item) => item.error) ? 'inline-notice' : 'form-help'" role="status">{{ uploadSummary }}</p>
         <ul v-if="uploadResults" class="upload-results">
           <li v-for="(item, index) in uploadResults" :key="index">
             <strong>{{ item.filename }}</strong>
@@ -427,10 +554,18 @@ onBeforeUnmount(stopPolling)
                 <p>{{ jobFor(material)?.scope ?? jobErrors[material.id] ?? '未返回覆盖范围，请刷新查询处理详情。' }}</p>
                 <p v-if="jobFor(material)?.error_reason">{{ jobFor(material)?.error_reason }}</p>
                 <p class="form-help">缺失内容不会被当作“没有要求”；重试只补齐未识别的范围。</p>
+                <div v-if="material.source_type === 'web'" class="material-actions">
+                  <button type="button" class="text-button" @click="useMaterialFallback(material, 'text')">粘贴网页原文</button>
+                  <button type="button" class="text-button" @click="useMaterialFallback(material, 'files')">上传网页文件</button>
+                </div>
               </div>
               <div v-else-if="material.status === 'failed'" class="coverage-box failed">
                 <strong>处理失败</strong>
                 <p>{{ jobFor(material)?.error_reason ?? jobErrors[material.id] ?? '未返回失败原因，请刷新查询处理详情。' }}</p>
+                <div v-if="material.source_type === 'web'" class="material-actions">
+                  <button type="button" class="text-button" @click="useMaterialFallback(material, 'text')">粘贴网页原文</button>
+                  <button type="button" class="text-button" @click="useMaterialFallback(material, 'files')">上传网页文件</button>
+                </div>
               </div>
             </div>
             <div class="material-actions">
