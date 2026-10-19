@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppShell from './components/AppShell.vue'
 import { useAuth } from './composables/useAuth'
 import CoursesView from './views/CoursesView.vue'
+import ExportView from './views/ExportView.vue'
 import HealthView from './views/HealthView.vue'
 import LibraryView from './views/LibraryView.vue'
 import LoginView from './views/LoginView.vue'
@@ -60,6 +61,11 @@ const router = createRouter({
           path: 'reminders',
           name: 'reminders',
           component: RemindersView,
+        },
+        {
+          path: 'export',
+          name: 'export',
+          component: ExportView,
         },
         {
           path: 'settings',
