@@ -10,6 +10,11 @@ import type {
   Semester,
   SemesterInput,
   DependencyCheck,
+  Reminder,
+  ReminderRule,
+  ReminderRuleInput,
+  ReminderStatus,
+  ReminderSummary,
   SplitSuggestion,
   SubtaskInput,
   Task,
@@ -67,4 +72,22 @@ export const scheduleApi = {
   listSlots: () => apiRequest<AvailabilitySlot[]>('/availability-slots'),
   createSlot: (input: AvailabilitySlotInput) => apiRequest<AvailabilitySlot>('/availability-slots', { method: 'POST', body: JSON.stringify(input) }),
   deleteSlot: (id: number) => apiRequest<void>(`/availability-slots/${id}`, { method: 'DELETE' }),
+}
+
+export const remindersApi = {
+  list: (filters: { unreadOnly?: boolean; status?: ReminderStatus | null } = {}) => apiRequest<Reminder[]>(
+    `/reminders${queryString({
+      unread_only: filters.unreadOnly ? true : null,
+      status: filters.status ?? null,
+    })}`,
+  ),
+  summary: () => apiRequest<ReminderSummary>('/reminders/summary'),
+  action: (id: number, action: 'read' | 'dismiss') => apiRequest<{ id: number; status: ReminderStatus }>(
+    `/reminders/${id}/action`,
+    { method: 'POST', body: JSON.stringify({ action }) },
+  ),
+  listRules: () => apiRequest<ReminderRule[]>('/reminders/rules'),
+  createRule: (input: ReminderRuleInput) => apiRequest<ReminderRule>('/reminders/rules', { method: 'POST', body: JSON.stringify(input) }),
+  updateRule: (id: number, input: ReminderRuleInput) => apiRequest<ReminderRule>(`/reminders/rules/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteRule: (id: number) => apiRequest<void>(`/reminders/rules/${id}`, { method: 'DELETE' }),
 }

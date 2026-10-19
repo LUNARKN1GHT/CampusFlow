@@ -556,3 +556,47 @@ export type MergeResult = {
   created: boolean
   preview: MergePreview
 }
+
+export type ReminderKind = 'deadline' | 'review'
+export type ReminderStatus = 'pending' | 'sent' | 'dismissed' | 'cancelled'
+
+export type Reminder = {
+  id: number
+  task_id: number | null
+  kind: ReminderKind
+  message: string
+  status: ReminderStatus
+  scheduled_for: string
+  sent_at: string | null
+  read_at: string | null
+  payload: Record<string, unknown>
+}
+
+export type ReminderSummary = {
+  unread: number
+  sent: number
+  pending: number
+  dismissed: number
+  cancelled: number
+  note: string
+}
+
+export type ReminderRule = {
+  id: number | null
+  task_id: number | null
+  advance_minutes: number
+  repeat_minutes: number | null
+  paused: boolean
+  enabled: boolean
+  version: number
+  is_default: boolean
+  builtin: boolean
+}
+
+export type ReminderRuleInput = {
+  task_id?: number | null
+  advance_minutes: number
+  repeat_minutes: number | null
+  paused: boolean
+  enabled: boolean
+}

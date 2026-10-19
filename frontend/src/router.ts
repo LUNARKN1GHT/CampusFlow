@@ -9,6 +9,7 @@ import LoginView from './views/LoginView.vue'
 import OverviewView from './views/OverviewView.vue'
 import PlanView from './views/PlanView.vue'
 import QaView from './views/QaView.vue'
+import RemindersView from './views/RemindersView.vue'
 import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
@@ -54,6 +55,11 @@ const router = createRouter({
           path: 'tasks',
           name: 'tasks',
           component: TasksView,
+        },
+        {
+          path: 'reminders',
+          name: 'reminders',
+          component: RemindersView,
         },
         {
           path: 'settings',
