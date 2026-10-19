@@ -7,13 +7,20 @@ import { pathsApi } from '../api/paths'
 import type {
   AliasResolution,
   CourseAlias,
+  CourseGraph,
+  CourseGraphEdge,
+  CourseGraphNode,
+  CourseGraphProblem,
+  CourseOrder,
   CourseRelation,
   CourseStudyRecord,
   CourseStudyStatusSummary,
   CurriculumCourse,
   CurriculumPlan,
   LearnerProfile,
+  NextCourses,
   Semester,
+  SemesterPlan,
   StudyStatus,
   SwitchPreview,
 } from '../api/types'
@@ -23,11 +30,20 @@ const relationLabels: Record<string, string> = {
   corequisite: '并修',
   recommended: '建议先学',
 }
+const relationTypes = ['prerequisite', 'corequisite', 'recommended'] as const
 const statusLabels: Record<string, string> = {
   completed: '已修',
   in_progress: '在修',
   planned: '待修',
   unknown: '未知',
+}
+const problemCodeLabels: Record<string, string> = {
+  prerequisite_cycle: '强制先修成环',
+  relation_conflict: '关系类型矛盾',
+  relation_candidate_incomplete: '关系候选信息不完整',
+  relation_candidate_unmatched: '课程无法唯一匹配',
+  relation_candidate_conflict: '候选与正式关系冲突',
+  relation_candidate_pending: '关系候选待核对',
 }
 const termLabels: Record<string, string> = {
   fall: '秋',
@@ -105,12 +121,209 @@ const studyForm = reactive({
 })
 const studySaving = ref(false)
 
+const graph = ref<CourseGraph | null>(null)
+const graphLoading = ref(false)
+const graphError = ref('')
+const order = ref<CourseOrder | null>(null)
+const orderLoading = ref(false)
+const orderError = ref('')
+const nextCourses = ref<NextCourses | null>(null)
+const nextLoading = ref(false)
+const nextError = ref('')
+const selectedNodeId = ref<number | null>(null)
+const selectedEdgeId = ref<number | null>(null)
+
+const semesterForm = reactive({
+  credit_limit: '',
+  start_season: 'fall' as 'fall' | 'spring',
+  max_terms: '',
+})
+const semesterPlan = ref<SemesterPlan | null>(null)
+const semesterLoading = ref(false)
+const semesterError = ref('')
+
 const selectedPlan = computed(() => plans.value.find((plan) => plan.id === selectedPlanId.value) ?? null)
 const currentPlan = computed(() => profile.value?.current_plan ?? null)
 const courseById = computed(() => new Map(courses.value.map((course) => [course.id, course])))
 const semesterName = (id: number | null) =>
   id === null ? '未指定学期' : semesters.value.find((item) => item.id === id)?.name ?? `学期 #${id}`
 const relationName = (id: number) => courseById.value.get(id)?.name ?? `课程 #${id}`
+
+const graphNodeById = computed(
+  () => new Map((graph.value?.nodes ?? []).map((node) => [node.id, node])),
+)
+function courseName(id: number): string {
+  return graphNodeById.value.get(id)?.name ?? courseById.value.get(id)?.name ?? `课程 #${id}`
+}
+
+const selectedGraphNode = computed<CourseGraphNode | null>(
+  () => graph.value?.nodes.find((node) => node.id === selectedNodeId.value) ?? null,
+)
+const selectedGraphEdge = computed<CourseGraphEdge | null>(
+  () => graph.value?.edges.find((edge) => edge.id === selectedEdgeId.value) ?? null,
+)
+const cycleRelationIds = computed(
+  () => new Set((graph.value?.cycles ?? []).flatMap((problem) => problem.relation_ids)),
+)
+const cycleCourseIds = computed(
+  () => new Set((graph.value?.cycles ?? []).flatMap((problem) => [...problem.path, ...problem.course_ids])),
+)
+
+const graphProblemGroups = computed(() => {
+  const current = graph.value
+  if (!current) return []
+  return [
+    { key: 'cycles', label: '强制先修环', tone: 'danger', items: current.cycles },
+    { key: 'conflicts', label: '关系类型矛盾', tone: 'danger', items: current.conflicts },
+    { key: 'missing', label: '缺项与无法匹配', tone: 'warn', items: current.missing },
+    { key: 'pending', label: '待核对候选', tone: 'info', items: current.pending },
+  ]
+})
+
+const GRAPH_NODE_WIDTH = 172
+const GRAPH_NODE_HEIGHT = 54
+const GRAPH_COLUMN_GAP = 72
+const GRAPH_ROW_GAP = 18
+const GRAPH_PADDING = 18
+
+type GraphLayout = {
+  nodes: Array<{ node: CourseGraphNode; x: number; y: number; column: number; row: number }>
+  edges: Array<{ edge: CourseGraphEdge; path: string; self: boolean; cycle: boolean }>
+  width: number
+  height: number
+  columns: number
+}
+
+const graphLayout = computed<GraphLayout>(() => {
+  const current = graph.value
+  if (!current || !current.nodes.length) {
+    return { nodes: [], edges: [], width: 0, height: 0, columns: 0 }
+  }
+  const ids = current.nodes.map((node) => node.id)
+  const idSet = new Set(ids)
+  const indegree = new Map(ids.map((id) => [id, 0]))
+  const adjacency = new Map<number, number[]>()
+  current.edges.forEach((edge) => {
+    if (edge.relation_type !== 'prerequisite') return
+    if (!idSet.has(edge.from_course_id) || !idSet.has(edge.to_course_id)) return
+    const targets = adjacency.get(edge.from_course_id) ?? []
+    targets.push(edge.to_course_id)
+    adjacency.set(edge.from_course_id, targets)
+    indegree.set(edge.to_course_id, (indegree.get(edge.to_course_id) ?? 0) + 1)
+  })
+  const levelById = new Map<number, number>()
+  let frontier = ids.filter((id) => (indegree.get(id) ?? 0) === 0)
+  let depth = 0
+  while (frontier.length) {
+    frontier.forEach((id) => levelById.set(id, depth))
+    const next: number[] = []
+    frontier.forEach((id) => {
+      for (const target of adjacency.get(id) ?? []) {
+        const degree = (indegree.get(target) ?? 0) - 1
+        indegree.set(target, degree)
+        if (degree === 0) next.push(target)
+      }
+    })
+    frontier = Array.from(new Set(next))
+    depth += 1
+  }
+  // 成环及环下游的课程没有稳定层，统一放到最后一列，不伪造层次。
+  const remaining = current.nodes.filter((node) => !levelById.has(node.id))
+  const finalColumn = remaining.length ? Math.max(0, depth) : Math.max(0, depth - 1)
+  remaining.forEach((node) => levelById.set(node.id, finalColumn))
+  const groups = new Map<number, CourseGraphNode[]>()
+  current.nodes.forEach((node) => {
+    const column = levelById.get(node.id) ?? 0
+    const group = groups.get(column) ?? []
+    group.push(node)
+    groups.set(column, group)
+  })
+  const columns = Array.from(groups.entries())
+    .sort(([left], [right]) => left - right)
+    .map(([, nodes]) => [...nodes].sort((left, right) => left.name.localeCompare(right.name, 'zh')))
+  const maxRows = Math.max(...columns.map((nodes) => nodes.length))
+  const width =
+    columns.length * GRAPH_NODE_WIDTH +
+    Math.max(0, columns.length - 1) * GRAPH_COLUMN_GAP +
+    GRAPH_PADDING * 2
+  const height =
+    maxRows * GRAPH_NODE_HEIGHT +
+    Math.max(0, maxRows - 1) * GRAPH_ROW_GAP +
+    GRAPH_PADDING * 2
+  const positions = new Map<number, { x: number; y: number; column: number; row: number }>()
+  const layoutNodes: GraphLayout['nodes'] = []
+  columns.forEach((nodes, column) => {
+    nodes.forEach((node, row) => {
+      const position = {
+        x: GRAPH_PADDING + column * (GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP),
+        y: GRAPH_PADDING + row * (GRAPH_NODE_HEIGHT + GRAPH_ROW_GAP),
+        column,
+        row,
+      }
+      positions.set(node.id, position)
+      layoutNodes.push({ node, ...position })
+    })
+  })
+  const layoutEdges = current.edges.flatMap((edge) => {
+    const source = positions.get(edge.from_course_id)
+    const target = positions.get(edge.to_course_id)
+    if (!source || !target) return []
+    const sx = source.x + GRAPH_NODE_WIDTH
+    const sy = source.y + GRAPH_NODE_HEIGHT / 2
+    const tx = target.x
+    const ty = target.y + GRAPH_NODE_HEIGHT / 2
+    let path: string
+    if (edge.from_course_id === edge.to_course_id) {
+      // 自环必须可见：从节点右侧绕出再回到自身。
+      path = `M ${sx} ${sy - 9} C ${sx + 52} ${sy - 34}, ${sx + 52} ${sy + 34}, ${sx} ${sy + 9}`
+    } else if (target.column > source.column) {
+      const handle = Math.max(36, (tx - sx) / 2)
+      path = `M ${sx} ${sy} C ${sx + handle} ${sy}, ${tx - handle} ${ty}, ${tx} ${ty}`
+    } else if (target.column === source.column) {
+      path = `M ${sx} ${sy} C ${sx + 58} ${sy}, ${tx + 58} ${ty}, ${tx} ${ty}`
+    } else {
+      path = `M ${sx} ${sy} C ${sx + 76} ${sy - 66}, ${tx - 76} ${ty + 66}, ${tx} ${ty}`
+    }
+    return [{ edge, path, self: edge.from_course_id === edge.to_course_id, cycle: cycleRelationIds.value.has(edge.id) }]
+  })
+  return { nodes: layoutNodes, edges: layoutEdges, width, height, columns: columns.length }
+})
+
+const nextAvailable = computed(
+  () =>
+    nextCourses.value?.courses.filter(
+      (course) => course.available && course.study_status !== 'completed',
+    ) ?? [],
+)
+const nextBlocked = computed(
+  () =>
+    nextCourses.value?.courses.filter(
+      (course) => !course.available && course.study_status !== 'completed',
+    ) ?? [],
+)
+
+function toggleGraphNode(nodeId: number) {
+  selectedEdgeId.value = null
+  selectedNodeId.value = selectedNodeId.value === nodeId ? null : nodeId
+}
+
+function toggleGraphEdge(edgeId: number) {
+  selectedNodeId.value = null
+  selectedEdgeId.value = selectedEdgeId.value === edgeId ? null : edgeId
+}
+
+function problemCodeLabel(code: string): string {
+  return problemCodeLabels[code] ?? code
+}
+
+function problemCourseNames(problem: CourseGraphProblem): string {
+  const ids = problem.path.length ? problem.path : problem.course_ids
+  return ids.map(courseName).join(' → ')
+}
+
+function shortNodeName(name: string): string {
+  return name.length > 12 ? `${name.slice(0, 12)}…` : name
+}
 
 async function load() {
   loading.value = true
@@ -149,6 +362,7 @@ async function loadPlanData() {
     aliases.value = []
     studyRecords.value = []
     studyStatus.value = null
+    resetAnalysis()
     return
   }
   dataLoading.value = true
@@ -162,11 +376,88 @@ async function loadPlanData() {
     courses.value = loadedCourses
     relations.value = loadedRelations
     aliases.value = loadedAliases
-    await loadStudy()
+    await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
     dataLoading.value = false
+  }
+}
+
+function resetAnalysis() {
+  graph.value = null
+  graphError.value = ''
+  order.value = null
+  orderError.value = ''
+  nextCourses.value = null
+  nextError.value = ''
+  selectedNodeId.value = null
+  selectedEdgeId.value = null
+  semesterPlan.value = null
+  semesterError.value = ''
+}
+
+async function loadAnalysis() {
+  const planId = selectedPlanId.value
+  selectedNodeId.value = null
+  selectedEdgeId.value = null
+  semesterPlan.value = null
+  semesterError.value = ''
+  if (planId === null) {
+    resetAnalysis()
+    return
+  }
+  graphLoading.value = true
+  orderLoading.value = true
+  nextLoading.value = true
+  const [graphResult, orderResult, nextResult] = await Promise.allSettled([
+    pathsApi.graph(planId),
+    pathsApi.order(planId),
+    pathsApi.nextCourses(planId),
+  ])
+  if (selectedPlanId.value === planId) {
+    if (graphResult.status === 'fulfilled') {
+      graph.value = graphResult.value
+      graphError.value = ''
+    } else {
+      graph.value = null
+      graphError.value = errorMessage(graphResult.reason)
+    }
+    if (orderResult.status === 'fulfilled') {
+      order.value = orderResult.value
+      orderError.value = ''
+    } else {
+      order.value = null
+      orderError.value = errorMessage(orderResult.reason)
+    }
+    if (nextResult.status === 'fulfilled') {
+      nextCourses.value = nextResult.value
+      nextError.value = ''
+    } else {
+      nextCourses.value = null
+      nextError.value = errorMessage(nextResult.reason)
+    }
+    graphLoading.value = false
+    orderLoading.value = false
+    nextLoading.value = false
+  }
+}
+
+async function generateSemesterPlan() {
+  if (selectedPlanId.value === null) return
+  semesterLoading.value = true
+  semesterError.value = ''
+  try {
+    semesterPlan.value = await pathsApi.semesterPlan(selectedPlanId.value, {
+      credit_limit: semesterForm.credit_limit.trim() === '' ? null : Number(semesterForm.credit_limit),
+      start_season: semesterForm.start_season,
+      max_terms: semesterForm.max_terms.trim() === '' ? null : Number(semesterForm.max_terms),
+    })
+  } catch (caught) {
+    semesterPlan.value = null
+    semesterError.value = errorMessage(caught)
+  } finally {
+    semesterLoading.value = false
   }
 }
 
@@ -773,6 +1064,366 @@ onMounted(async () => {
           </template>
         </template>
       </section>
+
+      <section class="panel graph-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">C015 课程关系图</p><h2>依赖图与来源证据</h2></div>
+          <span v-if="graph" :class="['status-pill', graph.complete ? 'graph-complete' : 'graph-incomplete']">
+            {{ graph.complete ? '图完整' : '图不完整' }}
+          </span>
+        </div>
+        <p class="form-help">
+          只绘制当前方案内已确认的正式关系；节点按强制先修深度分列。点击课程节点或连线查看字段、条件与原文证据。
+        </p>
+        <p v-if="graphLoading" class="muted">正在加载课程关系图…</p>
+        <div v-else-if="graphError" class="status-banner failed" role="alert">
+          <div><strong>课程关系图加载失败</strong><p>{{ graphError }}</p></div>
+        </div>
+        <template v-else-if="graph">
+          <div :class="['status-banner', graph.complete ? 'success' : 'failed']">
+            <div>
+              <strong>{{ graph.complete ? '关系图完整' : '图不完整，不能宣称依赖关系已完整' }}</strong>
+              <p v-if="graph.complete">接口未报告环、缺项、矛盾或未转换候选；仍只代表当前方案内已确认的关系。</p>
+              <p v-else>环、缺项、矛盾或待核对候选的原因列在下方问题清单中；未核对前不生成完整结论。</p>
+            </div>
+          </div>
+          <ul v-if="graph.limitations.length" class="limitations-list">
+            <li v-for="(limitation, index) in graph.limitations" :key="`graph-limit-${index}`">{{ limitation }}</li>
+          </ul>
+          <div class="legend-row graph-legend">
+            <span class="legend-chip prerequisite">强制先修 · 实线箭头</span>
+            <span class="legend-chip corequisite">并修 · 点划线</span>
+            <span class="legend-chip recommended">建议先学 · 虚线</span>
+            <span class="legend-chip cycle">成环 · 高亮加粗</span>
+          </div>
+          <p v-if="!graph.nodes.length" class="compact-empty">当前方案还没有课程，无法绘制关系图。</p>
+          <template v-else>
+            <div class="graph-scroll">
+              <svg
+                :width="graphLayout.width"
+                :height="graphLayout.height"
+                :viewBox="`0 0 ${graphLayout.width} ${graphLayout.height}`"
+                class="graph-svg"
+                role="img"
+                aria-label="课程关系图"
+              >
+                <defs>
+                  <marker
+                    v-for="type in relationTypes"
+                    :id="`graph-arrow-${type}`"
+                    :key="`marker-${type}`"
+                    markerWidth="9"
+                    markerHeight="9"
+                    refX="8"
+                    refY="4.5"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M0,0 L9,4.5 L0,9 z" :class="`marker-${type}`" />
+                  </marker>
+                </defs>
+                <g>
+                  <g
+                    v-for="item in graphLayout.edges"
+                    :key="`edge-${item.edge.id}`"
+                    :class="['graph-edge', { cycle: item.cycle, selected: selectedEdgeId === item.edge.id }]"
+                    @click.stop="toggleGraphEdge(item.edge.id)"
+                  >
+                    <path :d="item.path" class="edge-hit" />
+                    <path
+                      :d="item.path"
+                      :class="[
+                        'edge-line',
+                        `edge-${item.edge.relation_type}`,
+                        {
+                          selected: selectedEdgeId === item.edge.id,
+                          'edge-self': item.self,
+                          'edge-cycle': item.cycle,
+                        },
+                      ]"
+                      :marker-end="`url(#graph-arrow-${item.edge.relation_type})`"
+                    />
+                  </g>
+                </g>
+                <g
+                  v-for="item in graphLayout.nodes"
+                  :key="`node-${item.node.id}`"
+                  :class="[
+                    'graph-node',
+                    {
+                      cycle: cycleCourseIds.has(item.node.id),
+                      selected: selectedNodeId === item.node.id,
+                    },
+                  ]"
+                  :transform="`translate(${item.x}, ${item.y})`"
+                  role="button"
+                  tabindex="0"
+                  @click.stop="toggleGraphNode(item.node.id)"
+                  @keydown.enter.prevent="toggleGraphNode(item.node.id)"
+                  @keydown.space.prevent="toggleGraphNode(item.node.id)"
+                >
+                  <title>{{ item.node.name }}</title>
+                  <rect :width="GRAPH_NODE_WIDTH" :height="GRAPH_NODE_HEIGHT" rx="12" />
+                  <text x="12" y="23" class="node-name">{{ shortNodeName(item.node.name) }}</text>
+                  <text x="12" y="41" class="node-meta">
+                    {{ item.node.code ?? '未填写代码' }} · {{ item.node.credits ?? '?' }} 学分 · {{ statusLabels[item.node.study_status] ?? item.node.study_status }}
+                  </text>
+                </g>
+              </svg>
+            </div>
+            <div v-if="selectedGraphNode" class="graph-detail">
+              <div class="section-heading">
+                <div><p class="eyebrow">课程详情</p><h3>{{ selectedGraphNode.name }}</h3></div>
+                <button type="button" class="text-button" @click="selectedNodeId = null">关闭</button>
+              </div>
+              <dl class="detail-grid">
+                <div><dt>课程代码</dt><dd>{{ selectedGraphNode.code ?? '未填写' }}</dd></div>
+                <div><dt>学分</dt><dd>{{ selectedGraphNode.credits ?? '未知' }}</dd></div>
+                <div><dt>开课季节</dt><dd>{{ selectedGraphNode.offered_terms.length ? selectedGraphNode.offered_terms.map((term) => termLabels[term] ?? term).join('、') : '未知' }}</dd></div>
+                <div><dt>修读状态</dt><dd>{{ statusLabels[selectedGraphNode.study_status] ?? selectedGraphNode.study_status }}</dd></div>
+                <div><dt>修读记录</dt><dd>{{ selectedGraphNode.record_count }} 条</dd></div>
+              </dl>
+            </div>
+            <div v-else-if="selectedGraphEdge" class="graph-detail">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">关系详情</p>
+                  <h3>{{ courseName(selectedGraphEdge.from_course_id) }} → {{ courseName(selectedGraphEdge.to_course_id) }}</h3>
+                </div>
+                <button type="button" class="text-button" @click="selectedEdgeId = null">关闭</button>
+              </div>
+              <dl class="detail-grid">
+                <div><dt>关系类型</dt><dd><span :class="['legend-chip', selectedGraphEdge.relation_type]">{{ relationLabels[selectedGraphEdge.relation_type] }}</span></dd></div>
+                <div><dt>条件原文</dt><dd>{{ selectedGraphEdge.condition_text ?? '未填写' }}</dd></div>
+                <div>
+                  <dt>来源候选</dt>
+                  <dd>
+                    <RouterLink v-if="selectedGraphEdge.source_candidate_id" :to="{ path: '/review', query: { candidate: selectedGraphEdge.source_candidate_id } }">候选 #{{ selectedGraphEdge.source_candidate_id }}</RouterLink>
+                    <span v-else>手动录入</span>
+                  </dd>
+                </div>
+              </dl>
+              <div class="evidence-list">
+                <p class="eyebrow">原文证据</p>
+                <p v-if="!selectedGraphEdge.evidence.length" class="compact-empty">该关系没有可展示的原文证据；不代表关系已被原文确认。</p>
+                <ul v-else>
+                  <li v-for="(evidence, index) in selectedGraphEdge.evidence" :key="`evidence-${index}`">
+                    <blockquote>{{ evidence.quote }}</blockquote>
+                    <p class="form-help">
+                      字段 {{ evidence.field }} · 片段 #{{ evidence.chunk_id }} · 版本 #{{ evidence.version_id }}
+                      <template v-if="evidence.material_id"> · 资料 #{{ evidence.material_id }}</template>
+                    </p>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </template>
+          <div class="problem-section">
+            <div class="section-heading">
+              <div><p class="eyebrow">问题清单</p><h3>环、矛盾、缺项与待核对</h3></div>
+              <span class="count-badge">始终可见</span>
+            </div>
+            <p v-if="!graph.complete" class="form-error">图不完整：以下问题未核对前，不能把当前依赖关系当作完整约束。</p>
+            <p v-else class="form-help">接口未报告环、缺项、矛盾或待核对关系；空清单不等于依赖绝对正确。</p>
+            <div v-for="group in graphProblemGroups" :key="group.key" :class="['problem-group', group.tone]">
+              <div class="problem-group-heading">
+                <strong>{{ group.label }}</strong>
+                <span class="count-badge">{{ group.items.length }} 条</span>
+              </div>
+              <p v-if="!group.items.length" class="compact-empty">无</p>
+              <ul v-else>
+                <li v-for="(problem, index) in group.items" :key="`${group.key}-${index}`">
+                  <p class="problem-title"><span class="problem-code">{{ problem.code }}</span>{{ problemCodeLabel(problem.code) }}</p>
+                  <p>{{ problem.message }}</p>
+                  <p v-if="problemCourseNames(problem)" class="form-help">涉及课程：{{ problemCourseNames(problem) }}</p>
+                  <p v-if="problem.relation_ids.length" class="form-help">相关关系：{{ problem.relation_ids.map((id) => `#${id}`).join('、') }}</p>
+                  <p v-if="problem.candidate_ids.length" class="form-help">
+                    来源候选：
+                    <RouterLink v-for="candidateId in problem.candidate_ids" :key="candidateId" :to="{ path: '/review', query: { candidate: candidateId } }">#{{ candidateId }}</RouterLink>
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <div class="two-column-layout">
+        <section class="panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">C016 修读顺序</p><h2>强制先修层次</h2></div>
+            <span v-if="order" class="count-badge">{{ order.levels.length }} 层</span>
+          </div>
+          <p class="form-help">只按强制先修分层；并修与建议先学不参与层次计算。</p>
+          <p v-if="orderLoading" class="muted">正在计算修读顺序…</p>
+          <div v-else-if="orderError" class="status-banner failed" role="alert">
+            <div><strong>修读顺序加载失败</strong><p>{{ orderError }}</p></div>
+          </div>
+          <template v-else-if="order">
+            <div :class="['status-banner', order.blocked ? 'failed' : 'success']">
+              <div>
+                <strong>{{ order.blocked ? '未生成完整顺序' : '已生成依赖层次' }}</strong>
+                <p v-if="order.blocked">存在未核对问题，后端没有输出层次；下方列出阻塞原因，不伪造顺序。</p>
+                <p v-else-if="!order.levels.length">当前方案没有可排序的课程。</p>
+                <p v-else>层次只表示强制先修先后，不代表每学期必须按层修读。</p>
+              </div>
+            </div>
+            <ul v-if="order.problems.length" class="problem-list">
+              <li v-for="(problem, index) in order.problems" :key="`order-problem-${index}`">
+                <p class="problem-title"><span class="problem-code">{{ problem.code }}</span>{{ problemCodeLabel(problem.code) }}</p>
+                <p>{{ problem.message }}</p>
+                <p v-if="problem.path.length" class="form-help">成环路径：{{ problemCourseNames(problem) }}</p>
+                <p v-else-if="problem.course_ids.length" class="form-help">涉及课程：{{ problemCourseNames(problem) }}</p>
+                <p v-if="problem.relation_ids.length" class="form-help">相关关系：{{ problem.relation_ids.map((id) => `#${id}`).join('、') }}</p>
+              </li>
+            </ul>
+            <div v-if="order.levels.length" class="level-grid">
+              <div v-for="(level, index) in order.levels" :key="`level-${index}`" class="level-card">
+                <p class="eyebrow">第 {{ index + 1 }} 层</p>
+                <ul>
+                  <li v-for="courseId in level" :key="courseId">{{ courseName(courseId) }}</li>
+                </ul>
+              </div>
+            </div>
+            <p v-if="order.alternatives" class="status-banner warn">
+              <span><strong>存在可替换层次</strong><p>同一层内课程没有相互强制先修，可调整先后；层次内顺序不是硬性要求。</p></span>
+            </p>
+            <ul v-if="order.limitations.length" class="limitations-list">
+              <li v-for="(limitation, index) in order.limitations" :key="`order-limit-${index}`">{{ limitation }}</li>
+            </ul>
+          </template>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">C016 下一步</p><h2>可学与待满足条件</h2></div>
+            <span v-if="nextCourses" class="count-badge">{{ nextAvailable.length }} 门可进入</span>
+          </div>
+          <p v-if="nextLoading" class="muted">正在判断下一步可学课程…</p>
+          <div v-else-if="nextError" class="status-banner failed" role="alert">
+            <div><strong>下一步课程加载失败</strong><p>{{ nextError }}</p></div>
+          </div>
+          <template v-else-if="nextCourses">
+            <div v-if="nextCourses.blocked" class="status-banner warn">
+              <div><strong>依赖图不完整</strong><p>以下判断只基于已确认关系；未核对约束可能改变结果。</p></div>
+            </div>
+            <p v-if="!nextCourses.courses.length" class="compact-empty">当前方案没有课程，无法判断下一步。</p>
+            <template v-else>
+              <h3 class="subheading">可进入的课程</h3>
+              <p v-if="!nextAvailable.length" class="compact-empty">现有资料中没有可进入的课程；这不等于没有课程可修。</p>
+              <ul v-else class="next-list">
+                <li v-for="course in nextAvailable" :key="`next-${course.course_id}`">
+                  <div class="next-title">
+                    <strong>{{ course.name }}</strong>
+                    <span class="status-pill">{{ statusLabels[course.study_status] ?? course.study_status }}</span>
+                  </div>
+                  <p v-if="course.recommended.length" class="form-help">建议先学（不阻塞）：{{ course.recommended.join('；') }}</p>
+                </li>
+              </ul>
+              <template v-if="nextBlocked.length">
+                <h3 class="subheading">暂未满足条件</h3>
+                <ul class="next-list">
+                  <li v-for="course in nextBlocked" :key="`blocked-${course.course_id}`">
+                    <div class="next-title">
+                      <strong>{{ course.name }}</strong>
+                      <span class="status-pill">{{ statusLabels[course.study_status] ?? course.study_status }}</span>
+                    </div>
+                    <ul v-if="course.unmet.length" class="condition-list">
+                      <li v-for="(item, index) in course.unmet" :key="`unmet-${index}`">{{ item }}</li>
+                    </ul>
+                    <p v-if="course.recommended.length" class="form-help">建议先学（不阻塞）：{{ course.recommended.join('；') }}</p>
+                  </li>
+                </ul>
+              </template>
+              <p class="form-help">建议先学不阻塞修读；只有强制先修与并修条件会影响可进入判断。</p>
+            </template>
+            <ul v-if="nextCourses.limitations.length" class="limitations-list">
+              <li v-for="(limitation, index) in nextCourses.limitations" :key="`next-limit-${index}`">{{ limitation }}</li>
+            </ul>
+          </template>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">C016 学期辅助</p><h2>按学分上限与开课季节试排</h2></div>
+          <span class="status-pill">仅作参考</span>
+        </div>
+        <p class="form-help">
+          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核（graduation_audit=false）。
+        </p>
+        <form class="stack-form semester-form" @submit.prevent="generateSemesterPlan">
+          <div class="form-grid">
+            <label>
+              每学期学分上限（留空使用方案值：{{ selectedPlan?.credit_limit_per_term ?? '未知' }}）
+              <input v-model.trim="semesterForm.credit_limit" type="number" min="1" max="60" placeholder="留空使用方案值" />
+            </label>
+            <label>
+              起始季节
+              <select v-model="semesterForm.start_season">
+                <option value="fall">秋季</option>
+                <option value="spring">春季</option>
+              </select>
+            </label>
+            <label>
+              最多学期数（可选）
+              <input v-model.trim="semesterForm.max_terms" type="number" min="1" max="16" placeholder="留空自动" />
+            </label>
+          </div>
+          <button type="submit" :disabled="semesterLoading || selectedPlanId === null">
+            {{ semesterLoading ? '生成中…' : '生成学期建议' }}
+          </button>
+        </form>
+        <p v-if="semesterError" class="form-error" role="alert">{{ semesterError }}</p>
+        <template v-if="semesterPlan">
+          <div :class="['status-banner', semesterPlan.blocked ? 'failed' : 'success']">
+            <div>
+              <strong>{{ semesterPlan.blocked ? '未生成学期建议' : '学期建议已生成' }}</strong>
+              <p v-if="semesterPlan.blocked">当前关系图存在未核对问题，后端未输出学期方案；原因见下方限制说明。</p>
+              <p v-else>学分上限：{{ semesterPlan.credit_limit ?? '未知（未检查学分负荷上限）' }}。</p>
+            </div>
+          </div>
+          <p class="status-banner warn">
+            <span><strong>不构成选课或毕业资格审核</strong><p>graduation_audit=false；请以学校正式培养方案和选课系统为准。</p></span>
+          </p>
+          <div v-if="semesterPlan.terms.length" class="term-grid">
+            <div v-for="term in semesterPlan.terms" :key="`term-${term.index}`" class="term-card">
+              <div class="term-heading">
+                <strong>第 {{ term.index + 1 }} 学期 · {{ termLabels[term.season] ?? term.season }}季</strong>
+                <span class="count-badge">已知 {{ term.credits_known }} 学分</span>
+              </div>
+              <ul>
+                <li v-for="courseId in term.course_ids" :key="courseId">{{ courseName(courseId) }}</li>
+              </ul>
+              <p v-if="term.credits_unknown" class="form-help">{{ term.credits_unknown }} 门课程学分未知，未计入上限判断。</p>
+              <ul v-if="term.warnings.length" class="condition-list">
+                <li v-for="(warning, index) in term.warnings" :key="`term-warning-${index}`">{{ warning }}</li>
+              </ul>
+            </div>
+          </div>
+          <p v-else class="compact-empty">没有可展示的学期建议。</p>
+          <template v-if="semesterPlan.unplaced.length">
+            <h3 class="subheading">未排入的课程</h3>
+            <ul class="unplaced-list">
+              <li v-for="item in semesterPlan.unplaced" :key="`unplaced-${item.course_id}`">
+                <strong>{{ item.name }}</strong>
+                <span>{{ item.reason }}</span>
+              </li>
+            </ul>
+          </template>
+          <div v-if="semesterPlan.limitations.length" class="analysis-notes">
+            <h3 class="subheading">限制说明</h3>
+            <ul class="limitations-list">
+              <li v-for="(limitation, index) in semesterPlan.limitations" :key="`semester-limit-${index}`">{{ limitation }}</li>
+            </ul>
+          </div>
+          <div v-if="semesterPlan.assumptions.length" class="analysis-notes">
+            <h3 class="subheading">使用的假设</h3>
+            <ul class="limitations-list">
+              <li v-for="(assumption, index) in semesterPlan.assumptions" :key="`semester-assumption-${index}`">{{ assumption }}</li>
+            </ul>
+          </div>
+        </template>
+      </section>
     </template>
   </main>
 </template>
@@ -807,4 +1458,68 @@ onMounted(async () => {
 .term-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .term-choice .check-line { display: flex; align-items: center; gap: 4px; }
 .term-choice .check-line input { width: auto; }
+.status-banner.warn { color: var(--warn-strong-ink); background: var(--warn-bg); }
+.status-banner.warn p { color: var(--warn-ink-soft); }
+
+.graph-panel { margin-top: 18px; }
+.graph-complete { color: var(--brand); background: var(--brand-soft); }
+.graph-incomplete { color: var(--danger-strong-ink); background: var(--danger-bg-soft); }
+.graph-legend { margin: 10px 0 12px; }
+.legend-chip.cycle { color: var(--danger-strong-ink); background: var(--danger-bg); border-color: var(--danger-border); }
+.graph-scroll { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
+.graph-svg { display: block; min-width: 100%; }
+.graph-edge { cursor: pointer; }
+.edge-hit { fill: none; stroke: transparent; stroke-width: 14; }
+.edge-line { fill: none; stroke: var(--line-strong); stroke-width: 1.8; }
+.edge-prerequisite { stroke: var(--danger-strong-ink); stroke-width: 2.1; }
+.edge-corequisite { stroke: var(--warn-strong-ink); stroke-width: 2.1; stroke-dasharray: 9 4 2 4; }
+.edge-recommended { stroke: var(--info-ink); stroke-width: 1.8; stroke-dasharray: 5 5; }
+.graph-edge.cycle .edge-line, .edge-cycle { stroke-width: 3.2; }
+.graph-edge.selected .edge-line { stroke-width: 3.6; }
+.marker-prerequisite { fill: var(--danger-strong-ink); }
+.marker-corequisite { fill: var(--warn-strong-ink); }
+.marker-recommended { fill: var(--info-ink); }
+.graph-node { cursor: pointer; outline: none; }
+.graph-node rect { fill: var(--paper-strong); stroke: var(--line-strong); stroke-width: 1.5; }
+.graph-node:hover rect, .graph-node:focus-visible rect { stroke: var(--brand-border); }
+.graph-node.selected rect { stroke: var(--brand); stroke-width: 2.6; }
+.graph-node.cycle rect { stroke: var(--danger-strong-ink); stroke-dasharray: 6 3; }
+.node-name { fill: var(--ink); font-size: 13px; font-weight: 800; }
+.node-meta { fill: var(--muted); font-size: 10.5px; }
+.graph-node.cycle .node-name { fill: var(--danger-strong-ink); }
+.graph-detail { display: grid; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid var(--brand-border); border-radius: 12px; background: var(--brand-selected); }
+.graph-detail .section-heading { margin-bottom: 0; }
+.detail-grid { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; }
+.detail-grid div { display: grid; gap: 2px; }
+.detail-grid dt { color: var(--muted); font-size: 11px; }
+.detail-grid dd { margin: 0; font-weight: 700; }
+.evidence-list ul, .problem-list, .problem-group ul, .next-list, .unplaced-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.evidence-list blockquote { margin: 0 0 6px; padding: 9px 12px; border-left: 3px solid var(--brand-border); border-radius: 0 8px 8px 0; background: var(--paper-strong); white-space: pre-wrap; }
+.problem-section { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line-strong); }
+.problem-group { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.problem-group.danger { border-color: var(--danger-border); background: var(--danger-bg); }
+.problem-group.warn { border-color: var(--warn-border); background: var(--warn-bg); }
+.problem-group.info { border-color: var(--line-strong); background: var(--info-bg); }
+.problem-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.problem-group p, .problem-list p { margin: 3px 0; font-size: 12.5px; }
+.problem-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; }
+.problem-code { padding: 2px 6px; border-radius: 6px; background: var(--surface-soft); color: var(--muted-strong); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 700; }
+.level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin: 12px 0; }
+.level-card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.level-card ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.level-card .eyebrow { margin-bottom: 4px; }
+.subheading { margin-top: 14px; }
+.next-list > li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.next-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.condition-list { margin: 6px 0 0; padding-left: 18px; color: var(--muted-strong); font-size: 12.5px; display: grid; gap: 2px; }
+.semester-form { margin: 12px 0; }
+.term-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin: 12px 0; }
+.term-card { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.term-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.term-card ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.unplaced-list { margin: 8px 0; }
+.unplaced-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--warn-border); border-radius: 8px; background: var(--warn-bg); }
+.unplaced-list span { color: var(--warn-strong-ink); text-align: right; }
+.analysis-notes { margin-top: 12px; }
+.limitations-list { margin: 8px 0 0; padding-left: 18px; color: var(--muted-strong); font-size: 12.5px; display: grid; gap: 4px; }
 </style>
