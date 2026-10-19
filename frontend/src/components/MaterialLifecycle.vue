@@ -118,6 +118,7 @@ function staleDelete() {
             <div class="summary-chip"><strong>{{ impact.candidate_count }}</strong><span>个候选事项将删除</span></div>
             <div v-if="impact.linked_fixed_event_ids.length" class="summary-chip"><strong>{{ impact.linked_fixed_event_ids.length }}</strong><span>个固定日程将标记来源失效</span></div>
             <div v-if="impact.linked_rule_ids.length" class="summary-chip"><strong>{{ impact.linked_rule_ids.length }}</strong><span>条课程规则将标记来源失效</span></div>
+            <div v-if="impact.version_relation_ids?.length" class="summary-chip"><strong>{{ impact.version_relation_ids.length }}</strong><span>条版本关联记录将删除，另一份原文件保留</span></div>
           </div>
           <p v-if="impact.unfinished_job_count" class="inline-notice" role="status">
             还有 {{ impact.unfinished_job_count }} 个未完成的处理作业会随资料一并清理。

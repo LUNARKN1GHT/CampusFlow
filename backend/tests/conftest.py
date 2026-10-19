@@ -40,6 +40,7 @@ TABLES = ", ".join(
         "processing_jobs",
         "processing_job_attempts",
         "source_chunks",
+        "material_version_relations",
         "embedding_profiles",
         "indexed_blocks",
         "index_manifests",

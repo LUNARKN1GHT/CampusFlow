@@ -45,6 +45,7 @@ from campusflow.infrastructure.db.models import (
     FixedEvent,
     Material,
     MaterialVersion,
+    MaterialVersionRelation,
     PlanBlock,
     PlanDraft,
     PlanVersion,
@@ -257,6 +258,32 @@ class SqlAlchemyMaterialRepository:
     def get(self, material_id: int) -> MaterialData | None:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
+
+    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
+        return (
+            self._session.scalar(
+                select(Material.id)
+                .where(
+                    Material.id == material_id,
+                    Material.workspace_id == workspace_id,
+                )
+                .with_for_update()
+            )
+            is not None
+        )
+
+    def version_relation_ids(self, material_id: int) -> list[int]:
+        versions = select(MaterialVersion.id).where(MaterialVersion.material_id == material_id)
+        return list(
+            self._session.scalars(
+                select(MaterialVersionRelation.id)
+                .where(
+                    MaterialVersionRelation.source_version_id.in_(versions)
+                    | MaterialVersionRelation.target_version_id.in_(versions)
+                )
+                .order_by(MaterialVersionRelation.id)
+            )
+        )
 
     def get_version(self, version_id: int) -> MaterialVersionData | None:
         row = self._session.get(MaterialVersion, version_id)
