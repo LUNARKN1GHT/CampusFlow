@@ -62,7 +62,9 @@ def test_unchanged_inputs_have_no_adjustment_suggestion(client: TestClient) -> N
     assert response.status_code == 409
 
 
-def test_progress_change_only_suggests_and_never_overwrites_plan(client: TestClient) -> None:
+def test_progress_change_only_suggests_and_never_overwrites_plan(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     task = _task(client, "剩余耗时变化")
     plan = _accepted_plan(client)
     draft_count = len(client.get("/api/v1/plans/drafts").json())
