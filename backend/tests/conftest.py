@@ -32,6 +32,7 @@ TABLES = ", ".join(
         "semesters",
         "courses",
         "tasks",
+        "task_dependencies",
         "task_progress_changes",
         "fixed_events",
         "availability_slots",
