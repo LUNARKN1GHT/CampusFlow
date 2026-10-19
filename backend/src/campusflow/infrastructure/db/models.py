@@ -294,6 +294,65 @@ class CourseRule(Base):
     )
 
 
+class CurriculumPlan(Base):
+    """C002：培养方案版本。专业、年级与版本共同确定适用规则，不同版本不混用。"""
+
+    __tablename__ = "curriculum_plans"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "major", "grade_year", "version_label", name="uq_curriculum_plan"
+        ),
+        CheckConstraint("grade_year BETWEEN 1900 AND 2100", name="ck_curriculum_plan_grade_year"),
+        CheckConstraint(
+            "credit_limit_per_term IS NULL OR credit_limit_per_term > 0",
+            name="ck_curriculum_plan_credit_limit",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    major: Mapped[str] = mapped_column(String(100))
+    grade_year: Mapped[int] = mapped_column(Integer)
+    version_label: Mapped[str] = mapped_column(String(100))
+    # 已知规则：每学期学分上限；未知保持 NULL，排学期时不补造限制。
+    credit_limit_per_term: Mapped[int | None] = mapped_column(Integer)
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
+    source_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class LearnerProfile(Base):
+    """C002：个人专业年级与当前适用方案。字段缺失时接口明确提示待补充。"""
+
+    __tablename__ = "learner_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "grade_year IS NULL OR grade_year BETWEEN 1900 AND 2100",
+            name="ck_learner_profile_grade_year",
+        ),
+    )
+
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    major: Mapped[str | None] = mapped_column(String(100))
+    grade_year: Mapped[int | None] = mapped_column(Integer)
+    curriculum_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="SET NULL"), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Material(Base):
     """学习资料（D001）。
 
