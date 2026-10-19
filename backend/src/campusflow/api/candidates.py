@@ -10,12 +10,14 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from campusflow.api.auth import require_session
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import get_current_workspace, get_repositories, get_version_relations
 from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
 from campusflow.application import conversion as conversions
+from campusflow.application import version_applicability
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.application.ports.version_relations import VersionRelations
 from campusflow.domain.candidate_diff import DiffStatus, FieldCategory, ScopeComponent
 from campusflow.domain.candidates import FieldOrigin
 from campusflow.domain.states import ReviewStatus
@@ -24,6 +26,7 @@ router = APIRouter(tags=["candidates"])
 
 CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
+Relations = Annotated[VersionRelations, Depends(get_version_relations)]
 
 
 class ReviewReasonOut(BaseModel):
@@ -506,6 +509,62 @@ def get_candidate_diff(
     """只读新旧差异：candidate_id 为基准/旧，other_candidate_id 为待比较/新。"""
     return _diff_out(
         diffs.compare_candidates(repos, workspace.id, candidate_id, other_candidate_id)
+    )
+
+
+class ApplicabilityReasonOut(BaseModel):
+    code: str
+    message: str
+
+
+class PublicationSideOut(BaseModel):
+    material_id: int
+    version_id: int
+    publisher: str | None
+    published_at: str | None
+    published_text: str | None
+
+
+class VersionApplicabilityOut(BaseModel):
+    status: Literal["applicable", "conflict", "requires_review"]
+    recommended_candidate_id: int | None
+    review_required: bool
+    applied: Literal[False] = False
+    relation_id: int | None
+    relation_kind: str | None
+    scope_comparison: Literal["same", "different", "unknown"]
+    publication: dict[str, PublicationSideOut]
+    reasons: list[ApplicabilityReasonOut]
+    diff: CandidateDiffOut
+
+
+@router.get(
+    "/candidates/{candidate_id}/diff/{other_candidate_id}/applicability",
+    response_model=VersionApplicabilityOut,
+)
+def get_candidate_applicability(
+    candidate_id: int,
+    other_candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    relations: Relations,
+) -> VersionApplicabilityOut:
+    """N012：只判定生效候选或冲突；不写库，接受变更由 N014 处理。"""
+    result = version_applicability.assess_applicability(
+        repos, relations, workspace.id, candidate_id, other_candidate_id
+    )
+    return VersionApplicabilityOut(
+        status=result.status,
+        recommended_candidate_id=result.recommended_candidate_id,
+        review_required=result.review_required,
+        relation_id=result.relation_id,
+        relation_kind=result.relation_kind,
+        scope_comparison=result.scope_comparison,
+        publication={key: PublicationSideOut(**value) for key, value in result.publication.items()},
+        reasons=[
+            ApplicabilityReasonOut(code=item.code, message=item.message) for item in result.reasons
+        ],
+        diff=_diff_out(result.diff),
     )
 
 
