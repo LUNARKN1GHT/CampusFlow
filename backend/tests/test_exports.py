@@ -474,7 +474,7 @@ def test_ics_escapes_special_characters_and_folds_long_titles(client: TestClient
     assert any(line.startswith(b" ") for line in continuation)
 
 
-def test_plan_ics_exports_accepted_blocks(client: TestClient) -> None:
+def test_plan_ics_exports_accepted_blocks(client: TestClient, fixed_planning_clock) -> None:
     task = _create_task(
         client,
         "论文初稿",
@@ -571,7 +571,9 @@ def test_plan_ics_rejects_draft_superseded_and_missing(client: TestClient) -> No
     assert "任务标识" in with_tasks.json()["detail"]
 
 
-def test_plan_ics_excludes_buffer_cancelled_and_warns_unscheduled(client: TestClient) -> None:
+def test_plan_ics_excludes_buffer_cancelled_and_warns_unscheduled(
+    client: TestClient, fixed_planning_clock
+) -> None:
     active = _create_task(
         client,
         "保留的任务",
@@ -647,7 +649,7 @@ def test_plan_ics_excludes_buffer_cancelled_and_warns_unscheduled(client: TestCl
     assert "缺少耗时的任务" not in _unfold(download.content)
 
 
-def test_plan_ics_fixed_events_are_opt_in(client: TestClient) -> None:
+def test_plan_ics_fixed_events_are_opt_in(client: TestClient, fixed_planning_clock) -> None:
     _create_task(
         client,
         "计划任务",

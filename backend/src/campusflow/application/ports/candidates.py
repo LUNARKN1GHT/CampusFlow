@@ -75,6 +75,7 @@ class CandidateSummaryData:
     course_id: int | None
     semester_id: int | None
     class_name: str | None
+    curriculum_plan_id: int | None
     source_version_id: int
     source_material_id: int
     version_no: int

@@ -294,6 +294,213 @@ class CourseRule(Base):
     )
 
 
+class CurriculumPlan(Base):
+    """C002：培养方案版本。专业、年级与版本共同确定适用规则，不同版本不混用。"""
+
+    __tablename__ = "curriculum_plans"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "major", "grade_year", "version_label", name="uq_curriculum_plan"
+        ),
+        CheckConstraint("grade_year BETWEEN 1900 AND 2100", name="ck_curriculum_plan_grade_year"),
+        CheckConstraint(
+            "credit_limit_per_term IS NULL OR credit_limit_per_term > 0",
+            name="ck_curriculum_plan_credit_limit",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    major: Mapped[str] = mapped_column(String(100))
+    grade_year: Mapped[int] = mapped_column(Integer)
+    version_label: Mapped[str] = mapped_column(String(100))
+    # 已知规则：每学期学分上限；未知保持 NULL，排学期时不补造限制。
+    credit_limit_per_term: Mapped[int | None] = mapped_column(Integer)
+    source_material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"), index=True
+    )
+    source_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class LearnerProfile(Base):
+    """C002：个人专业年级与当前适用方案。字段缺失时接口明确提示待补充。"""
+
+    __tablename__ = "learner_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "grade_year IS NULL OR grade_year BETWEEN 1900 AND 2100",
+            name="ck_learner_profile_grade_year",
+        ),
+    )
+
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    major: Mapped[str | None] = mapped_column(String(100))
+    grade_year: Mapped[int | None] = mapped_column(Integer)
+    curriculum_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="SET NULL"), index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CurriculumCourse(Base):
+    """培养方案内课程。学分或开课学期未知保持 NULL/空列表，不补造。"""
+
+    __tablename__ = "curriculum_courses"
+    __table_args__ = (
+        UniqueConstraint("curriculum_plan_id", "name", name="uq_curriculum_course_name"),
+        CheckConstraint("credits IS NULL OR credits >= 0", name="ck_curriculum_course_credits"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    code: Mapped[str | None] = mapped_column(String(50))
+    credits: Mapped[float | None] = mapped_column(Float)
+    # 已知开课季节，如 ["fall", "spring"]；空列表表示未知，不当作每学期都开。
+    offered_terms: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CourseRelation(Base):
+    """C004：三类课程关系分开保存。只有 prerequisite 参与拓扑排序。"""
+
+    __tablename__ = "course_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_plan_id",
+            "from_course_id",
+            "to_course_id",
+            "relation_type",
+            name="uq_course_relation",
+        ),
+        CheckConstraint(
+            "relation_type IN ('prerequisite', 'corequisite', 'recommended')",
+            name="ck_course_relation_type",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    # from_course_id 为先修/并修/建议先学的来源课程，to_course_id 为受限课程。
+    # 允许自环，由 C010 在分析时显式报告，而不是在写入时静默丢弃。
+    from_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    to_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    relation_type: Mapped[str] = mapped_column(String(20))
+    condition_text: Mapped[str | None] = mapped_column(String(1000))
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    created_by: Mapped[str] = mapped_column(String(100), default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CourseAlias(Base):
+    """C006：课程简称。只用于名称匹配，不合并课程或教学班。"""
+
+    __tablename__ = "course_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_course_id",
+            "alias",
+            "class_name",
+            "semester_id",
+            name="uq_course_alias",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    curriculum_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    alias: Mapped[str] = mapped_column(String(200))
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    semester_id: Mapped[int | None] = mapped_column(
+        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CourseStudyRecord(Base):
+    """C007：个人修读记录。
+
+    状态未知由“没有记录”表达，不落库成猜测值；成绩与已得学分只保存
+    用户显式填写的值，不按课程学分或其它记录推算。同一课程可在不同学期
+    重复修读，但同一课程、学期与状态只允许一条记录。
+    """
+
+    __tablename__ = "course_study_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_course_id",
+            "semester_id",
+            "status",
+            name="uq_course_study_record",
+            postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint(
+            "status IN ('completed', 'in_progress', 'planned')",
+            name="ck_course_study_record_status",
+        ),
+        CheckConstraint(
+            "credits_earned IS NULL OR credits_earned >= 0",
+            name="ck_course_study_record_credits",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    # 学期可未知；删除学期只清空引用，不删除修读记录。
+    semester_id: Mapped[int | None] = mapped_column(
+        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(20))
+    grade: Mapped[str | None] = mapped_column(String(100))
+    credits_earned: Mapped[float | None] = mapped_column(Float)
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Material(Base):
     """学习资料（D001）。
 
@@ -485,7 +692,10 @@ class ExtractedItem(Base):
 
     __tablename__ = "extracted_items"
     __table_args__ = (
-        CheckConstraint("kind IN ('task', 'event', 'rule')", name="ck_candidate_kind"),
+        CheckConstraint(
+            "kind IN ('task', 'event', 'rule', 'curriculum_course', 'course_relation')",
+            name="ck_candidate_kind",
+        ),
         CheckConstraint(
             "review_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
             name="ck_candidate_review_status",
@@ -503,6 +713,10 @@ class ExtractedItem(Base):
     semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
     class_name: Mapped[str | None] = mapped_column(String(100))
+    # C003：培养方案课程/关系候选的适用方案，避免跨版本混用。
+    curriculum_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
     review_reasons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

@@ -7,6 +7,7 @@
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -16,8 +17,35 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
+from campusflow.api import qa as qa_api
+from campusflow.application import planning
 from campusflow.core.config import Settings
 from campusflow.main import create_app
+
+# 排期用例以 2026-10-19 为基准日期，并假设当天仍可安排晚间时段。
+# 这些用例显式使用固定时钟，避免在当天晚些时候或之后运行时因容量耗尽而失败。
+FIXED_PLANNING_NOW = datetime(2026, 10, 19, 0, 30, tzinfo=UTC)
+
+
+class _FixedDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):  # type: ignore[override]
+        return FIXED_PLANNING_NOW.astimezone(tz) if tz else FIXED_PLANNING_NOW.replace(tzinfo=None)
+
+    @classmethod
+    def today(cls):
+        return cls.now()
+
+    @classmethod
+    def utcnow(cls):
+        return FIXED_PLANNING_NOW.replace(tzinfo=None)
+
+
+@pytest.fixture
+def fixed_planning_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(planning, "datetime", _FixedDateTime)
+    monkeypatch.setattr(qa_api, "datetime", _FixedDateTime)
+
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
@@ -31,6 +59,12 @@ TABLES = ", ".join(
         "workspaces",
         "semesters",
         "courses",
+        "learner_profiles",
+        "course_study_records",
+        "course_aliases",
+        "course_relations",
+        "curriculum_courses",
+        "curriculum_plans",
         "tasks",
         "task_dependencies",
         "reminder_triggers",

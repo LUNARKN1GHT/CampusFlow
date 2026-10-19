@@ -41,6 +41,7 @@ from campusflow.domain.states import (
     TaskProgress,
 )
 from campusflow.infrastructure.candidate_repository import SqlAlchemyCandidateRepository
+from campusflow.infrastructure.course_paths import SqlAlchemyCoursePathRepository
 from campusflow.infrastructure.db.models import (
     AvailabilitySlot,
     Course,
@@ -1977,6 +1978,7 @@ def build_repositories(session: Session) -> Repositories:
         workspaces=SqlAlchemyWorkspaceRepository(session),
         semesters=SqlAlchemySemesterRepository(session),
         courses=SqlAlchemyCourseRepository(session),
+        paths=SqlAlchemyCoursePathRepository(session),
         tasks=SqlAlchemyTaskRepository(session),
         schedule=SqlAlchemyScheduleRepository(session),
         materials=SqlAlchemyMaterialRepository(session),

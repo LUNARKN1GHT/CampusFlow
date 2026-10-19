@@ -155,7 +155,9 @@ def test_duration_increase_replans_once_without_duplicate_minutes(client: TestCl
     assert unchanged["remaining_minutes"] == 120
 
 
-def test_accepted_notification_change_does_not_rewrite_ddl(client: TestClient) -> None:
+def test_accepted_notification_change_does_not_rewrite_ddl(
+    client: TestClient, fixed_planning_clock
+) -> None:
     task = _task(client, "通知变更")
     _availability(client)
     accepted = _accept(client, _generate(client))

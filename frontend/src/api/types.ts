@@ -150,6 +150,118 @@ export type TaskInput = Pick<Task, 'course_id' | 'title' | 'description' | 'due_
 export type FixedEventInput = Omit<FixedEvent, 'id'>
 export type AvailabilitySlotInput = Omit<AvailabilitySlot, 'id'>
 
+export type CurriculumPlan = {
+  id: number
+  title: string
+  major: string
+  grade_year: number
+  version_label: string
+  credit_limit_per_term: number | null
+  source_material_id: number | null
+  source_version_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type LearnerProfile = {
+  workspace_id: number
+  major: string | null
+  grade_year: number | null
+  curriculum_plan_id: number | null
+  missing_fields: string[]
+  current_plan: CurriculumPlan | null
+}
+
+export type SwitchPreview = {
+  current_plan: CurriculumPlan | null
+  target_plan: CurriculumPlan
+  relation_count: number
+  course_count: number
+  study_record_count: number
+  note: string
+}
+
+export type CurriculumCourse = {
+  id: number
+  curriculum_plan_id: number
+  name: string
+  code: string | null
+  credits: number | null
+  offered_terms: Array<'fall' | 'spring' | 'summer' | 'winter'>
+  source_candidate_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export type CourseRelation = {
+  id: number
+  curriculum_plan_id: number
+  from_course_id: number
+  to_course_id: number
+  relation_type: 'prerequisite' | 'corequisite' | 'recommended'
+  condition_text: string | null
+  source_candidate_id: number | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export type CourseAlias = {
+  id: number
+  curriculum_plan_id: number
+  curriculum_course_id: number
+  alias: string
+  class_name: string | null
+  semester_id: number | null
+  created_at: string
+}
+
+export type AliasResolution = {
+  status: 'matched' | 'ambiguous' | 'not_found'
+  matches: CurriculumCourse[]
+  matched_by: 'name' | 'alias' | null
+  note: string
+}
+
+export type StudyStatus = 'completed' | 'in_progress' | 'planned'
+
+export type CourseStudyRecord = {
+  id: number
+  curriculum_plan_id: number
+  curriculum_course_id: number
+  semester_id: number | null
+  semester_name: string | null
+  status: StudyStatus
+  grade: string | null
+  credits_earned: number | null
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CourseStudyStatusEntry = {
+  curriculum_course_id: number
+  course_name: string
+  course_code: string | null
+  status: StudyStatus | 'unknown'
+  record_count: number
+  repeat_record_count: number
+  completed_semester_ids: number[]
+  in_progress_semester_ids: number[]
+  planned_semester_ids: number[]
+  note: string
+}
+
+export type CourseStudyStatusSummary = {
+  plan_id: number
+  courses: CourseStudyStatusEntry[]
+  completed_count: number
+  in_progress_count: number
+  planned_count: number
+  unknown_count: number
+  note: string
+}
+
 export type WorkspaceSettings = {
   workspace_id: number
   timezone: string

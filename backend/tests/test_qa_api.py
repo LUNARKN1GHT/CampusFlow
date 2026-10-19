@@ -255,7 +255,9 @@ def test_intent_protocol_returns_boundaries_and_rejects_tools(client, qa_models)
     assert rejected.json()["failure_kind"] == "invalid_output"
 
 
-def test_planning_and_conflict_intents_execute_without_auto_accepting(client, qa_models):
+def test_planning_and_conflict_intents_execute_without_auto_accepting(
+    client, qa_models, fixed_planning_clock
+):
     semesters, courses = scope_rows(client)
     scope = (semesters[0], courses[0])
     client.post(
