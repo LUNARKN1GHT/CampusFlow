@@ -73,6 +73,8 @@ class TaskCreate(BaseModel):
     priority: TaskPriority = TaskPriority.MEDIUM
     estimated_minutes: int | None = Field(default=None, gt=0)
     remaining_minutes: int | None = Field(default=None, ge=0)
+    # A001：创建子任务时指定父任务；包含关系与依赖关系分开保存
+    parent_task_id: int | None = Field(default=None, ge=1)
 
 
 class TaskUpdate(BaseModel):
@@ -121,9 +123,74 @@ class TaskOut(BaseModel):
     priority: TaskPriority
     estimated_minutes: int | None
     remaining_minutes: int | None
+    parent_task_id: int | None
     overdue: bool
     created_at: datetime
     updated_at: datetime
+
+
+class TaskLinkOut(BaseModel):
+    id: int
+    title: str
+    progress: TaskProgress
+    due_date: date | None
+    parent_task_id: int | None
+
+
+class TaskRollupOut(BaseModel):
+    subtask_count: int
+    estimated_minutes: int
+    remaining_minutes: int
+    missing_duration_count: int
+    progress_counts: dict[str, int]
+    percent_complete: int | None
+
+
+class TaskRelationsOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task_id: int
+    parent: TaskLinkOut | None
+    subtasks: list[TaskLinkOut]
+    prerequisites: list[TaskLinkOut]
+    dependents: list[TaskLinkOut]
+    rollup: TaskRollupOut
+
+
+class SubtaskDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=300)
+    priority: TaskPriority = TaskPriority.MEDIUM
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
+    due_date: date | None = None
+
+
+class SubtaskBatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[SubtaskDraftIn] = Field(min_length=1, max_length=20)
+
+
+class SplitSuggestionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    titles: list[str] | None = Field(default=None, max_length=20)
+
+
+class TaskParentIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    parent_task_id: int | None = Field(default=None, ge=1)
+
+
+class TaskDependencyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    depends_on_task_id: int = Field(ge=1)
+
+
+class TaskDependencyOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    task_id: int
+    depends_on_task_id: int
+    created_at: datetime
 
 
 class TaskProgressChangeOut(BaseModel):

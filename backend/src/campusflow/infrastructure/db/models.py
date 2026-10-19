@@ -164,6 +164,11 @@ class Task(Base):
     source_candidate_id: Mapped[int | None] = mapped_column(
         ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
     )
+    # 包含关系（A001）：子任务指向父任务，与 task_dependencies 的先后依赖分开保存。
+    # 父任务被删除时保留子任务本身，由应用层阻止静默孤立。
+    parent_task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="SET NULL"), index=True
+    )
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(String)
     # 截止时间：due_date 单独一列保持日期精度；due_time 为空表示"当天内完成"，
@@ -196,6 +201,28 @@ class TaskProgressChange(Base):
     previous_remaining_minutes: Mapped[int | None] = mapped_column(Integer)
     new_remaining_minutes: Mapped[int | None] = mapped_column(Integer)
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskDependency(Base):
+    """A001：任务之间的必要先后关系。
+
+    只表达"先完成 depends_on_task_id 才能开始 task_id"，不表示任务包含关系；
+    子任务归属由 tasks.parent_task_id 单独保存，两者不混用。
+    """
+
+    __tablename__ = "task_dependencies"
+    __table_args__ = (
+        UniqueConstraint("task_id", "depends_on_task_id", name="uq_task_dependencies_pair"),
+        CheckConstraint("task_id <> depends_on_task_id", name="ck_task_dependencies_not_self"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id", ondelete="CASCADE"), index=True)
+    depends_on_task_id: Mapped[int] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class FixedEvent(Base):

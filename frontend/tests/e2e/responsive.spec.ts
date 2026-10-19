@@ -19,9 +19,9 @@ test('窄屏下导航完整可见且页面不横向溢出', async ({ page }) => 
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBeTruthy()
 
-  await page.getByRole('link', { name: '学习计划', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '两周学习计划' })).toBeVisible()
-  await expect(page.getByRole('button', { name: '生成未来两周草案' })).toBeVisible()
+  await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()
+  await expect(page.getByRole('heading', { name: '学习计划' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '生成草案' })).toBeVisible()
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBeTruthy()

@@ -1,7 +1,7 @@
 """M5 计划草案 HTTP 路由（P013）。"""
 
-from datetime import UTC, date, datetime, timedelta
-from typing import Annotated
+from datetime import UTC, date, datetime
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
@@ -15,7 +15,8 @@ from campusflow.application.ports.repositories import (
     WorkspaceData,
 )
 from campusflow.application.settings import get_settings
-from campusflow.domain.planning import AssumptionOptions
+from campusflow.domain.errors import DomainError
+from campusflow.domain.planning import AssumptionOptions, resolve_planning_range
 
 router = APIRouter(tags=["plans"])
 
@@ -44,6 +45,7 @@ class PlanAssumptionsIn(BaseModel):
 class PlanDraftCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     semester_id: int | None = Field(default=None, ge=1)
+    range_type: Literal["today", "this_week", "two_weeks", "custom"] | None = None
     start_date: date | None = None
     end_date: date | None = None
     assumptions: PlanAssumptionsIn = Field(default_factory=PlanAssumptionsIn)
@@ -59,6 +61,22 @@ class PlanBlockMoveIn(BaseModel):
     starts_at: datetime
     ends_at: datetime
     expected_version: int = Field(ge=1)
+
+
+class PlanRescheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    semester_id: int | None = Field(default=None, ge=1)
+    start_date: date | None = None
+    end_date: date | None = None
+    task_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AdjustmentDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    semester_id: int | None = Field(default=None, ge=1)
+    task_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class PlanBlockLockIn(BaseModel):
@@ -127,9 +145,16 @@ class PlanDraftOut(BaseModel):
 def _default_range(workspace: WorkspaceData, repos: Repositories, payload: PlanDraftCreate):
     settings = get_settings(repos, workspace.id)
     today = datetime.now(UTC).astimezone(ZoneInfo(settings.timezone)).date()
-    start = payload.start_date or today
-    end = payload.end_date or (start + timedelta(days=13))
-    return start, end
+    kind = payload.range_type
+    if kind is None:
+        kind = (
+            "custom"
+            if payload.start_date is not None or payload.end_date is not None
+            else "two_weeks"
+        )
+    if kind != "custom" and (payload.start_date is not None or payload.end_date is not None):
+        raise DomainError("预设规划区间不接受自定义起止日期；如需指定日期请使用 custom")
+    return resolve_planning_range(kind, today, start=payload.start_date, end=payload.end_date)
 
 
 @router.post("/plans/drafts", response_model=PlanDraftOut, status_code=201)
@@ -144,6 +169,43 @@ def create_plan_draft(
         range_start=start,
         range_end=end,
         options=payload.assumptions.to_options(),
+    )
+    return PlanDraftOut.from_data(draft)
+
+
+@router.post("/plans/reschedule", response_model=PlanDraftOut, status_code=201)
+def reschedule_plan(
+    payload: PlanRescheduleIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.reschedule_plan(
+        repos,
+        workspace.id,
+        semester_id=payload.semester_id,
+        range_start=payload.start_date,
+        range_end=payload.end_date,
+        task_ids=payload.task_ids,
+    )
+    return PlanDraftOut.from_data(draft)
+
+
+@router.get("/plans/adjustments", response_model=dict)
+def get_plan_adjustments(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict:
+    return use_cases.adjustment_suggestions(repos, workspace.id, semester_id=semester_id)
+
+
+@router.post("/plans/adjustments/draft", response_model=PlanDraftOut, status_code=201)
+def create_plan_adjustment_draft(
+    payload: AdjustmentDraftIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.create_adjustment_draft(
+        repos,
+        workspace.id,
+        semester_id=payload.semester_id,
+        task_ids=payload.task_ids,
     )
     return PlanDraftOut.from_data(draft)
 

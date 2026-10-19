@@ -17,11 +17,14 @@ from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
     AssumptionOptions,
     AvailabilityRule,
+    BlockSuggestion,
     ExcludedTask,
     FixedEventOccurrence,
+    PlanningDependency,
     PlanningInput,
     PlanningTask,
     PlanOutcome,
+    PreservedBlock,
     allocate_tasks,
     build_outcome,
     detect_overlaps,
@@ -73,6 +76,7 @@ def collect_inputs(
     range_end: date,
     now: datetime | None = None,
     segment_minutes: int = 90,
+    preserved_blocks: tuple[PreservedBlock, ...] = (),
 ) -> CollectedPlanInput:
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
@@ -83,11 +87,32 @@ def collect_inputs(
     raw_tasks: list[dict] = []
     tasks: list[PlanningTask] = []
     excluded: list[ExcludedTask] = []
-    for task in repos.tasks.list(workspace_id, semester_id=semester_id):
+    preserved_minutes: dict[int, int] = {}
+    for block in preserved_blocks:
+        if block.task_id is not None:
+            preserved_minutes[block.task_id] = (
+                preserved_minutes.get(block.task_id, 0) + block.minutes
+            )
+    scoped_tasks = repos.tasks.list(workspace_id, semester_id=semester_id)
+    container_ids = {
+        task.parent_task_id for task in scoped_tasks if task.parent_task_id is not None
+    }
+    for task in scoped_tasks:
         progress = TaskProgress(task.progress)
         if progress not in PLANNABLE_PROGRESS:
             excluded.append(
                 ExcludedTask(task_id=task.id, title=task.title, progress=progress.value)
+            )
+            continue
+        if task.id in container_ids:
+            # A004：父任务只做汇总容器，子任务各自排期，避免父子耗时重复计入
+            excluded.append(
+                ExcludedTask(
+                    task_id=task.id,
+                    title=task.title,
+                    progress=progress.value,
+                    reason="container",
+                )
             )
             continue
         due_at, date_only = _due_at(task, timezone)
@@ -103,6 +128,7 @@ def collect_inputs(
                 due_date_only=date_only,
                 target_date=task.target_date,
                 estimated=estimated,
+                locked_minutes=preserved_minutes.get(task.id, 0),
             )
         )
         raw_tasks.append(
@@ -117,8 +143,38 @@ def collect_inputs(
                 "due_date": task.due_date.isoformat() if task.due_date else None,
                 "due_time": task.due_time.isoformat() if task.due_time else None,
                 "target_date": task.target_date.isoformat() if task.target_date else None,
+                "parent_task_id": task.parent_task_id,
                 "updated_at": task.updated_at.isoformat(),
             }
+        )
+
+    scope_ids = {task.id for task in repos.tasks.list(workspace_id, semester_id=semester_id)}
+    all_tasks = {task.id: task for task in repos.tasks.list(workspace_id)}
+    dependencies: list[PlanningDependency] = []
+    for link in repos.tasks.list_workspace_dependencies(workspace_id):
+        if link.task_id not in scope_ids:
+            continue
+        prerequisite = all_tasks.get(link.depends_on_task_id)
+        if prerequisite is None:
+            state = "missing"
+            title = f"任务 {link.depends_on_task_id}"
+        else:
+            title = prerequisite.title
+            if prerequisite.progress == TaskProgress.DONE:
+                state = "done"
+            elif prerequisite.progress == TaskProgress.CANCELLED:
+                state = "cancelled"
+            elif prerequisite.id not in scope_ids:
+                state = "out_of_scope"
+            else:
+                state = "planned"
+        dependencies.append(
+            PlanningDependency(
+                task_id=link.task_id,
+                depends_on_task_id=link.depends_on_task_id,
+                prerequisite_title=title,
+                state=state,
+            )
         )
 
     events = schedule_use_cases.list_fixed_event_occurrences(
@@ -155,6 +211,8 @@ def collect_inputs(
         break_minutes=settings.break_minutes,
         buffer_minutes=settings.buffer_minutes,
         segment_minutes=segment_minutes,
+        dependencies=tuple(dependencies),
+        preserved_blocks=preserved_blocks,
     )
     snapshot = input_snapshot(inputs, raw_tasks)
     return CollectedPlanInput(
@@ -240,8 +298,13 @@ def generate_draft(
     range_end: date,
     options: AssumptionOptions | None = None,
     now: datetime | None = None,
+    preserved_blocks: tuple[PreservedBlock, ...] = (),
+    change: str = "generated",
 ):
-    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。"""
+    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。
+
+    A005：preserved_blocks 原样带入新草案并占用可用时间，对应任务只排剩余分钟。
+    """
     if range_end < range_start:
         raise DomainError("规划结束日期不得早于开始日期")
     collected = collect_inputs(
@@ -252,12 +315,39 @@ def generate_draft(
         range_end=range_end,
         now=now,
         segment_minutes=(options.segment_minutes if options and options.segment_minutes else 90),
+        preserved_blocks=preserved_blocks,
     )
     resolved = resolve_assumptions(collected.inputs, options or AssumptionOptions())
     allocation = allocate_tasks(collected.inputs, resolved)
     outcome: PlanOutcome = build_outcome(collected.inputs, resolved, allocation)
-    conflicts = detect_overlaps(collected.inputs, outcome.blocks)
-    conflicts.extend(detect_risks(collected.inputs, resolved, outcome))
+    preserved_blocks_suggestions = tuple(
+        BlockSuggestion(
+            task_id=block.task_id,
+            title=block.title,
+            starts_at=block.start,
+            ends_at=block.end,
+            minutes=block.minutes,
+            seq=block.seq,
+            reason=("保留已锁定安排" if block.locked else "保留不在本次重排范围的安排"),
+            constraint_source=(
+                {
+                    "kind": "preserved",
+                    "value": block.block_id,
+                    "text": "重排时原样保留的时间块",
+                },
+            ),
+            locked=block.locked,
+        )
+        for block in preserved_blocks
+    )
+    all_blocks = tuple(
+        sorted(
+            (*preserved_blocks_suggestions, *outcome.blocks),
+            key=lambda block: (block.starts_at, block.seq),
+        )
+    )
+    conflicts = detect_overlaps(collected.inputs, all_blocks)
+    conflicts.extend(detect_risks(collected.inputs, resolved, outcome, all_blocks))
     unscheduled = [
         _disposition_dict(item) for item in outcome.dispositions if item.status != "scheduled"
     ] + [_excluded_dict(item) for item in outcome.excluded]
@@ -275,11 +365,11 @@ def generate_draft(
         conflicts=conflicts,
         coverage=outcome.coverage,
     )
-    blocks = repos.plans.create_blocks(draft.id, [_block_dict(block) for block in outcome.blocks])
+    blocks = repos.plans.create_blocks(draft.id, [_block_dict(block) for block in all_blocks])
     repos.plans.add_version(
         draft.id,
         version_no=draft.version,
-        change="generated",
+        change=change,
         snapshot=_draft_snapshot(draft, blocks),
     )
     repos.uow.commit()
@@ -296,6 +386,21 @@ def get_draft(repos: Repositories, workspace_id: int, draft_id: int):
     if draft is None or draft.workspace_id != workspace_id:
         raise NotFoundError("计划草案不存在")
     return draft
+
+
+def _preserved_blocks_from_snapshot(snapshot: dict) -> tuple[PreservedBlock, ...]:
+    return tuple(
+        PreservedBlock(
+            block_id=int(item["block_id"]),
+            task_id=item.get("task_id"),
+            title=str(item["title"]),
+            start=datetime.fromisoformat(item["starts_at"]),
+            end=datetime.fromisoformat(item["ends_at"]),
+            minutes=int(item["minutes"]),
+            locked=bool(item.get("locked", False)),
+        )
+        for item in snapshot.get("preserved_blocks", [])
+    )
 
 
 def accept_draft(
@@ -319,6 +424,7 @@ def accept_draft(
         range_end=draft.range_end,
         now=now or datetime.now(UTC),
         segment_minutes=segment_minutes,
+        preserved_blocks=_preserved_blocks_from_snapshot(draft.input_snapshot),
     )
     if collected.fingerprint != draft.input_fingerprint:
         raise ConflictError("排期输入已变化，请重新生成草案后再接受")
@@ -351,6 +457,279 @@ def accept_draft(
 
 def current_plan(repos: Repositories, workspace_id: int, *, semester_id: int | None = None):
     return repos.plans.get_current(workspace_id, semester_id=semester_id)
+
+
+def reschedule_plan(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None = None,
+    range_start: date | None = None,
+    range_end: date | None = None,
+    task_ids: list[int] | None = None,
+    now: datetime | None = None,
+):
+    """基于当前已接受计划做局部重排（A005）。
+
+    锁定时间块始终原样保留；指定 task_ids 时，范围外任务的现有时间块也保留。
+    其余任务在剩余可用时间内重新安排，结果仍是待接受草案。
+    """
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    else:
+        semester_id = None
+    current = current_plan(repos, workspace_id, semester_id=semester_id)
+    if current is None:
+        raise NotFoundError("当前没有已接受的计划，无法局部重排")
+    effective_start = range_start or current.range_start
+    effective_end = range_end or current.range_end
+    if effective_end < effective_start:
+        raise DomainError("规划结束日期不得早于开始日期")
+    timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
+    scope: set[int] | None = None
+    if task_ids is not None:
+        scope = set(task_ids)
+        if not scope:
+            raise DomainError("局部重排至少需要指定一个任务")
+        for task_id in scope:
+            task = repos.tasks.get(task_id)
+            if task is None or task.workspace_id != workspace_id:
+                raise NotFoundError("任务不存在")
+
+    preserved: list[PreservedBlock] = []
+    for block in current.blocks:
+        block_start = block.starts_at.astimezone(timezone).date()
+        block_end = block.ends_at.astimezone(timezone).date()
+        outside_range = block_start < effective_start or block_end > effective_end
+        keep = (
+            block.locked
+            or outside_range
+            or (scope is not None and (block.task_id is None or block.task_id not in scope))
+        )
+        if keep:
+            preserved.append(
+                PreservedBlock(
+                    block_id=block.id,
+                    task_id=block.task_id,
+                    title=block.title,
+                    start=block.starts_at,
+                    end=block.ends_at,
+                    minutes=block.minutes,
+                    locked=block.locked,
+                )
+            )
+
+    return generate_draft(
+        repos,
+        workspace_id,
+        semester_id=semester_id,
+        range_start=effective_start,
+        range_end=effective_end,
+        now=now,
+        preserved_blocks=tuple(preserved),
+        change="rescheduled",
+    )
+
+
+_TASK_FIELDS = {
+    "title": "标题变化",
+    "due_date": "截止日期变化",
+    "due_time": "截止时刻变化",
+    "remaining_minutes": "剩余耗时变化",
+    "estimated_minutes": "预计耗时变化",
+    "priority": "优先级变化",
+    "progress": "执行进度变化",
+    "parent_task_id": "子任务归属变化",
+    "target_date": "个人目标日期变化",
+    "course_id": "课程归属变化",
+}
+
+
+def _snapshot_diff(old: dict, new: dict) -> tuple[list[dict], set[int], bool]:
+    suggestions: list[dict] = []
+    affected: set[int] = set()
+    all_tasks = False
+
+    old_tasks = {item["id"]: item for item in old.get("tasks", [])}
+    new_tasks = {item["id"]: item for item in new.get("tasks", [])}
+    for task_id in sorted(set(old_tasks) | set(new_tasks)):
+        before = old_tasks.get(task_id)
+        after = new_tasks.get(task_id)
+        if before is None or after is None:
+            affected.add(task_id)
+            title = (after or before or {}).get("title", f"任务 {task_id}")
+            suggestions.append(
+                {
+                    "code": "task_added" if before is None else "task_removed",
+                    "task_id": task_id,
+                    "message": (
+                        f"新增任务《{title}》，需要排入"
+                        if before is None
+                        else f"任务《{title}》已不在当前排期范围"
+                    ),
+                }
+            )
+            continue
+        changed = [name for name in _TASK_FIELDS if before.get(name) != after.get(name)]
+        if not changed:
+            continue
+        affected.add(task_id)
+        for name in changed:
+            suggestions.append(
+                {
+                    "code": f"task_{name}_changed",
+                    "task_id": task_id,
+                    "field": name,
+                    "message": (
+                        f"任务《{after.get('title', task_id)}》{_TASK_FIELDS[name]}，"
+                        "建议检查对应时间块"
+                    ),
+                }
+            )
+
+    if old.get("availability") != new.get("availability"):
+        all_tasks = True
+        suggestions.append(
+            {
+                "code": "availability_changed",
+                "message": "可用时间变化，建议重新检查全部任务的时间块",
+            }
+        )
+    if old.get("settings") != new.get("settings"):
+        all_tasks = True
+        suggestions.append(
+            {
+                "code": "settings_changed",
+                "message": "每日/每周容量或休息偏好变化，建议重新检查负荷",
+            }
+        )
+    if old.get("fixed_events") != new.get("fixed_events"):
+        all_tasks = True
+        suggestions.append(
+            {
+                "code": "fixed_events_changed",
+                "message": "固定日程变化，建议重新检查时间冲突",
+            }
+        )
+    if old.get("dependencies") != new.get("dependencies"):
+        for item in new.get("dependencies", []):
+            affected.add(item["task_id"])
+        suggestions.append(
+            {
+                "code": "dependencies_changed",
+                "message": "任务依赖变化，建议检查后续任务的开始时间",
+            }
+        )
+    old_excluded = {item["id"]: item for item in old.get("excluded_tasks", [])}
+    new_excluded = {item["id"]: item for item in new.get("excluded_tasks", [])}
+    for task_id in sorted(set(old_excluded) | set(new_excluded)):
+        if old_excluded.get(task_id) == new_excluded.get(task_id):
+            continue
+        affected.add(task_id)
+        title = (new_excluded.get(task_id) or old_excluded.get(task_id) or {}).get(
+            "title", f"任务 {task_id}"
+        )
+        suggestions.append(
+            {
+                "code": "excluded_state_changed",
+                "task_id": task_id,
+                "message": f"任务《{title}》是否参与排期发生变化",
+            }
+        )
+    return suggestions, affected, all_tasks
+
+
+def adjustment_suggestions(
+    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
+) -> dict:
+    """比较当前输入与已接受计划，只提出调整建议（A006）；不生成草案、不改计划。"""
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    current = current_plan(repos, workspace_id, semester_id=semester_id)
+    if current is None:
+        return {
+            "has_plan": False,
+            "has_changes": False,
+            "auto_applied": False,
+            "requires_confirmation": True,
+            "current_plan_id": None,
+            "current_plan_version": None,
+            "affected_task_ids": [],
+            "affected_all_tasks": False,
+            "suggested_task_ids": [],
+            "suggestions": [],
+            "message": "当前没有已接受的计划，无法比较变化",
+        }
+
+    snapshot = current.input_snapshot
+    segment_minutes = int(snapshot.get("settings", {}).get("segment_minutes", 90))
+    collected = collect_inputs(
+        repos,
+        workspace_id,
+        semester_id=semester_id,
+        range_start=current.range_start,
+        range_end=current.range_end,
+        now=datetime.now(UTC),
+        segment_minutes=segment_minutes,
+        preserved_blocks=_preserved_blocks_from_snapshot(snapshot),
+    )
+    has_changes = collected.fingerprint != current.input_fingerprint
+    suggestions, affected, all_tasks = _snapshot_diff(snapshot, collected.snapshot)
+    if has_changes and not suggestions:
+        suggestions.append(
+            {
+                "code": "input_changed",
+                "message": "排期输入已变化，建议生成调整草案后核对",
+            }
+        )
+    elif not has_changes:
+        suggestions = []
+        affected.clear()
+        all_tasks = False
+    suggested = [] if all_tasks else sorted(affected)
+    return {
+        "has_plan": True,
+        "has_changes": has_changes,
+        "auto_applied": False,
+        "requires_confirmation": True,
+        "current_plan_id": current.id,
+        "current_plan_version": current.version,
+        "affected_task_ids": sorted(affected),
+        "affected_all_tasks": all_tasks,
+        "suggested_task_ids": suggested,
+        "suggestions": suggestions,
+        "message": (
+            "检测到排期输入变化；是否生成局部草案由你决定，当前计划尚未修改"
+            if has_changes
+            else "当前输入与已接受计划一致，无需调整"
+        ),
+    }
+
+
+def create_adjustment_draft(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None = None,
+    task_ids: list[int] | None = None,
+    now: datetime | None = None,
+):
+    """用户显式确认后才生成调整草案（A006）；仍不影响当前计划直到接受。"""
+    summary = adjustment_suggestions(repos, workspace_id, semester_id=semester_id)
+    if not summary["has_plan"]:
+        raise NotFoundError("当前没有已接受的计划，无法生成调整草案")
+    if not summary["has_changes"]:
+        raise ConflictError("当前输入与已接受计划一致，无需生成调整草案")
+    scope = task_ids
+    if scope is None:
+        scope = None if summary["affected_all_tasks"] else (summary["suggested_task_ids"] or None)
+    return reschedule_plan(
+        repos,
+        workspace_id,
+        semester_id=semester_id,
+        task_ids=scope,
+        now=now,
+    )
 
 
 def draft_conflicts(repos: Repositories, workspace_id: int, draft_id: int) -> list[dict]:

@@ -4,7 +4,19 @@ import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import type { Course, DueSourceType, Semester, Task, TaskInput, TaskPriority, TaskProgress, TaskProgressChange } from '../api/types'
+import type {
+  Course,
+  DependencyCheck,
+  DueSourceType,
+  Semester,
+  SplitSuggestion,
+  Task,
+  TaskInput,
+  TaskPriority,
+  TaskProgress,
+  TaskProgressChange,
+  TaskRelations,
+} from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 
@@ -23,6 +35,16 @@ const history = ref<TaskProgressChange[]>([])
 const progressSaving = ref(false)
 const progressError = ref('')
 const progressForm = reactive({ progress: 'in_progress' as TaskProgress, reason: '' })
+const selectedTask = ref<Task | null>(null)
+const relations = ref<TaskRelations | null>(null)
+const relationsLoading = ref(false)
+const relationsError = ref('')
+const dependencyCheck = ref<DependencyCheck | null>(null)
+const dependencyInput = ref('')
+const splitSuggestion = ref<SplitSuggestion | null>(null)
+const subtaskRows = ref<Array<{ title: string; remaining_minutes: number | null }>>([])
+const subtaskError = ref('')
+const subtaskSaving = ref(false)
 const filters = reactive({ semesterId: '', courseId: '', progress: '' })
 const form = reactive({
   title: '', description: '', course_id: '', due_date: '', due_time: '',
@@ -71,6 +93,11 @@ async function load() {
     ;[tasks.value, courses.value, semesters.value] = await Promise.all([
       tasksApi.list(), coursesApi.list(), semestersApi.list(true),
     ])
+    try {
+      dependencyCheck.value = await tasksApi.dependencyCheck()
+    } catch {
+      dependencyCheck.value = null
+    }
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -168,6 +195,110 @@ function formatChangedAt(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
+async function refreshDependencyCheck() {
+  try {
+    dependencyCheck.value = await tasksApi.dependencyCheck()
+  } catch {
+    dependencyCheck.value = null
+  }
+}
+
+async function openRelations(task: Task) {
+  selectedTask.value = task
+  relations.value = null
+  relationsError.value = ''
+  dependencyInput.value = ''
+  splitSuggestion.value = null
+  subtaskRows.value = []
+  subtaskError.value = ''
+  relationsLoading.value = true
+  try {
+    relations.value = await tasksApi.relations(task.id)
+  } catch (caught) {
+    relationsError.value = errorMessage(caught)
+  } finally {
+    relationsLoading.value = false
+  }
+}
+
+async function addDependency() {
+  const task = selectedTask.value
+  if (!task) return
+  const dependsOn = queryNumber(dependencyInput.value)
+  if (dependsOn === null) {
+    relationsError.value = '请输入有效的任务编号'
+    return
+  }
+  relationsError.value = ''
+  try {
+    await tasksApi.addDependency(task.id, dependsOn)
+    dependencyInput.value = ''
+    await openRelations(task)
+    await refreshDependencyCheck()
+  } catch (caught) {
+    relationsError.value = errorMessage(caught)
+  }
+}
+
+async function removeDependency(dependsOn: number) {
+  const task = selectedTask.value
+  if (!task) return
+  relationsError.value = ''
+  try {
+    await tasksApi.removeDependency(task.id, dependsOn)
+    await openRelations(task)
+    await refreshDependencyCheck()
+  } catch (caught) {
+    relationsError.value = errorMessage(caught)
+  }
+}
+
+async function loadSplitSuggestion() {
+  if (!selectedTask.value) return
+  subtaskError.value = ''
+  try {
+    splitSuggestion.value = await tasksApi.splitSuggestions(selectedTask.value.id)
+    subtaskRows.value = splitSuggestion.value.items.map((item) => ({
+      title: item.title,
+      remaining_minutes: item.remaining_minutes,
+    }))
+  } catch (caught) {
+    subtaskError.value = errorMessage(caught)
+  }
+}
+
+function addSubtaskRow() {
+  subtaskRows.value.push({ title: '', remaining_minutes: null })
+}
+
+async function saveSubtasks() {
+  const task = selectedTask.value
+  if (!task) return
+  const items = subtaskRows.value.filter((row) => row.title.trim())
+  if (!items.length) {
+    subtaskError.value = '至少需要一项子任务标题'
+    return
+  }
+  subtaskSaving.value = true
+  subtaskError.value = ''
+  try {
+    await tasksApi.createSubtasks(task.id, items)
+    subtaskRows.value = []
+    splitSuggestion.value = null
+    await load()
+    await openRelations(task)
+  } catch (caught) {
+    subtaskError.value = errorMessage(caught)
+  } finally {
+    subtaskSaving.value = false
+  }
+}
+
+function editSubtask(id: number) {
+  const task = tasks.value.find((item) => item.id === id)
+  if (task) openEditor(task)
+}
+
 onMounted(load)
 </script>
 
@@ -187,6 +318,22 @@ onMounted(load)
         <span class="count-badge">{{ visibleTasks.length }} 项</span>
       </section>
 
+      <section v-if="dependencyCheck" class="panel" aria-label="依赖检查">
+        <div class="section-heading">
+          <div><p class="eyebrow">依赖检查</p><h2>任务先后关系</h2></div>
+          <span class="count-badge">{{ dependencyCheck.valid ? '可执行' : '存在阻塞' }}</span>
+        </div>
+        <p v-if="dependencyCheck.valid" class="form-help">未发现成环、范围外前置或已取消前置。</p>
+        <template v-else>
+          <ul class="plain-list">
+            <li v-for="cycle in dependencyCheck.cycles" :key="`cycle-${cycle.task_ids.join('-')}`">{{ cycle.message }}</li>
+            <li v-for="item in dependencyCheck.missing_prerequisites" :key="`missing-${item.task_id}-${item.code}`">{{ item.title }}：{{ item.message }}</li>
+            <li v-for="item in dependencyCheck.cancelled_prerequisites" :key="`cancelled-${item.task_id}`">{{ item.title }}：{{ item.message }}</li>
+          </ul>
+          <p class="form-help">阻塞任务：{{ dependencyCheck.blocked_tasks.map((item) => item.title).join('、') || '无' }}。依赖不可满足时排期会把后续任务列为未排入。</p>
+        </template>
+      </section>
+
       <section class="panel">
         <p v-if="loading" class="muted">正在加载任务…</p>
         <div v-else-if="visibleTasks.length" class="task-list">
@@ -200,7 +347,7 @@ onMounted(load)
               <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>
             </div>
             <div class="task-meta"><span>优先级 {{ priorityLabels[task.priority] }}</span><strong>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong></div>
-            <div class="task-actions"><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
+            <div class="task-actions"><button type="button" class="button-secondary" @click="openRelations(task)">依赖与子任务</button><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
           </article>
         </div>
         <div v-else class="compact-empty">{{ tasks.length ? '没有符合当前筛选的任务。' : '还没有任务，先添加第一项。' }}</div>
@@ -241,6 +388,71 @@ onMounted(load)
           </div>
         </div>
       </section>
+      <section v-if="selectedTask" class="panel editor-panel" aria-label="依赖与子任务">
+        <div class="section-heading">
+          <div><p class="eyebrow">依赖与子任务</p><h2>{{ selectedTask.title }}</h2></div>
+          <button type="button" class="text-button" @click="selectedTask = null">关闭</button>
+        </div>
+        <ApiFeedback v-if="relationsError" :message="relationsError" title="关系操作未完成" />
+        <p v-if="relationsLoading" class="muted">正在读取关系…</p>
+        <template v-else-if="relations">
+          <p class="form-help">
+            子任务 {{ relations.rollup.subtask_count }} 项 · 预计 {{ relations.rollup.estimated_minutes }} 分钟 ·
+            剩余 {{ relations.rollup.remaining_minutes }} 分钟 ·
+            完成度 {{ relations.rollup.percent_complete === null ? '—' : `${relations.rollup.percent_complete}%` }}。
+            父任务只做汇总，排期只安排子任务，不会重复计入耗时。
+          </p>
+          <div class="form-grid">
+            <div>
+              <h3 class="subheading">前置任务</h3>
+              <ul v-if="relations.prerequisites.length" class="plain-list">
+                <li v-for="item in relations.prerequisites" :key="item.id">
+                  {{ item.title }}
+                  <button type="button" class="text-button" @click="removeDependency(item.id)">删除依赖</button>
+                </li>
+              </ul>
+              <p v-else class="muted">没有前置任务。</p>
+              <div class="page-actions">
+                <input v-model="dependencyInput" type="number" min="1" placeholder="前置任务编号" aria-label="前置任务编号" />
+                <button type="button" class="button-secondary" @click="addDependency">添加依赖</button>
+              </div>
+              <p v-if="relations.dependents.length" class="form-help">
+                后续任务：{{ relations.dependents.map((item) => item.title).join('、') }}
+              </p>
+            </div>
+            <div>
+              <h3 class="subheading">子任务</h3>
+              <ul v-if="relations.subtasks.length" class="plain-list">
+                <li v-for="item in relations.subtasks" :key="item.id">
+                  {{ item.title }} · {{ item.progress }}
+                  <button type="button" class="text-button" @click="editSubtask(item.id)">编辑</button>
+                </li>
+              </ul>
+              <p v-else class="muted">还没有子任务。</p>
+            </div>
+          </div>
+
+          <div class="section-heading">
+            <div><p class="eyebrow">拆分建议</p><h3 class="subheading">系统拆分只是可编辑建议</h3></div>
+            <div class="page-actions">
+              <button type="button" class="button-secondary" @click="loadSplitSuggestion">生成拆分建议</button>
+              <button type="button" class="text-button" @click="addSubtaskRow">手动添加一行</button>
+            </div>
+          </div>
+          <p v-if="splitSuggestion" class="inline-notice">{{ splitSuggestion.note }}</p>
+          <div v-if="subtaskRows.length" class="stack-form">
+            <div v-for="(row, index) in subtaskRows" :key="index" class="form-grid">
+              <label>子任务标题<input v-model.trim="row.title" maxlength="300" /></label>
+              <label>剩余分钟<input v-model.number="row.remaining_minutes" type="number" min="0" /></label>
+            </div>
+            <p v-if="subtaskError" class="form-error" role="alert">{{ subtaskError }}</p>
+            <button type="button" :disabled="subtaskSaving" @click="saveSubtasks">
+              {{ subtaskSaving ? '创建中…' : '按以上内容创建子任务' }}
+            </button>
+          </div>
+        </template>
+      </section>
+
       <FixedSchedule />
     </template>
   </main>
