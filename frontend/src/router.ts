@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import AppShell from './components/AppShell.vue'
 import { useAuth } from './composables/useAuth'
+import CalendarView from './views/CalendarView.vue'
 import CoursePathsView from './views/CoursePathsView.vue'
 import CoursesView from './views/CoursesView.vue'
 import ExportView from './views/ExportView.vue'
@@ -72,6 +73,11 @@ const router = createRouter({
           path: 'export',
           name: 'export',
           component: ExportView,
+        },
+        {
+          path: 'calendar',
+          name: 'calendar',
+          component: CalendarView,
         },
         {
           path: 'settings',

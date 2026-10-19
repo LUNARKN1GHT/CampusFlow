@@ -1251,12 +1251,20 @@ def _selected_items(draft: CalendarDraftData) -> list[CalendarDraftItemData]:
 def _payload_from_item(
     item: CalendarDraftItemData, *, operation_key_value: str
 ) -> CalendarEventPayload:
+    starts_at = item.starts_at
+    ends_at = item.ends_at
+    if item.date_only:
+        # 数据库可能以 UTC 回显时间点；仅日期事件必须按目标时区还原日期，
+        # 否则在东八区凌晨会在 UTC 时区显示为前一天。
+        zone = _zone(item.timezone)
+        starts_at = _in_zone(starts_at, zone)
+        ends_at = _in_zone(ends_at, zone)
     return CalendarEventPayload(
         title=item.title,
         timezone=item.timezone,
         date_only=item.date_only,
-        starts_at=item.starts_at,
-        ends_at=item.ends_at,
+        starts_at=starts_at,
+        ends_at=ends_at,
         location=item.location,
         operation_key=operation_key_value,
     )
@@ -1325,6 +1333,12 @@ def _zone(timezone: str) -> ZoneInfo:
         return ZoneInfo(timezone)
     except ZoneInfoNotFoundError:
         return ZoneInfo("UTC")
+
+
+def _in_zone(value: datetime, zone: ZoneInfo) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=zone)
+    return value.astimezone(zone)
 
 
 def _as_utc(value: datetime) -> datetime:
