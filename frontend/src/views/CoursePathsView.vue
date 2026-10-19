@@ -1394,7 +1394,6 @@ onMounted(async () => {
               <ul>
                 <li v-for="courseId in term.course_ids" :key="courseId">{{ courseName(courseId) }}</li>
               </ul>
-              <p v-if="term.credits_unknown" class="form-help">{{ term.credits_unknown }} 门课程学分未知，未计入上限判断。</p>
               <ul v-if="term.warnings.length" class="condition-list">
                 <li v-for="(warning, index) in term.warnings" :key="`term-warning-${index}`">{{ warning }}</li>
               </ul>
