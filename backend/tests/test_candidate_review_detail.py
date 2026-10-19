@@ -139,6 +139,7 @@ def test_detail_returns_scope_source_and_per_field_origins(source):
         "class_name": "2 班",
         "course_name": "数据库",
         "semester_name": "秋季",
+        "curriculum_plan_id": None,
     }
     assert body["source"] == {
         "material_id": material["id"],
@@ -314,6 +315,7 @@ def test_ignore_transition_updates_status_and_allowed_transitions(source):
         "class_name": None,
         "course_name": None,
         "semester_name": None,
+        "curriculum_plan_id": None,
     }
     assert body["review_status"] == "ignored"
     assert body["allowed_transitions"] == ["pending"]

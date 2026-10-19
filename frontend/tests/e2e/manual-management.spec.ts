@@ -24,7 +24,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByLabel('密码').press('Enter')
   await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
 
-  await page.getByRole('link', { name: '课程' }).click()
+  await page.getByRole('link', { name: '课程', exact: true }).click()
   await expect(page.getByText('没有进行中的学期')).toBeVisible()
   await page.getByLabel('学期名称').fill(semesterName)
   await page.getByLabel('开始日期').fill(dateKey(new Date(today.getFullYear(), 8, 1)))
@@ -99,7 +99,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   expect(new Date(savedEvent!.starts_at).toISOString()).toBe(`${eventDate}T02:00:00.000Z`)
 
   await page.route('**/api/v1/semesters?**', (route) => route.fulfill({ status: 500, body: '{}' }))
-  await page.getByRole('link', { name: '课程' }).click()
+  await page.getByRole('link', { name: '课程', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('服务暂时不可用')
   await page.unroute('**/api/v1/semesters?**')
   await page.getByRole('button', { name: '重新加载' }).click()
@@ -116,7 +116,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByRole('link', { name: '任务', exact: true }).click()
   await page.locator('.filter-bar').getByRole('combobox').first().selectOption({ label: `${semesterName}（已归档）` })
   await expect(page.locator('.task-row').filter({ hasText: taskName }).getByText('受阻')).toBeVisible()
-  await page.getByRole('link', { name: '课程' }).click()
+  await page.getByRole('link', { name: '课程', exact: true }).click()
   await page.getByLabel('显示历史学期').check()
   await page.getByRole('button', { name: '恢复', exact: true }).click()
   await page.getByRole('button', { name: new RegExp(semesterName) }).click()

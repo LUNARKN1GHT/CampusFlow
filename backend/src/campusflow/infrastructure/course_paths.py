@@ -220,9 +220,7 @@ class SqlAlchemyCoursePathRepository:
 
     def get_course_by_source_candidate(self, candidate_id: int) -> CurriculumCourseData | None:
         row = self._session.scalar(
-            select(CurriculumCourse).where(
-                CurriculumCourse.source_candidate_id == candidate_id
-            )
+            select(CurriculumCourse).where(CurriculumCourse.source_candidate_id == candidate_id)
         )
         return None if row is None else _course_to_data(row)
 

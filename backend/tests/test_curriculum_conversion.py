@@ -20,9 +20,7 @@ TEXT = "数据库原理与程序设计课程；学习数据库系统前须先修
 @pytest.fixture
 def source(client, monkeypatch, tmp_path):
     monkeypatch.setattr(client.app.state, "file_storage", LocalFileStorage(tmp_path))
-    response = client.post(
-        "/api/v1/materials/text", json={"title": "培养方案", "content": TEXT}
-    )
+    response = client.post("/api/v1/materials/text", json={"title": "培养方案", "content": TEXT})
     assert response.status_code == 201, response.text
     data = response.json()
     workspace_id = client.get("/api/v1/settings").json()["workspace_id"]
@@ -44,9 +42,7 @@ def _plan(client) -> dict:
 
 
 def _course(client, plan_id: int, name: str) -> dict:
-    response = client.post(
-        f"/api/v1/curriculum-plans/{plan_id}/courses", json={"name": name}
-    )
+    response = client.post(f"/api/v1/curriculum-plans/{plan_id}/courses", json={"name": name})
     assert response.status_code == 201, response.text
     return response.json()
 

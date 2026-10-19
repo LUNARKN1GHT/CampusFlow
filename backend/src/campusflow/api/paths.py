@@ -261,8 +261,7 @@ def _profile_out(view: use_cases.ProfileView) -> LearnerProfileOut:
 @router.get("/curriculum-plans", response_model=list[CurriculumPlanOut])
 def list_plans(workspace: CurrentWorkspace, repos: Repos) -> list[CurriculumPlanOut]:
     return [
-        CurriculumPlanOut.model_validate(plan)
-        for plan in use_cases.list_plans(repos, workspace.id)
+        CurriculumPlanOut.model_validate(plan) for plan in use_cases.list_plans(repos, workspace.id)
     ]
 
 
@@ -276,9 +275,7 @@ def create_plan(
 
 @router.get("/curriculum-plans/{plan_id}", response_model=CurriculumPlanOut)
 def get_plan(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> CurriculumPlanOut:
-    return CurriculumPlanOut.model_validate(
-        use_cases.get_plan(repos, workspace.id, plan_id)
-    )
+    return CurriculumPlanOut.model_validate(use_cases.get_plan(repos, workspace.id, plan_id))
 
 
 @router.put("/curriculum-plans/{plan_id}", response_model=CurriculumPlanOut)
@@ -292,9 +289,7 @@ def update_plan(
     return CurriculumPlanOut.model_validate(plan)
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/courses", response_model=list[CurriculumCourseOut]
-)
+@router.get("/curriculum-plans/{plan_id}/courses", response_model=list[CurriculumCourseOut])
 def list_plan_courses(
     plan_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[CurriculumCourseOut]:
@@ -315,9 +310,7 @@ def create_plan_course(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> CurriculumCourseOut:
-    course = use_cases.create_course(
-        repos, workspace.id, plan_id, **payload.model_dump()
-    )
+    course = use_cases.create_course(repos, workspace.id, plan_id, **payload.model_dump())
     return CurriculumCourseOut.model_validate(course)
 
 
@@ -336,13 +329,9 @@ def update_plan_course(
     merged = {
         "name": payload.name if payload.name is not None else current.name,
         "code": payload.code if "code" in payload.model_fields_set else current.code,
-        "credits": (
-            payload.credits if "credits" in payload.model_fields_set else current.credits
-        ),
+        "credits": (payload.credits if "credits" in payload.model_fields_set else current.credits),
         "offered_terms": (
-            payload.offered_terms
-            if payload.offered_terms is not None
-            else current.offered_terms
+            payload.offered_terms if payload.offered_terms is not None else current.offered_terms
         ),
     }
     course = use_cases.update_course(repos, workspace.id, plan_id, course_id, **merged)
@@ -357,9 +346,7 @@ def delete_plan_course(
     return Response(status_code=204)
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/relations", response_model=list[CourseRelationOut]
-)
+@router.get("/curriculum-plans/{plan_id}/relations", response_model=list[CourseRelationOut])
 def list_plan_relations(
     plan_id: int,
     workspace: CurrentWorkspace,
@@ -385,9 +372,7 @@ def create_plan_relation(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> CourseRelationOut:
-    relation = use_cases.create_relation(
-        repos, workspace.id, plan_id, **payload.model_dump()
-    )
+    relation = use_cases.create_relation(repos, workspace.id, plan_id, **payload.model_dump())
     return CourseRelationOut.model_validate(relation)
 
 
@@ -416,9 +401,7 @@ def delete_plan_relation(
     return Response(status_code=204)
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/aliases", response_model=list[CourseAliasOut]
-)
+@router.get("/curriculum-plans/{plan_id}/aliases", response_model=list[CourseAliasOut])
 def list_plan_aliases(
     plan_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[CourseAliasOut]:
@@ -451,9 +434,7 @@ def delete_plan_alias(
     return Response(status_code=204)
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/aliases/resolve", response_model=AliasResolveOut
-)
+@router.get("/curriculum-plans/{plan_id}/aliases/resolve", response_model=AliasResolveOut)
 def resolve_plan_alias(
     plan_id: int,
     workspace: CurrentWorkspace,
@@ -478,9 +459,7 @@ def resolve_plan_alias(
     )
 
 
-@router.post(
-    "/curriculum-plans/{plan_id}/extract", response_model=CurriculumExtractionOut
-)
+@router.post("/curriculum-plans/{plan_id}/extract", response_model=CurriculumExtractionOut)
 def extract_curriculum(
     plan_id: int,
     payload: CurriculumExtractionRequest,
@@ -519,9 +498,7 @@ def extract_curriculum(
     )
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/study-records", response_model=list[StudyRecordOut]
-)
+@router.get("/curriculum-plans/{plan_id}/study-records", response_model=list[StudyRecordOut])
 def list_plan_study_records(
     plan_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[StudyRecordOut]:
@@ -542,9 +519,7 @@ def create_plan_study_record(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> StudyRecordOut:
-    view = use_cases.create_study_record(
-        repos, workspace.id, plan_id, **payload.model_dump()
-    )
+    view = use_cases.create_study_record(repos, workspace.id, plan_id, **payload.model_dump())
     return _study_record_out(view)
 
 
@@ -566,31 +541,21 @@ def update_plan_study_record(
             if "semester_id" in payload.model_fields_set
             else current.record.semester_id
         ),
-        "status": (
-            payload.status if payload.status is not None else current.record.status
-        ),
+        "status": (payload.status if payload.status is not None else current.record.status),
         # 未提交的字段保持原值；修改状态不会补造成绩或已得学分。
-        "grade": (
-            payload.grade if "grade" in payload.model_fields_set else current.record.grade
-        ),
+        "grade": (payload.grade if "grade" in payload.model_fields_set else current.record.grade),
         "credits_earned": (
             payload.credits_earned
             if "credits_earned" in payload.model_fields_set
             else current.record.credits_earned
         ),
-        "note": (
-            payload.note if "note" in payload.model_fields_set else current.record.note
-        ),
+        "note": (payload.note if "note" in payload.model_fields_set else current.record.note),
     }
-    view = use_cases.update_study_record(
-        repos, workspace.id, plan_id, record_id, **merged
-    )
+    view = use_cases.update_study_record(repos, workspace.id, plan_id, record_id, **merged)
     return _study_record_out(view)
 
 
-@router.delete(
-    "/curriculum-plans/{plan_id}/study-records/{record_id}", status_code=204
-)
+@router.delete("/curriculum-plans/{plan_id}/study-records/{record_id}", status_code=204)
 def delete_plan_study_record(
     plan_id: int, record_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> Response:
@@ -598,9 +563,7 @@ def delete_plan_study_record(
     return Response(status_code=204)
 
 
-@router.get(
-    "/curriculum-plans/{plan_id}/study-status", response_model=StudyStatusOut
-)
+@router.get("/curriculum-plans/{plan_id}/study-status", response_model=StudyStatusOut)
 def get_plan_study_status(
     plan_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> StudyStatusOut:
@@ -640,9 +603,7 @@ def get_profile(workspace: CurrentWorkspace, repos: Repos) -> LearnerProfileOut:
 def update_profile(
     payload: LearnerProfileUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> LearnerProfileOut:
-    return _profile_out(
-        use_cases.update_profile(repos, workspace.id, **payload.model_dump())
-    )
+    return _profile_out(use_cases.update_profile(repos, workspace.id, **payload.model_dump()))
 
 
 @router.get("/learning-profile/switch-preview", response_model=SwitchPreviewOut)

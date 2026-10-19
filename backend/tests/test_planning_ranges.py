@@ -124,7 +124,9 @@ def test_new_range_draft_does_not_touch_current_plan(client: TestClient) -> None
     assert len(current["blocks"]) == len(accepted["blocks"])
 
 
-def test_reschedule_subrange_keeps_blocks_outside_range(client: TestClient) -> None:
+def test_reschedule_subrange_keeps_blocks_outside_range(
+    client: TestClient, fixed_planning_clock
+) -> None:
     first = _task(client, "周一任务", due_date="2026-10-19")
     second = _task(client, "周二任务", due_date="2026-10-20")
     _availability(client, day_of_week=0)

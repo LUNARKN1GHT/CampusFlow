@@ -189,9 +189,7 @@ def update_course(
     return course
 
 
-def delete_course(
-    repos: Repositories, workspace_id: int, plan_id: int, course_id: int
-) -> None:
+def delete_course(repos: Repositories, workspace_id: int, plan_id: int, course_id: int) -> None:
     get_course(repos, workspace_id, plan_id, course_id)
     try:
         if not repos.paths.delete_course(course_id):
@@ -284,9 +282,7 @@ def update_relation(
     return relation
 
 
-def delete_relation(
-    repos: Repositories, workspace_id: int, plan_id: int, relation_id: int
-) -> None:
+def delete_relation(repos: Repositories, workspace_id: int, plan_id: int, relation_id: int) -> None:
     get_relation(repos, workspace_id, plan_id, relation_id)
     try:
         if not repos.paths.delete_relation(relation_id):
@@ -297,9 +293,7 @@ def delete_relation(
         raise
 
 
-def list_aliases(
-    repos: Repositories, workspace_id: int, plan_id: int
-) -> list[CourseAliasData]:
+def list_aliases(repos: Repositories, workspace_id: int, plan_id: int) -> list[CourseAliasData]:
     get_plan(repos, workspace_id, plan_id)
     return repos.paths.list_aliases(plan_id)
 
@@ -345,9 +339,7 @@ def create_alias(
     return created
 
 
-def delete_alias(
-    repos: Repositories, workspace_id: int, plan_id: int, alias_id: int
-) -> None:
+def delete_alias(repos: Repositories, workspace_id: int, plan_id: int, alias_id: int) -> None:
     get_plan(repos, workspace_id, plan_id)
     alias = repos.paths.get_alias(alias_id)
     if alias is None or alias.workspace_id != workspace_id:
@@ -543,9 +535,7 @@ def _study_entry_note(records: tuple[StudyRecordView, ...]) -> str:
     return note
 
 
-def get_study_status(
-    repos: Repositories, workspace_id: int, plan_id: int
-) -> StudyStatusSummary:
+def get_study_status(repos: Repositories, workspace_id: int, plan_id: int) -> StudyStatusSummary:
     """逐门课程汇总状态；没有记录的课程显式标为 unknown，不推断已修。"""
     get_plan(repos, workspace_id, plan_id)
     courses = repos.paths.list_courses(plan_id)

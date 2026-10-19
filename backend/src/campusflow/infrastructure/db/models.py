@@ -359,9 +359,7 @@ class CurriculumCourse(Base):
     __tablename__ = "curriculum_courses"
     __table_args__ = (
         UniqueConstraint("curriculum_plan_id", "name", name="uq_curriculum_course_name"),
-        CheckConstraint(
-            "credits IS NULL OR credits >= 0", name="ck_curriculum_course_credits"
-        ),
+        CheckConstraint("credits IS NULL OR credits >= 0", name="ck_curriculum_course_credits"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

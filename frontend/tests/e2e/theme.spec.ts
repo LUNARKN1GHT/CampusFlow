@@ -20,7 +20,7 @@ test('界面主题可切换、跨刷新保持并覆盖业务页面', async ({ pa
   // 刷新后保持，且业务页面同样生效。
   await page.reload()
   await expect(root).toHaveAttribute('data-theme', 'dark')
-  await page.getByRole('link', { name: '课程' }).click()
+  await page.getByRole('link', { name: '课程', exact: true }).click()
   await expect(root).toHaveAttribute('data-theme', 'dark')
 
   // 跟随系统：随操作系统深浅色自动切换。

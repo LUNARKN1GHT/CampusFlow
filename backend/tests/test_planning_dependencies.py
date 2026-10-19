@@ -1,8 +1,11 @@
 """A003：依赖参与排期顺序与可安排窗口。"""
 
+import pytest
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
+
+pytestmark = pytest.mark.usefixtures("fixed_planning_clock")
 
 
 def _task(client: TestClient, title: str, **overrides) -> dict:

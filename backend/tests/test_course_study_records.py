@@ -74,9 +74,7 @@ def _summary(client: TestClient, plan_id: int) -> dict:
 
 
 def _entry(summary: dict, course_id: int) -> dict:
-    return next(
-        entry for entry in summary["courses"] if entry["curriculum_course_id"] == course_id
-    )
+    return next(entry for entry in summary["courses"] if entry["curriculum_course_id"] == course_id)
 
 
 def test_status_change_does_not_fabricate_credits_or_grade(client: TestClient) -> None:
@@ -177,9 +175,7 @@ def test_duplicate_same_term_and_status_is_rejected(client: TestClient) -> None:
     first = _record(client, plan["id"], course["id"], status="planned", semester_id=term["id"])
     assert first.status_code == 201, first.text
 
-    duplicate = _record(
-        client, plan["id"], course["id"], status="planned", semester_id=term["id"]
-    )
+    duplicate = _record(client, plan["id"], course["id"], status="planned", semester_id=term["id"])
     assert duplicate.status_code == 400
     assert "已有修读记录" in duplicate.text
 
@@ -249,14 +245,10 @@ def test_cross_plan_course_is_rejected(client: TestClient) -> None:
     assert patched.status_code == 400
     assert "不属于该培养方案" in patched.text
 
-    deleted = client.delete(
-        f"/api/v1/curriculum-plans/{first['id']}/study-records/{record_id}"
-    )
+    deleted = client.delete(f"/api/v1/curriculum-plans/{first['id']}/study-records/{record_id}")
     assert deleted.status_code == 400
     # 另一种方案里的记录没有被误删。
-    assert len(
-        client.get(f"/api/v1/curriculum-plans/{second['id']}/study-records").json()
-    ) == 1
+    assert len(client.get(f"/api/v1/curriculum-plans/{second['id']}/study-records").json()) == 1
     assert _entry(_summary(client, first["id"]), local["id"])["status"] == "unknown"
 
 
@@ -281,9 +273,7 @@ def test_aggregate_precedence_is_completed_in_progress_planned_unknown(
     assert entry["record_count"] == 3
     assert entry["completed_semester_ids"] == [first["id"]]
 
-    client.delete(
-        f"/api/v1/curriculum-plans/{plan['id']}/study-records/{completed.json()['id']}"
-    )
+    client.delete(f"/api/v1/curriculum-plans/{plan['id']}/study-records/{completed.json()['id']}")
     assert _entry(_summary(client, plan["id"]), course["id"])["status"] == "in_progress"
 
     client.delete(
@@ -293,9 +283,7 @@ def test_aggregate_precedence_is_completed_in_progress_planned_unknown(
     # 剩下 planned 记录时状态回落到待修，而不是被推断为未知。
     assert _entry(_summary(client, plan["id"]), course["id"])["status"] == "planned"
 
-    client.delete(
-        f"/api/v1/curriculum-plans/{plan['id']}/study-records/{planned.json()['id']}"
-    )
+    client.delete(f"/api/v1/curriculum-plans/{plan['id']}/study-records/{planned.json()['id']}")
     assert _entry(_summary(client, plan["id"]), course["id"])["status"] == "unknown"
 
 
@@ -360,14 +348,8 @@ def test_records_are_isolated_by_workspace(client: TestClient) -> None:
         other_plan_id = other_plan.id
         other_record_id = other_record.id
 
-    assert (
-        client.get(f"/api/v1/curriculum-plans/{other_plan_id}/study-records").status_code
-        == 404
-    )
-    assert (
-        client.get(f"/api/v1/curriculum-plans/{other_plan_id}/study-status").status_code
-        == 404
-    )
+    assert client.get(f"/api/v1/curriculum-plans/{other_plan_id}/study-records").status_code == 404
+    assert client.get(f"/api/v1/curriculum-plans/{other_plan_id}/study-status").status_code == 404
     assert (
         client.patch(
             f"/api/v1/curriculum-plans/{plan['id']}/study-records/{other_record_id}",
@@ -383,9 +365,7 @@ def test_records_are_isolated_by_workspace(client: TestClient) -> None:
     )
 
     summary = _summary(client, plan["id"])
-    record_ids = [
-        record["id"] for entry in summary["courses"] for record in entry["records"]
-    ]
+    record_ids = [record["id"] for entry in summary["courses"] for record in entry["records"]]
     assert record_ids == [own.json()["id"]]
     assert summary["completed_count"] == 0
     assert summary["planned_count"] == 1
