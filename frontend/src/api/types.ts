@@ -262,6 +262,119 @@ export type CourseStudyStatusSummary = {
   note: string
 }
 
+export type CourseGraphProblem = {
+  code: string
+  message: string
+  course_ids: number[]
+  relation_ids: number[]
+  path: number[]
+  candidate_ids: number[]
+}
+
+export type CourseGraphNode = {
+  id: number
+  name: string
+  code: string | null
+  credits: number | null
+  offered_terms: string[]
+  study_status: string
+  record_count: number
+}
+
+export type CourseGraphEvidence = {
+  chunk_id: number
+  quote: string
+  field: string
+  version_id: number
+  material_id: number | null
+}
+
+export type CourseGraphEdge = {
+  id: number
+  from_course_id: number
+  to_course_id: number
+  relation_type: CourseRelation['relation_type']
+  condition_text: string | null
+  source_candidate_id: number | null
+  evidence: CourseGraphEvidence[]
+}
+
+export type CourseGraph = {
+  plan_id: number
+  plan_version: string
+  nodes: CourseGraphNode[]
+  edges: CourseGraphEdge[]
+  cycles: CourseGraphProblem[]
+  conflicts: CourseGraphProblem[]
+  missing: CourseGraphProblem[]
+  pending: CourseGraphProblem[]
+  complete: boolean
+  limitations: string[]
+}
+
+export type CourseOrder = {
+  plan_id: number
+  plan_version: string
+  complete: boolean
+  blocked: boolean
+  levels: number[][]
+  alternatives: boolean
+  problems: CourseGraphProblem[]
+  limitations: string[]
+}
+
+export type NextCourse = {
+  course_id: number
+  name: string
+  study_status: string
+  available: boolean
+  unmet: string[]
+  recommended: string[]
+}
+
+export type NextCourses = {
+  plan_id: number
+  plan_version: string
+  complete: boolean
+  blocked: boolean
+  courses: NextCourse[]
+  limitations: string[]
+}
+
+export type SemesterPlanInput = {
+  credit_limit: number | null
+  start_season: 'fall' | 'spring'
+  max_terms: number | null
+}
+
+export type SemesterPlanTerm = {
+  index: number
+  season: 'fall' | 'spring'
+  course_ids: number[]
+  credits_known: number
+  credits_unknown: number
+  warnings: string[]
+}
+
+export type SemesterPlanUnplaced = {
+  course_id: number
+  name: string
+  reason: string
+}
+
+export type SemesterPlan = {
+  plan_id: number
+  plan_version: string
+  complete: boolean
+  blocked: boolean
+  credit_limit: number | null
+  terms: SemesterPlanTerm[]
+  unplaced: SemesterPlanUnplaced[]
+  limitations: string[]
+  assumptions: string[]
+  graduation_audit: false
+}
+
 export type WorkspaceSettings = {
   workspace_id: number
   timezone: string

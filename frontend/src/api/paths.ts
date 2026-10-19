@@ -5,9 +5,14 @@ import type {
   CourseRelation,
   CourseStudyRecord,
   CourseStudyStatusSummary,
+  CourseGraph,
+  CourseOrder,
   CurriculumCourse,
   CurriculumPlan,
   LearnerProfile,
+  NextCourses,
+  SemesterPlan,
+  SemesterPlanInput,
   StudyStatus,
   SwitchPreview,
 } from './types'
@@ -88,4 +93,15 @@ export const pathsApi = {
     apiRequest<void>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'DELETE' }),
   studyStatus: (planId: number) =>
     apiRequest<CourseStudyStatusSummary>(`/curriculum-plans/${planId}/study-status`),
+  graph: (planId: number) =>
+    apiRequest<CourseGraph>(`/curriculum-plans/${planId}/graph`),
+  order: (planId: number) =>
+    apiRequest<CourseOrder>(`/curriculum-plans/${planId}/order`),
+  nextCourses: (planId: number) =>
+    apiRequest<NextCourses>(`/curriculum-plans/${planId}/next`),
+  semesterPlan: (planId: number, input: SemesterPlanInput) =>
+    apiRequest<SemesterPlan>(`/curriculum-plans/${planId}/semester-plan`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 }
