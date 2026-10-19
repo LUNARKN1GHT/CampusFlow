@@ -2,13 +2,14 @@
 
 from dataclasses import asdict
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from campusflow.application.ports.candidates import (
     CandidateData,
     CandidateSummaryData,
     FieldRevisionRecord,
+    MergeRecordData,
     ReviewChangeRecord,
 )
 from campusflow.domain.candidates import (
@@ -27,6 +28,7 @@ from campusflow.domain.states import ReviewStatus
 from campusflow.infrastructure.db.models import (
     CandidateFieldEvidence,
     CandidateFieldRevision,
+    CandidateMerge,
     CandidateReviewChange,
     ExtractedField,
     ExtractedItem,
@@ -353,3 +355,75 @@ class SqlAlchemyCandidateRepository:
         # JSONB 列必须整体赋值：原地修改不会被 SQLAlchemy 视为变更
         row.review_reasons = [asdict(reason) for reason in reasons]
         self._session.flush()
+
+    def find_merge(
+        self, workspace_id: int, target_candidate_id: int, source_candidate_id: int
+    ) -> MergeRecordData | None:
+        row = self._session.scalar(
+            select(CandidateMerge).where(
+                CandidateMerge.workspace_id == workspace_id,
+                CandidateMerge.target_candidate_id == target_candidate_id,
+                CandidateMerge.source_candidate_id == source_candidate_id,
+            )
+        )
+        return _merge_data(row) if row else None
+
+    def create_merge(
+        self,
+        workspace_id: int,
+        *,
+        target_candidate_id: int,
+        source_candidate_id: int,
+        target_formal_kind: str | None,
+        target_formal_id: int | None,
+        source_formal_id: int | None,
+        preserved_progress: dict,
+        source_snapshot: dict,
+        reason: str,
+        operator: str,
+    ) -> MergeRecordData:
+        row = CandidateMerge(
+            workspace_id=workspace_id,
+            target_candidate_id=target_candidate_id,
+            source_candidate_id=source_candidate_id,
+            target_formal_kind=target_formal_kind,
+            target_formal_id=target_formal_id,
+            source_formal_id=source_formal_id,
+            preserved_progress=preserved_progress,
+            source_snapshot=source_snapshot,
+            reason=reason,
+            operator=operator,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _merge_data(row)
+
+    def list_merges(self, workspace_id: int, candidate_id: int) -> list[MergeRecordData]:
+        rows = self._session.scalars(
+            select(CandidateMerge)
+            .where(
+                CandidateMerge.workspace_id == workspace_id,
+                or_(
+                    CandidateMerge.target_candidate_id == candidate_id,
+                    CandidateMerge.source_candidate_id == candidate_id,
+                ),
+            )
+            .order_by(CandidateMerge.id)
+        )
+        return [_merge_data(row) for row in rows]
+
+
+def _merge_data(row: CandidateMerge) -> MergeRecordData:
+    return MergeRecordData(
+        id=row.id,
+        target_candidate_id=row.target_candidate_id,
+        source_candidate_id=row.source_candidate_id,
+        target_formal_kind=row.target_formal_kind,
+        target_formal_id=row.target_formal_id,
+        source_formal_id=row.source_formal_id,
+        preserved_progress=dict(row.preserved_progress),
+        source_snapshot=dict(row.source_snapshot),
+        reason=row.reason,
+        operator=row.operator,
+        created_at=row.created_at,
+    )

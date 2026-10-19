@@ -82,6 +82,21 @@ class CandidateSummaryData:
     created_at: datetime
 
 
+@dataclass(frozen=True)
+class MergeRecordData:
+    id: int
+    target_candidate_id: int
+    source_candidate_id: int
+    target_formal_kind: str | None
+    target_formal_id: int | None
+    source_formal_id: int | None
+    preserved_progress: dict
+    source_snapshot: dict
+    reason: str
+    operator: str
+    created_at: datetime
+
+
 class CandidateRepository(Protocol):
     def create(
         self, workspace_id: int, version_id: int, draft: CandidateDraft
@@ -137,3 +152,24 @@ class CandidateRepository(Protocol):
     ) -> None:
         """只替换核对原因，不改动字段、证据与核对状态（X008 冲突原因刷新）。"""
         ...
+
+    def find_merge(
+        self, workspace_id: int, target_candidate_id: int, source_candidate_id: int
+    ) -> MergeRecordData | None: ...
+
+    def create_merge(
+        self,
+        workspace_id: int,
+        *,
+        target_candidate_id: int,
+        source_candidate_id: int,
+        target_formal_kind: str | None,
+        target_formal_id: int | None,
+        source_formal_id: int | None,
+        preserved_progress: dict,
+        source_snapshot: dict,
+        reason: str,
+        operator: str,
+    ) -> MergeRecordData: ...
+
+    def list_merges(self, workspace_id: int, candidate_id: int) -> list[MergeRecordData]: ...
