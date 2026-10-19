@@ -70,6 +70,8 @@ class ExcludedTask:
     task_id: int
     title: str
     progress: str
+    # progress：已完成/已取消；container：有子任务，父任务本身不参与排期
+    reason: str = "progress"
 
 
 @dataclass(frozen=True)
@@ -134,7 +136,12 @@ def input_snapshot(
             for task in inputs.tasks
         ],
         "excluded_tasks": [
-            {"id": task.task_id, "title": task.title, "progress": task.progress}
+            {
+                "id": task.task_id,
+                "title": task.title,
+                "progress": task.progress,
+                "reason": task.reason,
+            }
             for task in inputs.excluded_tasks
         ],
         "fixed_events": [
@@ -646,13 +653,21 @@ def build_outcome(
             task_id=task.task_id,
             title=task.title,
             status="excluded",
-            reason_code=task.progress,
+            reason_code="container_with_subtasks" if task.reason == "container" else task.progress,
             message=(
-                "任务已完成，不参与本次排期"
-                if task.progress == "done"
-                else "任务已取消，不参与本次排期"
+                "任务包含子任务，父任务本身不参与排期，避免与子任务重复计入"
+                if task.reason == "container"
+                else (
+                    "任务已完成，不参与本次排期"
+                    if task.progress == "done"
+                    else "任务已取消，不参与本次排期"
+                )
             ),
-            options=("重新打开任务",) if task.progress == "cancelled" else (),
+            options=(
+                ("查看或调整子任务",)
+                if task.reason == "container"
+                else (("重新打开任务",) if task.progress == "cancelled" else ())
+            ),
         )
         for task in inputs.excluded_tasks
     )

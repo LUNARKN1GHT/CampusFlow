@@ -137,6 +137,15 @@ class TaskLinkOut(BaseModel):
     parent_task_id: int | None
 
 
+class TaskRollupOut(BaseModel):
+    subtask_count: int
+    estimated_minutes: int
+    remaining_minutes: int
+    missing_duration_count: int
+    progress_counts: dict[str, int]
+    percent_complete: int | None
+
+
 class TaskRelationsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
     task_id: int
@@ -144,6 +153,26 @@ class TaskRelationsOut(BaseModel):
     subtasks: list[TaskLinkOut]
     prerequisites: list[TaskLinkOut]
     dependents: list[TaskLinkOut]
+    rollup: TaskRollupOut
+
+
+class SubtaskDraftIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=300)
+    priority: TaskPriority = TaskPriority.MEDIUM
+    estimated_minutes: int | None = Field(default=None, gt=0)
+    remaining_minutes: int | None = Field(default=None, ge=0)
+    due_date: date | None = None
+
+
+class SubtaskBatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[SubtaskDraftIn] = Field(min_length=1, max_length=20)
+
+
+class SplitSuggestionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    titles: list[str] | None = Field(default=None, max_length=20)
 
 
 class TaskParentIn(BaseModel):
