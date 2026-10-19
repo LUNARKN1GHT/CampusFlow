@@ -46,6 +46,10 @@ def save_candidates(
     # 先验证整批，避免后面的候选不合法时留下前面的半成品。
     for draft in drafts:
         validate_candidate(draft)
+        if draft.scope.curriculum_plan_id is not None:
+            plan = repos.paths.get_plan(draft.scope.curriculum_plan_id)
+            if plan is None or plan.workspace_id != workspace_id:
+                raise NotFoundError("培养方案不存在")
         _require_associations(repos, workspace_id, draft.scope.semester_id, draft.scope.course_id)
         if (
             material.semester_id is not None

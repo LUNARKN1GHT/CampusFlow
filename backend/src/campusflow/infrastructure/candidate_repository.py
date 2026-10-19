@@ -100,7 +100,12 @@ class SqlAlchemyCandidateRepository:
         )
         draft = CandidateDraft(
             kind=CandidateKind(row.kind),
-            scope=CandidateScope(row.semester_id, row.course_id, row.class_name),
+            scope=CandidateScope(
+                row.semester_id,
+                row.course_id,
+                row.class_name,
+                row.curriculum_plan_id,
+            ),
             fields=tuple(
                 CandidateField(
                     name=field.name,
@@ -134,6 +139,7 @@ class SqlAlchemyCandidateRepository:
             semester_id=draft.scope.semester_id,
             course_id=draft.scope.course_id,
             class_name=draft.scope.class_name,
+            curriculum_plan_id=draft.scope.curriculum_plan_id,
             review_reasons=[asdict(reason) for reason in draft.review_reasons],
         )
         self._session.add(row)
@@ -234,18 +240,22 @@ class SqlAlchemyCandidateRepository:
         rows = self._session.execute(stmt).all()
         if not rows:
             return []
-        title_by_candidate = {
-            row.candidate_id: row.value
-            for row in self._session.execute(
-                select(ExtractedField.candidate_id, ExtractedField.value).where(
-                    ExtractedField.candidate_id.in_([item[0].id for item in rows]),
-                    ExtractedField.name == "title",
-                )
-            ).all()
-        }
+        label_fields: dict[int, dict[str, object]] = {}
+        for row in self._session.execute(
+            select(ExtractedField.candidate_id, ExtractedField.name, ExtractedField.value).where(
+                ExtractedField.candidate_id.in_([item[0].id for item in rows]),
+                ExtractedField.name.in_(
+                    ("title", "course_name", "from_course_name", "to_course_name")
+                ),
+            )
+        ).all():
+            label_fields.setdefault(row.candidate_id, {})[row.name] = row.value
         summaries = []
         for item, item_material_id, item_version_no in rows:
-            title = title_by_candidate.get(item.id)
+            labels = label_fields.get(item.id, {})
+            title = labels.get("title") or labels.get("course_name")
+            if title is None and labels.get("from_course_name") and labels.get("to_course_name"):
+                title = f"{labels['from_course_name']} → {labels['to_course_name']}"
             summaries.append(
                 CandidateSummaryData(
                     id=item.id,
@@ -256,6 +266,7 @@ class SqlAlchemyCandidateRepository:
                     course_id=item.course_id,
                     semester_id=item.semester_id,
                     class_name=item.class_name,
+                    curriculum_plan_id=item.curriculum_plan_id,
                     source_version_id=item.source_version_id,
                     source_material_id=item_material_id,
                     version_no=item_version_no,

@@ -6,14 +6,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.api.deps import (
+    get_current_workspace,
+    get_repositories,
+    get_text_generator,
+)
 from campusflow.application import course_paths as use_cases
+from campusflow.application import curriculum_extraction
+from campusflow.application.candidates import save_candidates
+from campusflow.application.ports.generation import TextGenerator
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 
 router = APIRouter(tags=["course-paths"])
 
 CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
+Generator = Annotated[TextGenerator, Depends(get_text_generator)]
 
 
 class CurriculumPlanCreate(BaseModel):
@@ -117,6 +125,25 @@ class AliasResolveOut(BaseModel):
     status: str
     matches: list[CurriculumCourseOut]
     matched_by: str | None
+    note: str
+
+
+class CurriculumExtractionRequest(BaseModel):
+    material_id: int = Field(gt=0)
+    version_no: int = Field(gt=0)
+    include_courses: bool = True
+    include_relations: bool = True
+
+
+class ExtractedCandidateOut(BaseModel):
+    id: int
+    kind: str
+    review_status: str
+
+
+class CurriculumExtractionOut(BaseModel):
+    candidates: list[ExtractedCandidateOut]
+    pending_review: bool = True
     note: str
 
 
@@ -376,6 +403,47 @@ def resolve_plan_alias(
         matches=[CurriculumCourseOut.model_validate(course) for course in resolved.matches],
         matched_by=resolved.matched_by,
         note=resolved.note,
+    )
+
+
+@router.post(
+    "/curriculum-plans/{plan_id}/extract", response_model=CurriculumExtractionOut
+)
+def extract_curriculum(
+    plan_id: int,
+    payload: CurriculumExtractionRequest,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    generator: Generator,
+) -> CurriculumExtractionOut:
+    """显式请求才调用模型；结果全部保存为待核对候选，不直接写正式课程或关系。"""
+    drafts = curriculum_extraction.extract_curriculum_drafts(
+        repos,
+        workspace.id,
+        plan_id,
+        payload.material_id,
+        payload.version_no,
+        generator,
+        include_courses=payload.include_courses,
+        include_relations=payload.include_relations,
+    )
+    saved = save_candidates(
+        repos,
+        workspace.id,
+        payload.material_id,
+        payload.version_no,
+        drafts,
+    )
+    return CurriculumExtractionOut(
+        candidates=[
+            ExtractedCandidateOut(
+                id=candidate.id,
+                kind=candidate.draft.kind.value,
+                review_status=candidate.review_status.value,
+            )
+            for candidate in saved
+        ],
+        note="提取结果已保存为待核对候选；确认前不会写入正式课程或依赖关系。",
     )
 
 
