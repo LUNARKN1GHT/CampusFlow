@@ -111,6 +111,18 @@ class CourseRelationData:
     updated_at: datetime
 
 
+@dataclass
+class CourseAliasData:
+    id: int
+    workspace_id: int
+    curriculum_plan_id: int
+    curriculum_course_id: int
+    alias: str
+    class_name: str | None
+    semester_id: int | None
+    created_at: datetime
+
+
 class CoursePathRepository(Protocol):
     """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。"""
 
@@ -197,6 +209,23 @@ class CoursePathRepository(Protocol):
     ) -> CourseRelationData | None: ...
 
     def delete_relation(self, relation_id: int) -> bool: ...
+
+    def list_aliases(self, plan_id: int) -> list[CourseAliasData]: ...
+
+    def get_alias(self, alias_id: int) -> CourseAliasData | None: ...
+
+    def create_alias(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        curriculum_course_id: int,
+        alias: str,
+        class_name: str | None,
+        semester_id: int | None,
+    ) -> CourseAliasData: ...
+
+    def delete_alias(self, alias_id: int) -> bool: ...
 
     def get_profile(self, workspace_id: int) -> LearnerProfileData | None: ...
 

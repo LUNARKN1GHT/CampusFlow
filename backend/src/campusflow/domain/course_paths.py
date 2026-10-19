@@ -114,6 +114,36 @@ def validate_course_fields(
     return normalized
 
 
+def validate_alias_text(value: str) -> None:
+    _text(value, 200, "课程别名", required=True)
+
+
+def normalize_course_name(value: str) -> str:
+    """匹配用标准化：去首尾空白、合并空白、拉丁字母不区分大小写。
+
+    不做简称、同义词或模糊猜测；别名由用户显式维护。
+    """
+    return " ".join(value.replace("\u3000", " ").split()).casefold()
+
+
+def alias_scope_applies(
+    *,
+    alias_class_name: str | None,
+    alias_semester_id: int | None,
+    class_name: str | None,
+    semester_id: int | None,
+) -> bool:
+    """别名只有在自身范围被明确满足时才参与匹配，避免跨班或跨学期猜测。"""
+    if alias_class_name is not None:
+        if class_name is None or normalize_course_name(alias_class_name) != normalize_course_name(
+            class_name
+        ):
+            return False
+    if alias_semester_id is not None and alias_semester_id != semester_id:
+        return False
+    return True
+
+
 def validate_relation_type(value: str) -> RelationType:
     try:
         return RelationType(value)
