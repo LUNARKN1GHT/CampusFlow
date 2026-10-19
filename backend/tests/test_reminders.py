@@ -1,6 +1,20 @@
 """A010：提醒规则、触发生成、幂等与操作接口。"""
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from fastapi.testclient import TestClient
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+def _instant(value: str) -> datetime:
+    """数据库可能以 UTC 或 +08:00 回显同一时间点，只比较时刻本身。"""
+    return datetime.fromisoformat(value)
+
+
+def _local(*args: int) -> datetime:
+    return datetime(*args, tzinfo=SHANGHAI)
 
 
 def _task(client: TestClient, title: str = "提醒任务", **overrides) -> dict:
@@ -66,10 +80,10 @@ def test_repeat_windows_generated_and_idempotent(client: TestClient) -> None:
 
     first = _reminders(client)
     assert len(first) == 3
-    assert sorted(item["scheduled_for"] for item in first) == [
-        "2026-11-02T09:00:00+08:00",
-        "2026-11-02T09:30:00+08:00",
-        "2026-11-02T10:00:00+08:00",
+    assert sorted(_instant(item["scheduled_for"]) for item in first) == [
+        _local(2026, 11, 2, 9, 0),
+        _local(2026, 11, 2, 9, 30),
+        _local(2026, 11, 2, 10, 0),
     ]
     assert all(item["status"] == "pending" for item in first)
     assert all("10:00" in item["message"] for item in first)
@@ -164,4 +178,4 @@ def test_delete_task_rule_falls_back_to_default(client: TestClient) -> None:
     assert deleted.status_code == 204
     pending = _reminders(client, status="pending")
     assert len(pending) == 1
-    assert pending[0]["scheduled_for"] == "2026-11-01T10:00:00+08:00"
+    assert _instant(pending[0]["scheduled_for"]) == _local(2026, 11, 1, 10, 0)
