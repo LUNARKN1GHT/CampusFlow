@@ -46,7 +46,7 @@ test.describe('M2 资料库真实队列闭环', () => {
     expect(await page.locator('.text-source .highlight').evaluate((mark) => mark.previousSibling?.textContent)).toContain('课程通知第二段')
     await page.locator('.source-panel').getByRole('button', { name: '关闭' }).click()
 
-    await page.getByRole('button', { name: '上传 PDF / 图片' }).click()
+    await page.getByRole('button', { name: '上传文件' }).click()
     await page.getByLabel('选择文件').setInputFiles(path.join(fixtures, 'm2-text.pdf'))
     await page.getByRole('button', { name: '上传并处理' }).click()
     const pdfRow = page.locator('.material-row').filter({ hasText: 'm2-text.pdf' })
