@@ -13,6 +13,11 @@ from zoneinfo import ZoneInfo
 from campusflow.application.ports.repositories import ReminderRuleData, Repositories
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
+from campusflow.domain.reminders import (
+    deadline_dedupe_key,
+    task_review_dedupe_key,
+    workspace_review_dedupe_key,
+)
 from campusflow.domain.states import DueSourceType, ReviewStatus, TaskProgress
 
 DEFAULT_ADVANCE_MINUTES = 1440
@@ -197,7 +202,9 @@ def _deadline_rows(
             if date_only
             else f"{task.due_date.isoformat()} {task.due_time.strftime('%H:%M')}"
         )
-        key = f"review-task:{task.id}:{task.due_date.isoformat()}:{rule.version}"
+        key = task_review_dedupe_key(
+            task_id=task.id, due_date=task.due_date, rule_version=rule.version
+        )
         return [], [
             {
                 "kind": "review",
@@ -233,10 +240,13 @@ def _deadline_rows(
     for scheduled in sorted(set(windows)):
         if scheduled < now - timedelta(days=1):
             continue
-        window = int(scheduled.timestamp())
-        key = (
-            f"deadline:{task.id}:{rule.rule_id or 'default'}:{rule.version}:"
-            f"{task.due_date.isoformat()}:{task.due_time or 'date'}:{window}"
+        key = deadline_dedupe_key(
+            task_id=task.id,
+            rule_id=rule.rule_id,
+            rule_version=rule.version,
+            due_date=task.due_date,
+            due_time=task.due_time,
+            window_start=scheduled,
         )
         if date_only:
             message = (
@@ -295,7 +305,7 @@ def sync_reminders(
             cancelled += repos.reminders.cancel_pending_for_task(workspace_id, task.id)
             continue
         deadline_rows, review_rows = _deadline_rows(task, rule, moment, timezone)
-        desired = deadline_rows + review_rows
+        desired = list({row["dedupe_key"]: row for row in deadline_rows + review_rows}.values())
         keys = {row["dedupe_key"] for row in desired}
         cancelled += repos.reminders.cancel_pending_not_in_keys(workspace_id, task.id, keys)
         rows = [
@@ -316,7 +326,7 @@ def sync_reminders(
         )
         repos.reminders.cancel_pending_reviews(workspace_id)
         if pending_reviews and default_rule is not None and not default_rule.paused:
-            key = f"review:pending:{moment.date().isoformat()}"
+            key = workspace_review_dedupe_key(day=moment.date())
             rows = [
                 {
                     "workspace_id": workspace_id,
