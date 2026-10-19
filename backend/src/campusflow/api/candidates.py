@@ -13,7 +13,12 @@ from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories, get_version_relations
 from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
-from campusflow.application import change_impact, version_acceptance, version_applicability
+from campusflow.application import (
+    change_impact,
+    duplicates,
+    version_acceptance,
+    version_applicability,
+)
 from campusflow.application import conversion as conversions
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
@@ -642,6 +647,64 @@ def get_candidate_applicability(
             ApplicabilityReasonOut(code=item.code, message=item.message) for item in result.reasons
         ],
         diff=_diff_out(result.diff),
+    )
+
+
+class DuplicateSuggestionOut(BaseModel):
+    candidate_id: int
+    source_version_id: int
+    title: str | None
+    score: float
+    reasons: list[str]
+    matched_fields: list[str]
+    review_status: str
+    scope_same: bool
+
+
+class ExcludedCandidateOut(BaseModel):
+    candidate_id: int
+    code: str
+    message: str
+
+
+class DuplicateReportOut(BaseModel):
+    candidate_id: int
+    kind: str
+    suggestions: list[DuplicateSuggestionOut]
+    excluded: list[ExcludedCandidateOut]
+    auto_merge: Literal[False] = False
+
+
+@router.get("/candidates/{candidate_id}/duplicates", response_model=DuplicateReportOut)
+def get_candidate_duplicates(
+    candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> DuplicateReportOut:
+    """N015：只读重复建议，不删除、不合并、不改核对状态。"""
+    report = duplicates.suggest_duplicates(repos, workspace.id, candidate_id)
+    return DuplicateReportOut(
+        candidate_id=report.candidate_id,
+        kind=report.kind,
+        suggestions=[
+            DuplicateSuggestionOut(
+                candidate_id=item.candidate_id,
+                source_version_id=item.source_version_id,
+                title=item.title,
+                score=item.score,
+                reasons=list(item.reasons),
+                matched_fields=list(item.matched_fields),
+                review_status=item.review_status,
+                scope_same=item.scope_same,
+            )
+            for item in report.suggestions
+        ],
+        excluded=[
+            ExcludedCandidateOut(
+                candidate_id=item.candidate_id, code=item.code, message=item.message
+            )
+            for item in report.excluded
+        ],
     )
 
 

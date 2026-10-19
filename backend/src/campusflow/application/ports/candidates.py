@@ -6,6 +6,7 @@ from typing import Protocol
 
 from campusflow.domain.candidates import (
     CandidateDraft,
+    CandidateKind,
     FieldRevision,
     ReviewChange,
     ReviewReason,
@@ -89,6 +90,10 @@ class CandidateRepository(Protocol):
     def get(self, workspace_id: int, candidate_id: int) -> CandidateData | None: ...
 
     def list_by_version(self, workspace_id: int, version_id: int) -> list[CandidateData]: ...
+
+    def list_all(self, workspace_id: int, kind: CandidateKind) -> list[CandidateData]:
+        """同一空间内指定类型的全部候选，供重复建议只读比较。"""
+        ...
 
     def list_for_review(
         self,
