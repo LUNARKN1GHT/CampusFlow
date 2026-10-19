@@ -16,6 +16,9 @@ class CandidateKind(StrEnum):
     TASK = "task"
     EVENT = "event"
     RULE = "rule"
+    # C003：培养方案课程与三类课程关系的提取候选；确认后才转换为正式课程/关系。
+    CURRICULUM_COURSE = "curriculum_course"
+    COURSE_RELATION = "course_relation"
 
 
 class FieldOrigin(StrEnum):
@@ -46,6 +49,8 @@ class CandidateScope:
     semester_id: int | None = None
     course_id: int | None = None
     class_name: str | None = None
+    # C003：培养方案候选必须绑定唯一适用方案，避免不同版本规则混用。
+    curriculum_plan_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -128,9 +133,18 @@ def validate_candidate(draft: CandidateDraft) -> None:
     names: set[str] = set()
     for item in draft.fields:
         _validate_field(item, names)
-    for identifier in (draft.scope.semester_id, draft.scope.course_id):
+    for identifier in (
+        draft.scope.semester_id,
+        draft.scope.course_id,
+        draft.scope.curriculum_plan_id,
+    ):
         if identifier is not None and (type(identifier) is not int or identifier < 1):
-            raise DomainError("适用学期或课程编号无效")
+            raise DomainError("适用学期、课程或培养方案编号无效")
+    plan_kinds = (CandidateKind.CURRICULUM_COURSE, CandidateKind.COURSE_RELATION)
+    if draft.kind in plan_kinds and draft.scope.curriculum_plan_id is None:
+        raise DomainError("培养方案候选必须绑定适用方案")
+    if draft.kind not in plan_kinds and draft.scope.curriculum_plan_id is not None:
+        raise DomainError("只有培养方案候选可以绑定适用方案")
     _text(draft.scope.class_name, 100, "教学班")
     if len(draft.review_reasons) > 64:
         raise DomainError("待核对原因数量过多")
@@ -206,6 +220,8 @@ REQUIRED_FIELDS: dict[CandidateKind, tuple[str, ...]] = {
     CandidateKind.TASK: ("title",),
     CandidateKind.EVENT: ("title", "activity_text"),
     CandidateKind.RULE: (),
+    CandidateKind.CURRICULUM_COURSE: ("course_name",),
+    CandidateKind.COURSE_RELATION: ("from_course_name", "to_course_name", "relation_type"),
 }
 
 _REVIEW_LABELS = {

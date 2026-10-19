@@ -52,6 +52,7 @@ class CandidateSummaryOut(BaseModel):
     course_id: int | None
     semester_id: int | None
     class_name: str | None
+    curriculum_plan_id: int | None
     source_material_id: int
     source_version_id: int
     version_no: int
@@ -74,6 +75,7 @@ def _to_out(item: CandidateSummaryData) -> CandidateSummaryOut:
         course_id=item.course_id,
         semester_id=item.semester_id,
         class_name=item.class_name,
+        curriculum_plan_id=item.curriculum_plan_id,
         source_material_id=item.source_material_id,
         source_version_id=item.source_version_id,
         version_no=item.version_no,

@@ -5,7 +5,15 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    ValidationError,
+)
 
 from campusflow.application.materials import get_material, get_version, list_version_chunks
 from campusflow.application.ports.generation import GenerationRequest, TextGenerator
@@ -35,7 +43,7 @@ class InvalidModelOutput(ModelOutputError):
 class FieldDefinition:
     name: str
     description: str
-    value_type: Literal["text", "integer"] = "text"
+    value_type: Literal["text", "integer", "number"] = "text"
     allow_missing: bool = True
     origins: tuple[FieldOrigin, ...] = (FieldOrigin.DOCUMENT,)
 
@@ -58,7 +66,7 @@ class _Evidence(_StrictModel):
 
 class _Field(_StrictModel):
     name: str = Field(min_length=1, max_length=64)
-    value: StrictStr | StrictInt | None
+    value: StrictStr | StrictInt | StrictFloat | None
     # 模型不能冒充用户补充，也不能决定确认状态或课程 ID。
     origin: Literal["document", "inferred", "suggestion"]
     evidence: list[_Evidence] = Field(default_factory=list, max_length=32)
@@ -73,7 +81,7 @@ class _Reason(_StrictModel):
 
 
 class _Item(_StrictModel):
-    kind: Literal["task", "event", "rule"]
+    kind: Literal["task", "event", "rule", "curriculum_course", "course_relation"]
     fields: list[_Field] = Field(min_length=1, max_length=64)
     review_reasons: list[_Reason] = Field(default_factory=list, max_length=64)
 
@@ -91,7 +99,7 @@ def _validate_spec(spec: ExtractionSpec) -> None:
         if (
             not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", field.name)
             or not field.description.strip()
-            or field.value_type not in ("text", "integer")
+            or field.value_type not in ("text", "integer", "number")
             or not field.origins
             or any(not isinstance(o, FieldOrigin) or o == FieldOrigin.USER for o in field.origins)
         ):
@@ -192,6 +200,8 @@ def validate_output(
                 and type(field.value) is not str
                 or definition.value_type == "integer"
                 and type(field.value) is not int
+                or definition.value_type == "number"
+                and type(field.value) not in (int, float)
             ):
                 raise InvalidModelOutput("模型字段值的类型不符合约定")
             elif isinstance(field.value, str) and not field.value.strip():
@@ -242,6 +252,8 @@ def generate_for_version(
     version_no: int,
     generator: TextGenerator,
     spec: ExtractionSpec,
+    *,
+    curriculum_plan_id: int | None = None,
 ) -> list[CandidateDraft]:
     """应用入口：联网前核对空间；只返回草稿，后续提取用例再调用 X001 保存。
 
@@ -253,7 +265,12 @@ def generate_for_version(
     if material.archived:
         raise DomainError("资料已归档，请恢复后再提取")
     chunks = list_version_chunks(repos, workspace_id, material_id, version_no)
-    scope = CandidateScope(material.semester_id, material.course_id, material.class_name)
+    scope = CandidateScope(
+        material.semester_id,
+        material.course_id,
+        material.class_name,
+        curriculum_plan_id,
+    )
     drafts = generate_candidates(generator, spec, chunks, scope=scope)
     version = get_version(repos, workspace_id, material_id, version_no)
     return with_coverage_reasons(drafts, stored_uncovered_ranges(version))

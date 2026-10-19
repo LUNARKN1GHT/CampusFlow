@@ -648,7 +648,10 @@ class ExtractedItem(Base):
 
     __tablename__ = "extracted_items"
     __table_args__ = (
-        CheckConstraint("kind IN ('task', 'event', 'rule')", name="ck_candidate_kind"),
+        CheckConstraint(
+            "kind IN ('task', 'event', 'rule', 'curriculum_course', 'course_relation')",
+            name="ck_candidate_kind",
+        ),
         CheckConstraint(
             "review_status IN ('pending', 'confirmed', 'ignored', 'superseded')",
             name="ck_candidate_review_status",
@@ -666,6 +669,10 @@ class ExtractedItem(Base):
     semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
     course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"), index=True)
     class_name: Mapped[str | None] = mapped_column(String(100))
+    # C003：培养方案课程/关系候选的适用方案，避免跨版本混用。
+    curriculum_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
     review_reasons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
