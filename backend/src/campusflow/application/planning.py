@@ -19,6 +19,7 @@ from campusflow.domain.planning import (
     AvailabilityRule,
     ExcludedTask,
     FixedEventOccurrence,
+    PlanningDependency,
     PlanningInput,
     PlanningTask,
     PlanOutcome,
@@ -121,6 +122,35 @@ def collect_inputs(
             }
         )
 
+    scope_ids = {task.id for task in repos.tasks.list(workspace_id, semester_id=semester_id)}
+    all_tasks = {task.id: task for task in repos.tasks.list(workspace_id)}
+    dependencies: list[PlanningDependency] = []
+    for link in repos.tasks.list_workspace_dependencies(workspace_id):
+        if link.task_id not in scope_ids:
+            continue
+        prerequisite = all_tasks.get(link.depends_on_task_id)
+        if prerequisite is None:
+            state = "missing"
+            title = f"任务 {link.depends_on_task_id}"
+        else:
+            title = prerequisite.title
+            if prerequisite.progress == TaskProgress.DONE:
+                state = "done"
+            elif prerequisite.progress == TaskProgress.CANCELLED:
+                state = "cancelled"
+            elif prerequisite.id not in scope_ids:
+                state = "out_of_scope"
+            else:
+                state = "planned"
+        dependencies.append(
+            PlanningDependency(
+                task_id=link.task_id,
+                depends_on_task_id=link.depends_on_task_id,
+                prerequisite_title=title,
+                state=state,
+            )
+        )
+
     events = schedule_use_cases.list_fixed_event_occurrences(
         repos, workspace_id, range_start, range_end, semester_id=semester_id
     )
@@ -155,6 +185,7 @@ def collect_inputs(
         break_minutes=settings.break_minutes,
         buffer_minutes=settings.buffer_minutes,
         segment_minutes=segment_minutes,
+        dependencies=tuple(dependencies),
     )
     snapshot = input_snapshot(inputs, raw_tasks)
     return CollectedPlanInput(

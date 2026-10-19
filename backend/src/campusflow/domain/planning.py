@@ -13,6 +13,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from campusflow.domain.errors import DomainError
+from campusflow.domain.task_dependencies import cyclic_components
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,20 @@ class PlanningTask:
 
 
 @dataclass(frozen=True)
+class PlanningDependency:
+    """A003：排期使用的依赖边。
+
+    state 由应用层按工作空间数据判定：planned（前置也在本次排期中）、done（已完成）、
+    cancelled / out_of_scope / missing（不可满足）。
+    """
+
+    task_id: int
+    depends_on_task_id: int
+    prerequisite_title: str
+    state: str
+
+
+@dataclass(frozen=True)
 class ExcludedTask:
     task_id: int
     title: str
@@ -80,6 +95,7 @@ class PlanningInput:
     break_minutes: int
     buffer_minutes: int
     segment_minutes: int = 90
+    dependencies: tuple[PlanningDependency, ...] = ()
 
 
 def _iso(value: datetime | date | time | None) -> str | None:
@@ -137,6 +153,14 @@ def input_snapshot(
                 "end_time": _iso(rule.end_time),
             }
             for rule in inputs.availability
+        ],
+        "dependencies": [
+            {
+                "task_id": link.task_id,
+                "depends_on_task_id": link.depends_on_task_id,
+                "state": link.state,
+            }
+            for link in inputs.dependencies
         ],
     }
 
@@ -651,11 +675,13 @@ def build_outcome(
             "fixed_event_overlap",
             "daily_capacity",
             "weekly_capacity",
+            *(["task_dependencies"] if inputs.dependencies else []),
         ],
         "not_checked": not_checked,
         "notes": [
             "未确认候选事项不参与排期；需先在待核对中确认后才会成为排期输入",
             "固定日程与可用时间均按工作空间时区解释",
+            "必要依赖按完成时间约束后续任务；前置取消或无法排入时后续任务不安排",
         ],
         "capacity_gap_minutes": allocation.capacity_gap_minutes,
         "adjustment_options": [],
@@ -683,9 +709,44 @@ def build_outcome(
     )
 
 
-def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> AllocationResult:
-    """按截止与可用时间分配任务；不越过确定截止，也不占用固定日程。
+def _planned_edges(inputs: PlanningInput, task_ids: set[int]) -> list[tuple[int, int]]:
+    return [
+        (link.task_id, link.depends_on_task_id)
+        for link in inputs.dependencies
+        if link.state == "planned"
+        and link.task_id in task_ids
+        and link.depends_on_task_id in task_ids
+    ]
 
+
+def _topological_order(
+    tasks: tuple[PlanningTask, ...], edges: list[tuple[int, int]]
+) -> list[PlanningTask]:
+    """按依赖先后排序；同一批可执行任务仍按截止与优先级排序，结果确定。"""
+    by_id = {task.task_id: task for task in tasks}
+    indegree = {task_id: 0 for task_id in by_id}
+    outgoing: dict[int, list[int]] = {task_id: [] for task_id in by_id}
+    for task_id, prerequisite in edges:
+        indegree[task_id] += 1
+        outgoing[prerequisite].append(task_id)
+    ready = [task for task in tasks if indegree[task.task_id] == 0]
+    order: list[PlanningTask] = []
+    while ready:
+        ready.sort(key=task_order_key)
+        task = ready.pop(0)
+        order.append(task)
+        for dependent in outgoing[task.task_id]:
+            indegree[dependent] -= 1
+            if indegree[dependent] == 0:
+                ready.append(by_id[dependent])
+    return order
+
+
+def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> AllocationResult:
+    """按依赖、截止与可用时间分配任务；不越过确定截止，也不占用固定日程。
+
+    依赖先于优先级：后续任务只能安排在前置任务完成之后。前置取消、缺失、
+    越出范围或未能排入时，依赖不可满足，后续任务直接列为未排入。
     这里只处理硬约束；每日／每周容量、休息与分段在后续规则中叠加。
     """
     windows = [[window.start, window.end] for window in build_free_windows(inputs)]
@@ -695,8 +756,69 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
     weekly_used: dict[tuple[int, int], int] = {}
     day_last_end: dict[date, datetime] = {}
 
-    for task in sorted(resolved.tasks, key=task_order_key):
+    by_id = {task.task_id: task for task in resolved.tasks}
+    planned_edges = _planned_edges(inputs, set(by_id))
+    cycle_edges: dict[int, set[int]] = {}
+    for task_id, prerequisite in planned_edges:
+        cycle_edges.setdefault(task_id, set()).add(prerequisite)
+    cycle_members = {
+        task_id for component in cyclic_components(cycle_edges) for task_id in component
+    }
+    unmet: dict[int, list[PlanningDependency]] = {}
+    for link in inputs.dependencies:
+        if link.task_id in by_id and link.state in {"cancelled", "out_of_scope", "missing"}:
+            unmet.setdefault(link.task_id, []).append(link)
+
+    order = _topological_order(resolved.tasks, planned_edges)
+    ordered_ids = {task.task_id for task in order}
+    prerequisite_links: dict[int, list[PlanningDependency]] = {}
+    for link in inputs.dependencies:
+        if link.state == "planned" and link.task_id in by_id:
+            prerequisite_links.setdefault(link.task_id, []).append(link)
+
+    completed: dict[int, datetime] = {}
+    satisfied: dict[int, bool] = {}
+
+    def record_blocked(
+        task: PlanningTask,
+        *,
+        reason_code: str,
+        message: str,
+        options: tuple[str, ...],
+    ) -> None:
+        satisfied[task.task_id] = False
+        dispositions.append(
+            TaskDisposition(
+                task_id=task.task_id,
+                title=task.title,
+                status="unscheduled",
+                scheduled_minutes=0,
+                remaining_minutes=task.minutes or 0,
+                reason_code=reason_code,
+                message=message,
+                options=options,
+            )
+        )
+
+    def unmet_message(link: PlanningDependency) -> str:
+        reasons = {
+            "cancelled": "已取消",
+            "out_of_scope": "不在当前规划范围",
+            "missing": "已不存在",
+        }
+        return f"前置任务《{link.prerequisite_title}》{reasons[link.state]}，依赖无法满足"
+
+    for task in order:
+        if task.task_id in unmet:
+            record_blocked(
+                task,
+                reason_code="dependency_unmet",
+                message="；".join(unmet_message(link) for link in unmet[task.task_id]),
+                options=("重新打开或恢复前置任务", "删除依赖", "调整任务"),
+            )
+            continue
         if task.minutes is None:
+            satisfied[task.task_id] = False
             dispositions.append(
                 TaskDisposition(
                     task_id=task.task_id,
@@ -711,6 +833,8 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
         if task.minutes == 0:
+            satisfied[task.task_id] = True
+            completed[task.task_id] = inputs.now
             dispositions.append(
                 TaskDisposition(
                     task_id=task.task_id,
@@ -725,11 +849,55 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
 
+        links = prerequisite_links.get(task.task_id, [])
+        earliest_start: datetime | None = None
+        blocked_by_unscheduled: PlanningDependency | None = None
+        for link in links:
+            if satisfied.get(link.depends_on_task_id) is False:
+                blocked_by_unscheduled = link
+                break
+            prerequisite_end = completed.get(link.depends_on_task_id)
+            if prerequisite_end is not None:
+                earliest_start = (
+                    prerequisite_end
+                    if earliest_start is None
+                    else max(earliest_start, prerequisite_end)
+                )
+        if blocked_by_unscheduled is not None:
+            record_blocked(
+                task,
+                reason_code="dependency_unmet",
+                message=(
+                    f"前置任务《{blocked_by_unscheduled.prerequisite_title}》"
+                    "未能排入本次计划，后续任务暂不安排"
+                ),
+                options=("增加可用时间", "调整前置任务截止", "接受未排入"),
+            )
+            continue
+        if (
+            earliest_start is not None
+            and task.due_at is not None
+            and earliest_start >= task.due_at - timedelta(minutes=resolved.buffer_minutes)
+        ):
+            record_blocked(
+                task,
+                reason_code="dependency_deadline",
+                message="前置任务完成时间晚于本任务截止，无法在截止前开始",
+                options=("调整前置任务时间", "调整本任务截止", "接受逾期"),
+            )
+            continue
+
         remaining = task.minutes
         scheduled = 0
         seq = 0
         deadline = task.due_at
+        last_end: datetime | None = None
         for window in windows:
+            if earliest_start is not None:
+                if window[1] <= earliest_start:
+                    continue
+                if window[0] < earliest_start:
+                    window[0] = earliest_start
             while remaining > 0:
                 window_start, window_end = window
                 if deadline is not None and window_start >= deadline:
@@ -786,6 +954,18 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                         "value": task.priority,
                         "text": "按任务重要性与截止顺序安排",
                     },
+                    *(
+                        [
+                            {
+                                "kind": "dependency",
+                                "value": [link.depends_on_task_id for link in links],
+                                "text": "先完成前置任务："
+                                + "、".join(link.prerequisite_title for link in links),
+                            }
+                        ]
+                        if links
+                        else []
+                    ),
                     {
                         "kind": "daily_capacity",
                         "value": inputs.daily_capacity_minutes,
@@ -851,6 +1031,7 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                     )
                 )
                 window[0] = block_end
+                last_end = block_end
                 remaining -= minutes
                 scheduled += minutes
                 seq += 1
@@ -897,6 +1078,28 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
                 options=options,
             )
         )
+        satisfied[task.task_id] = remaining == 0
+        if remaining == 0 and last_end is not None:
+            completed[task.task_id] = last_end
+
+    # 拓扑排序没有释放的任务：成环节点及其下游，均不能确定可执行顺序
+    for task in resolved.tasks:
+        if task.task_id in ordered_ids:
+            continue
+        if task.task_id in cycle_members:
+            record_blocked(
+                task,
+                reason_code="dependency_cycle",
+                message="任务位于依赖环中，不能确定可执行顺序",
+                options=("删除其中一条依赖", "调整任务顺序"),
+            )
+        else:
+            record_blocked(
+                task,
+                reason_code="dependency_unmet",
+                message="前置任务位于依赖环中，后续任务无法确定开始时间",
+                options=("删除其中一条依赖", "调整任务顺序"),
+            )
 
     gap = sum(item.remaining_minutes for item in dispositions)
     return AllocationResult(
