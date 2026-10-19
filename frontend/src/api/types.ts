@@ -327,3 +327,106 @@ export type CandidateReviewDetail = {
   allowed_transitions: ReviewStatus[]
   converted: CandidateConversion | null
 }
+
+export type DiffEvidence = {
+  chunk_id: number
+  quote: string
+  locator_type: string
+  locator_value: string
+  verifiable: boolean
+}
+
+export type DiffFieldSide = {
+  candidate_id: number
+  source_version_id: number
+  present: boolean
+  value: unknown
+  effective_value: unknown
+  origin: FieldOrigin | null
+  effective_origin: FieldOrigin | null
+  verifiable: boolean
+  evidence: DiffEvidence[]
+}
+
+export type DiffField = {
+  name: string
+  category: string
+  status: 'unchanged' | 'changed' | 'added' | 'missing' | 'explicitly_removed'
+  left: DiffFieldSide
+  right: DiffFieldSide
+}
+
+export type DiffScope = {
+  semester_id: number | null
+  semester_name: string | null
+  course_id: number | null
+  course_name: string | null
+  class_name: string | null
+}
+
+export type DiffSource = {
+  candidate_id: number
+  source_version_id: number
+  material_id: number
+  material_title: string
+  version_no: number
+  material_archived: boolean
+  kind: CandidateKind
+  review_status: ReviewStatus
+  scope: DiffScope
+}
+
+export type CandidateDiff = {
+  left: DiffSource
+  right: DiffSource
+  scope: { left: DiffScope; right: DiffScope; differences: { component: string; status: string }[] }
+  fields: DiffField[]
+  summary: { total: number; unchanged: number; changed: number; added: number; missing: number; explicitly_removed: number }
+}
+
+export type VersionApplicability = {
+  status: 'applicable' | 'conflict' | 'requires_review'
+  recommended_candidate_id: number | null
+  review_required: boolean
+  applied: false
+  relation_id: number | null
+  relation_kind: string | null
+  scope_comparison: 'same' | 'different' | 'unknown'
+  publication: Record<string, { material_id: number; version_id: number; publisher: string | null; published_at: string | null; published_text: string | null }>
+  reasons: { code: string; message: string }[]
+  diff: CandidateDiff
+}
+
+export type ImpactedBlock = {
+  id: number
+  draft_id: number
+  draft_status: string
+  title: string
+  starts_at: string
+  ends_at: string
+  locked: boolean
+}
+
+export type ChangeImpact = {
+  summary: Record<string, number>
+  unsupported: { code: string; message: string }[]
+  tasks: { id: number; title: string; progress: string; completed: boolean; due_date: string | null; source_state: string; plan_blocks: ImpactedBlock[] }[]
+  fixed_events: { id: number; title: string; starts_at: string; ends_at: string; location: string | null }[]
+  rules: { id: number; title: string }[]
+}
+
+export type VersionAcceptance = {
+  id: number
+  baseline_candidate_id: number
+  comparison_candidate_id: number
+  baseline_version_id: number
+  comparison_version_id: number
+  accepted_fields: string[]
+  reason: string
+  operator: string
+  evidence_snapshot: { name: string; status: string; left: DiffFieldSide; right: DiffFieldSide }[]
+  previous_review_status: string
+  created_at: string
+  baseline_review_status: string
+  created: boolean
+}
