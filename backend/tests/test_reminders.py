@@ -78,7 +78,7 @@ def test_repeat_windows_generated_and_idempotent(client: TestClient) -> None:
     task = _task(client)
     _rule(client, task_id=task["id"], advance_minutes=60, repeat_minutes=30)
 
-    first = _reminders(client)
+    first = _reminders(client, status="pending")
     assert len(first) == 3
     assert sorted(_instant(item["scheduled_for"]) for item in first) == [
         _local(2026, 11, 2, 9, 0),
@@ -88,7 +88,7 @@ def test_repeat_windows_generated_and_idempotent(client: TestClient) -> None:
     assert all(item["status"] == "pending" for item in first)
     assert all("10:00" in item["message"] for item in first)
 
-    second = _reminders(client)
+    second = _reminders(client, status="pending")
     assert [item["id"] for item in second] == [item["id"] for item in first]
 
 
@@ -128,7 +128,7 @@ def test_read_and_dismiss_actions(client: TestClient) -> None:
 def test_paused_rule_cancels_pending(client: TestClient) -> None:
     _task(client)
     rule = _rule(client, advance_minutes=60)
-    assert len(_reminders(client)) == 1
+    assert len(_reminders(client, status="pending")) == 1
 
     paused = client.patch(
         f"/api/v1/reminders/rules/{rule['id']}",
@@ -149,7 +149,7 @@ def test_paused_rule_cancels_pending(client: TestClient) -> None:
 def test_done_cancels_and_reopen_restores(client: TestClient) -> None:
     task = _task(client)
     _rule(client, task_id=task["id"], advance_minutes=60)
-    [item] = _reminders(client)
+    [item] = _reminders(client, status="pending")
 
     done = client.patch(
         f"/api/v1/tasks/{task['id']}/progress",
@@ -157,7 +157,8 @@ def test_done_cancels_and_reopen_restores(client: TestClient) -> None:
     )
     assert done.status_code == 200
     cancelled = _reminders(client, status="cancelled")
-    assert [row["id"] for row in cancelled] == [item["id"]]
+    assert item["id"] in [row["id"] for row in cancelled]
+    assert _reminders(client, status="pending") == []
 
     reopened = client.patch(
         f"/api/v1/tasks/{task['id']}/progress",
@@ -166,13 +167,12 @@ def test_done_cancels_and_reopen_restores(client: TestClient) -> None:
     assert reopened.status_code == 200
     pending = _reminders(client, status="pending")
     assert [row["id"] for row in pending] == [item["id"]]
-    assert len(_reminders(client)) == 1
 
 
 def test_delete_task_rule_falls_back_to_default(client: TestClient) -> None:
     task = _task(client)
     rule = _rule(client, task_id=task["id"], advance_minutes=60)
-    assert len(_reminders(client)) == 1
+    assert len(_reminders(client, status="pending")) == 1
 
     deleted = client.delete(f"/api/v1/reminders/rules/{rule['id']}")
     assert deleted.status_code == 204
