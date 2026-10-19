@@ -6,7 +6,11 @@ import type {
   CandidateReviewDetail,
   CandidateSummary,
   ChangeImpact,
+  DuplicateReport,
   FieldOrigin,
+  MergePreview,
+  MergeRecord,
+  MergeResult,
   ReviewStatus,
   VersionAcceptance,
   VersionApplicability,
@@ -80,4 +84,11 @@ export const candidatesApi = {
     body: JSON.stringify(input),
   }),
   acceptances: (candidateId: number) => apiRequest<VersionAcceptance[]>(`/candidates/${candidateId}/acceptances`),
+  duplicates: (candidateId: number) => apiRequest<DuplicateReport>(`/candidates/${candidateId}/duplicates`),
+  mergePreview: (candidateId: number, sourceIds: number[]) => apiRequest<MergePreview>(`/candidates/${candidateId}/merge-preview?${sourceIds.map((id) => `source_ids=${id}`).join('&')}`),
+  merge: (candidateId: number, input: { source_candidate_ids: number[]; preview_token: string; reason: string }) => apiRequest<MergeResult>(`/candidates/${candidateId}/merge`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  merges: (candidateId: number) => apiRequest<MergeRecord[]>(`/candidates/${candidateId}/merges`),
 }

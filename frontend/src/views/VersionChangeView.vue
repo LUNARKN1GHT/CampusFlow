@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { errorMessage } from '../api/client'
 import { candidatesApi } from '../api/review'
-import type { CandidateDiff, CandidateSummary, ChangeImpact, VersionAcceptance, VersionApplicability } from '../api/types'
+import type { CandidateDiff, CandidateSummary, ChangeImpact, DuplicateReport, MergePreview, MergeResult, VersionAcceptance, VersionApplicability } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 
 const route = useRoute()
@@ -25,6 +25,13 @@ const selectedFields = ref<string[]>([])
 const reason = ref('')
 const acknowledgeConflict = ref(false)
 const accepted = ref<VersionAcceptance | null>(null)
+const duplicateReport = ref<DuplicateReport | null>(null)
+const selectedSources = ref<number[]>([])
+const mergePreview = ref<MergePreview | null>(null)
+const mergeReason = ref('')
+const mergeError = ref('')
+const merging = ref(false)
+const mergeResult = ref<MergeResult | null>(null)
 
 const statusLabels: Record<string, string> = {
   unchanged: '无变化', changed: '已修改', added: '新增', missing: '缺失', explicitly_removed: '原文明确删除',
@@ -52,10 +59,74 @@ async function loadCandidates() {
   try {
     candidates.value = await candidatesApi.list({ statuses: ['pending', 'confirmed', 'ignored', 'superseded'] })
     baselineId.value = queryNumber(route.query.baseline) ?? candidates.value[0]?.id ?? null
+    await loadDuplicates()
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadDuplicates() {
+  if (baselineId.value === null) return
+  try {
+    duplicateReport.value = await candidatesApi.duplicates(baselineId.value)
+    selectedSources.value = []
+    mergePreview.value = null
+  } catch (caught) {
+    mergeError.value = errorMessage(caught)
+  }
+}
+
+function toggleSource(candidateId: number) {
+  selectedSources.value = selectedSources.value.includes(candidateId)
+    ? selectedSources.value.filter((item) => item !== candidateId)
+    : [...selectedSources.value, candidateId]
+  mergePreview.value = null
+  mergeResult.value = null
+}
+
+async function loadMergePreview() {
+  if (baselineId.value === null || !selectedSources.value.length) {
+    mergeError.value = '请先选择要合并的重复候选。'
+    return
+  }
+  mergeError.value = ''
+  mergeResult.value = null
+  try {
+    mergePreview.value = await candidatesApi.mergePreview(baselineId.value, selectedSources.value)
+  } catch (caught) {
+    mergeError.value = errorMessage(caught)
+  }
+}
+
+function cancelMerge() {
+  // 取消只清空预览，不隐藏原始候选或重复列表。
+  mergePreview.value = null
+  mergeError.value = ''
+}
+
+async function submitMerge() {
+  if (baselineId.value === null || !mergePreview.value) return
+  if (!mergeReason.value.trim()) {
+    mergeError.value = '请填写合并原因。'
+    return
+  }
+  merging.value = true
+  mergeError.value = ''
+  try {
+    mergeResult.value = await candidatesApi.merge(baselineId.value, {
+      source_candidate_ids: selectedSources.value,
+      preview_token: mergePreview.value.token,
+      reason: mergeReason.value.trim(),
+    })
+    mergePreview.value = null
+    await loadComparison()
+    await loadDuplicates()
+  } catch (caught) {
+    mergeError.value = errorMessage(caught)
+  } finally {
+    merging.value = false
   }
 }
 
@@ -194,6 +265,44 @@ onMounted(loadCandidates)
           </div>
           <p v-else class="compact-empty">旧版本尚未转换为正式任务。</p>
           <p v-for="item in impact.unsupported" :key="item.code" class="inline-notice">{{ item.message }}</p>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading"><div><p class="eyebrow">重复建议</p><h2>合并预览</h2></div></div>
+          <p class="form-help">重复建议只供核对；必须预览并确认后才会合并。取消或请求失败不会隐藏原候选。</p>
+          <div v-if="duplicateReport?.suggestions.length" class="material-list">
+            <article v-for="item in duplicateReport.suggestions" :key="item.candidate_id" class="material-row">
+              <div class="material-main">
+                <div class="task-title-line">
+                  <label><input type="checkbox" :checked="selectedSources.includes(item.candidate_id)" @change="toggleSource(item.candidate_id)" /> #{{ item.candidate_id }} · {{ item.title ?? '未命名' }}</label>
+                  <span class="status-pill">相似度 {{ item.score }}</span>
+                </div>
+                <p>{{ item.reasons.join(' · ') }} · 来源版本 {{ item.source_version_id }}</p>
+                <p v-if="!item.scope_same" class="form-help">范围信息不完整，请人工核对。</p>
+              </div>
+            </article>
+          </div>
+          <p v-else class="compact-empty">没有重复建议。</p>
+          <p v-for="item in duplicateReport?.excluded ?? []" :key="item.candidate_id" class="form-help">已排除 #{{ item.candidate_id }}：{{ item.message }}</p>
+          <button type="button" @click="loadMergePreview">预览合并</button>
+
+          <div v-if="mergePreview" class="coverage-box">
+            <strong>将保留目标 #{{ mergePreview.target_candidate_id }} 的字段</strong>
+            <p>{{ Object.entries(mergePreview.kept_fields).map(([key, value]) => `${key}=${valueText(value)}`).join(' · ') }}</p>
+            <ul>
+              <li v-for="source in mergePreview.sources" :key="source.candidate_id">
+                合并 #{{ source.candidate_id }}（{{ source.title ?? '未命名' }}）：来源进度 {{ source.progress ?? '无' }}，时间块 {{ source.plan_block_count }} 个
+              </li>
+            </ul>
+            <label>合并原因<textarea v-model="mergeReason" rows="2" placeholder="说明为什么这些事项是同一项"></textarea></label>
+            <p v-if="mergeError" class="form-error" role="alert">{{ mergeError }}</p>
+            <div class="material-actions">
+              <button type="button" class="button-secondary" @click="cancelMerge">取消预览</button>
+              <button type="button" :disabled="merging" @click="submitMerge">{{ merging ? '正在合并…' : '确认合并预览范围' }}</button>
+            </div>
+          </div>
+          <p v-if="mergeError && !mergePreview" class="form-error" role="alert">{{ mergeError }}</p>
+          <p v-if="mergeResult" class="success-message" role="status">已合并 {{ mergeResult.records.length }} 项；原候选与来源历史已保留。</p>
         </section>
 
         <section class="panel">
