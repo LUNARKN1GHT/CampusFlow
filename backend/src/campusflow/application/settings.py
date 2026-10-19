@@ -51,5 +51,9 @@ def update_settings(
     )
     if workspace is None:
         raise NotFoundError("工作空间不存在")
+    # 时区变化会移动提醒窗口；在提交前重算，避免旧时区触发残留
+    from campusflow.application.reminders import sync_reminders
+
+    sync_reminders(repos, workspace_id)
     repos.uow.commit()
     return workspace
