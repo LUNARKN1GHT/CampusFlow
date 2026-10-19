@@ -221,8 +221,22 @@ class GoogleCalendarProvider:
 
     def _event_body(self, event: CalendarEventPayload) -> dict[str, Any]:
         if event.date_only:
-            start = {"date": event.starts_at.date().isoformat()}
-            end = {"date": event.ends_at.date().isoformat()}
+            try:
+                zone = ZoneInfo(event.timezone)
+            except ZoneInfoNotFoundError:
+                zone = UTC
+            start_value = (
+                event.starts_at.replace(tzinfo=zone)
+                if event.starts_at.tzinfo is None
+                else event.starts_at.astimezone(zone)
+            )
+            end_value = (
+                event.ends_at.replace(tzinfo=zone)
+                if event.ends_at.tzinfo is None
+                else event.ends_at.astimezone(zone)
+            )
+            start = {"date": start_value.date().isoformat()}
+            end = {"date": end_value.date().isoformat()}
         else:
             timezone = event.timezone
             try:
