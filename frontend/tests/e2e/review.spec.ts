@@ -6,9 +6,9 @@ test('待核对页面提供筛选与列表控制', async ({ page }) => {
   await page.getByLabel('用户名').fill('student')
   await page.getByLabel('密码').fill('campusflow-dev')
   await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: '让学习安排，' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
 
-  await page.getByRole('link', { name: '待核对' }).click()
+  await page.getByRole('link', { name: '待核对', exact: true }).click()
   await expect(page).toHaveURL(/\/review/)
   await expect(page.getByRole('heading', { name: '待核对' })).toBeVisible()
 

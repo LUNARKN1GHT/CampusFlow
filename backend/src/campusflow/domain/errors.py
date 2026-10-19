@@ -9,9 +9,20 @@ class NotFoundError(DomainError):
     """对象不存在（404）。"""
 
 
+class ConflictError(DomainError):
+    """并发或版本冲突（409）：过期草案、重复接受或输入已变化。"""
+
+
 class TransientError(DomainError):
     """临时故障（限流、超时、上游 5xx、连接中断）：处理作业可重试（J005）。"""
 
 
 class PermanentError(DomainError):
     """永久失败（格式不支持、来源已删除）：重试不会成功（J005）。"""
+
+
+class ModelOutputError(PermanentError):
+    """模型返回了响应，但内容不可用（结构错误、超限、维度不一致）。
+
+    与「请求被拒绝」区分：这类失败重试通常无效，但也不是服务不可用。
+    """

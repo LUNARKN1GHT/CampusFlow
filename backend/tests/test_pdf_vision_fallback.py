@@ -14,7 +14,11 @@ from campusflow.application.ports.parsers import (
     ParseOutcome,
     ParserLocator,
 )
-from campusflow.infrastructure.llm.errors import VisionRecognitionError
+from campusflow.infrastructure.llm.errors import (
+    VisionInvalidOutput,
+    VisionRecognitionError,
+    VisionRequestRejected,
+)
 from campusflow.infrastructure.llm.vision import FakeVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.pdf_with_vision import PdfWithVisionFallbackParser
@@ -95,6 +99,33 @@ def test_single_page_vision_failure_does_not_wipe_others() -> None:
     page2_failures = [f for f in outcome.failures if f.locator.page == 2]
     assert len(page2_failures) == 1
     assert "识别失败" in page2_failures[0].reason
+
+
+@pytest.mark.parametrize(
+    ("error", "retryable"),
+    [
+        (VisionRecognitionError("接口返回错误：HTTP 429"), True),
+        (VisionRequestRejected("接口返回错误：HTTP 401"), False),
+        (VisionInvalidOutput("识别结果不是合法 JSON"), False),
+    ],
+    ids=["transient", "rejected", "invalid-output"],
+)
+def test_vision_failure_retryability_is_preserved(error, retryable) -> None:
+    """Q009：单页失败的临时/永久语义随异常类型保留。"""
+
+    class FailingVision:
+        def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+            raise error
+
+    outcome = PdfWithVisionFallbackParser(PdfDocumentParser(), FailingVision()).parse(
+        _make_mixed_pdf(), "application/pdf"
+    )
+
+    page2_failures = [f for f in outcome.failures if f.locator.page == 2]
+    assert len(page2_failures) == 1
+    assert page2_failures[0].retryable is retryable
+    # 第 1 页文本结果不受影响
+    assert any(f.locator.page == 1 and "text layer" in f.text for f in outcome.fragments)
 
 
 def test_blank_page_stays_as_blank_failure() -> None:

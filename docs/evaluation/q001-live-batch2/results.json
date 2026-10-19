@@ -1,0 +1,4133 @@
+{
+  "mode": "real_api_pending_human_review",
+  "sample_set_version": "q001-preparation-v2",
+  "recorded_at": "2026-10-15T15:33:03.993957+00:00",
+  "status": "completed_pending_review",
+  "repeats": 2,
+  "planned_samples": 120,
+  "runs": [
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2403.291,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"本学期大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "本学期大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4038.573,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题的截止时间是2026年10月12日18:00前。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题的截止时间是2026年10月12日18:00前。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2457.743,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"现有资料中未提及物理A班练习的提交地点。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "现有资料中未提及物理A班练习的提交地点。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4827.661,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-partial-date",
+        "os-lab2"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台，但未写明具体年份和时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失具体年份和时刻\",\"explanation\":\"资料中未提供操作系统实验一的准确截止日期和时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台，但未写明具体年份和时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失具体年份和时刻",
+            "explanation": "资料中未提供操作系统实验一的准确截止日期和时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3475.185,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"网络实验报告截止时间为2026年10月18日18:00。\",\"citations\":[\"net-v1\"]},{\"text\":\"网络实验报告截止时间为2026年10月20日20:00。\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[{\"reason\":\"矛盾通知\",\"explanation\":\"两个来源中关于网络实验报告截止时间的声明相互矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "网络实验报告截止时间为2026年10月18日18:00。",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "网络实验报告截止时间为2026年10月20日20:00。",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "矛盾通知",
+            "explanation": "两个来源中关于网络实验报告截止时间的声明相互矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3728.991,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分资料缺失\",\"explanation\":\"实验二的提交格式所在区域无法识别，因为第二页未导入。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分资料缺失",
+            "explanation": "实验二的提交格式所在区域无法识别，因为第二页未导入。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2099.94,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训者不得进入实验室，即使有老师陪同也不行。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训者不得进入实验室，即使有老师陪同也不行。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1708.606,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1258.713,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4010.107,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59。\",\"citations\":[\"algo-hw1\"]},{\"text\":\"第一次作业逾期不再接受补交。\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59。",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "第一次作业逾期不再接受补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2375.988,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-presentation"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%，期末考试成绩占60%。\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%，期末考试成绩占60%。",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2038.411,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失具体要求\",\"explanation\":\"现有资料中未提供统计学论文的具体字数要求。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失具体要求",
+            "explanation": "现有资料中未提供统计学论文的具体字数要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3322.6,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00。\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00。\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"conflict\",\"explanation\":\"两个来源提供了不同的考试时间，存在矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00。",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00。",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "conflict",
+            "explanation": "两个来源提供了不同的考试时间，存在矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2829.616,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2048.679,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失截止时间信息\",\"explanation\":\"现有资料中未发现操作系统实验二的截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失截止时间信息",
+            "explanation": "现有资料中未发现操作系统实验二的截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3559.547,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"本学期大学物理A班第一次习题最晚提交时间为2026年10月10日20:00前。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "本学期大学物理A班第一次习题最晚提交时间为2026年10月10日20:00前。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2179.086,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题的截止时间是2026年10月12日18:00前。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题的截止时间是2026年10月12日18:00前。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2059.305,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"现有资料中未提及物理A班练习的提交地点。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "现有资料中未提及物理A班练习的提交地点。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4155.744,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-partial-date",
+        "os-lab2"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失具体年份和时刻\",\"explanation\":\"资料中未提供操作系统实验一的准确截止日期和时刻，仅说明了提交日期为10月15日。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台，但未写明年份和具体时刻。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失具体年份和时刻",
+            "explanation": "资料中未提供操作系统实验一的准确截止日期和时刻，仅说明了提交日期为10月15日。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5257.334,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"网络实验报告截止时间为2026年10月18日18:00。\",\"citations\":[\"net-v1\"]},{\"text\":\"网络实验报告截止时间为2026年10月20日20:00。\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[{\"reason\":\"矛盾通知\",\"explanation\":\"两个来源提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "网络实验报告截止时间为2026年10月18日18:00。",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "网络实验报告截止时间为2026年10月20日20:00。",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "矛盾通知",
+            "explanation": "两个来源提供了不同的截止日期，net-v1指出截止日期为10月18日，而net-v2指出截止日期为10月20日。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3402.201,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分资料缺失\",\"explanation\":\"实验二的提交格式所在区域无法识别，因为第二页未导入。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分资料缺失",
+            "explanation": "实验二的提交格式所在区域无法识别，因为第二页未导入。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 25962.019,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训者不得进入实验室，即使有老师陪同也不行。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训者不得进入实验室，即使有老师陪同也不行。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2414.204,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2080.948,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3094.476,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59。\",\"citations\":[\"algo-hw1\"]},{\"text\":\"第一次作业逾期不再接受补交。\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59。",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "第一次作业逾期不再接受补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4225.402,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-presentation"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%，期末考试成绩占60%。\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%，期末考试成绩占60%。",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2172.425,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失具体要求\",\"explanation\":\"现有资料中未提供统计学论文的具体字数要求。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失具体要求",
+            "explanation": "现有资料中未提供统计学论文的具体字数要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6562.726,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00。\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00。\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"conflict\",\"explanation\":\"两个来源提供了不同的考试时间，存在矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00。",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00。",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "conflict",
+            "explanation": "两个来源提供了不同的考试时间，存在矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4550.617,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3281.229,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失截止时间信息\",\"explanation\":\"现有资料中未发现操作系统实验二的截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失截止时间信息",
+            "explanation": "现有资料中未发现操作系统实验二的截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3545.972,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3819.825,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 13491.042,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交\",\"citations\":[\"physics-a\"]},{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a"
+            ]
+          },
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 37022.843,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-partial-date",
+        "os-lab2"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"年份缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体年份\"},{\"reason\":\"时刻缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "年份缺失",
+            "explanation": "资料中未明确说明实验一提交的具体年份"
+          },
+          {
+            "reason": "时刻缺失",
+            "explanation": "资料中未明确说明实验一提交的具体时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 19793.997,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"实验报告截止时间为2026年10月18日18:00\",\"citations\":[\"net-v1\"]},{\"text\":\"实验报告截止时间为2026年10月20日20:00\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "实验报告截止时间为2026年10月18日18:00",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "实验报告截止时间为2026年10月20日20:00",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 15863.53,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"资料缺失\",\"explanation\":\"实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "资料缺失",
+            "explanation": "实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "interrupted",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 2,
+      "latency_ms": 2358.608,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2174.211,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺少资料\",\"explanation\":\"现有资料中未发现关于美术课下次作业提交时间的信息\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少资料",
+            "explanation": "现有资料中未发现关于美术课下次作业提交时间的信息"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2457.893,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3055.878,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59\",\"citations\":[\"algo-hw1\"]},{\"text\":\"第一次作业逾期不接受补交\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "第一次作业逾期不接受补交",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2397.053,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-presentation"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4685.363,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\": \"insufficient\", \"claims\": [], \"uncertainties\": [{\"reason\": \"缺少具体字数信息\", \"explanation\": \"资料中仅提到\\\"统计学期中论文题目自选，字数与格式要求见后续通知\\\"，但未提供具体的字数要求\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少具体字数信息",
+            "explanation": "资料中仅提到\"统计学期中论文题目自选，字数与格式要求见后续通知\"，但未提供具体的字数要求"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 7951.232,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"时间冲突\",\"explanation\":\"两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "时间冲突",
+            "explanation": "两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2587.123,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3482.083,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺少截止时间信息\",\"explanation\":\"提供的资料中只提到了实验一的截止时间（10月15日），但没有提到实验二的截止时间。实验二的提交方式也仅说明'另行通知'，没有具体时间安排。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少截止时间信息",
+            "explanation": "提供的资料中只提到了实验一的截止时间（10月15日），但没有提到实验二的截止时间。实验二的提交方式也仅说明'另行通知'，没有具体时间安排。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3023.444,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4156.779,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6788.467,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交\",\"citations\":[\"physics-a\"]},{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a"
+            ]
+          },
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5413.248,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-partial-date",
+        "os-lab2"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失年份\",\"explanation\":\"资料中未明确说明实验一提交的具体年份\"},{\"reason\":\"缺失具体时刻\",\"explanation\":\"资料中未明确说明实验一提交的具体时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失年份",
+            "explanation": "资料中未明确说明实验一提交的具体年份"
+          },
+          {
+            "reason": "缺失具体时刻",
+            "explanation": "资料中未明确说明实验一提交的具体时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3114.896,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"实验报告截止时间为2026年10月18日18:00\",\"citations\":[\"net-v1\"]},{\"text\":\"实验报告截止时间为2026年10月20日20:00\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "实验报告截止时间为2026年10月18日18:00",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "实验报告截止时间为2026年10月20日20:00",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3128.624,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"资料缺失\",\"explanation\":\"实验二的提交格式要求在提供的资料中无法识别，因为相关页面未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "资料缺失",
+            "explanation": "实验二的提交格式要求在提供的资料中无法识别，因为相关页面未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2519.425,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1604.991,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1553.968,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3251.892,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59\",\"citations\":[\"algo-hw1\"]},{\"text\":\"算法课第一次作业逾期不接受补交\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "算法课第一次作业逾期不接受补交",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2654.058,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-presentation"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3237.903,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\": \"insufficient\", \"claims\": [], \"uncertainties\": [{\"reason\": \"缺少具体字数信息\", \"explanation\": \"资料中仅提到\\\"统计学期中论文题目自选，字数与格式要求见后续通知\\\"，但未提供具体的字数要求\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少具体字数信息",
+            "explanation": "资料中仅提到\"统计学期中论文题目自选，字数与格式要求见后续通知\"，但未提供具体的字数要求"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4976.443,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"时间冲突\",\"explanation\":\"两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "时间冲突",
+            "explanation": "两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3848.184,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3219.829,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺少截止时间信息\",\"explanation\":\"提供的资料中只提到了实验一的截止时间（10月15日），但没有提到实验二的截止时间。实验二的提交方式也仅说明'另行通知'，没有具体时间安排。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少截止时间信息",
+            "explanation": "提供的资料中只提到了实验一的截止时间（10月15日），但没有提到实验二的截止时间。实验二的提交方式也仅说明'另行通知'，没有具体时间安排。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2546.281,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"本学期大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "本学期大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2656.616,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题的截止时间是2026年10月12日18:00前通过课程平台提交。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2572.074,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"现有资料中未提及物理A班练习的提交地点。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "现有资料中未提及物理A班练习的提交地点。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4461.299,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"操作系统实验一请在10月15日提交到课程平台。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失具体时刻\",\"explanation\":\"资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失具体时刻",
+            "explanation": "资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4485.258,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"网络实验报告截止时间为2026年10月18日18:00。\",\"citations\":[\"net-v1\"]},{\"text\":\"网络实验报告截止时间为2026年10月20日20:00。\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[{\"reason\":\"矛盾通知\",\"explanation\":\"两个来源中关于网络实验报告截止时间的声明相互矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "网络实验报告截止时间为2026年10月18日18:00。",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "网络实验报告截止时间为2026年10月20日20:00。",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "矛盾通知",
+            "explanation": "两个来源中关于网络实验报告截止时间的声明相互矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3472.653,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二的内容是事务隔离级别。\",\"citations\":[\"scan-readable\"]},{\"text\":\"提交格式的要求无法识别，因为第二页未导入。\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"部分资料缺失\",\"explanation\":\"实验二的具体提交格式由于第二页未导入而无法识别。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二的内容是事务隔离级别。",
+            "citations": [
+              "scan-readable"
+            ]
+          },
+          {
+            "text": "提交格式的要求无法识别，因为第二页未导入。",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "部分资料缺失",
+            "explanation": "实验二的具体提交格式由于第二页未导入而无法识别。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2732.552,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训者不得进入实验室，即使有老师陪同也不行。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训者不得进入实验室，即使有老师陪同也不行。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1530.131,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2342.996,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"no sources provided\",\"explanation\":\"There are no sources available to answer the question about the current exam arrangements for the music class.\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "no sources provided",
+            "explanation": "There are no sources available to answer the question about the current exam arrangements for the music class."
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3265.668,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-grading"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。\",\"citations\":[\"algo-hw1\"]},{\"text\":\"第一次作业不可以补交。\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "第一次作业不可以补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2541.312,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-textbook"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%，期末考试成绩占60%。\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%，期末考试成绩占60%。",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4402.028,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失具体要求\",\"explanation\":\"现有资料中未提供统计学论文的具体字数要求。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失具体要求",
+            "explanation": "现有资料中未提供统计学论文的具体字数要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 6311.01,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00。\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00。\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"矛盾通知\",\"explanation\":\"两个来源提供了不同的考试时间，一个为2026年12月28日上午9:00至11:00，另一个为2026年12月29日下午14:00至16:00。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00。",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00。",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "矛盾通知",
+            "explanation": "两个来源提供了不同的考试时间，一个为2026年12月28日上午9:00至11:00，另一个为2026年12月29日下午14:00至16:00。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2526.166,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2154.655,
+      "retrieved_ids": [
+        "os-lab2",
+        "os-lab1-log",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失截止时间信息\",\"explanation\":\"现有资料中未发现操作系统实验二的截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失截止时间信息",
+            "explanation": "现有资料中未发现操作系统实验二的截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3635.723,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"本学期大学物理A班第一次习题最晚提交时间为2026年10月10日20:00前。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "本学期大学物理A班第一次习题最晚提交时间为2026年10月10日20:00前。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2780.479,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题的截止时间是2026年10月12日18:00前。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题的截止时间是2026年10月12日18:00前。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2354.802,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失信息\",\"explanation\":\"现有资料中未提及物理A班练习的提交地点。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失信息",
+            "explanation": "现有资料中未提及物理A班练习的提交地点。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3686.624,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"操作系统实验一请在10月15日提交到课程平台。\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"缺失具体时刻\",\"explanation\":\"资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201。",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "操作系统实验一请在10月15日提交到课程平台。",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "缺失具体时刻",
+            "explanation": "资料中提到实验一提交的日期是10月15日，但没有提供具体的提交时刻。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3726.234,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"网络实验报告截止时间为2026年10月18日18:00。\",\"citations\":[\"net-v1\"]},{\"text\":\"网络实验报告截止时间为2026年10月20日20:00。\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[{\"reason\":\"矛盾通知\",\"explanation\":\"两个来源中关于网络实验报告截止时间的声明相互矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "网络实验报告截止时间为2026年10月18日18:00。",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "网络实验报告截止时间为2026年10月20日20:00。",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "矛盾通知",
+            "explanation": "两个来源中关于网络实验报告截止时间的声明相互矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2622.758,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"资料不完整\",\"explanation\":\"关于数据库实验二的内容和提交格式的要求，第二页资料未导入，无法识别提交格式所在区域。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "资料不完整",
+            "explanation": "关于数据库实验二的内容和提交格式的要求，第二页资料未导入，无法识别提交格式所在区域。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3154.598,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训者不得进入实验室，即使有老师陪同也不行。\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训者不得进入实验室，即使有老师陪同也不行。",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2220.291,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2109.19,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"no sources provided\",\"explanation\":\"There are no sources available to answer the question about the current exam arrangements for the music class.\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "no sources provided",
+            "explanation": "There are no sources available to answer the question about the current exam arrangements for the music class."
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4964.262,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-grading"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。\",\"citations\":[\"algo-hw1\"]},{\"text\":\"第一次作业不可以补交。\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59，逾期不再接受补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "第一次作业不可以补交。",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3301.436,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-textbook"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%，期末考试成绩占60%。\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%，期末考试成绩占60%。",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2282.126,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失具体要求\",\"explanation\":\"现有资料中未提供统计学论文的具体字数要求。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失具体要求",
+            "explanation": "现有资料中未提供统计学论文的具体字数要求。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3791.101,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00。\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00。\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"conflict\",\"explanation\":\"两个来源提供了不同的考试时间，存在矛盾。\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00。",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00。",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "conflict",
+            "explanation": "两个来源提供了不同的考试时间，存在矛盾。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3374.005,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2000.737,
+      "retrieved_ids": [
+        "os-lab2",
+        "os-lab1-log",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺失截止时间信息\",\"explanation\":\"现有资料中未发现操作系统实验二的截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺失截止时间信息",
+            "explanation": "现有资料中未发现操作系统实验二的截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3145.075,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2740.127,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4164.561,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交\",\"citations\":[\"physics-a\"]},{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a"
+            ]
+          },
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 7168.624,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"年份缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体年份\"},{\"reason\":\"时刻缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "年份缺失",
+            "explanation": "资料中未明确说明实验一提交的具体年份"
+          },
+          {
+            "reason": "时刻缺失",
+            "explanation": "资料中未明确说明实验一提交的具体时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4463.639,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"实验报告截止时间为2026年10月18日18:00\",\"citations\":[\"net-v1\"]},{\"text\":\"实验报告截止时间为2026年10月20日20:00\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "实验报告截止时间为2026年10月18日18:00",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "实验报告截止时间为2026年10月20日20:00",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3648.234,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"资料缺失\",\"explanation\":\"实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "资料缺失",
+            "explanation": "实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3525.597,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训者不得进入实验室，即使有教师陪同也不允许\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训者不得进入实验室，即使有教师陪同也不允许",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2533.21,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1925.34,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3746.83,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-grading"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59\",\"citations\":[\"algo-hw1\"]},{\"text\":\"算法课第一次作业逾期不接受补交\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "算法课第一次作业逾期不接受补交",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2422.733,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-textbook"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2849.772,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\": \"insufficient\", \"claims\": [], \"uncertainties\": [{\"reason\": \"缺少具体字数信息\", \"explanation\": \"资料中仅提到\\\"统计学期中论文题目自选，字数与格式要求见后续通知\\\"，但未提供具体的字数要求\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少具体字数信息",
+            "explanation": "资料中仅提到\"统计学期中论文题目自选，字数与格式要求见后续通知\"，但未提供具体的字数要求"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 4717.163,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"时间冲突\",\"explanation\":\"两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "时间冲突",
+            "explanation": "两个来源提供了不同的考试时间，且第二个来源未明确说明是否替代第一个安排"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2783.459,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 1,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2406.264,
+      "retrieved_ids": [
+        "os-lab2",
+        "os-lab1-log",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺少截止时间信息\",\"explanation\":\"提供的资料中只提到了实验二为进程调度模拟，但未提及任何截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少截止时间信息",
+            "explanation": "提供的资料中只提到了实验二为进程调度模拟，但未提及任何截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "deadline-a",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2314.131,
+      "retrieved_ids": [
+        "physics-a",
+        "physics-a-2nd",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。\",\"citations\":[\"physics-a\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "deadline-b",
+      "scenario": "scope-isolation",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3058.72,
+      "retrieved_ids": [
+        "physics-b",
+        "physics-b-2nd",
+        "physics-b-lab"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。\",\"citations\":[\"physics-b\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理B班第一次习题须在2026年10月12日18:00前通过课程平台提交。",
+            "citations": [
+              "physics-b"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "submission-paraphrase",
+      "scenario": "chinese-paraphrase",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3416.111,
+      "retrieved_ids": [
+        "physics-a-exam",
+        "physics-a",
+        "physics-a-2nd"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交\",\"citations\":[\"physics-a\"]},{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第一次习题须在2026年10月10日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a"
+            ]
+          },
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "missing-year-time",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 26230.619,
+      "retrieved_ids": [
+        "os-lab1-log",
+        "os-lab2",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"操作系统实验一的上机安排为第6周周四第7-8节，实验室B201\",\"citations\":[\"os-lab1-log\"]},{\"text\":\"实验一请在10月15日提交到课程平台\",\"citations\":[\"os-partial-date\"]}],\"uncertainties\":[{\"reason\":\"年份缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体年份\"},{\"reason\":\"具体时刻缺失\",\"explanation\":\"资料中未明确说明实验一提交的具体时刻\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "操作系统实验一的上机安排为第6周周四第7-8节，实验室B201",
+            "citations": [
+              "os-lab1-log"
+            ]
+          },
+          {
+            "text": "实验一请在10月15日提交到课程平台",
+            "citations": [
+              "os-partial-date"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "年份缺失",
+            "explanation": "资料中未明确说明实验一提交的具体年份"
+          },
+          {
+            "reason": "具体时刻缺失",
+            "explanation": "资料中未明确说明实验一提交的具体时刻"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "conflicting-notices",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 17379.061,
+      "retrieved_ids": [
+        "net-v1",
+        "net-v2"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"实验报告截止时间为2026年10月18日18:00\",\"citations\":[\"net-v1\"]},{\"text\":\"实验报告截止时间为2026年10月20日20:00\",\"citations\":[\"net-v2\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "实验报告截止时间为2026年10月18日18:00",
+            "citations": [
+              "net-v1"
+            ]
+          },
+          {
+            "text": "实验报告截止时间为2026年10月20日20:00",
+            "citations": [
+              "net-v2"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "partial-coverage",
+      "scenario": "partial-coverage",
+      "input_type": "manual-transcript",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3340.09,
+      "retrieved_ids": [
+        "db-lab1",
+        "scan-readable"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"uncertain\",\"claims\":[{\"text\":\"数据库实验二为事务隔离级别\",\"citations\":[\"scan-readable\"]}],\"uncertainties\":[{\"reason\":\"资料缺失\",\"explanation\":\"实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入\"}]}",
+      "answer": {
+        "disposition": "uncertain",
+        "claims": [
+          {
+            "text": "数据库实验二为事务隔离级别",
+            "citations": [
+              "scan-readable"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "资料缺失",
+            "explanation": "实验二的提交格式要求在提供的资料中无法识别，因为相关区域未导入"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "conditional-rule",
+      "scenario": "conditional-rule",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2552.413,
+      "retrieved_ids": [
+        "lab-rule",
+        "chem-safety-class"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许\",\"citations\":[\"lab-rule\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "未通过安全培训的人员不得进入实验室，即使有教师陪同也不允许",
+            "citations": [
+              "lab-rule"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "no-material",
+      "scenario": "insufficient-material",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2497.353,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "archived-only",
+      "scenario": "unavailable-source",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 1632.517,
+      "retrieved_ids": [],
+      "retrieval_hits": 0,
+      "retrieval_expected": 0,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "algo-hw1",
+      "scenario": "multi-part-question",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3071.89,
+      "retrieved_ids": [
+        "algo-hw1",
+        "algo-hw1-issue",
+        "algo-grading"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"算法课第一次作业最晚提交时间是2026年10月20日23:59\",\"citations\":[\"algo-hw1\"]},{\"text\":\"算法课第一次作业逾期不接受补交\",\"citations\":[\"algo-hw1\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "算法课第一次作业最晚提交时间是2026年10月20日23:59",
+            "citations": [
+              "algo-hw1"
+            ]
+          },
+          {
+            "text": "算法课第一次作业逾期不接受补交",
+            "citations": [
+              "algo-hw1"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "eng-grading",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2717.144,
+      "retrieved_ids": [
+        "eng-grading",
+        "eng-deadline",
+        "eng-textbook"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"英语课平时成绩占总成绩的40%\",\"citations\":[\"eng-grading\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "英语课平时成绩占总成绩的40%",
+            "citations": [
+              "eng-grading"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "stat-paper-words",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3128.606,
+      "retrieved_ids": [
+        "stat-paper",
+        "stat-lecture"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\": \"insufficient\", \"claims\": [], \"uncertainties\": [{\"reason\": \"缺少具体字数信息\", \"explanation\": \"资料中仅提到\\\"统计学期中论文题目自选，字数与格式要求见后续通知\\\"，但未提供具体的字数要求\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少具体字数信息",
+            "explanation": "资料中仅提到\"统计学期中论文题目自选，字数与格式要求见后续通知\"，但未提供具体的字数要求"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "ds-exam",
+      "scenario": "source-conflict",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 5820.328,
+      "retrieved_ids": [
+        "ds-exam-v1",
+        "ds-exam-v2",
+        "ds-lab"
+      ],
+      "retrieval_hits": 2,
+      "retrieval_expected": 2,
+      "raw_answer": "{\"disposition\":\"conflict\",\"claims\":[{\"text\":\"数据结构期末考试定于2026年12月28日上午9:00至11:00\",\"citations\":[\"ds-exam-v1\"]},{\"text\":\"数据结构期末考试调整至2026年12月29日下午14:00至16:00\",\"citations\":[\"ds-exam-v2\"]}],\"uncertainties\":[{\"reason\":\"时间冲突\",\"explanation\":\"两个来源提供了不同的考试时间，且第二个来源未说明是否替代第一个安排\"}]}",
+      "answer": {
+        "disposition": "conflict",
+        "claims": [
+          {
+            "text": "数据结构期末考试定于2026年12月28日上午9:00至11:00",
+            "citations": [
+              "ds-exam-v1"
+            ]
+          },
+          {
+            "text": "数据结构期末考试调整至2026年12月29日下午14:00至16:00",
+            "citations": [
+              "ds-exam-v2"
+            ]
+          }
+        ],
+        "uncertainties": [
+          {
+            "reason": "时间冲突",
+            "explanation": "两个来源提供了不同的考试时间，且第二个来源未说明是否替代第一个安排"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "physics-a-2nd-deadline",
+      "scenario": "distractor-selection",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 3284.292,
+      "retrieved_ids": [
+        "physics-a-2nd",
+        "physics-a",
+        "physics-a-exam"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"answer\",\"claims\":[{\"text\":\"大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。\",\"citations\":[\"physics-a-2nd\"]}],\"uncertainties\":[]}",
+      "answer": {
+        "disposition": "answer",
+        "claims": [
+          {
+            "text": "大学物理A班第二次习题须在2026年10月24日20:00前通过课程平台提交。",
+            "citations": [
+              "physics-a-2nd"
+            ]
+          }
+        ],
+        "uncertainties": []
+      },
+      "invalid_citation_ids": []
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "case_id": "os-lab2-deadline",
+      "scenario": "missing-information",
+      "input_type": "text",
+      "repeat": 2,
+      "status": "completed",
+      "human_review": "pending",
+      "reviewer": "",
+      "attempt": 1,
+      "latency_ms": 2868.288,
+      "retrieved_ids": [
+        "os-lab2",
+        "os-lab1-log",
+        "os-partial-date"
+      ],
+      "retrieval_hits": 1,
+      "retrieval_expected": 1,
+      "raw_answer": "{\"disposition\":\"insufficient\",\"claims\":[],\"uncertainties\":[{\"reason\":\"缺少截止时间信息\",\"explanation\":\"提供的资料中只提到了实验二为进程调度模拟，但未提及任何截止时间信息。\"}]}",
+      "answer": {
+        "disposition": "insufficient",
+        "claims": [],
+        "uncertainties": [
+          {
+            "reason": "缺少截止时间信息",
+            "explanation": "提供的资料中只提到了实验二为进程调度模拟，但未提及任何截止时间信息。"
+          }
+        ]
+      },
+      "invalid_citation_ids": []
+    }
+  ],
+  "caveat": "未经人工语义复核；没有引用支持率或模型选型结论。费用为用量乘单价估算。",
+  "unattempted_samples": 0
+}

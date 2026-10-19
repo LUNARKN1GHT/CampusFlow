@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,9 @@ from campusflow.application.ports.repositories import (
     MaterialData,
     MaterialVersionData,
     NewSourceChunk,
+    PlanBlockData,
+    PlanDraftData,
+    PlanVersionData,
     ProcessingJobAttemptData,
     ProcessingJobData,
     Repositories,
@@ -25,6 +28,7 @@ from campusflow.application.ports.repositories import (
     TaskProgressChangeData,
     WorkspaceData,
 )
+from campusflow.domain.errors import DomainError
 from campusflow.domain.states import (
     DueSourceType,
     EventRecurrence,
@@ -42,6 +46,9 @@ from campusflow.infrastructure.db.models import (
     Material,
     MaterialVersion,
     MaterialVersionRelation,
+    PlanBlock,
+    PlanDraft,
+    PlanVersion,
     ProcessingJob,
     ProcessingJobAttempt,
     Semester,
@@ -1077,6 +1084,9 @@ def _job_to_data(row: ProcessingJob) -> ProcessingJobData:
         retryable=row.retryable,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        heartbeat_at=row.heartbeat_at,
+        manifest_id=row.manifest_id,
+        auto_retry_count=row.auto_retry_count,
     )
 
 
@@ -1173,16 +1183,32 @@ class SqlAlchemyJobRepository:
         )
         return [_attempt_to_data(row) for row in rows]
 
-    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
-        from campusflow.domain.states import JobStatus
+    def list_stale_running(
+        self, *, timeout_seconds: int, embed_timeout_seconds: int | None = None
+    ) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStage, JobStatus
 
+        embed_threshold = datetime.now(UTC) - timedelta(
+            seconds=timeout_seconds if embed_timeout_seconds is None else embed_timeout_seconds
+        )
         threshold = datetime.now(UTC) - timedelta(seconds=timeout_seconds)
+        # 索引作业按块推进，长时间没有新块完成不代表卡死；用最近心跳判断。
         rows = self._session.scalars(
             select(ProcessingJob)
             .where(
                 ProcessingJob.status == JobStatus.RUNNING,
                 ProcessingJob.started_at.is_not(None),
-                ProcessingJob.started_at <= threshold,
+                or_(
+                    and_(
+                        ProcessingJob.stage != JobStage.EMBED,
+                        ProcessingJob.started_at <= threshold,
+                    ),
+                    and_(
+                        ProcessingJob.stage == JobStage.EMBED,
+                        func.coalesce(ProcessingJob.heartbeat_at, ProcessingJob.started_at)
+                        <= embed_threshold,
+                    ),
+                ),
             )
             .order_by(ProcessingJob.id)
         )
@@ -1212,6 +1238,10 @@ class SqlAlchemyJobRepository:
         row.error_reason = None
         row.retryable = None
         row.started_at = None
+        row.heartbeat_at = None
+        row.manifest_id = None
+        # 人工重试重新计算自动重投额度，避免历史自动重投次数把人工重试挡住
+        row.auto_retry_count = 0
         # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
         row.enqueued_at = None
         self._session.flush()
@@ -1243,6 +1273,363 @@ class SqlAlchemyJobRepository:
         rows = self._session.scalars(query.order_by(ProcessingJob.id).limit(limit))
         return [_job_to_data(row) for row in rows]
 
+    def set_manifest(self, job_id: int, manifest_id: str) -> ProcessingJobData | None:
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
+        row = self._session.get(ProcessingJob, job_id)
+        if row is None:
+            return None
+        row.manifest_id = manifest_id
+        self._session.flush()
+        return _job_to_data(row)
+
+    def heartbeat(self, job_id: int) -> ProcessingJobData | None:
+        if _row_missing(self._session, ProcessingJob, job_id):
+            return None
+        row = self._session.get(ProcessingJob, job_id)
+        if row is None:
+            return None
+        row.heartbeat_at = datetime.now(UTC)
+        self._session.flush()
+        return _job_to_data(row)
+
+    def create_or_requeue(
+        self, workspace_id: int, material_id: int, version_id: int, stage: str
+    ) -> ProcessingJobData:
+        from campusflow.domain.states import JobStage, JobStatus
+
+        stage = JobStage(stage)
+        # 先插入再读取：外部唯一索引兜底并发，重复的解析结果不会造出第二个索引作业。
+        self._session.execute(
+            pg_insert(ProcessingJob)
+            .values(
+                workspace_id=workspace_id,
+                material_id=material_id,
+                version_id=version_id,
+                stage=stage,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["version_id"],
+                index_where=text("stage = 'embed'"),
+            )
+        )
+        row = self._session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.version_id == version_id, ProcessingJob.stage == stage)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if row is None:
+            raise DomainError("作业创建失败，请稍后重试")
+        # 待处理或处理中不改状态：避免两个执行者同时消费同一作业。
+        if row.status in (JobStatus.PENDING, JobStatus.RUNNING):
+            return _job_to_data(row)
+        # 终态重置：成功块保留，已完成的块不会重复调用模型。
+        row.status = JobStatus.PENDING
+        row.scope = None
+        row.error_reason = None
+        row.retryable = None
+        row.started_at = None
+        row.heartbeat_at = None
+        row.enqueued_at = None
+        row.manifest_id = None
+        row.auto_retry_count = 0
+        self._session.flush()
+        return _job_to_data(row)
+
+    def prepare_auto_retry(self, job_id: int, *, max_auto_retries: int) -> ProcessingJobData | None:
+        from campusflow.domain.states import JobStage, JobStatus
+
+        result = self._session.execute(
+            update(ProcessingJob)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.stage == JobStage.EMBED,
+                ProcessingJob.status.in_([JobStatus.FAILED, JobStatus.PARTIAL]),
+                ProcessingJob.retryable.is_(True),
+                ProcessingJob.auto_retry_count < max_auto_retries,
+            )
+            .values(
+                status=JobStatus.PENDING,
+                scope=None,
+                error_reason=None,
+                retryable=None,
+                started_at=None,
+                heartbeat_at=None,
+                enqueued_at=None,
+                manifest_id=None,
+                auto_retry_count=ProcessingJob.auto_retry_count + 1,
+                updated_at=func.now(),
+            )
+        )
+        if not result.rowcount:
+            return None
+        self._session.flush()
+        row = self._session.get(ProcessingJob, job_id)
+        return _job_to_data(row) if row is not None else None
+
+    def list_auto_retryable(
+        self, *, stage: str, max_auto_retries: int, limit: int = 50
+    ) -> list[ProcessingJobData]:
+        from campusflow.domain.states import JobStatus
+
+        rows = self._session.scalars(
+            select(ProcessingJob)
+            .where(
+                ProcessingJob.stage == stage,
+                ProcessingJob.status.in_([JobStatus.FAILED, JobStatus.PARTIAL]),
+                ProcessingJob.retryable.is_(True),
+                ProcessingJob.auto_retry_count < max_auto_retries,
+            )
+            .order_by(ProcessingJob.id)
+            .limit(limit)
+        )
+        return [_job_to_data(row) for row in rows]
+
+
+def _plan_draft_to_data(row: PlanDraft) -> PlanDraftData:
+    return PlanDraftData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        semester_id=row.semester_id,
+        range_start=row.range_start,
+        range_end=row.range_end,
+        status=row.status,
+        version=row.version,
+        input_snapshot=row.input_snapshot,
+        input_fingerprint=row.input_fingerprint,
+        assumptions=row.assumptions,
+        gaps=row.gaps,
+        unscheduled=row.unscheduled,
+        conflicts=row.conflicts,
+        coverage=row.coverage,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        accepted_at=row.accepted_at,
+    )
+
+
+def _plan_block_to_data(row: PlanBlock) -> PlanBlockData:
+    return PlanBlockData(
+        id=row.id,
+        draft_id=row.draft_id,
+        task_id=row.task_id,
+        kind=row.kind,
+        title=row.title,
+        starts_at=row.starts_at,
+        ends_at=row.ends_at,
+        minutes=row.minutes,
+        seq=row.seq,
+        locked=row.locked,
+        reason=row.reason,
+        constraint_source=row.constraint_source,
+        created_at=row.created_at,
+    )
+
+
+def _plan_version_to_data(row: PlanVersion) -> PlanVersionData:
+    return PlanVersionData(
+        id=row.id,
+        draft_id=row.draft_id,
+        version_no=row.version_no,
+        change=row.change,
+        snapshot=row.snapshot,
+        created_at=row.created_at,
+    )
+
+
+class SqlAlchemyPlanRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def create_draft(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        range_start: date,
+        range_end: date,
+        input_snapshot: dict,
+        input_fingerprint: str,
+        assumptions: list[dict],
+        gaps: list[dict],
+        unscheduled: list[dict],
+        conflicts: list[dict],
+        coverage: dict,
+    ) -> PlanDraftData:
+        row = PlanDraft(
+            workspace_id=workspace_id,
+            semester_id=semester_id,
+            range_start=range_start,
+            range_end=range_end,
+            input_snapshot=input_snapshot,
+            input_fingerprint=input_fingerprint,
+            assumptions=assumptions,
+            gaps=gaps,
+            unscheduled=unscheduled,
+            conflicts=conflicts,
+            coverage=coverage,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _plan_draft_to_data(row)
+
+    def get_draft(self, draft_id: int) -> PlanDraftData | None:
+        row = self._session.get(PlanDraft, draft_id)
+        if row is None:
+            return None
+        data = _plan_draft_to_data(row)
+        data.blocks = self.list_blocks(row.id)
+        return data
+
+    def list_drafts(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[PlanDraftData]:
+        stmt = select(PlanDraft).where(PlanDraft.workspace_id == workspace_id)
+        if semester_id is not None:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        stmt = stmt.order_by(PlanDraft.created_at.desc(), PlanDraft.id.desc())
+        return [_plan_draft_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_current(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> PlanDraftData | None:
+        stmt = select(PlanDraft).where(
+            PlanDraft.workspace_id == workspace_id, PlanDraft.status == "accepted"
+        )
+        if semester_id is None:
+            stmt = stmt.where(PlanDraft.semester_id.is_(None))
+        else:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        row = self._session.scalar(stmt.order_by(PlanDraft.accepted_at.desc(), PlanDraft.id.desc()))
+        if row is None:
+            return None
+        data = _plan_draft_to_data(row)
+        data.blocks = self.list_blocks(row.id)
+        return data
+
+    def create_blocks(self, draft_id: int, blocks: list[dict]) -> list[PlanBlockData]:
+        rows = [
+            PlanBlock(
+                draft_id=draft_id,
+                task_id=block.get("task_id"),
+                kind=block.get("kind", "task"),
+                title=block["title"],
+                starts_at=block["starts_at"],
+                ends_at=block["ends_at"],
+                minutes=block["minutes"],
+                seq=block.get("seq", 0),
+                locked=block.get("locked", False),
+                reason=block["reason"],
+                constraint_source=block.get("constraint_source", []),
+            )
+            for block in blocks
+        ]
+        self._session.add_all(rows)
+        self._session.flush()
+        return [_plan_block_to_data(row) for row in rows]
+
+    def list_blocks(self, draft_id: int) -> list[PlanBlockData]:
+        stmt = (
+            select(PlanBlock)
+            .where(PlanBlock.draft_id == draft_id)
+            .order_by(PlanBlock.starts_at, PlanBlock.seq, PlanBlock.id)
+        )
+        return [_plan_block_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_block(self, block_id: int) -> PlanBlockData | None:
+        row = self._session.get(PlanBlock, block_id)
+        return _plan_block_to_data(row) if row is not None else None
+
+    def update_block(
+        self,
+        block_id: int,
+        *,
+        starts_at: datetime,
+        ends_at: datetime,
+        minutes: int,
+        locked: bool,
+        reason: str,
+    ) -> PlanBlockData | None:
+        row = self._session.get(PlanBlock, block_id)
+        if row is None:
+            return None
+        row.starts_at = starts_at
+        row.ends_at = ends_at
+        row.minutes = minutes
+        row.locked = locked
+        row.reason = reason
+        self._session.flush()
+        return _plan_block_to_data(row)
+
+    def bump_version(
+        self,
+        draft_id: int,
+        *,
+        expected_version: int,
+        change: str,
+        snapshot: dict,
+        status: str | None = None,
+        accepted_at: datetime | None = None,
+    ) -> PlanDraftData | None:
+        values: dict[str, object] = {
+            "version": PlanDraft.version + 1,
+            "updated_at": func.now(),
+        }
+        if status is not None:
+            values["status"] = status
+        if accepted_at is not None:
+            values["accepted_at"] = accepted_at
+        result = self._session.execute(
+            update(PlanDraft)
+            .where(
+                PlanDraft.id == draft_id,
+                PlanDraft.version == expected_version,
+                PlanDraft.status.in_(["draft", "accepted"]),
+            )
+            .values(**values)
+        )
+        if not result.rowcount:
+            return None
+        self._session.flush()
+        row = self._session.get(PlanDraft, draft_id)
+        if row is None:
+            return None
+        self.add_version(draft_id, version_no=row.version, change=change, snapshot=snapshot)
+        return _plan_draft_to_data(row)
+
+    def supersede_others(
+        self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
+    ) -> None:
+        stmt = update(PlanDraft).where(
+            PlanDraft.workspace_id == workspace_id,
+            PlanDraft.status == "accepted",
+            PlanDraft.id != keep_draft_id,
+        )
+        if semester_id is None:
+            stmt = stmt.where(PlanDraft.semester_id.is_(None))
+        else:
+            stmt = stmt.where(PlanDraft.semester_id == semester_id)
+        self._session.execute(stmt.values(status="superseded", updated_at=func.now()))
+
+    def add_version(
+        self, draft_id: int, *, version_no: int, change: str, snapshot: dict
+    ) -> PlanVersionData:
+        row = PlanVersion(
+            draft_id=draft_id, version_no=version_no, change=change, snapshot=snapshot
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _plan_version_to_data(row)
+
+    def list_versions(self, draft_id: int) -> list[PlanVersionData]:
+        stmt = (
+            select(PlanVersion)
+            .where(PlanVersion.draft_id == draft_id)
+            .order_by(PlanVersion.version_no)
+        )
+        return [_plan_version_to_data(row) for row in self._session.scalars(stmt)]
+
 
 def build_repositories(session: Session) -> Repositories:
     """装配全部仓储与工作单元（API 装配、Worker、投递补偿共用）。"""
@@ -1256,5 +1643,6 @@ def build_repositories(session: Session) -> Repositories:
         jobs=SqlAlchemyJobRepository(session),
         candidates=SqlAlchemyCandidateRepository(session),
         rules=SqlAlchemyRuleRepository(session),
+        plans=SqlAlchemyPlanRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )

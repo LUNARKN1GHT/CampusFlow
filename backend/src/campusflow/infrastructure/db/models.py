@@ -8,6 +8,7 @@
 
 from datetime import date, datetime, time
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -15,17 +16,95 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Time,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from campusflow.domain.states import DueSourceType, EventRecurrence, TaskPriority, TaskProgress
 from campusflow.infrastructure.db.base import Base
+
+
+class EmbeddingProfileRecord(Base):
+    __tablename__ = "embedding_profiles"
+    __table_args__ = (CheckConstraint("dimensions > 0 AND dimensions <= 4096"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(100))
+    model: Mapped[str] = mapped_column(String(100))
+    revision: Mapped[str] = mapped_column(String(100))
+    dimensions: Mapped[int] = mapped_column(Integer)
+    generation_config: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexedBlock(Base):
+    """Q004 逐块进度与成功向量；同一配置/块只有一行。"""
+
+    __tablename__ = "indexed_blocks"
+    __table_args__ = (
+        CheckConstraint("start_offset >= 0 AND end_offset > start_offset"),
+        CheckConstraint("state IN ('pending', 'running', 'done', 'failed', 'skipped')"),
+        CheckConstraint("(state = 'done') = (embedding IS NOT NULL)"),
+        CheckConstraint("NOT retryable OR state = 'failed'"),
+        CheckConstraint(
+            "(state = 'running' AND claim_token IS NOT NULL AND lease_until IS NOT NULL) OR "
+            "(state <> 'running' AND claim_token IS NULL AND lease_until IS NULL)",
+            name="ck_indexed_blocks_claim",
+        ),
+        CheckConstraint("attempts >= 0", name="ck_indexed_blocks_attempts"),
+        # 检索加速（Q004）：按余弦距离的 HNSW 索引，语义搜索不必全表扫描。
+        Index(
+            "ix_indexed_blocks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"), primary_key=True)
+    block_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    source_chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
+    )
+    source_fingerprint: Mapped[str] = mapped_column(String(64))
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    chunker_version: Mapped[str] = mapped_column(String(100))
+    text: Mapped[str] = mapped_column(String)
+    state: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    retryable: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    failure_code: Mapped[str | None] = mapped_column(String(40))
+    # 领取次数（含第一次）：达到上限后不再调用模型，避免崩溃或临时失败无限重试。
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024))
+    claim_token: Mapped[str | None] = mapped_column(String(32))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndexManifest(Base):
+    """完整来源/块清单快照；身份包含配置、来源、分块设置和解析覆盖。"""
+
+    __tablename__ = "index_manifests"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
+    )
+    profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Workspace(Base):
@@ -305,6 +384,16 @@ class ProcessingJob(Base):
     """后台处理作业（J001）：阶段、覆盖范围、错误原因、尝试次数。"""
 
     __tablename__ = "processing_jobs"
+    __table_args__ = (
+        # 一份资料版本最多只有一个向量索引作业（Q004）：重复的解析结果只会重置它，
+        # 不会产生第二个执行者。
+        Index(
+            "uq_processing_jobs_embed_version",
+            "version_id",
+            unique=True,
+            postgresql_where=text("stage = 'embed'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
@@ -328,6 +417,14 @@ class ProcessingJob(Base):
     delivery_attempts: Mapped[int] = mapped_column(Integer, default=0)
     # 领取时间（J005）：用于识别长期停在 running 的超时作业
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    # 心跳（Q004）：索引作业按块推进，长作业借此避免被超时回收误判
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 当前索引作业使用的完整清单；为空表示尚未生成或已重置
+    manifest_id: Mapped[str | None] = mapped_column(
+        ForeignKey("index_manifests.id", ondelete="SET NULL")
+    )
+    # 自动重投次数（Q004）：与人工重试分开计数，防止崩溃循环无限重投
+    auto_retry_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # 最近一次失败是否可重试（J005）：区分临时故障与永久失败
     retryable: Mapped[bool | None] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -464,3 +561,127 @@ class CandidateReviewChange(Base):
     operator: Mapped[str] = mapped_column(String(100))
     reason: Mapped[str | None] = mapped_column(String(500))
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QaConversation(Base):
+    """Q014：有范围的问答会话；范围以工作空间为边界。"""
+
+    __tablename__ = "qa_conversations"
+    __table_args__ = (
+        CheckConstraint("mode IN ('keyword', 'vector', 'hybrid')", name="ck_qa_conversation_mode"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"))
+    course_id: Mapped[int | None] = mapped_column(ForeignKey("courses.id"))
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    mode: Mapped[str] = mapped_column(String(20), default="hybrid", server_default="hybrid")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class PlanDraft(Base):
+    """P001：计划草案。输入快照与假设随草案保存，接受状态与版本独立维护。
+
+    时间块与任务原始 DDL 分表保存：调整或移动计划块不会改写任务截止。
+    version 用于并发校验，每次生成、接受、移动或锁定都递增。
+    """
+
+    __tablename__ = "plan_drafts"
+    __table_args__ = (
+        CheckConstraint("range_end >= range_start", name="ck_plan_drafts_range"),
+        CheckConstraint("version >= 1", name="ck_plan_drafts_version"),
+        CheckConstraint(
+            "status IN ('draft', 'accepted', 'superseded')", name="ck_plan_drafts_status"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    semester_id: Mapped[int | None] = mapped_column(ForeignKey("semesters.id"), index=True)
+    range_start: Mapped[date] = mapped_column(Date)
+    range_end: Mapped[date] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    input_snapshot: Mapped[dict] = mapped_column(JSONB)
+    input_fingerprint: Mapped[str] = mapped_column(String(64))
+    assumptions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    gaps: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    unscheduled: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    coverage: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PlanBlock(Base):
+    """P001：草案中的建议时间块。task_id 只关联任务，不复制或改写 DDL。"""
+
+    __tablename__ = "plan_blocks"
+    __table_args__ = (
+        CheckConstraint("ends_at > starts_at", name="ck_plan_blocks_interval"),
+        CheckConstraint("minutes > 0", name="ck_plan_blocks_minutes"),
+        CheckConstraint("kind IN ('task', 'buffer')", name="ck_plan_blocks_kind"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("plan_drafts.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="SET NULL"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20), default="task", server_default="task")
+    title: Mapped[str] = mapped_column(String(300))
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    minutes: Mapped[int] = mapped_column(Integer)
+    seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    reason: Mapped[str] = mapped_column(String(1000))
+    constraint_source: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanVersion(Base):
+    """P001：草案每次实质变化的快照，保证同一草案的版本可追溯。"""
+
+    __tablename__ = "plan_versions"
+    __table_args__ = (UniqueConstraint("draft_id", "version_no"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(
+        ForeignKey("plan_drafts.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    change: Mapped[str] = mapped_column(String(30))
+    snapshot: Mapped[dict] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QaTurn(Base):
+    """Q014/Q017：一轮问答的范围、引用与覆盖快照；引用在读取时重新复核。"""
+
+    __tablename__ = "qa_turns"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("qa_conversations.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(String(2000))
+    answer: Mapped[str] = mapped_column(String)
+    insufficient: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    intent: Mapped[str] = mapped_column(String(20), default="query", server_default="query")
+    scope: Mapped[dict] = mapped_column(JSONB)
+    citations: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    coverage: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    comparisons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    uncertainties: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

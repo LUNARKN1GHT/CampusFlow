@@ -10,11 +10,13 @@ const availableItems = [
   { label: '课程', to: '/courses' },
   { label: '资料库', to: '/library' },
   { label: '待核对', to: '/review' },
-  { label: '任务与计划', to: '/tasks' },
+  { label: '智能问答', to: '/qa' },
+  { label: '任务', to: '/tasks' },
+  { label: '学习计划', to: '/plan' },
   { label: '设置', to: '/settings' },
 ]
 
-const futureItems = ['智能问答']
+const futureItems: string[] = []
 
 async function signOut() {
   await logout()
@@ -35,10 +37,12 @@ async function signOut() {
         <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to" active-class="" exact-active-class="router-link-active">
           {{ item.label }}
         </RouterLink>
-        <p class="nav-label nav-label-spaced">后续阶段</p>
-        <span v-for="item in futureItems" :key="item" class="nav-item nav-item-disabled">
-          {{ item }}<small>尚未开放</small>
-        </span>
+        <template v-if="futureItems.length">
+          <p class="nav-label nav-label-spaced">后续阶段</p>
+          <span v-for="item in futureItems" :key="item" class="nav-item nav-item-disabled">
+            {{ item }}<small>尚未开放</small>
+          </span>
+        </template>
       </nav>
 
       <p class="sidebar-note">所有业务数据均来自真实 API；尚未实现的能力不会展示为可用入口。</p>

@@ -7,11 +7,16 @@
 
 ## 1. 各程序做什么
 
-- API：接收上传、保存资料，告诉你资料编号和后台作业编号。
-- PostgreSQL：保存资料、作业状态和原文片段，是查询状态的依据。
-- Redis／RQ：保存等待执行的作业编号，不存资料原文。
-- Worker：独立的后台程序，读取私有文件，解析后把片段和状态写回数据库。
-- 粘贴文本目前直接解析并返回段落，不经过队列；PDF 和图片经 Worker 处理。
+- API：接收上传、保存资料，告诉你资料编号和后台作业编号；同时每 15 秒做一次
+  后台恢复扫描（补投、超时回收、自动重试索引作业）。
+- PostgreSQL：保存资料、作业状态、原文片段和向量，是查询状态的依据。
+- Redis／RQ：保存等待执行的作业编号，不存资料原文；解析与向量索引分属
+  `campusflow-parse` 和 `campusflow-index` 两个队列，互不阻塞。
+- Worker：独立的后台程序，读取私有文件，解析后把片段和状态写回数据库；同一进程
+  也消费索引队列，把解析出的每一段文字转成向量并保存。
+- 文件与网页导入：上传 → 解析作业 → 解析完成后自动生成一个索引作业 → 恢复扫描
+  投递 → Worker 逐块调用向量模型。粘贴文本目前直接解析并返回段落，不经过队列，
+  也暂不生成索引作业（见 Q004 完成记录中的已知限制）。
 
 ## 2. 首次启动（Windows + Docker Desktop）
 
@@ -65,6 +70,17 @@ uv run --locked python -m campusflow.workers.main
 Windows 原生 Python 不支持当前 RQ Worker 的 Linux 进程方式，应使用上述 Docker 命令。
 `--burst` 表示处理完当时的队列就退出；日常常驻运行不要加这个参数。
 
+Worker 同时监听 `campusflow-parse` 与 `campusflow-index`。解析成功后只在数据库里
+生成一个待处理索引作业，**不会直接写 Redis**（outbox 语义）；由 API 的恢复扫描在
+最长一个扫描周期内投递。相关开关在 `backend/.env` 中配置：
+
+| 配置项 | 默认 | 作用 |
+| --- | --- | --- |
+| `CAMPUSFLOW_RECOVERY_INTERVAL_SECONDS` | 15 | 恢复扫描周期；0 表示只在 API 启动时扫描一次 |
+| `CAMPUSFLOW_JOB_TIMEOUT_SECONDS` | 900 | 解析作业无心跳超时 |
+| `CAMPUSFLOW_EMBED_JOB_TIMEOUT_SECONDS` | 300 | 索引作业心跳超时 |
+| `CAMPUSFLOW_EMBED_JOB_MAX_AUTO_RETRIES` | 3 | 索引作业自动重投上限（每块另有 3 次领取上限） |
+
 ## 3. 三种输入的检查步骤
 
 打开 `http://127.0.0.1:8000/docs`，先调用 `POST /api/v1/auth/login` 登录。
@@ -88,6 +104,15 @@ Windows 原生 Python 不支持当前 RQ Worker 的 Linux 进程方式，应使�
 接口均加 `/api/v1` 前缀。用 `GET /materials/{id}/versions` 查询版本，再用
 `GET /materials/{id}/versions/{version_no}/chunks` 核对文字、页码、段落或坐标，
 `GET /materials/{id}/versions/{version_no}/file` 读取对应原文件。
+
+解析作业结束后，同一份资料会出现一个 `stage=embed` 的索引作业；它可能先显示
+`pending` 且 `enqueued_at` 为空，表示等待恢复扫描投递。用
+`GET /api/v1/jobs/{embed_job_id}/index-progress` 查看等待／处理中／部分成功／失败：
+
+- `summary=null`：尚未生成清单，前端显示“等待索引”；
+- `summary.fully_searchable=true`：全部块成功且解析覆盖完整，才可宣称可检索；
+- 加 `?include_blocks=true` 可看每个块的状态、领取次数、是否可重试与失败码，
+  接口不返回正文、向量或异常原文。
 
 模型返回的文字和区域仍需人工核对；不得把这一步成功当作识别准确性已验收。
 重复上传会返回已有资料提示，不会为相同文件再创建作业。
@@ -118,26 +143,53 @@ docker compose -f infra/docker-compose.worker.yml run --rm worker uv run --locke
 | 现象 | 检查与处理 |
 | --- | --- |
 | 数据库结构不是最新 | 确认选对数据库，执行 `alembic upgrade head`；不要手动改 `alembic_version` |
-| `pending` 且没有投递时间 | 先恢复 Redis，再调用 `POST /api/v1/jobs/redeliver`；只补投当前空间的待处理作业 |
+| `pending` 且没有投递时间 | 先恢复 Redis；默认 15 秒内恢复扫描会自动补投，也可调用 `POST /api/v1/jobs/redeliver` 立即补投当前空间的待处理作业 |
 | 已有投递时间但一直 `pending` | 检查 Worker 是否退出、密钥是否填写、两端 Redis 库号是否相同 |
 | Worker 报来源不可用 | 核对两端挂载目录；资料已删除则不应重试或恢复旧结果 |
-| `partial`／`failed` | 只有返回 `retryable=true` 时才调用 `POST /api/v1/jobs/{id}/retry`；随后重新查状态 |
-| 长时间 `running` | 先停掉卡住的 Worker，再重启 API 执行超时回收，确认状态变为可重试失败后重试 |
+| 视觉模型 401／403 或请求被拒绝 | 永久失败，重投不会变好；核对 `ZHIPU_API_KEY`、模型名和账号额度 |
+| 视觉模型 429／5xx／超时 | 临时失败；适配器按配置自动重试，耗尽后作业标记可重试 |
+| 视觉模型返回内容无法解析 | 永久失败（`retryable=false`）；重投无效，需检查模型输出或评估换模型 |
+| `partial`／`failed` | 只有返回 `retryable=true` 时才调用 `POST /api/v1/jobs/{id}/retry`；索引作业先看 `index-progress` 定位失败块，随后重新查状态 |
+| 长时间 `running` | 先停掉卡住的 Worker，再重启 API 执行超时回收，确认状态变为可重试失败后重试；索引作业每领取一块刷新心跳，超过 `EMBED_JOB_TIMEOUT_SECONDS` 后恢复扫描自动回收并最多自动重投 3 次 |
 | 401／404 | 重新登录，核对当前空间和编号；跨空间与不存在都返回 404，不通过改库绕过授权 |
 
-补投成功计数表示进入队列，**不表示解析成功**。资料和待投递记录同时入库，Redis
-中断不会撤销已保存资料。默认 API 启动会补投并回收超时作业，这不是周期定时任务。
-`CAMPUSFLOW_DISPATCH_ON_STARTUP=false` 只关闭启动补投；超时回收仍在 API 启动时执行。
+补投成功计数表示进入队列，**不表示解析或索引成功**。资料和待投递记录同时入库，
+Redis 中断不会撤销已保存资料。API 启动时扫描一次，之后默认每 15 秒扫描一次；
+`CAMPUSFLOW_DISPATCH_ON_STARTUP=false` 只关闭启动时的投递部分（超时回收仍执行）。
+索引恢复只重做未完成块，已成功向量不会重复调用模型。
 不要让多个旧、新 Worker 同时处理同一测试数据，不要删除 Redis／数据库卷来“修复”问题。
 
 错误日志只保留作业编号、阶段和受控错误分类；RQ 失败记录不保存原始堆栈。需要更多
 信息时查看授权状态接口和脱敏后的尝试记录，不打开包含资料正文的调试日志。
 
+视觉识别的重试参数由 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、
+`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和
+`CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）控制；0 次重试表示只调用一次。
+默认最坏等待约 3 分钟，低于作业超时默认 900 秒。适配器内重试只针对临时故障；永久失败
+（401／403、响应结构无效、超限）立即停止，不消耗重试次数。
+
 ## 6. 无模型费用的演示与验证范围
 
-`--demo` 使用假识别器，只允许名称以 `_test` 结尾的专用测试数据库。其固定输出
-“假识别结果”仅用于验证管道，**不能作为真实识别效果或课程事实**。演示应使用独立
-Redis 库号和临时存储目录，避免消费日常队列。正式 Worker 不加 `--demo`。
+`--demo` 使用假识别器与假向量器（sha256 确定性向量），只允许名称以 `_test`
+结尾的专用测试数据库。其固定输出仅用于验证管道，**不能作为真实识别效果、检索质量
+或课程事实**。演示应使用独立 Redis 库号和临时存储目录，避免消费日常队列。
+正式 Worker 不加 `--demo`。
+
+Docker 下可复现的最小闭环（Windows 用 Git Bash 时，`docker run` 的容器内路径前加
+`MSYS_NO_PATHCONV=1`，否则 `/app/...` 会被改写成本机路径）：
+
+```bash
+docker run --rm --add-host=host.docker.internal:host-gateway \
+  -e CAMPUSFLOW_DATABASE_URL="postgresql+psycopg://campusflow:campusflow@host.docker.internal:5432/<临时_test库>" \
+  -e CAMPUSFLOW_REDIS_URL="redis://host.docker.internal:6379/<独立库号>" \
+  -e CAMPUSFLOW_STORAGE_DIR=/app/data/materials \
+  -v "<本机存储目录>:/app/data/materials" \
+  campusflow-worker-worker:latest \
+  uv run --locked --no-dev python -m campusflow.workers.main --burst --demo
+```
+
+先用 API 或测试脚本创建资料并投递 `parse` 作业；解析成功后由 API 恢复扫描补投
+`campusflow-index`，再运行一次 Worker 即可看到向量落库与进度汇总。
 
 后端回归检查：
 

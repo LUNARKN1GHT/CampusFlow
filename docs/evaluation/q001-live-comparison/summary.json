@@ -1,0 +1,60 @@
+{
+  "mode": "diagnostic_pending_semantic_review",
+  "groups": [
+    {
+      "config_id": "embedding-2+glm-4-flash-250414",
+      "planned_samples": 18,
+      "valid_structure": 11,
+      "invalid_structure": 7,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 5439.575,
+      "historical_failed_attempts": 0
+    },
+    {
+      "config_id": "embedding-2+glm-4.5-flash",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 9,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 11020.501,
+      "historical_failed_attempts": 1
+    },
+    {
+      "config_id": "embedding-3+glm-4-flash-250414",
+      "planned_samples": 18,
+      "valid_structure": 12,
+      "invalid_structure": 6,
+      "invalid_reference_answers_among_valid": 0,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 7102.36,
+      "historical_failed_attempts": 0
+    },
+    {
+      "config_id": "embedding-3+glm-4.5-flash",
+      "planned_samples": 18,
+      "valid_structure": 18,
+      "invalid_structure": 0,
+      "invalid_reference_answers_among_valid": 10,
+      "retrieval_hits": 16,
+      "retrieval_expected": 16,
+      "p95_ms_valid_structure_only": 17975.585,
+      "historical_failed_attempts": 0
+    }
+  ],
+  "call_count": 170,
+  "reserved_cny": "0.3768320",
+  "estimated_known_cny": "0.0007050",
+  "unknown_usage_calls": [
+    51
+  ],
+  "actual_billed_cny": null,
+  "total_sample_attempts": 73,
+  "distinct_samples": 72,
+  "independent_review_complete": false,
+  "model_selection_complete": false
+}

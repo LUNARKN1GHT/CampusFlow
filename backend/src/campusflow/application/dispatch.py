@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories
+from campusflow.domain.states import JobStage, JobStatus
 
 DEFAULT_DISPATCH_LIMIT = 100
 
@@ -26,12 +27,31 @@ class DispatchResult:
 
 
 def dispatch_job(repos: Repositories, queue: JobQueue, job_id: int) -> bool:
-    """投递单个作业。
+    """按阶段投递单个作业（Q004）。
 
     成功登记 enqueued_at；队列不可用时只累加尝试次数并保留待投递记录，返回 False。
+    未知阶段不投递：队列里不应出现没有任何 Worker 能执行的作业。
     """
+    job = repos.jobs.get(job_id)
+    if job is None:
+        # 作业已随资料删除：不必投递，也不必登记。
+        return False
+    if job.stage == JobStage.PARSE:
+        enqueue = queue.enqueue_parse
+    elif job.stage == JobStage.EMBED:
+        enqueue = queue.enqueue_index
+    else:
+        repos.jobs.record_attempt(
+            job_id,
+            status=JobStatus.FAILED,
+            scope=None,
+            error_reason="作业阶段没有对应的处理入口",
+            retryable=False,
+        )
+        repos.uow.commit()
+        return False
     try:
-        queue.enqueue_parse(job_id)
+        enqueue(job_id)
     except Exception:
         # 队列侧故障（连接失败、超时等）不属于业务失败：不抛出、不回滚已提交数据
         repos.jobs.record_delivery(job_id, delivered=False)

@@ -257,6 +257,10 @@ class ProcessingJobData:
     retryable: bool | None
     created_at: datetime
     updated_at: datetime
+    # Q004：索引作业的清单与心跳；其它阶段保持默认值。
+    heartbeat_at: datetime | None = None
+    manifest_id: str | None = None
+    auto_retry_count: int = 0
 
 
 @dataclass
@@ -311,8 +315,45 @@ class JobRepository(Protocol):
         """按尝试顺序列出终态历史（J005），供状态查询与诊断。"""
         ...
 
-    def list_stale_running(self, *, timeout_seconds: int) -> list[ProcessingJobData]:
-        """列出领取后超过阈值仍停在处理中的作业（J005 超时回收）。"""
+    def list_stale_running(
+        self,
+        *,
+        timeout_seconds: int,
+        embed_timeout_seconds: int | None = None,
+    ) -> list[ProcessingJobData]:
+        """列出领取后超过阈值仍停在处理中的作业（J005 超时回收）。
+
+        Q004 起按阶段用不同阈值：解析看 started_at，索引看最近心跳，
+        避免按块推进的长作业被误判超时。
+        """
+        ...
+
+    def set_manifest(self, job_id: int, manifest_id: str) -> ProcessingJobData | None:
+        """登记索引作业当前使用的完整清单（Q004）。"""
+        ...
+
+    def heartbeat(self, job_id: int) -> ProcessingJobData | None:
+        """刷新作业心跳（Q004）：索引作业按块推进时调用。"""
+        ...
+
+    def create_or_requeue(
+        self, workspace_id: int, material_id: int, version_id: int, stage: str
+    ) -> ProcessingJobData:
+        """创建或重置同一版本的阶段作业（Q004 索引作业专用）。
+
+        已存在且为终态时重置为待处理（保留已完成的块），已待处理或处理中时
+        不改变状态，保证一份版本最多一个执行者。
+        """
+        ...
+
+    def prepare_auto_retry(self, job_id: int, *, max_auto_retries: int) -> ProcessingJobData | None:
+        """原子准备一次自动重投（Q004），达到上限或不满足条件时返回 None。"""
+        ...
+
+    def list_auto_retryable(
+        self, *, stage: str, max_auto_retries: int, limit: int = 50
+    ) -> list[ProcessingJobData]:
+        """列出还能自动重投的失败/部分成功作业（Q004）。"""
         ...
 
     def list_by_material(self, material_id: int) -> list[ProcessingJobData]:
@@ -677,6 +718,127 @@ class RuleRepository(Protocol):
 
 
 @dataclass
+class PlanBlockData:
+    """P001：建议时间块。minutes 与起止时间同时保存，便于校验分段总量。"""
+
+    id: int
+    draft_id: int
+    task_id: int | None
+    kind: str
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    minutes: int
+    seq: int
+    locked: bool
+    reason: str
+    constraint_source: list[dict]
+    created_at: datetime
+
+
+@dataclass
+class PlanVersionData:
+    id: int
+    draft_id: int
+    version_no: int
+    change: str
+    snapshot: dict
+    created_at: datetime
+
+
+@dataclass
+class PlanDraftData:
+    id: int
+    workspace_id: int
+    semester_id: int | None
+    range_start: date
+    range_end: date
+    status: str
+    version: int
+    input_snapshot: dict
+    input_fingerprint: str
+    assumptions: list[dict]
+    gaps: list[dict]
+    unscheduled: list[dict]
+    conflicts: list[dict]
+    coverage: dict
+    created_at: datetime
+    updated_at: datetime
+    accepted_at: datetime | None
+    blocks: list[PlanBlockData] = field(default_factory=list)
+
+
+class PlanRepository(Protocol):
+    def create_draft(
+        self,
+        workspace_id: int,
+        *,
+        semester_id: int | None,
+        range_start: date,
+        range_end: date,
+        input_snapshot: dict,
+        input_fingerprint: str,
+        assumptions: list[dict],
+        gaps: list[dict],
+        unscheduled: list[dict],
+        conflicts: list[dict],
+        coverage: dict,
+    ) -> PlanDraftData: ...
+
+    def get_draft(self, draft_id: int) -> PlanDraftData | None: ...
+
+    def list_drafts(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> list[PlanDraftData]: ...
+
+    def get_current(
+        self, workspace_id: int, *, semester_id: int | None = None
+    ) -> PlanDraftData | None:
+        """当前已接受计划；同一空间／学期最多一份 accepted。"""
+        ...
+
+    def create_blocks(self, draft_id: int, blocks: list[dict]) -> list[PlanBlockData]: ...
+
+    def list_blocks(self, draft_id: int) -> list[PlanBlockData]: ...
+
+    def get_block(self, block_id: int) -> PlanBlockData | None: ...
+
+    def update_block(
+        self,
+        block_id: int,
+        *,
+        starts_at: datetime,
+        ends_at: datetime,
+        minutes: int,
+        locked: bool,
+        reason: str,
+    ) -> PlanBlockData | None: ...
+
+    def bump_version(
+        self,
+        draft_id: int,
+        *,
+        expected_version: int,
+        change: str,
+        snapshot: dict,
+        status: str | None = None,
+        accepted_at: datetime | None = None,
+    ) -> PlanDraftData | None:
+        """原子校验版本并递增；版本不匹配返回 None（P013 并发保护）。"""
+        ...
+
+    def supersede_others(
+        self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
+    ) -> None: ...
+
+    def add_version(
+        self, draft_id: int, *, version_no: int, change: str, snapshot: dict
+    ) -> PlanVersionData: ...
+
+    def list_versions(self, draft_id: int) -> list[PlanVersionData]: ...
+
+
+@dataclass
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
@@ -689,4 +851,5 @@ class Repositories:
     jobs: JobRepository
     candidates: CandidateRepository
     rules: RuleRepository
+    plans: PlanRepository
     uow: UnitOfWork

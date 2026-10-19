@@ -6,6 +6,9 @@ import CoursesView from './views/CoursesView.vue'
 import HealthView from './views/HealthView.vue'
 import LibraryView from './views/LibraryView.vue'
 import LoginView from './views/LoginView.vue'
+import OverviewView from './views/OverviewView.vue'
+import PlanView from './views/PlanView.vue'
+import QaView from './views/QaView.vue'
 import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
@@ -18,7 +21,9 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'overview', component: HealthView },
+        { path: '', name: 'overview', component: OverviewView },
+        { path: 'health', name: 'health', component: HealthView },
+        { path: 'plan', name: 'plan', component: PlanView },
         {
           path: 'courses',
           name: 'courses',
@@ -33,6 +38,11 @@ const router = createRouter({
           path: 'review',
           name: 'review',
           component: ReviewView,
+        },
+        {
+          path: 'qa',
+          name: 'qa',
+          component: QaView,
         },
         {
           path: 'tasks',

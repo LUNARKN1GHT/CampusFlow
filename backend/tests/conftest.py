@@ -41,6 +41,14 @@ TABLES = ", ".join(
         "processing_job_attempts",
         "source_chunks",
         "material_version_relations",
+        "embedding_profiles",
+        "indexed_blocks",
+        "index_manifests",
+        "qa_turns",
+        "qa_conversations",
+        "plan_versions",
+        "plan_blocks",
+        "plan_drafts",
     )
 )
 
@@ -88,7 +96,10 @@ def client() -> Iterator[TestClient]:
         config.set_main_option("script_location", str(BACKEND_DIR / "migrations"))
         command.upgrade(config, "head")
 
-        settings = Settings(_env_file=None, database_url=TEST_DATABASE_URL)
+        # 测试里关闭周期恢复扫描，避免后台任务干扰用例；启动扫描仍保留
+        settings = Settings(
+            _env_file=None, database_url=TEST_DATABASE_URL, recovery_interval_seconds=0
+        )
         with TestClient(create_app(settings)) as test_client:
             response = test_client.post(
                 "/api/v1/auth/login",
