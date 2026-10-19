@@ -169,7 +169,12 @@ class CoursePathRepository(Protocol):
         code: str | None,
         credits: float | None,
         offered_terms: list[str],
+        source_candidate_id: int | None = None,
     ) -> CurriculumCourseData: ...
+
+    def get_course_by_source_candidate(self, candidate_id: int) -> CurriculumCourseData | None:
+        """按来源候选查已转换的方案课程（C005 幂等）。"""
+        ...
 
     def update_course(
         self,
@@ -198,7 +203,12 @@ class CoursePathRepository(Protocol):
         to_course_id: int,
         relation_type: str,
         condition_text: str | None,
+        source_candidate_id: int | None = None,
     ) -> CourseRelationData: ...
+
+    def get_relation_by_source_candidate(self, candidate_id: int) -> CourseRelationData | None:
+        """按来源候选查已转换的课程关系（C005 幂等）。"""
+        ...
 
     def update_relation(
         self,

@@ -142,6 +142,7 @@ class CandidateScopeOut(BaseModel):
     course_id: int | None
     semester_id: int | None
     class_name: str | None
+    curriculum_plan_id: int | None = None
     course_name: str | None
     semester_name: str | None
 
@@ -358,6 +359,7 @@ def _to_detail_out(
             course_id=candidate.draft.scope.course_id,
             semester_id=candidate.draft.scope.semester_id,
             class_name=candidate.draft.scope.class_name,
+            curriculum_plan_id=candidate.draft.scope.curriculum_plan_id,
             course_name=detail.course_name,
             semester_name=detail.semester_name,
         ),

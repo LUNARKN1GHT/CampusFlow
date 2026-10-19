@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 from campusflow.application.candidates import CandidateData, get_candidate
+from campusflow.application.course_paths import resolve_course_name
 from campusflow.application.ports.repositories import (
+    CourseRelationData,
+    CurriculumCourseData,
     FixedEventData,
     Repositories,
     RuleData,
@@ -19,6 +22,10 @@ from campusflow.domain.candidate_conversion import build_task_conversion
 from campusflow.domain.candidates import (
     CandidateKind,
     require_confirmed_for_conversion,
+)
+from campusflow.domain.course_paths import (
+    parse_relation_type_text,
+    validate_course_fields,
 )
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.event_conversion import build_event_conversion
@@ -53,6 +60,24 @@ def find_candidate_conversion(
             if event is None
             else CandidateConversion(CandidateKind.EVENT, event.id, event.title)
         )
+    if candidate.draft.kind is CandidateKind.CURRICULUM_COURSE:
+        course = repos.paths.get_course_by_source_candidate(candidate.id)
+        return (
+            None
+            if course is None
+            else CandidateConversion(CandidateKind.CURRICULUM_COURSE, course.id, course.name)
+        )
+    if candidate.draft.kind is CandidateKind.COURSE_RELATION:
+        relation = repos.paths.get_relation_by_source_candidate(candidate.id)
+        return (
+            None
+            if relation is None
+            else CandidateConversion(
+                CandidateKind.COURSE_RELATION,
+                relation.id,
+                f"{relation.from_course_id} → {relation.to_course_id}",
+            )
+        )
     rule = repos.rules.get_by_source_candidate(candidate.id)
     return None if rule is None else CandidateConversion(CandidateKind.RULE, rule.id, rule.title)
 
@@ -76,6 +101,22 @@ def convert_candidate(
     if candidate.draft.kind is CandidateKind.EVENT:
         event = convert_candidate_to_event(repos, workspace_id, candidate_id)
         return CandidateConversion(CandidateKind.EVENT, event.id, event.title), True
+    if candidate.draft.kind is CandidateKind.CURRICULUM_COURSE:
+        course = convert_candidate_to_curriculum_course(repos, workspace_id, candidate_id)
+        return (
+            CandidateConversion(CandidateKind.CURRICULUM_COURSE, course.id, course.name),
+            True,
+        )
+    if candidate.draft.kind is CandidateKind.COURSE_RELATION:
+        relation = convert_candidate_to_course_relation(repos, workspace_id, candidate_id)
+        return (
+            CandidateConversion(
+                CandidateKind.COURSE_RELATION,
+                relation.id,
+                f"{relation.from_course_id} → {relation.to_course_id}",
+            ),
+            True,
+        )
     rule = convert_candidate_to_rule(repos, workspace_id, candidate_id)
     return CandidateConversion(CandidateKind.RULE, rule.id, rule.title), True
 
@@ -154,6 +195,133 @@ def convert_candidate_to_event(
         repos.uow.rollback()
         raise
     return event
+
+
+def _plan_scope(repos: Repositories, workspace_id: int, candidate) -> int:
+    plan_id = candidate.draft.scope.curriculum_plan_id
+    if plan_id is None:
+        raise DomainError("候选未绑定培养方案，不能转换为正式课程数据")
+    plan = repos.paths.get_plan(plan_id)
+    if plan is None or plan.workspace_id != workspace_id:
+        raise NotFoundError("培养方案不存在")
+    return plan_id
+
+
+def convert_candidate_to_curriculum_course(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> CurriculumCourseData:
+    """把已确认的课程候选写入方案课程；重复调用返回既有行。"""
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    require_confirmed_for_conversion(candidate.review_status)
+    existing = repos.paths.get_course_by_source_candidate(candidate.id)
+    if existing is not None:
+        return existing
+    plan_id = _plan_scope(repos, workspace_id, candidate)
+    fields = {field.name: field for field in candidate.effective_draft().fields}
+    name = fields["course_name"].value
+    code = fields.get("course_code")
+    credits_field = fields.get("credits")
+    credits = (
+        float(credits_field.value)
+        if credits_field is not None and type(credits_field.value) in (int, float)
+        else None
+    )
+    terms_field = fields.get("offered_terms")
+    terms = (
+        [str(item) for item in terms_field.value]
+        if terms_field is not None and isinstance(terms_field.value, list)
+        else []
+    )
+    normalized_terms = validate_course_fields(
+        name=name if isinstance(name, str) else "",
+        code=code.value if code is not None and isinstance(code.value, str) else None,
+        credits=credits,
+        offered_terms=terms,
+    )
+    try:
+        course = repos.paths.create_course(
+            workspace_id,
+            plan_id,
+            name=name if isinstance(name, str) else "",
+            code=code.value if code is not None and isinstance(code.value, str) else None,
+            credits=credits,
+            offered_terms=normalized_terms,
+            source_candidate_id=candidate.id,
+        )
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return course
+
+
+def _match_course(
+    repos: Repositories,
+    workspace_id: int,
+    plan_id: int,
+    name: object,
+    candidate,
+    label: str,
+) -> CurriculumCourseData:
+    if not isinstance(name, str) or not name.strip():
+        raise DomainError(f"{label}为空，不能确定课程关系")
+    scope = candidate.draft.scope
+    result = resolve_course_name(
+        repos,
+        workspace_id,
+        plan_id,
+        name=name,
+        semester_id=scope.semester_id,
+        class_name=scope.class_name,
+    )
+    if result.status != "matched":
+        raise DomainError(
+            f"{label}“{name}”在方案内无法唯一匹配（{result.status}），请先核对课程或别名"
+        )
+    return result.matches[0]
+
+
+def convert_candidate_to_course_relation(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> CourseRelationData:
+    """把已确认的关系候选写入正式关系；课程无法唯一匹配时拒绝，保留候选待核对。"""
+    candidate = get_candidate(repos, workspace_id, candidate_id)
+    require_confirmed_for_conversion(candidate.review_status)
+    existing = repos.paths.get_relation_by_source_candidate(candidate.id)
+    if existing is not None:
+        return existing
+    plan_id = _plan_scope(repos, workspace_id, candidate)
+    fields = {field.name: field for field in candidate.effective_draft().fields}
+    relation = parse_relation_type_text(fields["relation_type"].value)
+    if relation is None:
+        raise DomainError("关系类型无法确定为强制先修、并修或建议先学")
+    source = _match_course(
+        repos, workspace_id, plan_id, fields["from_course_name"].value, candidate, "前置课程"
+    )
+    target = _match_course(
+        repos, workspace_id, plan_id, fields["to_course_name"].value, candidate, "受约束课程"
+    )
+    condition = fields.get("condition_text")
+    condition_text = (
+        condition.value.strip()
+        if condition is not None and isinstance(condition.value, str) and condition.value.strip()
+        else None
+    )
+    try:
+        created = repos.paths.create_relation(
+            workspace_id,
+            plan_id,
+            from_course_id=source.id,
+            to_course_id=target.id,
+            relation_type=relation.value,
+            condition_text=condition_text,
+            source_candidate_id=candidate.id,
+        )
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return created
 
 
 def convert_candidate_to_rule(

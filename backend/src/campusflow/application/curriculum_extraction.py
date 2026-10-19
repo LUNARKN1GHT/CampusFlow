@@ -25,7 +25,11 @@ from campusflow.domain.candidates import (
     ReviewReason,
     validate_candidate,
 )
-from campusflow.domain.course_paths import RelationType, normalize_course_name
+from campusflow.domain.course_paths import (
+    RelationType,
+    normalize_course_name,
+    parse_relation_type_text,
+)
 from campusflow.domain.errors import DomainError
 
 COURSE_SPEC = ExtractionSpec(
@@ -65,22 +69,6 @@ _TERM_PATTERNS = (
     (re.compile(r"夏|暑期|夏季|summer", re.IGNORECASE), "summer"),
     (re.compile(r"冬|冬季|winter", re.IGNORECASE), "winter"),
 )
-
-_RELATION_ALIASES = {
-    "prerequisite": RelationType.PREREQUISITE,
-    "强制先修": RelationType.PREREQUISITE,
-    "先修": RelationType.PREREQUISITE,
-    "必修前置": RelationType.PREREQUISITE,
-    "corequisite": RelationType.COREQUISITE,
-    "并修": RelationType.COREQUISITE,
-    "同时修读": RelationType.COREQUISITE,
-    "同修": RelationType.COREQUISITE,
-    "recommended": RelationType.RECOMMENDED,
-    "建议先学": RelationType.RECOMMENDED,
-    "建议": RelationType.RECOMMENDED,
-    "推荐先学": RelationType.RECOMMENDED,
-}
-
 
 def _terms_from_text(value: str) -> list[str]:
     terms = []
@@ -173,8 +161,7 @@ def _check_course(
 def _normalize_relation_type(value: object) -> RelationType:
     if not isinstance(value, str):
         raise InvalidModelOutput("关系类型必须是原文文本")
-    key = value.strip().casefold()
-    relation = _RELATION_ALIASES.get(key)
+    relation = parse_relation_type_text(value)
     if relation is None:
         raise InvalidModelOutput("关系类型无法确定为强制先修、并修或建议先学")
     return relation

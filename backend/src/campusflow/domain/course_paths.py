@@ -144,6 +144,29 @@ def alias_scope_applies(
     return True
 
 
+_RELATION_TEXT_ALIASES = {
+    "prerequisite": RelationType.PREREQUISITE,
+    "强制先修": RelationType.PREREQUISITE,
+    "先修": RelationType.PREREQUISITE,
+    "必修前置": RelationType.PREREQUISITE,
+    "corequisite": RelationType.COREQUISITE,
+    "并修": RelationType.COREQUISITE,
+    "同时修读": RelationType.COREQUISITE,
+    "同修": RelationType.COREQUISITE,
+    "recommended": RelationType.RECOMMENDED,
+    "建议先学": RelationType.RECOMMENDED,
+    "建议": RelationType.RECOMMENDED,
+    "推荐先学": RelationType.RECOMMENDED,
+}
+
+
+def parse_relation_type_text(value: object) -> RelationType | None:
+    """把原文字段解释成三类关系；无法确定时返回 None，不猜测。"""
+    if not isinstance(value, str):
+        return None
+    return _RELATION_TEXT_ALIASES.get(value.strip().casefold())
+
+
 def validate_relation_type(value: str) -> RelationType:
     try:
         return RelationType(value)
