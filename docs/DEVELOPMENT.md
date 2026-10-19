@@ -199,13 +199,51 @@ uv run --locked pytest tests/test_qa_api.py -k intent
 
 接受草案时服务端会重新采集输入并比较指纹；任务、固定日程、可用时间或设置发生变化后，旧草案返回 409，需要重新生成。旧草案也不能覆盖较新接受的计划。
 
+## M9 外部日历
+
+M9 新增迁移 `k001_external_calendar`（连接、OAuth state、草案、条目、执行记录与外部事件映射）。启动新代码前在 `backend/` 执行：
+
+```bash
+uv run --locked alembic upgrade head
+```
+
+外部日历配置见 `backend/.env.example`：
+
+- `CAMPUSFLOW_CALENDAR_PROVIDER=google|local`：生产使用 `google`；`local` 只用于自动化验收和显式本地演示，事件保存在进程内。
+- `CAMPUSFLOW_CALENDAR_TOKEN_KEY`：Fernet 密钥，用于加密 access token / refresh token；未配置时连接会返回明确错误。生成方式：
+
+  ```bash
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+
+- `GOOGLE_CALENDAR_CLIENT_ID`、`GOOGLE_CALENDAR_CLIENT_SECRET`、`GOOGLE_CALENDAR_REDIRECT_URI`：Google OAuth 客户端配置；未配置时授权入口返回业务错误。
+- 授权范围限定为 `calendar.app.created`，只管理应用自建的专用日历。
+
+本地闭环：
+
+1. 启动 API 与前端，登录后进入 `/calendar`；
+2. 点击“连接外部日历”完成授权，页面显示账户、日历与状态；
+3. 选择任务或已接受计划生成预览；预览不会写入外部日历；
+4. 勾选范围并确认，再点击“执行写入”；
+5. 页面逐项显示成功、失败或待核实；失败项可只重试，未知结果可先核对；
+6. 修改内部任务后可“检查同步差异”并生成新的更新／删除草案；
+7. 撤销连接后待写入操作立即失效，内部任务与计划保留。
+
+接口、测试账户缺口与限制见 [M9 外部日历记录](verification/M9-external-calendar.md)。专项测试：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_calendar_connections.py tests/test_calendar_execution.py -q
+```
+
 ## 当前限制
 
 Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --locked alembic upgrade head`。环境字段见 `.env.example` 的 `CAMPUSFLOW_EMBEDDING_*`；沿用 `ZHIPU_API_KEY`，不要写入配置记录。构造适配器不会联网，现有 Worker 尚未自动调用；契约和版本升级要求见 [Q002 说明](verification/Q002-embedding-adapter.md)。
 
 Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
 
-- 手动管理、资料处理、核对、带引用问答与两周计划已实现；仍无生产身份系统。真实模型语义复核（Q019）、M5 的 V001–V007 独立验收与发布准备尚未完成。
+- 手动管理、资料处理、核对、带引用问答、两周计划、课程路径与外部日历写入已实现；仍无生产身份系统。真实模型语义复核（Q019）、M5 的 V001–V007 独立验收与发布准备尚未完成。
+- 外部日历的真实 Google 账户授权与写入尚未验证；当前验收使用确定性本地模拟供应商。真实账户验证需要项目组提供 Google Cloud OAuth 客户端与测试账户。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
