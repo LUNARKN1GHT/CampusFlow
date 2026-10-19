@@ -87,11 +87,7 @@ def validate_profile_fields(
     # 专业与年级允许暂缺，但若与方案声明明显不同则拒绝，避免混用不同年级规则。
     if major is not None and plan_major is not None and major.strip() != plan_major.strip():
         raise DomainError("个人专业与所选方案专业不一致，请核对后保存")
-    if (
-        grade_year is not None
-        and plan_grade_year is not None
-        and grade_year != plan_grade_year
-    ):
+    if grade_year is not None and plan_grade_year is not None and grade_year != plan_grade_year:
         raise DomainError("个人年级与所选方案年级不一致，请核对后保存")
 
 
@@ -100,9 +96,7 @@ def validate_course_fields(
 ) -> list[str]:
     _text(name, 200, "课程名称", required=True)
     _text(code, 50, "课程代码")
-    if credits is not None and (
-        type(credits) not in (int, float) or credits < 0 or credits > 100
-    ):
+    if credits is not None and (type(credits) not in (int, float) or credits < 0 or credits > 100):
         raise DomainError("学分必须是非负数")
     normalized: list[str] = []
     for term in offered_terms:
@@ -200,9 +194,7 @@ def validate_study_record_fields(
     _text(grade, 100, "成绩")
     _text(note, 500, "备注")
     if credits_earned is not None and (
-        type(credits_earned) not in (int, float)
-        or credits_earned < 0
-        or credits_earned > 100
+        type(credits_earned) not in (int, float) or credits_earned < 0 or credits_earned > 100
     ):
         raise DomainError("已得学分必须是不大于 100 的非负数")
     return parsed

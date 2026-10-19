@@ -39,9 +39,7 @@ def _course(client: TestClient, plan_id: int, name: str, code: str | None = None
     return response.json()
 
 
-def _relation(
-    client: TestClient, plan_id: int, source: int, target: int, kind: str
-) -> dict:
+def _relation(client: TestClient, plan_id: int, source: int, target: int, kind: str) -> dict:
     response = client.post(
         f"/api/v1/curriculum-plans/{plan_id}/relations",
         json={"from_course_id": source, "to_course_id": target, "relation_type": kind},
@@ -81,9 +79,7 @@ def test_graph_distinguishes_three_edge_types_and_scope(client: TestClient) -> N
 
 def test_graph_edge_keeps_candidate_evidence(client, monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(client.app.state, "file_storage", LocalFileStorage(tmp_path))
-    material = client.post(
-        "/api/v1/materials/text", json={"title": "方案", "content": TEXT}
-    ).json()
+    material = client.post("/api/v1/materials/text", json={"title": "方案", "content": TEXT}).json()
     plan = _plan(client)
     _course(client, plan["id"], "程序设计")
     _course(client, plan["id"], "数据库系统")

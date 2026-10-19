@@ -70,6 +70,7 @@ _TERM_PATTERNS = (
     (re.compile(r"冬|冬季|winter", re.IGNORECASE), "winter"),
 )
 
+
 def _terms_from_text(value: str) -> list[str]:
     terms = []
     for pattern, term in _TERM_PATTERNS:
@@ -82,8 +83,7 @@ def _evidence_texts(field: CandidateField, sources: dict[int, str]) -> list[str]
     return [
         sources[evidence.chunk_id]
         for evidence in field.evidence
-        if evidence.chunk_id in sources
-        and evidence.quote in sources[evidence.chunk_id]
+        if evidence.chunk_id in sources and evidence.quote in sources[evidence.chunk_id]
     ]
 
 
@@ -109,9 +109,7 @@ def _check_course(
     name_field = by_name["course_name"]
     if not isinstance(name_field.value, str):
         raise InvalidModelOutput("课程名称必须是原文文本")
-    if not any(
-        name_field.value in text for text in _evidence_texts(name_field, sources)
-    ):
+    if not any(name_field.value in text for text in _evidence_texts(name_field, sources)):
         raise InvalidModelOutput("课程名称必须逐字出现在证据中")
     credits = by_name["credits"].value
     if credits is not None and (type(credits) not in (int, float) or credits < 0):
@@ -229,8 +227,7 @@ def extract_curriculum_drafts(
         for chunk in list_version_chunks(repos, workspace_id, material_id, version_no)
     }
     plan_names = {
-        normalize_course_name(course.name)
-        for course in repos.paths.list_courses(plan_id)
+        normalize_course_name(course.name) for course in repos.paths.list_courses(plan_id)
     }
     drafts: list[CandidateDraft] = []
     if include_courses:

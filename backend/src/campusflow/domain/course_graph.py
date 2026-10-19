@@ -160,9 +160,12 @@ def find_conflicts(relations: tuple[GraphRelation, ...]) -> tuple[GraphProblem, 
     for (source, target), items in sorted(by_pair.items()):
         types = {item.relation_type for item in items}
         inconsistent = (
-            RelationType.PREREQUISITE in types and RelationType.RECOMMENDED in types
-            or RelationType.PREREQUISITE in types and RelationType.COREQUISITE in types
-            or RelationType.COREQUISITE in types and RelationType.RECOMMENDED in types
+            RelationType.PREREQUISITE in types
+            and RelationType.RECOMMENDED in types
+            or RelationType.PREREQUISITE in types
+            and RelationType.COREQUISITE in types
+            or RelationType.COREQUISITE in types
+            and RelationType.RECOMMENDED in types
         )
         if inconsistent:
             conflicts.append(
@@ -294,8 +297,7 @@ def suggest_terms(
     active = [
         course
         for course in courses
-        if course.study_status
-        not in (StudyStatus.COMPLETED.value, StudyStatus.IN_PROGRESS.value)
+        if course.study_status not in (StudyStatus.COMPLETED.value, StudyStatus.IN_PROGRESS.value)
     ]
     if not active:
         return SemesterSuggestion(
@@ -386,9 +388,7 @@ def suggest_terms(
         if not term["courses"]:
             continue
         known = sum(
-            by_id[item].credits or 0
-            for item in term["courses"]
-            if by_id[item].credits is not None
+            by_id[item].credits or 0 for item in term["courses"] if by_id[item].credits is not None
         )
         unknown = sum(1 for item in term["courses"] if by_id[item].credits is None)
         if unknown:

@@ -177,9 +177,7 @@ def test_relation_candidate_keeps_unmatched_course_as_review_reason(client, mate
     finally:
         client.app.dependency_overrides.pop(get_text_generator, None)
     assert response.status_code == 200, response.text
-    listed = client.get(
-        "/api/v1/candidates", params={"kind": ["course_relation"]}
-    ).json()
+    listed = client.get("/api/v1/candidates", params={"kind": ["course_relation"]}).json()
     assert listed[0]["review_reasons"]
     codes = {reason["code"] for reason in listed[0]["review_reasons"]}
     assert "course_relation_review" in codes

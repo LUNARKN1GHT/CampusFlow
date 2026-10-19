@@ -49,9 +49,7 @@ def upgrade() -> None:
         sa.Column(
             "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
         ),
-        sa.UniqueConstraint(
-            "curriculum_plan_id", "name", name="uq_curriculum_course_name"
-        ),
+        sa.UniqueConstraint("curriculum_plan_id", "name", name="uq_curriculum_course_name"),
         sa.CheckConstraint("credits IS NULL OR credits >= 0", name="ck_curriculum_course_credits"),
     )
     op.create_index("ix_curriculum_courses_workspace_id", "curriculum_courses", ["workspace_id"])

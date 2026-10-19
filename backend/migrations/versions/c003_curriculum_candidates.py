@@ -23,9 +23,7 @@ def upgrade() -> None:
         "extracted_items",
         "kind IN ('task', 'event', 'rule', 'curriculum_course', 'course_relation')",
     )
-    op.add_column(
-        "extracted_items", sa.Column("curriculum_plan_id", sa.Integer(), nullable=True)
-    )
+    op.add_column("extracted_items", sa.Column("curriculum_plan_id", sa.Integer(), nullable=True))
     op.create_index(
         "ix_extracted_items_curriculum_plan_id",
         "extracted_items",

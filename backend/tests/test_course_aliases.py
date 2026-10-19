@@ -18,9 +18,7 @@ def _plan(client: TestClient) -> dict:
 
 
 def _course(client: TestClient, plan_id: int, name: str) -> dict:
-    response = client.post(
-        f"/api/v1/curriculum-plans/{plan_id}/courses", json={"name": name}
-    )
+    response = client.post(f"/api/v1/curriculum-plans/{plan_id}/courses", json={"name": name})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -152,7 +150,8 @@ def test_alias_can_be_deleted(client: TestClient) -> None:
     plan = _plan(client)
     course = _course(client, plan["id"], "数据库系统")
     alias = _alias(client, plan["id"], course["id"], "DB")
-    assert client.delete(
-        f"/api/v1/curriculum-plans/{plan['id']}/aliases/{alias['id']}"
-    ).status_code == 204
+    assert (
+        client.delete(f"/api/v1/curriculum-plans/{plan['id']}/aliases/{alias['id']}").status_code
+        == 204
+    )
     assert _resolve(client, plan["id"], "DB").json()["status"] == "not_found"

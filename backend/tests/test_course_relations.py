@@ -138,9 +138,7 @@ def test_referenced_course_cannot_be_deleted_silently(client: TestClient) -> Non
     b = _course(client, plan["id"], "B")
     _relation(client, plan["id"], a["id"], b["id"])
 
-    blocked = client.delete(
-        f"/api/v1/curriculum-plans/{plan['id']}/courses/{a['id']}"
-    )
+    blocked = client.delete(f"/api/v1/curriculum-plans/{plan['id']}/courses/{a['id']}")
     assert blocked.status_code == 400
     assert "关系" in blocked.text
 

@@ -40,7 +40,7 @@ def _generate(client, **overrides):
     return client.post("/api/v1/plans/drafts", json=payload)
 
 
-def test_generate_and_accept_plan_without_changing_task_ddl(client) -> None:
+def test_generate_and_accept_plan_without_changing_task_ddl(client, fixed_planning_clock) -> None:
     task = _task(client)
     _availability(client)
 
@@ -79,7 +79,7 @@ def test_generate_and_accept_plan_without_changing_task_ddl(client) -> None:
     assert repeat.status_code == 409
 
 
-def test_stale_version_and_changed_inputs_are_rejected(client) -> None:
+def test_stale_version_and_changed_inputs_are_rejected(client, fixed_planning_clock) -> None:
     task = _task(client, title="变更输入")
     _availability(client)
     first = _generate(client).json()
@@ -124,7 +124,7 @@ def test_newer_accepted_plan_is_not_overwritten_by_old_draft(client) -> None:
     assert "较新的已接受计划" in stale.json()["detail"]
 
 
-def test_plan_lists_and_reports_no_availability(client) -> None:
+def test_plan_lists_and_reports_no_availability(client, fixed_planning_clock) -> None:
     _task(client, title="没有可用时间", due_time=None)
     response = _generate(client)
     assert response.status_code == 201, response.text
@@ -143,7 +143,7 @@ def test_plan_lists_and_reports_no_availability(client) -> None:
     assert isinstance(conflicts.json(), list)
 
 
-def test_unknown_duration_is_reported_without_scheduling(client) -> None:
+def test_unknown_duration_is_reported_without_scheduling(client, fixed_planning_clock) -> None:
     _availability(client)
     _task(
         client,
@@ -161,7 +161,7 @@ def test_unknown_duration_is_reported_without_scheduling(client) -> None:
     assert any(item["code"] == "missing_duration" for item in draft["gaps"])
 
 
-def test_explicit_assumptions_are_echoed(client) -> None:
+def test_explicit_assumptions_are_echoed(client, fixed_planning_clock) -> None:
     _availability(client)
     _task(
         client,
@@ -200,7 +200,7 @@ def _accepted_plan(client, *, tasks: int = 1) -> dict:
     return accepted.json()
 
 
-def test_move_block_updates_schedule_but_not_task_ddl(client) -> None:
+def test_move_block_updates_schedule_but_not_task_ddl(client, fixed_planning_clock) -> None:
     task = _task(client)
     _availability(client)
     draft = _generate(client).json()
@@ -240,7 +240,9 @@ def test_move_block_updates_schedule_but_not_task_ddl(client) -> None:
     assert stale.status_code == 409
 
 
-def test_move_rejects_overlap_with_fixed_event_and_other_blocks(client) -> None:
+def test_move_rejects_overlap_with_fixed_event_and_other_blocks(
+    client, fixed_planning_clock
+) -> None:
     _task(client, title="甲", due_time=None)
     _task(client, title="乙", due_time=None)
     _availability(client)
@@ -282,7 +284,7 @@ def test_move_rejects_overlap_with_fixed_event_and_other_blocks(client) -> None:
     assert overlap_block.status_code == 400
 
 
-def test_lock_and_unlock_accepted_block(client) -> None:
+def test_lock_and_unlock_accepted_block(client, fixed_planning_clock) -> None:
     accepted = _accepted_plan(client)
     block = accepted["blocks"][0]
     locked = client.post(
@@ -300,7 +302,7 @@ def test_lock_and_unlock_accepted_block(client) -> None:
     assert unlocked.json()["blocks"][0]["locked"] is False
 
 
-def test_draft_block_cannot_be_moved_before_accepting(client) -> None:
+def test_draft_block_cannot_be_moved_before_accepting(client, fixed_planning_clock) -> None:
     _task(client)
     _availability(client)
     draft = _generate(client).json()
@@ -317,7 +319,7 @@ def test_draft_block_cannot_be_moved_before_accepting(client) -> None:
     assert "已接受计划" in response.json()["detail"]
 
 
-def test_overview_reports_today_plan_and_upcoming_tasks(client) -> None:
+def test_overview_reports_today_plan_and_upcoming_tasks(client, fixed_planning_clock) -> None:
     before = client.get("/api/v1/plans/overview")
     assert before.status_code == 200
     assert before.json()["has_plan"] is False
@@ -339,7 +341,7 @@ def test_overview_reports_today_plan_and_upcoming_tasks(client) -> None:
     assert body["unscheduled_count"] == 0
 
 
-def test_plan_from_another_workspace_is_not_visible(client) -> None:
+def test_plan_from_another_workspace_is_not_visible(client, fixed_planning_clock) -> None:
     with open_session() as session, session.begin():
         other = Workspace(name="另一个工作空间", timezone="Asia/Shanghai")
         session.add(other)
@@ -361,7 +363,7 @@ def test_plan_from_another_workspace_is_not_visible(client) -> None:
     assert client.get("/api/v1/plans/current").json() is None
 
 
-def test_range_validation(client) -> None:
+def test_range_validation(client, fixed_planning_clock) -> None:
     response = client.post(
         "/api/v1/plans/drafts",
         json={"start_date": "2026-10-20", "end_date": "2026-10-19"},

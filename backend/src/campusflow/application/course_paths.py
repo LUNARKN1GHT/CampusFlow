@@ -207,9 +207,7 @@ def update_course(
     return course
 
 
-def delete_course(
-    repos: Repositories, workspace_id: int, plan_id: int, course_id: int
-) -> None:
+def delete_course(repos: Repositories, workspace_id: int, plan_id: int, course_id: int) -> None:
     get_course(repos, workspace_id, plan_id, course_id)
     try:
         if not repos.paths.delete_course(course_id):
@@ -302,9 +300,7 @@ def update_relation(
     return relation
 
 
-def delete_relation(
-    repos: Repositories, workspace_id: int, plan_id: int, relation_id: int
-) -> None:
+def delete_relation(repos: Repositories, workspace_id: int, plan_id: int, relation_id: int) -> None:
     get_relation(repos, workspace_id, plan_id, relation_id)
     try:
         if not repos.paths.delete_relation(relation_id):
@@ -315,9 +311,7 @@ def delete_relation(
         raise
 
 
-def list_aliases(
-    repos: Repositories, workspace_id: int, plan_id: int
-) -> list[CourseAliasData]:
+def list_aliases(repos: Repositories, workspace_id: int, plan_id: int) -> list[CourseAliasData]:
     get_plan(repos, workspace_id, plan_id)
     return repos.paths.list_aliases(plan_id)
 
@@ -363,9 +357,7 @@ def create_alias(
     return created
 
 
-def delete_alias(
-    repos: Repositories, workspace_id: int, plan_id: int, alias_id: int
-) -> None:
+def delete_alias(repos: Repositories, workspace_id: int, plan_id: int, alias_id: int) -> None:
     get_plan(repos, workspace_id, plan_id)
     alias = repos.paths.get_alias(alias_id)
     if alias is None or alias.workspace_id != workspace_id:
@@ -561,9 +553,7 @@ def _study_entry_note(records: tuple[StudyRecordView, ...]) -> str:
     return note
 
 
-def get_study_status(
-    repos: Repositories, workspace_id: int, plan_id: int
-) -> StudyStatusSummary:
+def get_study_status(repos: Repositories, workspace_id: int, plan_id: int) -> StudyStatusSummary:
     """逐门课程汇总状态；没有记录的课程显式标为 unknown，不推断已修。"""
     get_plan(repos, workspace_id, plan_id)
     courses = repos.paths.list_courses(plan_id)
@@ -818,9 +808,9 @@ def _relation_candidate_issues(
     pending: list[GraphProblem] = []
     formal_by_pair: dict[tuple[int, int], set[RelationType]] = {}
     for relation in relations:
-        formal_by_pair.setdefault(
-            (relation.from_course_id, relation.to_course_id), set()
-        ).add(relation.relation_type)
+        formal_by_pair.setdefault((relation.from_course_id, relation.to_course_id), set()).add(
+            relation.relation_type
+        )
     for candidate in repos.candidates.list_all(workspace_id, CandidateKind.COURSE_RELATION):
         if candidate.draft.scope.curriculum_plan_id != plan_id:
             continue
@@ -886,9 +876,7 @@ def _relation_candidate_issues(
     return tuple(missing), tuple(pending)
 
 
-def build_plan_graph(
-    repos: Repositories, workspace_id: int, plan_id: int
-) -> PlanGraph:
+def build_plan_graph(repos: Repositories, workspace_id: int, plan_id: int) -> PlanGraph:
     """只读取当前方案的有效课程、正式关系与待核对关系候选。"""
     plan = get_plan(repos, workspace_id, plan_id)
     course_rows = repos.paths.list_courses(plan_id)
@@ -923,9 +911,7 @@ def build_plan_graph(
     )
     cycles = find_cycles(courses, relations)
     conflicts = find_conflicts(relations)
-    missing, pending = _relation_candidate_issues(
-        repos, workspace_id, plan_id, relations
-    )
+    missing, pending = _relation_candidate_issues(repos, workspace_id, plan_id, relations)
     complete = not (cycles or conflicts or missing or pending)
     limitations = [
         "只使用当前方案内已确认的课程关系；不同方案的课程不会被连接。",
@@ -967,10 +953,7 @@ def analyze_plan(
     """一次读取图、顺序、下一步与学期建议；问题只阻塞结论，不改写数据。"""
     graph = build_plan_graph(repos, workspace_id, plan_id)
     blocked = bool(
-        graph.graph.cycles
-        or graph.graph.conflicts
-        or graph.graph.missing
-        or graph.graph.pending
+        graph.graph.cycles or graph.graph.conflicts or graph.graph.missing or graph.graph.pending
     )
     order = topological_levels(graph.graph.courses, graph.graph.relations)
     if blocked:
@@ -989,8 +972,7 @@ def analyze_plan(
         semester = SemesterSuggestion(
             (),
             (),
-            tuple(graph.graph.limitations)
-            + ("存在未核对问题，未生成学期方案。",),
+            tuple(graph.graph.limitations) + ("存在未核对问题，未生成学期方案。",),
         )
     else:
         semester = suggest_terms(

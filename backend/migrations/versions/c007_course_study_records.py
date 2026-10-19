@@ -68,15 +68,11 @@ def upgrade() -> None:
         "course_study_records",
         ["curriculum_course_id"],
     )
-    op.create_index(
-        "ix_course_study_records_semester_id", "course_study_records", ["semester_id"]
-    )
+    op.create_index("ix_course_study_records_semester_id", "course_study_records", ["semester_id"])
 
 
 def downgrade() -> None:
     op.drop_index("ix_course_study_records_semester_id", table_name="course_study_records")
-    op.drop_index(
-        "ix_course_study_records_curriculum_course_id", table_name="course_study_records"
-    )
+    op.drop_index("ix_course_study_records_curriculum_course_id", table_name="course_study_records")
     op.drop_index("ix_course_study_records_workspace_id", table_name="course_study_records")
     op.drop_table("course_study_records")

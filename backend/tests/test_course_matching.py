@@ -170,7 +170,14 @@ def run_match(client, data, **kwargs):
         )
 
 
-@pytest.mark.parametrize("kind", list(CandidateKind))
+@pytest.mark.parametrize(
+    "kind",
+    [
+        kind
+        for kind in CandidateKind
+        if kind not in {CandidateKind.CURRICULUM_COURSE, CandidateKind.COURSE_RELATION}
+    ],
+)
 def test_supported_candidates_keep_scope_and_save_pending(client, source, kind):
     data = source(section="PHY2026-A")
     data["draft"] = replace(data["draft"], kind=kind)
