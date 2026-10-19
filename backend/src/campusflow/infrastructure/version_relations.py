@@ -3,13 +3,18 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from campusflow.application.ports.version_relations import VersionContext, VersionRelationData
+from campusflow.application.ports.version_relations import (
+    VersionAcceptanceData,
+    VersionContext,
+    VersionRelationData,
+)
 from campusflow.domain.errors import NotFoundError
 from campusflow.domain.version_relations import VersionRelationKind
 from campusflow.infrastructure.db.models import (
     Material,
     MaterialVersion,
     MaterialVersionRelation,
+    VersionChangeAcceptance,
     Workspace,
 )
 from campusflow.infrastructure.repositories import _material_to_data, _material_version_to_data
@@ -120,3 +125,81 @@ class SqlVersionRelations:
             .order_by(MaterialVersionRelation.id)
         )
         return [_data(row) for row in rows]
+
+    def find_acceptance(
+        self,
+        workspace_id: int,
+        baseline_candidate_id: int,
+        comparison_candidate_id: int,
+        accepted_fields: tuple[str, ...],
+    ) -> VersionAcceptanceData | None:
+        row = self.session.scalar(
+            select(VersionChangeAcceptance).where(
+                VersionChangeAcceptance.workspace_id == workspace_id,
+                VersionChangeAcceptance.baseline_candidate_id == baseline_candidate_id,
+                VersionChangeAcceptance.comparison_candidate_id == comparison_candidate_id,
+                VersionChangeAcceptance.accepted_fields == list(accepted_fields),
+            )
+        )
+        return _acceptance_data(row) if row else None
+
+    def create_acceptance(
+        self,
+        workspace_id: int,
+        *,
+        baseline_candidate_id: int,
+        comparison_candidate_id: int,
+        baseline_version_id: int,
+        comparison_version_id: int,
+        accepted_fields: tuple[str, ...],
+        reason: str,
+        operator: str,
+        evidence_snapshot: tuple[dict, ...],
+        previous_review_status: str,
+    ) -> VersionAcceptanceData:
+        row = VersionChangeAcceptance(
+            workspace_id=workspace_id,
+            baseline_candidate_id=baseline_candidate_id,
+            comparison_candidate_id=comparison_candidate_id,
+            baseline_version_id=baseline_version_id,
+            comparison_version_id=comparison_version_id,
+            accepted_fields=list(accepted_fields),
+            reason=reason,
+            operator=operator,
+            evidence_snapshot=list(evidence_snapshot),
+            previous_review_status=previous_review_status,
+        )
+        self.session.add(row)
+        self.session.flush()
+        return _acceptance_data(row)
+
+    def list_acceptances(self, workspace_id: int, candidate_id: int) -> list[VersionAcceptanceData]:
+        rows = self.session.scalars(
+            select(VersionChangeAcceptance)
+            .where(
+                VersionChangeAcceptance.workspace_id == workspace_id,
+                or_(
+                    VersionChangeAcceptance.baseline_candidate_id == candidate_id,
+                    VersionChangeAcceptance.comparison_candidate_id == candidate_id,
+                ),
+            )
+            .order_by(VersionChangeAcceptance.id)
+        )
+        return [_acceptance_data(row) for row in rows]
+
+
+def _acceptance_data(row: VersionChangeAcceptance) -> VersionAcceptanceData:
+    return VersionAcceptanceData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        baseline_candidate_id=row.baseline_candidate_id,
+        comparison_candidate_id=row.comparison_candidate_id,
+        baseline_version_id=row.baseline_version_id,
+        comparison_version_id=row.comparison_version_id,
+        accepted_fields=tuple(row.accepted_fields),
+        reason=row.reason,
+        operator=row.operator,
+        evidence_snapshot=tuple(row.evidence_snapshot),
+        previous_review_status=row.previous_review_status,
+        created_at=row.created_at,
+    )
