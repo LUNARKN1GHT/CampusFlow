@@ -27,12 +27,12 @@ def upload(client, title, content, published_at):
     return response.json()
 
 
-def make_scope(client):
+def make_scope(client, name="一班"):
     workspace_id = client.get("/api/v1/settings").json()["workspace_id"]
     with client.app.state.session_factory() as session:
         semester = Semester(
             workspace_id=workspace_id,
-            name="秋季",
+            name=f"秋季-{name}",
             start_date=date(2026, 9, 1),
             end_date=date(2027, 1, 31),
         )
@@ -41,7 +41,7 @@ def make_scope(client):
         course = Course(workspace_id=workspace_id, semester_id=semester.id, name="数据库原理")
         session.add(course)
         session.flush()
-        scope = CandidateScope(semester.id, course.id, "一班")
+        scope = CandidateScope(semester.id, course.id, name)
         session.commit()
         return scope
 
