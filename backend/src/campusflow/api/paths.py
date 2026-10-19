@@ -95,6 +95,31 @@ class CourseRelationOut(BaseModel):
     updated_at: datetime
 
 
+class CourseAliasCreate(BaseModel):
+    curriculum_course_id: int = Field(gt=0)
+    alias: str = Field(min_length=1, max_length=200)
+    class_name: str | None = Field(default=None, max_length=100)
+    semester_id: int | None = None
+
+
+class CourseAliasOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    curriculum_plan_id: int
+    curriculum_course_id: int
+    alias: str
+    class_name: str | None
+    semester_id: int | None
+    created_at: datetime
+
+
+class AliasResolveOut(BaseModel):
+    status: str
+    matches: list[CurriculumCourseOut]
+    matched_by: str | None
+    note: str
+
+
 class LearnerProfileUpdate(BaseModel):
     major: str | None = Field(default=None, max_length=100)
     grade_year: int | None = None
@@ -290,6 +315,68 @@ def delete_plan_relation(
 ) -> Response:
     use_cases.delete_relation(repos, workspace.id, plan_id, relation_id)
     return Response(status_code=204)
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/aliases", response_model=list[CourseAliasOut]
+)
+def list_plan_aliases(
+    plan_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[CourseAliasOut]:
+    return [
+        CourseAliasOut.model_validate(alias)
+        for alias in use_cases.list_aliases(repos, workspace.id, plan_id)
+    ]
+
+
+@router.post(
+    "/curriculum-plans/{plan_id}/aliases",
+    response_model=CourseAliasOut,
+    status_code=201,
+)
+def create_plan_alias(
+    plan_id: int,
+    payload: CourseAliasCreate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CourseAliasOut:
+    alias = use_cases.create_alias(repos, workspace.id, plan_id, **payload.model_dump())
+    return CourseAliasOut.model_validate(alias)
+
+
+@router.delete("/curriculum-plans/{plan_id}/aliases/{alias_id}", status_code=204)
+def delete_plan_alias(
+    plan_id: int, alias_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> Response:
+    use_cases.delete_alias(repos, workspace.id, plan_id, alias_id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/aliases/resolve", response_model=AliasResolveOut
+)
+def resolve_plan_alias(
+    plan_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    name: Annotated[str, Query(min_length=1, max_length=200)],
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+    class_name: Annotated[str | None, Query(max_length=100)] = None,
+) -> AliasResolveOut:
+    resolved = use_cases.resolve_course_name(
+        repos,
+        workspace.id,
+        plan_id,
+        name=name,
+        semester_id=semester_id,
+        class_name=class_name,
+    )
+    return AliasResolveOut(
+        status=resolved.status,
+        matches=[CurriculumCourseOut.model_validate(course) for course in resolved.matches],
+        matched_by=resolved.matched_by,
+        note=resolved.note,
+    )
 
 
 @router.get("/learning-profile", response_model=LearnerProfileOut)

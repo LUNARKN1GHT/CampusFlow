@@ -426,6 +426,37 @@ class CourseRelation(Base):
     )
 
 
+class CourseAlias(Base):
+    """C006：课程简称。只用于名称匹配，不合并课程或教学班。"""
+
+    __tablename__ = "course_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_course_id",
+            "alias",
+            "class_name",
+            "semester_id",
+            name="uq_course_alias",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    curriculum_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    alias: Mapped[str] = mapped_column(String(200))
+    class_name: Mapped[str | None] = mapped_column(String(100))
+    semester_id: Mapped[int | None] = mapped_column(
+        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Material(Base):
     """学习资料（D001）。
 

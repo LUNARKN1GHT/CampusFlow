@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from campusflow.application.ports.repositories import (
+    CourseAliasData,
     CourseRelationData,
     CurriculumCourseData,
     CurriculumPlanData,
@@ -12,6 +13,7 @@ from campusflow.application.ports.repositories import (
 )
 from campusflow.domain.errors import DomainError
 from campusflow.infrastructure.db.models import (
+    CourseAlias,
     CourseRelation,
     CurriculumCourse,
     CurriculumPlan,
@@ -47,6 +49,19 @@ def _course_to_data(row: CurriculumCourse) -> CurriculumCourseData:
         source_candidate_id=row.source_candidate_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
+    )
+
+
+def _alias_to_data(row: CourseAlias) -> CourseAliasData:
+    return CourseAliasData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        curriculum_plan_id=row.curriculum_plan_id,
+        curriculum_course_id=row.curriculum_course_id,
+        alias=row.alias,
+        class_name=row.class_name,
+        semester_id=row.semester_id,
+        created_at=row.created_at,
     )
 
 
@@ -285,6 +300,52 @@ class SqlAlchemyCoursePathRepository:
 
     def delete_relation(self, relation_id: int) -> bool:
         row = self._session.get(CourseRelation, relation_id)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
+    def list_aliases(self, plan_id: int) -> list[CourseAliasData]:
+        rows = self._session.scalars(
+            select(CourseAlias)
+            .where(CourseAlias.curriculum_plan_id == plan_id)
+            .order_by(CourseAlias.alias)
+        ).all()
+        return [_alias_to_data(row) for row in rows]
+
+    def get_alias(self, alias_id: int) -> CourseAliasData | None:
+        row = self._session.get(CourseAlias, alias_id)
+        return None if row is None else _alias_to_data(row)
+
+    def create_alias(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        curriculum_course_id: int,
+        alias: str,
+        class_name: str | None,
+        semester_id: int | None,
+    ) -> CourseAliasData:
+        row = CourseAlias(
+            workspace_id=workspace_id,
+            curriculum_plan_id=plan_id,
+            curriculum_course_id=curriculum_course_id,
+            alias=alias,
+            class_name=class_name,
+            semester_id=semester_id,
+        )
+        self._session.add(row)
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError("该课程在相同范围内已有这个别名") from None
+        return _alias_to_data(row)
+
+    def delete_alias(self, alias_id: int) -> bool:
+        row = self._session.get(CourseAlias, alias_id)
         if row is None:
             return False
         self._session.delete(row)

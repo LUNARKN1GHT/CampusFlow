@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from campusflow.application.ports.repositories import (
+    CourseAliasData,
     CourseRelationData,
     CurriculumCourseData,
     CurriculumPlanData,
@@ -10,7 +11,10 @@ from campusflow.application.ports.repositories import (
     Repositories,
 )
 from campusflow.domain.course_paths import (
+    alias_scope_applies,
+    normalize_course_name,
     profile_missing_fields,
+    validate_alias_text,
     validate_course_fields,
     validate_plan_fields,
     validate_profile_fields,
@@ -287,6 +291,130 @@ def delete_relation(
     except Exception:
         repos.uow.rollback()
         raise
+
+
+def list_aliases(
+    repos: Repositories, workspace_id: int, plan_id: int
+) -> list[CourseAliasData]:
+    get_plan(repos, workspace_id, plan_id)
+    return repos.paths.list_aliases(plan_id)
+
+
+def _require_semester_scope(
+    repos: Repositories, workspace_id: int, semester_id: int | None
+) -> None:
+    if semester_id is None:
+        return
+    semester = repos.semesters.get(semester_id)
+    if semester is None or semester.workspace_id != workspace_id:
+        raise NotFoundError("学期不存在")
+
+
+def create_alias(
+    repos: Repositories,
+    workspace_id: int,
+    plan_id: int,
+    *,
+    curriculum_course_id: int,
+    alias: str,
+    class_name: str | None,
+    semester_id: int | None,
+) -> CourseAliasData:
+    get_course(repos, workspace_id, plan_id, curriculum_course_id)
+    validate_alias_text(alias)
+    if class_name is not None and (not class_name.strip() or len(class_name) > 100):
+        raise DomainError("教学班名称无效")
+    _require_semester_scope(repos, workspace_id, semester_id)
+    try:
+        created = repos.paths.create_alias(
+            workspace_id,
+            plan_id,
+            curriculum_course_id=curriculum_course_id,
+            alias=alias.strip(),
+            class_name=class_name.strip() if class_name else None,
+            semester_id=semester_id,
+        )
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+    return created
+
+
+def delete_alias(
+    repos: Repositories, workspace_id: int, plan_id: int, alias_id: int
+) -> None:
+    get_plan(repos, workspace_id, plan_id)
+    alias = repos.paths.get_alias(alias_id)
+    if alias is None or alias.workspace_id != workspace_id:
+        raise NotFoundError("课程别名不存在")
+    if alias.curriculum_plan_id != plan_id:
+        raise DomainError("别名不属于该培养方案")
+    try:
+        if not repos.paths.delete_alias(alias_id):
+            raise NotFoundError("课程别名不存在")
+        repos.uow.commit()
+    except Exception:
+        repos.uow.rollback()
+        raise
+
+
+@dataclass(frozen=True)
+class AliasResolution:
+    status: str
+    matches: tuple[CurriculumCourseData, ...]
+    matched_by: str | None
+    note: str
+
+
+def resolve_course_name(
+    repos: Repositories,
+    workspace_id: int,
+    plan_id: int,
+    *,
+    name: str,
+    semester_id: int | None = None,
+    class_name: str | None = None,
+) -> AliasResolution:
+    """严格匹配正式课名或显式别名；多于一个课程时返回歧义，不自动选择。
+
+    这里只做查询：不会写入绑定，也不会合并任何真实课程或教学班。
+    """
+    get_plan(repos, workspace_id, plan_id)
+    validate_alias_text(name)
+    _require_semester_scope(repos, workspace_id, semester_id)
+    target = normalize_course_name(name)
+    courses = {course.id: course for course in repos.paths.list_courses(plan_id)}
+    matched: dict[int, str] = {}
+    for course in courses.values():
+        if normalize_course_name(course.name) == target:
+            matched[course.id] = "name"
+    for alias in repos.paths.list_aliases(plan_id):
+        if normalize_course_name(alias.alias) != target:
+            continue
+        if not alias_scope_applies(
+            alias_class_name=alias.class_name,
+            alias_semester_id=alias.semester_id,
+            class_name=class_name,
+            semester_id=semester_id,
+        ):
+            continue
+        matched.setdefault(alias.curriculum_course_id, "alias")
+    matches = tuple(courses[course_id] for course_id in matched if course_id in courses)
+    if len(matches) == 1:
+        course = matches[0]
+        status = "matched"
+        matched_by = matched[course.id]
+        note = "唯一匹配结果仅供确认，不自动合并课程或教学班。"
+    elif len(matches) > 1:
+        status = "ambiguous"
+        matched_by = None
+        note = "该名称对应多门课程或教学班范围不清，不能自动匹配，请人工选择。"
+    else:
+        status = "not_found"
+        matched_by = None
+        note = "方案内没有找到匹配的课程名称或别名。"
+    return AliasResolution(status, matches, matched_by, note)
 
 
 @dataclass(frozen=True)
