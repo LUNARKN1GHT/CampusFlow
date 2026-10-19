@@ -252,6 +252,65 @@ class CourseGraphOut(BaseModel):
     limitations: list[str]
 
 
+class CourseOrderOut(BaseModel):
+    """C010/C012：强制先修层次；环或缺项时层次为空并给出阻塞问题。"""
+
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    levels: list[list[int]]
+    alternatives: bool
+    problems: list[GraphProblemOut]
+    limitations: list[str]
+
+
+class NextCourseOut(BaseModel):
+    course_id: int
+    name: str
+    study_status: str
+    available: bool
+    unmet: list[str]
+    recommended: list[str]
+
+
+class NextCoursesOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    courses: list[NextCourseOut]
+    limitations: list[str]
+
+
+class SemesterPlanRequest(BaseModel):
+    credit_limit: int | None = Field(default=None, ge=1, le=60)
+    start_season: str = Field(default="fall", pattern="^(fall|spring)$")
+    max_terms: int | None = Field(default=None, ge=1, le=16)
+
+
+class SuggestedTermOut(BaseModel):
+    index: int
+    season: str
+    course_ids: list[int]
+    credits_known: float
+    credits_unknown: int
+    warnings: list[str]
+
+
+class SemesterPlanOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    credit_limit: int | None
+    terms: list[SuggestedTermOut]
+    unplaced: list[dict]
+    limitations: list[str]
+    assumptions: list[str]
+    graduation_audit: bool
+
+
 def _problem_out(problem) -> GraphProblemOut:
     return GraphProblemOut(
         code=problem.code,
@@ -559,6 +618,92 @@ def get_plan_graph(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> C
         pending=[_problem_out(item) for item in graph.pending],
         complete=graph.complete,
         limitations=list(graph.limitations),
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/order", response_model=CourseOrderOut)
+def get_plan_order(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> CourseOrderOut:
+    """C010/C012：只对强制先修分层；成环或缺项时不返回伪造的完整顺序。"""
+    analysis = use_cases.analyze_plan(repos, workspace.id, plan_id)
+    return CourseOrderOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        levels=[list(level) for level in analysis.order.levels],
+        alternatives=analysis.order.alternatives,
+        problems=[_problem_out(item) for item in analysis.order.problems],
+        limitations=list(analysis.graph.graph.limitations),
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/next", response_model=NextCoursesOut)
+def get_next_courses(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> NextCoursesOut:
+    """C013：按已修/在修状态列出下一步；建议先学单独返回，不当作硬阻塞。"""
+    analysis = use_cases.analyze_plan(repos, workspace.id, plan_id)
+    return NextCoursesOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        courses=[
+            NextCourseOut(
+                course_id=item.course_id,
+                name=item.name,
+                study_status=item.study_status,
+                available=item.available,
+                unmet=list(item.unmet),
+                recommended=list(item.recommended),
+            )
+            for item in analysis.next_courses
+        ],
+        limitations=list(analysis.graph.graph.limitations),
+    )
+
+
+@router.post("/curriculum-plans/{plan_id}/semester-plan", response_model=SemesterPlanOut)
+def get_semester_plan(
+    plan_id: int,
+    payload: SemesterPlanRequest,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> SemesterPlanOut:
+    """C014：按已知开课季节与学分上限辅助排学期；不代替选课或毕业审核。"""
+    analysis = use_cases.analyze_plan(
+        repos,
+        workspace.id,
+        plan_id,
+        credit_limit=payload.credit_limit,
+        start_season=payload.start_season,
+        max_terms=payload.max_terms,
+    )
+    suggestion = analysis.semester
+    effective_limit = (
+        payload.credit_limit
+        if payload.credit_limit is not None
+        else analysis.plan.credit_limit_per_term
+    )
+    return SemesterPlanOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        credit_limit=effective_limit,
+        terms=[
+            SuggestedTermOut(
+                index=term.index,
+                season=term.season,
+                course_ids=list(term.course_ids),
+                credits_known=term.credits_known,
+                credits_unknown=term.credits_unknown,
+                warnings=list(term.warnings),
+            )
+            for term in suggestion.terms
+        ],
+        unplaced=[dict(item) for item in suggestion.unplaced],
+        limitations=list(suggestion.limitations),
+        assumptions=list(suggestion.assumptions),
+        graduation_audit=suggestion.graduation_audit,
     )
 
 
