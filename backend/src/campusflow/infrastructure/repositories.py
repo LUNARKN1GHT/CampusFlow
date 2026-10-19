@@ -1935,6 +1935,7 @@ class SqlAlchemyReminderRepository:
             .where(
                 ReminderTrigger.workspace_id == workspace_id,
                 ReminderTrigger.kind == "review",
+                ReminderTrigger.task_id.is_(None),
                 ReminderTrigger.status == "pending",
             )
             .values(status="cancelled", updated_at=func.now())
