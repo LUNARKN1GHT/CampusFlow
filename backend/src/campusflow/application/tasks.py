@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 
 from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData, TaskDependencyData
+from campusflow.application.reminders import sync_reminders
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
@@ -127,6 +128,7 @@ def create_task(
         remaining_minutes,
         parent_task_id=parent_task_id,
     )
+    sync_reminders(repos, workspace_id, task_ids=[task.id])
     repos.uow.commit()
     return _apply_overdue(repos, workspace_id, [task])[0]
 
@@ -168,6 +170,7 @@ def update_task(
         estimated_minutes=estimated_minutes,
         remaining_minutes=remaining_minutes,
     )
+    sync_reminders(repos, workspace_id, task_ids=[task_id])
     repos.uow.commit()
     return _apply_overdue(repos, workspace_id, [updated])[0]
 
@@ -177,6 +180,7 @@ def set_progress(
 ) -> TaskData:
     _require_task_in_workspace(repos, workspace_id, task_id)
     task = repos.tasks.set_progress(task_id, progress, reason)
+    sync_reminders(repos, workspace_id, task_ids=[task_id])
     repos.uow.commit()
     return _apply_overdue(repos, workspace_id, [task])[0]
 

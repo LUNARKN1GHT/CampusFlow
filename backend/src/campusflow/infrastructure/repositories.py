@@ -20,6 +20,8 @@ from campusflow.application.ports.repositories import (
     PlanVersionData,
     ProcessingJobAttemptData,
     ProcessingJobData,
+    ReminderRuleData,
+    ReminderTriggerData,
     Repositories,
     RuleData,
     SemesterData,
@@ -52,6 +54,8 @@ from campusflow.infrastructure.db.models import (
     PlanVersion,
     ProcessingJob,
     ProcessingJobAttempt,
+    ReminderRule,
+    ReminderTrigger,
     Semester,
     SourceChunk,
     Task,
@@ -1463,6 +1467,40 @@ class SqlAlchemyJobRepository:
         return [_job_to_data(row) for row in rows]
 
 
+def _reminder_rule_to_data(row: ReminderRule) -> ReminderRuleData:
+    return ReminderRuleData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        task_id=row.task_id,
+        advance_minutes=row.advance_minutes,
+        repeat_minutes=row.repeat_minutes,
+        paused=row.paused,
+        enabled=row.enabled,
+        version=row.version,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _reminder_trigger_to_data(row: ReminderTrigger) -> ReminderTriggerData:
+    return ReminderTriggerData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        rule_id=row.rule_id,
+        task_id=row.task_id,
+        kind=row.kind,
+        dedupe_key=row.dedupe_key,
+        scheduled_for=row.scheduled_for,
+        message=row.message,
+        status=row.status,
+        payload=row.payload,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        sent_at=row.sent_at,
+        read_at=row.read_at,
+    )
+
+
 def _plan_draft_to_data(row: PlanDraft) -> PlanDraftData:
     return PlanDraftData(
         id=row.id,
@@ -1716,6 +1754,223 @@ class SqlAlchemyPlanRepository:
         return [_plan_version_to_data(row) for row in self._session.scalars(stmt)]
 
 
+class SqlAlchemyReminderRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list_rules(self, workspace_id: int) -> list[ReminderRuleData]:
+        stmt = (
+            select(ReminderRule)
+            .where(ReminderRule.workspace_id == workspace_id)
+            .order_by(ReminderRule.task_id.nulls_first(), ReminderRule.id)
+        )
+        return [_reminder_rule_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_rule(self, rule_id: int) -> ReminderRuleData | None:
+        row = self._session.get(ReminderRule, rule_id)
+        return _reminder_rule_to_data(row) if row is not None else None
+
+    def get_task_rule(self, workspace_id: int, task_id: int) -> ReminderRuleData | None:
+        row = self._session.scalar(
+            select(ReminderRule).where(
+                ReminderRule.workspace_id == workspace_id,
+                ReminderRule.task_id == task_id,
+            )
+        )
+        return _reminder_rule_to_data(row) if row is not None else None
+
+    def get_default_rule(self, workspace_id: int) -> ReminderRuleData | None:
+        row = self._session.scalar(
+            select(ReminderRule).where(
+                ReminderRule.workspace_id == workspace_id,
+                ReminderRule.task_id.is_(None),
+            )
+        )
+        return _reminder_rule_to_data(row) if row is not None else None
+
+    def create_rule(
+        self,
+        workspace_id: int,
+        *,
+        task_id: int | None,
+        advance_minutes: int,
+        repeat_minutes: int | None,
+        paused: bool,
+        enabled: bool,
+    ) -> ReminderRuleData:
+        row = ReminderRule(
+            workspace_id=workspace_id,
+            task_id=task_id,
+            advance_minutes=advance_minutes,
+            repeat_minutes=repeat_minutes,
+            paused=paused,
+            enabled=enabled,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return _reminder_rule_to_data(row)
+
+    def update_rule(
+        self,
+        rule_id: int,
+        *,
+        advance_minutes: int,
+        repeat_minutes: int | None,
+        paused: bool,
+        enabled: bool,
+    ) -> ReminderRuleData | None:
+        row = self._session.get(ReminderRule, rule_id)
+        if row is None:
+            return None
+        row.advance_minutes = advance_minutes
+        row.repeat_minutes = repeat_minutes
+        row.paused = paused
+        row.enabled = enabled
+        row.version += 1
+        self._session.flush()
+        return _reminder_rule_to_data(row)
+
+    def delete_rule(self, rule_id: int) -> bool:
+        row = self._session.get(ReminderRule, rule_id)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
+    def list_triggers(
+        self,
+        workspace_id: int,
+        *,
+        statuses: tuple[str, ...] | None = None,
+        unread_only: bool = False,
+        limit: int = 200,
+    ) -> list[ReminderTriggerData]:
+        stmt = select(ReminderTrigger).where(ReminderTrigger.workspace_id == workspace_id)
+        if statuses is not None:
+            stmt = stmt.where(ReminderTrigger.status.in_(statuses))
+        if unread_only:
+            stmt = stmt.where(ReminderTrigger.status == "sent", ReminderTrigger.read_at.is_(None))
+        stmt = stmt.order_by(ReminderTrigger.scheduled_for.desc(), ReminderTrigger.id.desc()).limit(
+            limit
+        )
+        return [_reminder_trigger_to_data(row) for row in self._session.scalars(stmt)]
+
+    def get_trigger(self, trigger_id: int) -> ReminderTriggerData | None:
+        row = self._session.get(ReminderTrigger, trigger_id)
+        return _reminder_trigger_to_data(row) if row is not None else None
+
+    def upsert_triggers(self, rows: list[dict]) -> list[ReminderTriggerData]:
+        if not rows:
+            return []
+        insert_stmt = pg_insert(ReminderTrigger).values(rows)
+        statement = insert_stmt.on_conflict_do_update(
+            index_elements=["dedupe_key"],
+            set_={
+                "status": "pending",
+                "message": insert_stmt.excluded.message,
+                "payload": insert_stmt.excluded.payload,
+                "updated_at": func.now(),
+            },
+            # 仍需要的触发恢复为待发送；已读或已忽略的不重新弹出
+            where=ReminderTrigger.status == "cancelled",
+        ).returning(ReminderTrigger.id)
+        created_ids = list(self._session.scalars(statement))
+        self._session.flush()
+        return [
+            _reminder_trigger_to_data(row)
+            for row in (self._session.get(ReminderTrigger, item) for item in created_ids)
+            if row is not None
+        ]
+
+    def set_trigger_status(
+        self,
+        trigger_id: int,
+        *,
+        status: str,
+        read_at: datetime | None = None,
+        sent_at: datetime | None = None,
+    ) -> ReminderTriggerData | None:
+        row = self._session.get(ReminderTrigger, trigger_id)
+        if row is None:
+            return None
+        row.status = status
+        if read_at is not None:
+            row.read_at = read_at
+        if sent_at is not None:
+            row.sent_at = sent_at
+        self._session.flush()
+        return _reminder_trigger_to_data(row)
+
+    def cancel_pending_for_task(self, workspace_id: int, task_id: int) -> int:
+        result = self._session.execute(
+            update(ReminderTrigger)
+            .where(
+                ReminderTrigger.workspace_id == workspace_id,
+                ReminderTrigger.task_id == task_id,
+                ReminderTrigger.status == "pending",
+            )
+            .values(status="cancelled", updated_at=func.now())
+        )
+        self._session.flush()
+        return result.rowcount or 0
+
+    def cancel_pending_not_in_keys(
+        self, workspace_id: int, task_id: int, keep_keys: set[str]
+    ) -> int:
+        stmt = update(ReminderTrigger).where(
+            ReminderTrigger.workspace_id == workspace_id,
+            ReminderTrigger.task_id == task_id,
+            ReminderTrigger.status == "pending",
+        )
+        if keep_keys:
+            stmt = stmt.where(ReminderTrigger.dedupe_key.not_in(keep_keys))
+        result = self._session.execute(stmt.values(status="cancelled", updated_at=func.now()))
+        self._session.flush()
+        return result.rowcount or 0
+
+    def cancel_pending_reviews(self, workspace_id: int) -> int:
+        result = self._session.execute(
+            update(ReminderTrigger)
+            .where(
+                ReminderTrigger.workspace_id == workspace_id,
+                ReminderTrigger.kind == "review",
+                ReminderTrigger.task_id.is_(None),
+                ReminderTrigger.status == "pending",
+            )
+            .values(status="cancelled", updated_at=func.now())
+        )
+        self._session.flush()
+        return result.rowcount or 0
+
+    def restore_future_cancelled(self, workspace_id: int, task_id: int, now: datetime) -> int:
+        result = self._session.execute(
+            update(ReminderTrigger)
+            .where(
+                ReminderTrigger.workspace_id == workspace_id,
+                ReminderTrigger.task_id == task_id,
+                ReminderTrigger.status == "cancelled",
+                ReminderTrigger.scheduled_for > now,
+            )
+            .values(status="pending", updated_at=func.now())
+        )
+        self._session.flush()
+        return result.rowcount or 0
+
+    def mark_due_sent(self, workspace_id: int, now: datetime) -> int:
+        result = self._session.execute(
+            update(ReminderTrigger)
+            .where(
+                ReminderTrigger.workspace_id == workspace_id,
+                ReminderTrigger.status == "pending",
+                ReminderTrigger.scheduled_for <= now,
+            )
+            .values(status="sent", sent_at=now, updated_at=func.now())
+        )
+        self._session.flush()
+        return result.rowcount or 0
+
+
 def build_repositories(session: Session) -> Repositories:
     """装配全部仓储与工作单元（API 装配、Worker、投递补偿共用）。"""
     return Repositories(
@@ -1729,5 +1984,6 @@ def build_repositories(session: Session) -> Repositories:
         candidates=SqlAlchemyCandidateRepository(session),
         rules=SqlAlchemyRuleRepository(session),
         plans=SqlAlchemyPlanRepository(session),
+        reminders=SqlAlchemyReminderRepository(session),
         uow=SqlAlchemyUnitOfWork(session),
     )

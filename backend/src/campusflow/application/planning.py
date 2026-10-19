@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 from campusflow.application import schedule as schedule_use_cases
 from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
+from campusflow.application.reminders import sync_reminders
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
@@ -451,6 +452,8 @@ def accept_draft(
     repos.plans.supersede_others(
         workspace_id, semester_id=draft.semester_id, keep_draft_id=draft.id
     )
+    # 接受后才把最新安排落到提醒；未接受草案不触发重算
+    sync_reminders(repos, workspace_id)
     repos.uow.commit()
     return repos.plans.get_draft(draft.id)
 

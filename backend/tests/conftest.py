@@ -33,6 +33,8 @@ TABLES = ", ".join(
         "courses",
         "tasks",
         "task_dependencies",
+        "reminder_triggers",
+        "reminder_rules",
         "task_progress_changes",
         "fixed_events",
         "availability_slots",
