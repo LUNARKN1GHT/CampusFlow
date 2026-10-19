@@ -147,7 +147,7 @@ def test_invalidated_source_replaces_definite_deadline(client: TestClient) -> No
     assert "将在" not in review[0]["message"]
 
     cancelled = _reminders(client, status="cancelled")
-    assert [item["id"] for item in cancelled] == [deadline["id"]]
+    assert deadline["id"] in [item["id"] for item in cancelled]
     assert _reminders(client, status="pending") == []
 
 

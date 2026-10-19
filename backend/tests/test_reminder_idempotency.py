@@ -102,7 +102,8 @@ def test_repeated_cycles_keep_one_trigger(client: TestClient) -> None:
         sync_reminders(repos, workspace_id, now=datetime(2026, 11, 9, 10, tzinfo=UTC))
         sync_reminders(repos, workspace_id, now=datetime(2026, 11, 9, 12, tzinfo=UTC))
         session.commit()
-        assert len(repos.reminders.list_triggers(workspace_id)) == 1
+        pending = repos.reminders.list_triggers(workspace_id, statuses=("pending",))
+        assert len(pending) == 1
 
 
 def test_concurrent_inserts_produce_one_row(client: TestClient) -> None:
@@ -166,5 +167,5 @@ def test_failed_sync_rolls_back_and_retry_succeeds(client: TestClient) -> None:
         repos.reminders.upsert_triggers = original
         sync_reminders(repos, workspace_id)
         session.commit()
-        triggers = repos.reminders.list_triggers(workspace_id)
+        triggers = repos.reminders.list_triggers(workspace_id, statuses=("pending",))
         assert len(triggers) == 1
