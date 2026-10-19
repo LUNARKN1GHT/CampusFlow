@@ -1,7 +1,7 @@
-"""A018：任务清单导出 HTTP 路由（预览与 CSV 下载）。
+"""A018／A019：清单与日历导出 HTTP 路由（预览与文件下载）。
 
 范围由请求显式给出；预览返回范围指纹，下载必须携带同一指纹。
-计划模式与 ICS 格式由 A019 接入，当前返回 400 而不是生成空文件。
+计划模式支持 ICS；计划模式的 CSV 清单留待后续任务，返回 400 而不是空文件。
 """
 
 from datetime import date, time
@@ -96,6 +96,7 @@ class ExportPreviewOut(BaseModel):
     timezone: str
     item_count: int
     row_count: int
+    event_count: int
     date_range: ExportDateRangeOut
     counts: ExportCountsOut
     excluded: list[ExportNoticeOut]
@@ -125,10 +126,18 @@ def preview_export(
     return ExportPreviewOut(
         mode=preview.mode,
         format=preview.format,
-        scope=ExportScopeOut(task_ids=list(preview.task_ids)),
+        scope=ExportScopeOut(
+            task_ids=list(preview.task_ids),
+            plan_id=preview.plan_id,
+            plan_version=preview.plan_version,
+            semester_id=preview.semester_id,
+            range_start=preview.range_start,
+            range_end=preview.range_end,
+        ),
         timezone=preview.timezone,
         item_count=preview.item_count,
         row_count=preview.row_count,
+        event_count=preview.event_count,
         date_range=ExportDateRangeOut(
             start=preview.date_start,
             end=preview.date_end,
