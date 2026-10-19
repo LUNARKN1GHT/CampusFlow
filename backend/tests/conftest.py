@@ -32,6 +32,8 @@ TABLES = ", ".join(
         "semesters",
         "courses",
         "learner_profiles",
+        "course_relations",
+        "curriculum_courses",
         "curriculum_plans",
         "tasks",
         "task_dependencies",

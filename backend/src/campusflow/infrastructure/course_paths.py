@@ -1,12 +1,22 @@
 """培养方案与个人方案的 SQLAlchemy 仓储（C002 起）。"""
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from campusflow.application.ports.repositories import CurriculumPlanData, LearnerProfileData
+from campusflow.application.ports.repositories import (
+    CourseRelationData,
+    CurriculumCourseData,
+    CurriculumPlanData,
+    LearnerProfileData,
+)
 from campusflow.domain.errors import DomainError
-from campusflow.infrastructure.db.models import CurriculumPlan, LearnerProfile
+from campusflow.infrastructure.db.models import (
+    CourseRelation,
+    CurriculumCourse,
+    CurriculumPlan,
+    LearnerProfile,
+)
 
 
 def _plan_to_data(row: CurriculumPlan) -> CurriculumPlanData:
@@ -20,6 +30,37 @@ def _plan_to_data(row: CurriculumPlan) -> CurriculumPlanData:
         credit_limit_per_term=row.credit_limit_per_term,
         source_material_id=row.source_material_id,
         source_version_id=row.source_version_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _course_to_data(row: CurriculumCourse) -> CurriculumCourseData:
+    return CurriculumCourseData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        curriculum_plan_id=row.curriculum_plan_id,
+        name=row.name,
+        code=row.code,
+        credits=row.credits,
+        offered_terms=list(row.offered_terms or []),
+        source_candidate_id=row.source_candidate_id,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def _relation_to_data(row: CourseRelation) -> CourseRelationData:
+    return CourseRelationData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        curriculum_plan_id=row.curriculum_plan_id,
+        from_course_id=row.from_course_id,
+        to_course_id=row.to_course_id,
+        relation_type=row.relation_type,
+        condition_text=row.condition_text,
+        source_candidate_id=row.source_candidate_id,
+        created_by=row.created_by,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -102,9 +143,172 @@ class SqlAlchemyCoursePathRepository:
             raise DomainError("同一专业、年级和版本的培养方案已存在") from None
         return _plan_to_data(row)
 
+    def list_courses(self, plan_id: int) -> list[CurriculumCourseData]:
+        rows = self._session.scalars(
+            select(CurriculumCourse)
+            .where(CurriculumCourse.curriculum_plan_id == plan_id)
+            .order_by(CurriculumCourse.name)
+        ).all()
+        return [_course_to_data(row) for row in rows]
+
+    def get_course(self, course_id: int) -> CurriculumCourseData | None:
+        row = self._session.get(CurriculumCourse, course_id)
+        return None if row is None else _course_to_data(row)
+
+    def create_course(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        name: str,
+        code: str | None,
+        credits: float | None,
+        offered_terms: list[str],
+    ) -> CurriculumCourseData:
+        row = CurriculumCourse(
+            workspace_id=workspace_id,
+            curriculum_plan_id=plan_id,
+            name=name,
+            code=code,
+            credits=credits,
+            offered_terms=offered_terms,
+        )
+        self._session.add(row)
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError("同一方案内已存在同名课程") from None
+        return _course_to_data(row)
+
+    def update_course(
+        self,
+        course_id: int,
+        *,
+        name: str,
+        code: str | None,
+        credits: float | None,
+        offered_terms: list[str],
+    ) -> CurriculumCourseData | None:
+        row = self._session.get(CurriculumCourse, course_id)
+        if row is None:
+            return None
+        row.name = name
+        row.code = code
+        row.credits = credits
+        row.offered_terms = offered_terms
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError("同一方案内已存在同名课程") from None
+        return _course_to_data(row)
+
+    def delete_course(self, course_id: int) -> bool:
+        row = self._session.get(CurriculumCourse, course_id)
+        if row is None:
+            return False
+        related = self._session.scalar(
+            select(func.count())
+            .select_from(CourseRelation)
+            .where(
+                (CourseRelation.from_course_id == course_id)
+                | (CourseRelation.to_course_id == course_id)
+            )
+        )
+        if related:
+            raise DomainError("课程仍被课程关系引用，请先删除相关关系")
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
+    def list_relations(
+        self, plan_id: int, *, relation_type: str | None = None
+    ) -> list[CourseRelationData]:
+        stmt = select(CourseRelation).where(CourseRelation.curriculum_plan_id == plan_id)
+        if relation_type is not None:
+            stmt = stmt.where(CourseRelation.relation_type == relation_type)
+        rows = self._session.scalars(
+            stmt.order_by(CourseRelation.from_course_id, CourseRelation.to_course_id)
+        ).all()
+        return [_relation_to_data(row) for row in rows]
+
+    def get_relation(self, relation_id: int) -> CourseRelationData | None:
+        row = self._session.get(CourseRelation, relation_id)
+        return None if row is None else _relation_to_data(row)
+
+    def create_relation(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        from_course_id: int,
+        to_course_id: int,
+        relation_type: str,
+        condition_text: str | None,
+    ) -> CourseRelationData:
+        row = CourseRelation(
+            workspace_id=workspace_id,
+            curriculum_plan_id=plan_id,
+            from_course_id=from_course_id,
+            to_course_id=to_course_id,
+            relation_type=relation_type,
+            condition_text=condition_text,
+            created_by="user",
+        )
+        self._session.add(row)
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError("相同方向与类型的关系已存在") from None
+        return _relation_to_data(row)
+
+    def update_relation(
+        self,
+        relation_id: int,
+        *,
+        relation_type: str,
+        condition_text: str | None,
+    ) -> CourseRelationData | None:
+        row = self._session.get(CourseRelation, relation_id)
+        if row is None:
+            return None
+        row.relation_type = relation_type
+        row.condition_text = condition_text
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError("相同方向与类型的关系已存在") from None
+        return _relation_to_data(row)
+
+    def delete_relation(self, relation_id: int) -> bool:
+        row = self._session.get(CourseRelation, relation_id)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
     def plan_impact_counts(self, workspace_id: int, plan_id: int | None) -> dict[str, int]:
-        # 课程、关系与修读记录在后续叶子任务接入；当前方案尚未建立这些数据时计为 0。
-        return {"courses": 0, "relations": 0, "study_records": 0}
+        if plan_id is None:
+            return {"courses": 0, "relations": 0, "study_records": 0}
+        courses = self._session.scalar(
+            select(func.count())
+            .select_from(CurriculumCourse)
+            .where(CurriculumCourse.curriculum_plan_id == plan_id)
+        )
+        relations = self._session.scalar(
+            select(func.count())
+            .select_from(CourseRelation)
+            .where(CourseRelation.curriculum_plan_id == plan_id)
+        )
+        return {
+            "courses": int(courses or 0),
+            "relations": int(relations or 0),
+            "study_records": 0,
+        }
 
     def get_profile(self, workspace_id: int) -> LearnerProfileData | None:
         row = self._session.get(LearnerProfile, workspace_id)

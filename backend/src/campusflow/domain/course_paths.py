@@ -94,6 +94,39 @@ def validate_profile_fields(
         raise DomainError("个人年级与所选方案年级不一致，请核对后保存")
 
 
+def validate_course_fields(
+    *, name: str, code: str | None, credits: float | None, offered_terms: list[str]
+) -> list[str]:
+    _text(name, 200, "课程名称", required=True)
+    _text(code, 50, "课程代码")
+    if credits is not None and (
+        type(credits) not in (int, float) or credits < 0 or credits > 100
+    ):
+        raise DomainError("学分必须是非负数")
+    normalized: list[str] = []
+    for term in offered_terms:
+        try:
+            value = OfferedTerm(term)
+        except ValueError:
+            raise DomainError("开课学期只能是 fall、spring、summer 或 winter") from None
+        if value.value not in normalized:
+            normalized.append(value.value)
+    return normalized
+
+
+def validate_relation_type(value: str) -> RelationType:
+    try:
+        return RelationType(value)
+    except ValueError:
+        raise DomainError("关系类型只能是强制先修、并修或建议先学") from None
+
+
+def validate_relation_fields(*, relation_type: str, condition_text: str | None) -> RelationType:
+    parsed = validate_relation_type(relation_type)
+    _text(condition_text, 1000, "关系说明")
+    return parsed
+
+
 def profile_missing_fields(
     *, major: str | None, grade_year: int | None, plan_id: int | None
 ) -> tuple[str, ...]:

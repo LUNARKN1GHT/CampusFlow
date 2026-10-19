@@ -82,6 +82,35 @@ class LearnerProfileData:
     updated_at: datetime | None
 
 
+@dataclass
+class CurriculumCourseData:
+    id: int
+    workspace_id: int
+    curriculum_plan_id: int
+    name: str
+    code: str | None
+    credits: float | None
+    offered_terms: list[str]
+    source_candidate_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class CourseRelationData:
+    id: int
+    workspace_id: int
+    curriculum_plan_id: int
+    from_course_id: int
+    to_course_id: int
+    relation_type: str
+    condition_text: str | None
+    source_candidate_id: int | None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
 class CoursePathRepository(Protocol):
     """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。"""
 
@@ -114,6 +143,60 @@ class CoursePathRepository(Protocol):
     def plan_impact_counts(self, workspace_id: int, plan_id: int | None) -> dict[str, int]:
         """切换方案前统计当前方案的课程、关系与修读记录。"""
         ...
+
+    def list_courses(self, plan_id: int) -> list[CurriculumCourseData]: ...
+
+    def get_course(self, course_id: int) -> CurriculumCourseData | None: ...
+
+    def create_course(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        name: str,
+        code: str | None,
+        credits: float | None,
+        offered_terms: list[str],
+    ) -> CurriculumCourseData: ...
+
+    def update_course(
+        self,
+        course_id: int,
+        *,
+        name: str,
+        code: str | None,
+        credits: float | None,
+        offered_terms: list[str],
+    ) -> CurriculumCourseData | None: ...
+
+    def delete_course(self, course_id: int) -> bool: ...
+
+    def list_relations(
+        self, plan_id: int, *, relation_type: str | None = None
+    ) -> list[CourseRelationData]: ...
+
+    def get_relation(self, relation_id: int) -> CourseRelationData | None: ...
+
+    def create_relation(
+        self,
+        workspace_id: int,
+        plan_id: int,
+        *,
+        from_course_id: int,
+        to_course_id: int,
+        relation_type: str,
+        condition_text: str | None,
+    ) -> CourseRelationData: ...
+
+    def update_relation(
+        self,
+        relation_id: int,
+        *,
+        relation_type: str,
+        condition_text: str | None,
+    ) -> CourseRelationData | None: ...
+
+    def delete_relation(self, relation_id: int) -> bool: ...
 
     def get_profile(self, workspace_id: int) -> LearnerProfileData | None: ...
 
