@@ -12,6 +12,7 @@ import QaView from './views/QaView.vue'
 import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
+import VersionChangeView from './views/VersionChangeView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -38,6 +39,11 @@ const router = createRouter({
           path: 'review',
           name: 'review',
           component: ReviewView,
+        },
+        {
+          path: 'review/changes',
+          name: 'review-changes',
+          component: VersionChangeView,
         },
         {
           path: 'qa',

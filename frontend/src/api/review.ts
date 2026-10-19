@@ -1,11 +1,15 @@
 import { apiRequest } from './client'
 import type {
   CandidateConversionResult,
+  CandidateDiff,
   CandidateKind,
   CandidateReviewDetail,
   CandidateSummary,
+  ChangeImpact,
   FieldOrigin,
   ReviewStatus,
+  VersionAcceptance,
+  VersionApplicability,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -68,4 +72,12 @@ export const candidatesApi = {
     method: 'PATCH',
     body: JSON.stringify(input),
   }),
+  diff: (baselineId: number, comparisonId: number) => apiRequest<CandidateDiff>(`/candidates/${baselineId}/diff/${comparisonId}`),
+  applicability: (baselineId: number, comparisonId: number) => apiRequest<VersionApplicability>(`/candidates/${baselineId}/diff/${comparisonId}/applicability`),
+  impact: (baselineId: number, comparisonId: number) => apiRequest<ChangeImpact>(`/candidates/${baselineId}/diff/${comparisonId}/impact`),
+  accept: (baselineId: number, comparisonId: number, input: { field_names: string[]; reason: string; acknowledge_conflict: boolean }) => apiRequest<VersionAcceptance>(`/candidates/${baselineId}/diff/${comparisonId}/accept`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  acceptances: (candidateId: number) => apiRequest<VersionAcceptance[]>(`/candidates/${candidateId}/acceptances`),
 }
