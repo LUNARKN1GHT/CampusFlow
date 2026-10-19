@@ -202,6 +202,126 @@ class StudyStatusOut(BaseModel):
     note: str
 
 
+class GraphNodeOut(BaseModel):
+    id: int
+    name: str
+    code: str | None
+    credits: float | None
+    offered_terms: list[str]
+    study_status: str
+    record_count: int
+
+
+class GraphEvidenceOut(BaseModel):
+    chunk_id: int
+    quote: str
+    field: str
+    version_id: int
+    material_id: int | None
+
+
+class GraphEdgeOut(BaseModel):
+    id: int
+    from_course_id: int
+    to_course_id: int
+    relation_type: str
+    condition_text: str | None
+    source_candidate_id: int | None
+    evidence: list[GraphEvidenceOut]
+
+
+class GraphProblemOut(BaseModel):
+    code: str
+    message: str
+    course_ids: list[int]
+    relation_ids: list[int]
+    path: list[int]
+    candidate_ids: list[int]
+
+
+class CourseGraphOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    nodes: list[GraphNodeOut]
+    edges: list[GraphEdgeOut]
+    cycles: list[GraphProblemOut]
+    conflicts: list[GraphProblemOut]
+    missing: list[GraphProblemOut]
+    pending: list[GraphProblemOut]
+    complete: bool
+    limitations: list[str]
+
+
+class CourseOrderOut(BaseModel):
+    """C010/C012：强制先修层次；环或缺项时层次为空并给出阻塞问题。"""
+
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    levels: list[list[int]]
+    alternatives: bool
+    problems: list[GraphProblemOut]
+    limitations: list[str]
+
+
+class NextCourseOut(BaseModel):
+    course_id: int
+    name: str
+    study_status: str
+    available: bool
+    unmet: list[str]
+    recommended: list[str]
+
+
+class NextCoursesOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    courses: list[NextCourseOut]
+    limitations: list[str]
+
+
+class SemesterPlanRequest(BaseModel):
+    credit_limit: int | None = Field(default=None, ge=1, le=60)
+    start_season: str = Field(default="fall", pattern="^(fall|spring)$")
+    max_terms: int | None = Field(default=None, ge=1, le=16)
+
+
+class SuggestedTermOut(BaseModel):
+    index: int
+    season: str
+    course_ids: list[int]
+    credits_known: float
+    credits_unknown: int
+    warnings: list[str]
+
+
+class SemesterPlanOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    complete: bool
+    blocked: bool
+    credit_limit: int | None
+    terms: list[SuggestedTermOut]
+    unplaced: list[dict]
+    limitations: list[str]
+    assumptions: list[str]
+    graduation_audit: bool
+
+
+def _problem_out(problem) -> GraphProblemOut:
+    return GraphProblemOut(
+        code=problem.code,
+        message=problem.message,
+        course_ids=list(problem.course_ids),
+        relation_ids=list(problem.relation_ids),
+        path=list(problem.path),
+        candidate_ids=list(problem.candidate_ids),
+    )
+
+
 class LearnerProfileUpdate(BaseModel):
     major: str | None = Field(default=None, max_length=100)
     grade_year: int | None = None
@@ -456,6 +576,134 @@ def resolve_plan_alias(
         matches=[CurriculumCourseOut.model_validate(course) for course in resolved.matches],
         matched_by=resolved.matched_by,
         note=resolved.note,
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/graph", response_model=CourseGraphOut)
+def get_plan_graph(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> CourseGraphOut:
+    view = use_cases.build_plan_graph(repos, workspace.id, plan_id)
+    graph = view.graph
+    return CourseGraphOut(
+        plan_id=view.plan.id,
+        plan_version=view.plan.version_label,
+        nodes=[
+            GraphNodeOut(
+                id=course.id,
+                name=course.name,
+                code=course.code,
+                credits=course.credits,
+                offered_terms=list(course.offered_terms),
+                study_status=course.study_status,
+                record_count=course.record_count,
+            )
+            for course in graph.courses
+        ],
+        edges=[
+            GraphEdgeOut(
+                id=relation.id,
+                from_course_id=relation.from_course_id,
+                to_course_id=relation.to_course_id,
+                relation_type=relation.relation_type.value,
+                condition_text=relation.condition_text,
+                source_candidate_id=relation.source_candidate_id,
+                evidence=[
+                    GraphEvidenceOut(**item) for item in view.edge_evidence.get(relation.id, ())
+                ],
+            )
+            for relation in graph.relations
+        ],
+        cycles=[_problem_out(item) for item in graph.cycles],
+        conflicts=[_problem_out(item) for item in graph.conflicts],
+        missing=[_problem_out(item) for item in graph.missing],
+        pending=[_problem_out(item) for item in graph.pending],
+        complete=graph.complete,
+        limitations=list(graph.limitations),
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/order", response_model=CourseOrderOut)
+def get_plan_order(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> CourseOrderOut:
+    """C010/C012：只对强制先修分层；成环或缺项时不返回伪造的完整顺序。"""
+    analysis = use_cases.analyze_plan(repos, workspace.id, plan_id)
+    return CourseOrderOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        levels=[list(level) for level in analysis.order.levels],
+        alternatives=analysis.order.alternatives,
+        problems=[_problem_out(item) for item in analysis.order.problems],
+        limitations=list(analysis.graph.graph.limitations),
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/next", response_model=NextCoursesOut)
+def get_next_courses(plan_id: int, workspace: CurrentWorkspace, repos: Repos) -> NextCoursesOut:
+    """C013：按已修/在修状态列出下一步；建议先学单独返回，不当作硬阻塞。"""
+    analysis = use_cases.analyze_plan(repos, workspace.id, plan_id)
+    return NextCoursesOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        courses=[
+            NextCourseOut(
+                course_id=item.course_id,
+                name=item.name,
+                study_status=item.study_status,
+                available=item.available,
+                unmet=list(item.unmet),
+                recommended=list(item.recommended),
+            )
+            for item in analysis.next_courses
+        ],
+        limitations=list(analysis.graph.graph.limitations),
+    )
+
+
+@router.post("/curriculum-plans/{plan_id}/semester-plan", response_model=SemesterPlanOut)
+def get_semester_plan(
+    plan_id: int,
+    payload: SemesterPlanRequest,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> SemesterPlanOut:
+    """C014：按已知开课季节与学分上限辅助排学期；不代替选课或毕业审核。"""
+    analysis = use_cases.analyze_plan(
+        repos,
+        workspace.id,
+        plan_id,
+        credit_limit=payload.credit_limit,
+        start_season=payload.start_season,
+        max_terms=payload.max_terms,
+    )
+    suggestion = analysis.semester
+    effective_limit = (
+        payload.credit_limit
+        if payload.credit_limit is not None
+        else analysis.plan.credit_limit_per_term
+    )
+    return SemesterPlanOut(
+        plan_id=analysis.plan.id,
+        plan_version=analysis.plan.version_label,
+        complete=analysis.graph.graph.complete,
+        blocked=not analysis.graph.graph.complete,
+        credit_limit=effective_limit,
+        terms=[
+            SuggestedTermOut(
+                index=term.index,
+                season=term.season,
+                course_ids=list(term.course_ids),
+                credits_known=term.credits_known,
+                credits_unknown=term.credits_unknown,
+                warnings=list(term.warnings),
+            )
+            for term in suggestion.terms
+        ],
+        unplaced=[dict(item) for item in suggestion.unplaced],
+        limitations=list(suggestion.limitations),
+        assumptions=list(suggestion.assumptions),
+        graduation_audit=suggestion.graduation_audit,
     )
 
 
