@@ -416,6 +416,37 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .rule-form-heading { margin-top: 26px; }
 .reminder-summary .summary-chip { background: var(--paper-strong); }
 
+/* 导出预览与下载（A020） */
+.export-stack { display: grid; gap: 22px; }
+.export-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.export-filter label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.export-filter input { min-width: 240px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--paper-strong); }
+.export-filter .count-badge { margin-left: auto; }
+.export-select-list { display: grid; gap: 8px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+.export-select-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); cursor: pointer; }
+.export-select-row.is-selected { border-color: var(--brand-border); background: var(--brand-selected); }
+.export-select-row input { flex: none; width: auto; margin-top: 4px; }
+.export-select-main { display: grid; gap: 3px; min-width: 0; }
+.export-select-main small { color: var(--muted); font-size: 12px; }
+.export-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.export-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.export-stat-text { font-size: 15px; word-break: break-word; }
+.export-count-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 8px; }
+.export-count { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); text-align: center; }
+.export-count strong { font-size: 18px; }
+.export-count span { color: var(--muted); font-size: 11px; }
+.export-count.is-attention { border-color: var(--warn-border); background: var(--warn-bg); }
+.export-count.is-attention strong { color: var(--warn-strong-ink); }
+.export-notice-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.export-notice-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); font-size: 13px; }
+.export-scope { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); font-size: 13px; }
+.export-scope p { margin: 0; word-break: break-word; }
+.export-item-list { display: grid; gap: 8px; max-height: 360px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.export-item { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.export-item.is-excluded { border-style: dashed; opacity: .82; }
+.export-item p { margin: 0; color: var(--muted); font-size: 12px; word-break: break-word; }
+.export-quiet { margin: 0; color: var(--muted); font-size: 13px; }
+
 @media (max-width: 760px) {
   .app-frame { display: block; }
   .sidebar { position: static; width: 100%; height: auto; padding: 18px; }
@@ -444,4 +475,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .upload-results li { flex-wrap: wrap; }
   .source-layout, .source-viewer, .lifecycle-layout { grid-template-columns: 1fr; }
   .summary-row { grid-template-columns: 1fr; }
+  .export-filter { align-items: stretch; flex-direction: column; }
+  .export-filter input { min-width: 0; width: 100%; }
+  .export-filter .count-badge { margin-left: 0; align-self: flex-start; }
+  .export-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
