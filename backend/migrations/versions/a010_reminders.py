@@ -21,18 +21,14 @@ def upgrade() -> None:
     op.create_table(
         "reminder_rules",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "workspace_id", sa.Integer(), sa.ForeignKey("workspaces.id"), nullable=False
-        ),
+        sa.Column("workspace_id", sa.Integer(), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column(
             "task_id",
             sa.Integer(),
             sa.ForeignKey("tasks.id", ondelete="CASCADE"),
             nullable=True,
         ),
-        sa.Column(
-            "advance_minutes", sa.Integer(), nullable=False, server_default="1440"
-        ),
+        sa.Column("advance_minutes", sa.Integer(), nullable=False, server_default="1440"),
         sa.Column("repeat_minutes", sa.Integer(), nullable=True),
         sa.Column("paused", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("enabled", sa.Boolean(), nullable=False, server_default="true"),
@@ -76,9 +72,7 @@ def upgrade() -> None:
     op.create_table(
         "reminder_triggers",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column(
-            "workspace_id", sa.Integer(), sa.ForeignKey("workspaces.id"), nullable=False
-        ),
+        sa.Column("workspace_id", sa.Integer(), sa.ForeignKey("workspaces.id"), nullable=False),
         sa.Column(
             "rule_id",
             sa.Integer(),
@@ -95,9 +89,7 @@ def upgrade() -> None:
         sa.Column("dedupe_key", sa.String(length=200), nullable=False),
         sa.Column("scheduled_for", sa.DateTime(timezone=True), nullable=False),
         sa.Column("message", sa.String(length=500), nullable=False),
-        sa.Column(
-            "status", sa.String(length=20), nullable=False, server_default="pending"
-        ),
+        sa.Column("status", sa.String(length=20), nullable=False, server_default="pending"),
         sa.Column(
             "payload",
             postgresql.JSONB(),
@@ -118,23 +110,17 @@ def upgrade() -> None:
         ),
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("read_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint(
-            "kind IN ('deadline', 'review')", name="ck_reminder_triggers_kind"
-        ),
+        sa.CheckConstraint("kind IN ('deadline', 'review')", name="ck_reminder_triggers_kind"),
         sa.CheckConstraint(
             "status IN ('pending', 'sent', 'dismissed', 'cancelled')",
             name="ck_reminder_triggers_status",
         ),
         sa.UniqueConstraint("dedupe_key", name="uq_reminder_triggers_dedupe"),
     )
-    op.create_index(
-        "ix_reminder_triggers_workspace_id", "reminder_triggers", ["workspace_id"]
-    )
+    op.create_index("ix_reminder_triggers_workspace_id", "reminder_triggers", ["workspace_id"])
     op.create_index("ix_reminder_triggers_rule_id", "reminder_triggers", ["rule_id"])
     op.create_index("ix_reminder_triggers_task_id", "reminder_triggers", ["task_id"])
-    op.create_index(
-        "ix_reminder_triggers_scheduled_for", "reminder_triggers", ["scheduled_for"]
-    )
+    op.create_index("ix_reminder_triggers_scheduled_for", "reminder_triggers", ["scheduled_for"])
 
 
 def downgrade() -> None:
