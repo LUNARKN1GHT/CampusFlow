@@ -13,9 +13,8 @@ from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories, get_version_relations
 from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
-from campusflow.application import change_impact, version_applicability
+from campusflow.application import change_impact, duplicates, version_applicability
 from campusflow.application import conversion as conversions
-from campusflow.application import duplicates
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.version_relations import VersionRelations
