@@ -37,8 +37,72 @@ export type Task = {
   priority: TaskPriority
   estimated_minutes: number | null
   remaining_minutes: number | null
+  parent_task_id: number | null
   created_at: string
   updated_at: string
+}
+
+export type TaskLink = {
+  id: number
+  title: string
+  progress: TaskProgress
+  due_date: string | null
+  parent_task_id: number | null
+}
+
+export type TaskRollup = {
+  subtask_count: number
+  estimated_minutes: number
+  remaining_minutes: number
+  missing_duration_count: number
+  progress_counts: Record<string, number>
+  percent_complete: number | null
+}
+
+export type TaskRelations = {
+  task_id: number
+  parent: TaskLink | null
+  subtasks: TaskLink[]
+  prerequisites: TaskLink[]
+  dependents: TaskLink[]
+  rollup: TaskRollup
+}
+
+export type SubtaskInput = {
+  title: string
+  priority?: TaskPriority
+  estimated_minutes?: number | null
+  remaining_minutes?: number | null
+  due_date?: string | null
+}
+
+export type SplitSuggestion = {
+  parent_task_id: number
+  parent_title: string
+  suggestion: boolean
+  editable: boolean
+  note: string
+  items: Array<{
+    title: string
+    estimated_minutes: number | null
+    remaining_minutes: number | null
+    suggested: boolean
+  }>
+}
+
+export type DependencyCheck = {
+  semester_id: number | null
+  valid: boolean
+  checked_tasks: number
+  checked_edges: number
+  cycles: Array<{ task_ids: number[]; titles: string[]; message: string }>
+  missing_prerequisites: Array<Record<string, unknown> & { task_id: number; title: string; code: string; message: string }>
+  cancelled_prerequisites: Array<Record<string, unknown> & { task_id: number; title: string; code: string; message: string }>
+  blocked_tasks: Array<{
+    task_id: number
+    title: string
+    reasons: Array<{ code: string; message: string }>
+  }>
 }
 
 export type TaskProgressChange = {

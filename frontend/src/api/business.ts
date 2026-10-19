@@ -9,10 +9,15 @@ import type {
   FixedEventOccurrence,
   Semester,
   SemesterInput,
+  DependencyCheck,
+  SplitSuggestion,
+  SubtaskInput,
   Task,
   TaskInput,
   TaskProgress,
   TaskProgressChange,
+  TaskRelations,
+  TaskRollup,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -43,6 +48,14 @@ export const tasksApi = {
   update: (id: number, input: Partial<TaskInput>) => apiRequest<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   setProgress: (id: number, progress: TaskProgress, reason: string | null) => apiRequest<Task>(`/tasks/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress, reason }) }),
   progressHistory: (id: number) => apiRequest<TaskProgressChange[]>(`/tasks/${id}/progress-history`),
+  relations: (id: number) => apiRequest<TaskRelations>(`/tasks/${id}/relations`),
+  rollup: (id: number) => apiRequest<TaskRollup>(`/tasks/${id}/rollup`),
+  subtasks: (id: number) => apiRequest<Task[]>(`/tasks/${id}/subtasks`),
+  createSubtasks: (id: number, items: SubtaskInput[]) => apiRequest<Task[]>(`/tasks/${id}/subtasks`, { method: 'POST', body: JSON.stringify({ items }) }),
+  splitSuggestions: (id: number) => apiRequest<SplitSuggestion>(`/tasks/${id}/split-suggestions`, { method: 'POST', body: JSON.stringify({}) }),
+  addDependency: (id: number, dependsOnTaskId: number) => apiRequest<{ id: number }>(`/tasks/${id}/dependencies`, { method: 'POST', body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }) }),
+  removeDependency: (id: number, dependsOnTaskId: number) => apiRequest<void>(`/tasks/${id}/dependencies/${dependsOnTaskId}`, { method: 'DELETE' }),
+  dependencyCheck: (semesterId?: number) => apiRequest<DependencyCheck>(`/tasks/dependencies/check${queryString({ semester_id: semesterId })}`),
 }
 
 export const scheduleApi = {
