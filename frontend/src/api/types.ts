@@ -430,3 +430,65 @@ export type VersionAcceptance = {
   baseline_review_status: string
   created: boolean
 }
+
+export type DuplicateSuggestion = {
+  candidate_id: number
+  source_version_id: number
+  title: string | null
+  score: number
+  reasons: string[]
+  matched_fields: string[]
+  review_status: ReviewStatus
+  scope_same: boolean
+}
+
+export type DuplicateReport = {
+  candidate_id: number
+  kind: CandidateKind
+  suggestions: DuplicateSuggestion[]
+  excluded: { candidate_id: number; code: string; message: string }[]
+  auto_merge: false
+}
+
+export type MergeSource = {
+  candidate_id: number
+  version_id: number
+  title: string | null
+  review_status: ReviewStatus
+  formal_kind: string
+  formal_id: number | null
+  progress: string | null
+  plan_block_count: number
+}
+
+export type MergePreview = {
+  target_candidate_id: number
+  kind: CandidateKind
+  target_title: string | null
+  target_formal_id: number | null
+  target_progress: string | null
+  kept_fields: Record<string, unknown>
+  sources: MergeSource[]
+  token: string
+  auto_merge: false
+}
+
+export type MergeRecord = {
+  id: number
+  target_candidate_id: number
+  source_candidate_id: number
+  target_formal_kind: string | null
+  target_formal_id: number | null
+  source_formal_id: number | null
+  preserved_progress: Record<string, unknown>
+  source_snapshot: Record<string, unknown>
+  reason: string
+  operator: string
+  created_at: string
+}
+
+export type MergeResult = {
+  records: MergeRecord[]
+  created: boolean
+  preview: MergePreview
+}

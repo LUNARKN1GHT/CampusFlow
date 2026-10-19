@@ -117,3 +117,105 @@ test('版本对照展示范围、差异、影响，未接受前不提交变更',
   await expect(page.getByText(/已接受：due_text/)).toBeVisible()
   expect(posts).toEqual([{ field_names: ['due_text'], reason: '按修订通知接受', acknowledge_conflict: true }])
 })
+
+test('重复建议只在预览后合并，取消或失败不隐藏原候选', async ({ page }) => {
+  const mergeBodies: unknown[] = []
+  let failNext = false
+  await page.route('**/api/v1/candidates?**', (route) => route.fulfill({ json: [candidate(1, '旧通知'), candidate(3, '重复通知')] }))
+  await page.route('**/api/v1/candidates/1/duplicates', (route) => route.fulfill({ json: {
+    candidate_id: 1,
+    kind: 'task',
+    suggestions: [{
+      candidate_id: 3,
+      source_version_id: 3,
+      title: '重复通知',
+      score: 0.85,
+      reasons: ['标题相同', '时间字段相同'],
+      matched_fields: ['title', 'due_text'],
+      review_status: 'pending',
+      scope_same: true,
+    }],
+    excluded: [],
+    auto_merge: false,
+  } }))
+  await page.route('**/api/v1/candidates/1/merge-preview?**', (route) => route.fulfill({ json: {
+    target_candidate_id: 1,
+    kind: 'task',
+    target_title: '旧通知',
+    target_formal_id: 5,
+    target_progress: 'not_started',
+    kept_fields: { title: '旧通知', due_text: '下周五' },
+    sources: [{
+      candidate_id: 3,
+      version_id: 3,
+      title: '重复通知',
+      review_status: 'pending',
+      formal_kind: 'task',
+      formal_id: 6,
+      progress: 'done',
+      plan_block_count: 1,
+    }],
+    token: 'preview-token',
+    auto_merge: false,
+  } }))
+  await page.route('**/api/v1/candidates/1/merge', (route) => {
+    mergeBodies.push(route.request().postDataJSON())
+    if (failNext) {
+      failNext = false
+      return route.fulfill({ status: 500, json: { detail: '服务暂时不可用' } })
+    }
+    return route.fulfill({ json: {
+      records: [{
+        id: 1,
+        target_candidate_id: 1,
+        source_candidate_id: 3,
+        target_formal_kind: 'task',
+        target_formal_id: 5,
+        source_formal_id: 6,
+        preserved_progress: { target_progress: 'not_started', source_progress: 'done' },
+        source_snapshot: { candidate_id: 3 },
+        reason: '同一份作业',
+        operator: 'student',
+        created_at: '2026-10-19T00:00:00Z',
+      }],
+      created: true,
+      preview: { target_candidate_id: 1, kind: 'task', target_title: '旧通知', target_formal_id: 5, target_progress: 'not_started', kept_fields: {}, sources: [], token: 'preview-token', auto_merge: false },
+    } })
+  })
+  await page.route('**/api/v1/candidates/1/merges', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/v1/candidates/1/acceptances', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/v1/candidates/1/diff/3', (route) => route.fulfill({ json: diff }))
+  await page.route('**/api/v1/candidates/1/diff/3/applicability', (route) => route.fulfill({ json: applicability }))
+  await page.route('**/api/v1/candidates/1/diff/3/impact', (route) => route.fulfill({ json: impact }))
+
+  await page.goto('/login')
+  await page.getByLabel('用户名').fill('student')
+  await page.getByLabel('密码').fill('campusflow-dev')
+  await page.getByLabel('密码').press('Enter')
+  await page.goto('/review/changes?baseline=1')
+  await page.getByLabel('待比较（新）').selectOption('3')
+  await page.getByRole('button', { name: '加载对照' }).click()
+
+  await expect(page.getByText('相似度 0.85')).toBeVisible()
+  await page.getByRole('checkbox', { name: '#3 · 重复通知' }).check()
+  await page.getByRole('button', { name: '预览合并' }).click()
+  await expect(page.getByText(/来源进度 done/)).toBeVisible()
+  await expect(page.getByText(/时间块 1 个/)).toBeVisible()
+  expect(mergeBodies).toHaveLength(0)
+
+  await page.getByRole('button', { name: '取消预览' }).click()
+  await expect(page.getByRole('button', { name: '确认合并预览范围' })).toHaveCount(0)
+  await expect(page.getByText('相似度 0.85')).toBeVisible()
+
+  await page.getByRole('button', { name: '预览合并' }).click()
+  await page.getByLabel('合并原因').fill('同一份作业')
+  failNext = true
+  await page.getByRole('button', { name: '确认合并预览范围' }).click()
+  await expect(page.getByText('服务暂时不可用')).toBeVisible()
+  await expect(page.getByText('相似度 0.85')).toBeVisible()
+
+  await page.getByRole('button', { name: '确认合并预览范围' }).click()
+  await expect(page.getByText(/已合并 1 项/)).toBeVisible()
+  expect(mergeBodies).toHaveLength(2)
+  expect(mergeBodies[1]).toEqual({ source_candidate_ids: [3], preview_token: 'preview-token', reason: '同一份作业' })
+})
