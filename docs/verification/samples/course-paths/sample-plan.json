@@ -1,0 +1,161 @@
+{
+  "sample_id": "M8-C001-CS-2024",
+  "disclaimer": "合成样本，不对应任何真实学校、院系或培养方案。来源均为样本内部人工标注。",
+  "major": "计算机科学与技术",
+  "grade_year": 2024,
+  "annotation_convention": "source 为人工标注，指向本样本内部章节、表号、行号和页码。",
+  "versions": [
+    {
+      "version_label": "2024 版",
+      "credit_limit_per_term": 25,
+      "source": "人工标注：封面 p.1；表 2-1 p.2",
+      "complete_order_expected": true,
+      "courses": [
+        {"code": "CS101", "name": "高等数学（上）", "credits": 5.0, "offered_terms": ["fall"], "source": "表 3-1 第 1 行 p.4"},
+        {"code": "CS102", "name": "高等数学（下）", "credits": 5.0, "offered_terms": ["spring"], "source": "表 3-1 第 2 行 p.4"},
+        {"code": "CS111", "name": "程序设计基础", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-1 第 3 行 p.4"},
+        {"code": "CS112", "name": "面向对象程序设计", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-1 第 4 行 p.4"},
+        {"code": "CS203", "name": "离散数学", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-2 第 1 行 p.5"},
+        {"code": "CS201", "name": "数据结构", "credits": 4.0, "offered_terms": ["fall"], "source": "表 3-2 第 2 行 p.5"},
+        {"code": "CS202", "name": "计算机组成原理", "credits": 4.0, "offered_terms": ["spring"], "source": "表 3-2 第 3 行 p.5"},
+        {"code": "CS204", "name": "算法设计与分析", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-2 第 4 行 p.5"},
+        {"code": "CS205", "name": "数据库系统", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-2 第 5 行 p.5"},
+        {"code": "CS206", "name": "操作系统", "credits": 4.0, "offered_terms": ["spring"], "source": "表 3-2 第 6 行 p.5"},
+        {"code": "CS207", "name": "计算机网络", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 1 行 p.6"},
+        {"code": "CS208", "name": "软件工程", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-3 第 2 行 p.6"},
+        {"code": "CS212", "name": "编译原理", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 3 行 p.6"},
+        {"code": "CS213", "name": "编译原理课程设计", "credits": 1.0, "offered_terms": ["fall"], "source": "表 3-3 第 4 行 p.6"},
+        {"code": "CS209", "name": "人工智能导论", "credits": null, "offered_terms": [], "source": "表 3-3 第 5 行 p.6（学分、学期未标注）"},
+        {"code": "CS210", "name": "机器学习", "credits": null, "offered_terms": ["fall"], "source": "表 3-3 第 6 行 p.6（学分未标注）"},
+        {"code": "CS211", "name": "深度学习", "credits": 3.0, "offered_terms": [], "source": "表 3-3 第 7 行 p.6（学期未标注）"},
+        {"code": "CS214", "name": "数据可视化", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-3 第 8 行 p.6"},
+        {"code": "CS215", "name": "学术写作", "credits": null, "offered_terms": [], "source": "表 3-3 第 9 行 p.6（学分、学期未标注）"}
+      ],
+      "relations": [
+        {"id": "R-2024-001", "type": "prerequisite", "from": "CS101", "to": "CS102", "condition": "高等数学（下）先修课程：高等数学（上）", "source": "表 5-1 第 1 行 p.8"},
+        {"id": "R-2024-002", "type": "prerequisite", "from": "CS111", "to": "CS112", "condition": "面向对象程序设计先修课程：程序设计基础", "source": "表 5-1 第 2 行 p.8"},
+        {"id": "R-2024-003", "type": "prerequisite", "from": "CS101", "to": "CS203", "condition": "离散数学先修课程：高等数学（上）", "source": "表 5-1 第 3 行 p.8"},
+        {"id": "R-2024-004", "type": "prerequisite", "from": "CS112", "to": "CS201", "condition": "数据结构先修课程：面向对象程序设计", "source": "表 5-1 第 4 行 p.8"},
+        {"id": "R-2024-005", "type": "prerequisite", "from": "CS203", "to": "CS201", "condition": "数据结构先修课程：离散数学", "source": "表 5-1 第 5 行 p.8"},
+        {"id": "R-2024-006", "type": "prerequisite", "from": "CS201", "to": "CS202", "condition": "计算机组成原理先修课程：数据结构", "source": "表 5-1 第 6 行 p.8"},
+        {"id": "R-2024-007", "type": "prerequisite", "from": "CS201", "to": "CS204", "condition": "算法设计与分析先修课程：数据结构", "source": "表 5-1 第 7 行 p.8"},
+        {"id": "R-2024-008", "type": "prerequisite", "from": "CS201", "to": "CS205", "condition": "数据库系统先修课程：数据结构", "source": "表 5-1 第 8 行 p.8"},
+        {"id": "R-2024-009", "type": "prerequisite", "from": "CS201", "to": "CS206", "condition": "操作系统先修课程：数据结构", "source": "表 5-1 第 9 行 p.8"},
+        {"id": "R-2024-010", "type": "prerequisite", "from": "CS202", "to": "CS206", "condition": "操作系统先修课程：计算机组成原理", "source": "表 5-1 第 10 行 p.8"},
+        {"id": "R-2024-011", "type": "prerequisite", "from": "CS206", "to": "CS207", "condition": "计算机网络先修课程：操作系统", "source": "表 5-1 第 11 行 p.9"},
+        {"id": "R-2024-012", "type": "prerequisite", "from": "CS205", "to": "CS208", "condition": "软件工程先修课程：数据库系统", "source": "表 5-1 第 12 行 p.9"},
+        {"id": "R-2024-013", "type": "prerequisite", "from": "CS202", "to": "CS212", "condition": "编译原理先修课程：计算机组成原理", "source": "表 5-1 第 13 行 p.9"},
+        {"id": "R-2024-014", "type": "prerequisite", "from": "CS201", "to": "CS209", "condition": "人工智能导论先修课程：数据结构", "source": "表 5-1 第 14 行 p.9"},
+        {"id": "R-2024-015", "type": "prerequisite", "from": "CS209", "to": "CS210", "condition": "机器学习先修课程：人工智能导论", "source": "表 5-1 第 15 行 p.9"},
+        {"id": "R-2024-016", "type": "corequisite", "from": "CS212", "to": "CS213", "condition": "编译原理课程设计须与编译原理同学期修读", "source": "§5.2 并修要求 p.9"},
+        {"id": "R-2024-017", "type": "recommended", "from": "CS205", "to": "CS214", "condition": "建议先修数据库系统后再修数据可视化", "source": "表 5-3 第 1 行 p.9"},
+        {"id": "R-2024-018", "type": "recommended", "from": "CS210", "to": "CS211", "condition": "建议先修机器学习后再修深度学习", "source": "表 5-3 第 2 行 p.9"}
+      ],
+      "expected": {
+        "cycles": [],
+        "missing_courses": [],
+        "conflicts": [],
+        "order_satisfies_all_prerequisites": true,
+        "unknown_credits": ["CS209", "CS210", "CS215"],
+        "unknown_offered_terms": ["CS209", "CS211", "CS215"]
+      }
+    },
+    {
+      "version_label": "2025 修订版",
+      "credit_limit_per_term": 25,
+      "source": "人工标注：封面 p.1；表 2-1 p.2",
+      "complete_order_expected": false,
+      "courses": [
+        {"code": "CS101", "name": "高等数学（上）", "credits": 5.0, "offered_terms": ["fall"], "source": "表 3-1 第 1 行 p.4"},
+        {"code": "CS102", "name": "高等数学（下）", "credits": 5.0, "offered_terms": ["spring", "summer"], "source": "表 3-1 第 2 行 p.4"},
+        {"code": "CS111", "name": "程序设计基础", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-1 第 3 行 p.4"},
+        {"code": "CS112", "name": "面向对象程序设计", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-1 第 4 行 p.4"},
+        {"code": "CS203", "name": "离散数学", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-2 第 1 行 p.5"},
+        {"code": "CS201", "name": "数据结构", "credits": 4.5, "offered_terms": ["fall", "spring"], "source": "表 3-2 第 2 行 p.5"},
+        {"code": "CS202", "name": "计算机组成原理", "credits": 4.0, "offered_terms": ["spring"], "source": "表 3-2 第 3 行 p.5"},
+        {"code": "CS204", "name": "算法设计与分析", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-2 第 4 行 p.5"},
+        {"code": "CS205", "name": "数据库系统原理", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-2 第 5 行 p.5（更名）"},
+        {"code": "CS206", "name": "操作系统", "credits": 4.0, "offered_terms": ["spring"], "source": "表 3-2 第 6 行 p.5"},
+        {"code": "CS207", "name": "计算机网络", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 1 行 p.6"},
+        {"code": "CS208", "name": "软件工程", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-3 第 2 行 p.6"},
+        {"code": "CS212", "name": "编译原理", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 3 行 p.6"},
+        {"code": "CS213", "name": "编译原理课程设计", "credits": 1.0, "offered_terms": ["fall"], "source": "表 3-3 第 4 行 p.6"},
+        {"code": "CS209", "name": "人工智能导论", "credits": 2.0, "offered_terms": [], "source": "表 3-3 第 5 行 p.6"},
+        {"code": "CS210", "name": "机器学习", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 6 行 p.6"},
+        {"code": "CS211", "name": "深度学习", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-3 第 7 行 p.6"},
+        {"code": "CS214", "name": "数据可视化", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-3 第 8 行 p.6"},
+        {"code": "CS215", "name": "学术写作", "credits": null, "offered_terms": [], "source": "表 3-3 第 9 行 p.6（学分、学期未标注）"},
+        {"code": "CS401", "name": "分布式系统", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-4 第 1 行 p.7"},
+        {"code": "CS402", "name": "云计算", "credits": 3.0, "offered_terms": ["spring"], "source": "表 3-4 第 2 行 p.7"},
+        {"code": "CS403", "name": "系统可靠性", "credits": 2.0, "offered_terms": ["fall"], "source": "表 3-4 第 3 行 p.7"},
+        {"code": "CS404", "name": "毕业设计（论文）", "credits": 6.0, "offered_terms": ["spring"], "source": "表 3-5 第 1 行 p.8"},
+        {"code": "CS405", "name": "高级编译优化", "credits": 3.0, "offered_terms": ["fall"], "source": "表 3-4 第 5 行 p.7"}
+      ],
+      "missing_courses": [
+        {"code": "CS499", "name": "编译器构造", "referenced_by": "R-2025-023", "source": "表 3-4 脚注 2 p.7", "expected_state": "missing_course"}
+      ],
+      "relations": [
+        {"id": "R-2025-001", "type": "prerequisite", "from": "CS101", "to": "CS102", "condition": "高等数学（下）先修课程：高等数学（上）", "source": "表 5-1 第 1 行 p.9"},
+        {"id": "R-2025-002", "type": "prerequisite", "from": "CS111", "to": "CS112", "condition": "面向对象程序设计先修课程：程序设计基础", "source": "表 5-1 第 2 行 p.9"},
+        {"id": "R-2025-003", "type": "prerequisite", "from": "CS101", "to": "CS203", "condition": "离散数学先修课程：高等数学（上）", "source": "表 5-1 第 3 行 p.9"},
+        {"id": "R-2025-004", "type": "prerequisite", "from": "CS112", "to": "CS201", "condition": "数据结构先修课程：面向对象程序设计", "source": "表 5-1 第 4 行 p.9"},
+        {"id": "R-2025-005", "type": "prerequisite", "from": "CS203", "to": "CS201", "condition": "数据结构先修课程：离散数学", "source": "表 5-1 第 5 行 p.9"},
+        {"id": "R-2025-006", "type": "prerequisite", "from": "CS201", "to": "CS202", "condition": "计算机组成原理先修课程：数据结构", "source": "表 5-1 第 6 行 p.9"},
+        {"id": "R-2025-007", "type": "prerequisite", "from": "CS201", "to": "CS204", "condition": "算法设计与分析先修课程：数据结构", "source": "表 5-1 第 7 行 p.9"},
+        {"id": "R-2025-008", "type": "prerequisite", "from": "CS201", "to": "CS205", "condition": "数据库系统原理先修课程：数据结构", "source": "表 5-1 第 8 行 p.9"},
+        {"id": "R-2025-009", "type": "prerequisite", "from": "CS201", "to": "CS206", "condition": "操作系统先修课程：数据结构", "source": "表 5-1 第 9 行 p.9"},
+        {"id": "R-2025-010", "type": "prerequisite", "from": "CS202", "to": "CS206", "condition": "操作系统先修课程：计算机组成原理", "source": "表 5-1 第 10 行 p.9"},
+        {"id": "R-2025-011", "type": "prerequisite", "from": "CS206", "to": "CS207", "condition": "计算机网络先修课程：操作系统", "source": "表 5-1 第 11 行 p.9"},
+        {"id": "R-2025-012", "type": "prerequisite", "from": "CS205", "to": "CS208", "condition": "软件工程先修课程：数据库系统原理", "source": "表 5-1 第 12 行 p.9"},
+        {"id": "R-2025-013", "type": "prerequisite", "from": "CS202", "to": "CS212", "condition": "编译原理先修课程：计算机组成原理", "source": "表 5-1 第 13 行 p.9"},
+        {"id": "R-2025-014", "type": "prerequisite", "from": "CS201", "to": "CS209", "condition": "人工智能导论先修课程：数据结构", "source": "表 5-1 第 14 行 p.9"},
+        {"id": "R-2025-015", "type": "prerequisite", "from": "CS209", "to": "CS210", "condition": "机器学习先修课程：人工智能导论", "source": "表 5-1 第 15 行 p.9"},
+        {"id": "R-2025-016", "type": "corequisite", "from": "CS212", "to": "CS213", "condition": "编译原理课程设计须与编译原理同学期修读", "source": "§5.2 并修要求 p.10"},
+        {"id": "R-2025-017", "type": "prerequisite", "from": "CS205", "to": "CS214", "condition": "数据可视化先修课程：数据库系统原理", "source": "表 5-1 第 16 行 p.9"},
+        {"id": "R-2025-018", "type": "prerequisite", "from": "CS210", "to": "CS211", "condition": "深度学习先修课程：机器学习", "source": "表 5-1 第 17 行 p.9"},
+        {"id": "R-2025-019", "type": "prerequisite", "from": "CS403", "to": "CS401", "condition": "分布式系统先修课程：系统可靠性", "source": "表 5-4 第 1 行 p.11"},
+        {"id": "R-2025-020", "type": "prerequisite", "from": "CS401", "to": "CS402", "condition": "云计算先修课程：分布式系统", "source": "表 5-4 第 2 行 p.11"},
+        {"id": "R-2025-021", "type": "prerequisite", "from": "CS402", "to": "CS403", "condition": "系统可靠性先修课程：云计算", "source": "表 5-4 第 3 行 p.11"},
+        {"id": "R-2025-022", "type": "prerequisite", "from": "CS404", "to": "CS404", "condition": "毕业设计（论文）先修课程：毕业设计（论文）", "source": "附录 C 第 3 条 p.13（录入错误，自环）"},
+        {"id": "R-2025-023", "type": "prerequisite", "from": "CS499", "to": "CS405", "condition": "高级编译优化先修课程：编译器构造（CS499）", "source": "表 5-4 第 5 行 p.11", "endpoint_state": "missing_from_plan"},
+        {"id": "R-2025-024", "type": "recommended", "from": "CS210", "to": "CS211", "condition": "建议先修机器学习（同一对课程另有强制先修断言，见冲突 CG-2025-001）", "source": "《2025 级课程预修要求公示表》第 2 页 序号 27", "conflict": "CG-2025-001"}
+      ],
+      "conflicts": [
+        {
+          "id": "CG-2025-001",
+          "courses": ["CS210", "CS211"],
+          "assertions": [
+            {"type": "prerequisite", "source": "2025 修订版方案 §5.1 表 5-1 第 17 行 p.9"},
+            {"type": "recommended", "source": "2025 级课程预修要求公示表 第 2 页 序号 27"}
+          ],
+          "expected": "并列展示，标记待核对；核对前不宣称依赖图完整，不自动择一"
+        }
+      ],
+      "expected": {
+        "cycles": [["CS401", "CS402", "CS403", "CS401"], ["CS404", "CS404"]],
+        "missing_courses": ["CS499"],
+        "conflicts": ["CG-2025-001"],
+        "order_satisfies_all_prerequisites": false,
+        "unknown_credits": ["CS215"],
+        "unknown_offered_terms": ["CS209", "CS215"],
+        "unblocked_example_order": ["CS101", "CS102", "CS111", "CS112", "CS203", "CS201", "CS202", "CS204", "CS205", "CS206", "CS212", "CS213", "CS207", "CS208", "CS209", "CS210", "CS211", "CS214", "CS215"]
+      }
+    }
+  ],
+  "version_differences": [
+    {"object": "CS102", "field": "offered_terms", "2024": ["spring"], "2025": ["spring", "summer"]},
+    {"object": "CS201", "field": "credits", "2024": 4.0, "2025": 4.5},
+    {"object": "CS201", "field": "offered_terms", "2024": ["fall"], "2025": ["fall", "spring"]},
+    {"object": "CS205", "field": "name", "2024": "数据库系统", "2025": "数据库系统原理"},
+    {"object": "CS209", "field": "credits", "2024": null, "2025": 2.0},
+    {"object": "CS210", "field": "credits", "2024": null, "2025": 3.0},
+    {"object": "CS211", "field": "offered_terms", "2024": [], "2025": ["fall"]},
+    {"object": "CS205 → CS214", "field": "relation_type", "2024": "recommended", "2025": "prerequisite"},
+    {"object": "CS210 → CS211", "field": "relation_type", "2024": "recommended", "2025": "prerequisite（另有 recommended 冲突断言）"}
+  ],
+  "acceptance": {
+    "every_relation_has_annotation": true,
+    "contains_counterexample_without_complete_order": true,
+    "scope_isolation": "2024 版与 2025 修订版分别读取，不合并同名课程或关系。"
+  }
+}
