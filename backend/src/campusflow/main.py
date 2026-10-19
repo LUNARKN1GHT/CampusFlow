@@ -12,6 +12,7 @@ from campusflow.api import courses as courses_api
 from campusflow.api import exports as exports_api
 from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
+from campusflow.api import paths as paths_api
 from campusflow.api import plans as plans_api
 from campusflow.api import qa as qa_api
 from campusflow.api import reminders as reminders_api
@@ -154,6 +155,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.include_router(router, prefix="/api/v1")
     for router in (
         courses_api.router,
+        paths_api.router,
         tasks_api.router,
         schedule_api.router,
         settings_api.router,

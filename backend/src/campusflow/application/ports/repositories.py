@@ -59,6 +59,75 @@ class CourseData:
 
 
 @dataclass
+class CurriculumPlanData:
+    id: int
+    workspace_id: int
+    title: str
+    major: str
+    grade_year: int
+    version_label: str
+    credit_limit_per_term: int | None
+    source_material_id: int | None
+    source_version_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class LearnerProfileData:
+    workspace_id: int
+    major: str | None
+    grade_year: int | None
+    curriculum_plan_id: int | None
+    updated_at: datetime | None
+
+
+class CoursePathRepository(Protocol):
+    """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。"""
+
+    def list_plans(self, workspace_id: int) -> list[CurriculumPlanData]: ...
+
+    def get_plan(self, plan_id: int) -> CurriculumPlanData | None: ...
+
+    def create_plan(
+        self,
+        workspace_id: int,
+        *,
+        title: str,
+        major: str,
+        grade_year: int,
+        version_label: str,
+        credit_limit_per_term: int | None,
+    ) -> CurriculumPlanData: ...
+
+    def update_plan(
+        self,
+        plan_id: int,
+        *,
+        title: str,
+        major: str,
+        grade_year: int,
+        version_label: str,
+        credit_limit_per_term: int | None,
+    ) -> CurriculumPlanData | None: ...
+
+    def plan_impact_counts(self, workspace_id: int, plan_id: int | None) -> dict[str, int]:
+        """切换方案前统计当前方案的课程、关系与修读记录。"""
+        ...
+
+    def get_profile(self, workspace_id: int) -> LearnerProfileData | None: ...
+
+    def upsert_profile(
+        self,
+        workspace_id: int,
+        *,
+        major: str | None,
+        grade_year: int | None,
+        curriculum_plan_id: int | None,
+    ) -> LearnerProfileData: ...
+
+
+@dataclass
 class TaskData:
     id: int
     workspace_id: int
@@ -982,6 +1051,7 @@ class Repositories:
     workspaces: WorkspaceRepository
     semesters: SemesterRepository
     courses: CourseRepository
+    paths: CoursePathRepository
     tasks: TaskRepository
     schedule: ScheduleRepository
     materials: MaterialRepository
