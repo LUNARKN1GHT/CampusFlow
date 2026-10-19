@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from campusflow.api import auth as auth_api
 from campusflow.api import candidates as candidates_api
 from campusflow.api import courses as courses_api
+from campusflow.api import exports as exports_api
 from campusflow.api import jobs as jobs_api
 from campusflow.api import materials as materials_api
 from campusflow.api import plans as plans_api
@@ -162,6 +163,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version_relations_api.router,
         qa_api.router,
         plans_api.router,
+        exports_api.router,
     ):
         app.include_router(
             router,
