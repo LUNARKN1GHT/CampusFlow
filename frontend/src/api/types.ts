@@ -182,6 +182,7 @@ export type MaterialDeleteImpact = {
   candidate_count: number
   linked_fixed_event_ids: number[]
   linked_rule_ids: number[]
+  version_relation_ids: number[]
   confirm_token: string
   backup_note: string
 }

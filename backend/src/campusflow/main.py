@@ -17,6 +17,7 @@ from campusflow.api import rules as rules_api
 from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
+from campusflow.api import version_relations as version_relations_api
 from campusflow.api.health import router as health_router
 from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.jobs import (
@@ -158,6 +159,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         jobs_api.router,
         candidates_api.router,
         rules_api.router,
+        version_relations_api.router,
         qa_api.router,
         plans_api.router,
     ):
