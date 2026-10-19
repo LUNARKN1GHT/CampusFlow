@@ -46,6 +46,7 @@ uv run --locked pytest tests/test_calendar_connections.py tests/test_calendar_ex
 
 - `test_m7_dependency_acceptance.py`：锁定冲突、耗时增加、已完成前置；
 - `test_planning_reschedule.py`：保留锁定块、范围外保留、全部锁定不重复；
+- `test_planning_adjustments.py`：进度变化只生成建议、不覆盖当前计划；
 - `test_subtasks.py`：父任务耗时不重复计入。
 
 修正只作用于测试，不改变排期实现或业务规则。
