@@ -12,6 +12,8 @@ import type {
   ProcessingJob,
   SourceChunk,
   TextImportInput,
+  WebImportInput,
+  WebImportResult,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -45,6 +47,10 @@ export const materialsApi = {
   })}`),
   get: (id: number) => apiRequest<Material>(`/materials/${id}`),
   importText: (input: TextImportInput) => apiRequest<TextImportResult>('/materials/text', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }),
+  importWeb: (input: WebImportInput) => apiRequest<WebImportResult>('/materials/web', {
     method: 'POST',
     body: JSON.stringify(input),
   }),
