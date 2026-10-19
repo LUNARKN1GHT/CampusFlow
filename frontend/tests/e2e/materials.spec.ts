@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
@@ -152,5 +152,42 @@ test.describe('M6 网页不可访问时的替代输入', () => {
     await expect(page.getByLabel('标题', { exact: true })).toHaveValue('登录页通知')
     await expect(page.getByLabel('正文', { exact: true })).toBeVisible()
     await expect(page.getByText(/网页正文未导入/)).toBeVisible()
+  })
+})
+
+test.describe('M6 Word 与逐文件导入结果', () => {
+  test('Word 入口可用，单个格式失败不会标记全部成功', async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('student')
+    await page.getByLabel('密码').fill('campusflow-dev')
+    await page.getByLabel('密码').press('Enter')
+    await page.getByRole('link', { name: '资料库' }).click()
+    await page.getByRole('button', { name: '导入资料', exact: true }).click()
+    await page.getByRole('button', { name: '上传文件' }).click()
+    const input = page.getByLabel('选择文件')
+    await expect(input).toHaveAttribute('accept', /\.docx/)
+    await input.setInputFiles([
+      {
+        name: 'broken.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: Buffer.from('not a zip package'),
+      },
+      {
+        name: 'word-notice-paragraph.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        buffer: readFileSync(path.join(root, 'samples/synthetic/n001/word-notice-paragraph.docx')),
+      },
+    ])
+    await page.getByLabel('允许重复导入相同文件').check()
+    await page.getByRole('button', { name: '上传并处理' }).click()
+    await expect(page.getByText(/本次导入：成功 1 份，失败 1 份/)).toBeVisible()
+    await expect(page.getByText(/失败文件未建档，不影响其它文件/)).toBeVisible()
+    const results = page.locator('.upload-results')
+    await expect(results.getByText('broken.docx')).toBeVisible()
+    await expect(results.locator('.failed-pill')).toBeVisible()
+    await expect(results.locator('.status-pill').filter({ hasText: '已建档' })).toBeVisible()
+    const wordRow = page.locator('.material-row').filter({ hasText: 'word-notice-paragraph.docx' })
+    await expect(wordRow).toBeVisible()
+    await expect(wordRow).toContainText('Word')
   })
 })

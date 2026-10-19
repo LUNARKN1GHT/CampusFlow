@@ -84,6 +84,16 @@ const webCourses = computed(() => webForm.semester_id
   ? courses.value.filter((course) => course.semester_id === Number(webForm.semester_id))
   : courses.value)
 const visibleMaterials = computed(() => materials.value)
+const uploadSummary = computed(() => {
+  if (!uploadResults.value) return ''
+  const succeeded = uploadResults.value.filter((item) => item.material).length
+  const duplicated = uploadResults.value.filter((item) => item.duplicate_of).length
+  const failed = uploadResults.value.filter((item) => item.error).length
+  const parts = [`成功 ${succeeded} 份`]
+  if (duplicated) parts.push(`重复 ${duplicated} 份`)
+  if (failed) parts.push(`失败 ${failed} 份`)
+  return `本次导入：${parts.join('，')}。${failed ? '失败文件未建档，不影响其它文件。' : ''}`
+})
 
 function jobFor(material: Material): ProcessingJob | null {
   const jobId = jobByMaterial[material.id]
@@ -264,7 +274,7 @@ function onFilesChosen(event: Event) {
 
 async function submitUpload() {
   if (!selectedFiles.value.length) {
-    importError.value = '请先选择要导入的 PDF 或图片文件。'
+    importError.value = '请先选择要导入的 PDF、Word（DOCX）或图片文件。'
     return
   }
   importing.value = true
@@ -488,8 +498,8 @@ onBeforeUnmount(stopPolling)
         </form>
 
         <form v-else class="stack-form" @submit.prevent="submitUpload">
-          <label>选择文件<input ref="fileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" multiple @change="onFilesChosen" /></label>
-          <p class="form-help">支持 PDF、PNG、JPG/JPEG。完全相同的文件默认提示复用已有资料，避免重复建档。</p>
+          <label>选择文件<input ref="fileInput" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg" multiple @change="onFilesChosen" /></label>
+          <p class="form-help">支持 PDF、Word（DOCX）、PNG、JPG/JPEG。旧版 DOC 或宏文档请先另存为普通 DOCX；网页通知可使用“公开网页”入口。完全相同的文件默认提示复用已有资料，避免重复建档。</p>
           <div class="form-grid form-grid-3">
             <label>学期<select v-model="uploadForm.semester_id" @change="uploadForm.course_id = ''"><option value="">未指定</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
             <label>课程<select v-model="uploadForm.course_id"><option value="">未关联课程</option><option v-for="course in uploadCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
@@ -500,6 +510,7 @@ onBeforeUnmount(stopPolling)
           <button type="submit" :disabled="importing">{{ importing ? '正在上传…' : '上传并处理' }}</button>
         </form>
 
+        <p v-if="uploadResults" :class="uploadResults.some((item) => item.error) ? 'inline-notice' : 'form-help'" role="status">{{ uploadSummary }}</p>
         <ul v-if="uploadResults" class="upload-results">
           <li v-for="(item, index) in uploadResults" :key="index">
             <strong>{{ item.filename }}</strong>
