@@ -75,7 +75,7 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
 
   await tabUntilText(page, '学习计划')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: '两周学习计划' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '学习计划' })).toBeVisible()
 
   const slots = await page.request.get('/api/v1/availability-slots')
   expect(slots.ok()).toBeTruthy()
@@ -101,7 +101,7 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
   })
   expect(task.ok()).toBeTruthy()
 
-  await tabUntilText(page, '生成未来两周草案')
+  await tabUntilText(page, '生成草案')
   await page.keyboard.press('Enter')
   await expect(page.getByText('待接受草案')).toBeVisible()
 

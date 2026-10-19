@@ -42,8 +42,8 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
   await page.getByRole('button', { name: '保存任务' }).click()
   await expect(page.getByText(taskName)).toBeVisible()
 
-  await page.getByRole('link', { name: '学习计划' }).click()
-  await page.getByRole('button', { name: '生成未来两周草案' }).click()
+  await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()
+  await page.getByRole('button', { name: '生成草案' }).click()
   await expect(page.getByText('待接受草案')).toBeVisible()
 
   const block = page.locator('.block-row').filter({ hasText: taskName })
@@ -110,8 +110,8 @@ test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) 
   })
   expect(task.ok()).toBeTruthy()
 
-  await page.getByRole('link', { name: '学习计划' }).click()
-  await page.getByRole('button', { name: '生成未来两周草案' }).click()
+  await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()
+  await page.getByRole('button', { name: '生成草案' }).click()
   await expect(page.getByText('待接受草案')).toBeVisible()
 
   const drafts = await page.request.get('/api/v1/plans/drafts')
@@ -138,11 +138,11 @@ test('计划加载失败后可点击重试恢复', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
 
   await page.route('**/api/v1/plans/current', (route) => route.abort('failed'))
-  await page.getByRole('link', { name: '学习计划' }).click()
+  await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()
   await expect(page.getByText('加载失败')).toBeVisible()
 
   await page.unroute('**/api/v1/plans/current')
   await page.getByRole('button', { name: '重新加载' }).click()
   await expect(page.getByText('加载失败')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '生成未来两周草案' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '生成草案' })).toBeVisible()
 })
