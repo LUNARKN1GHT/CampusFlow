@@ -179,6 +179,7 @@ class SqlAlchemyCoursePathRepository:
         code: str | None,
         credits: float | None,
         offered_terms: list[str],
+        source_candidate_id: int | None = None,
     ) -> CurriculumCourseData:
         row = CurriculumCourse(
             workspace_id=workspace_id,
@@ -187,6 +188,7 @@ class SqlAlchemyCoursePathRepository:
             code=code,
             credits=credits,
             offered_terms=offered_terms,
+            source_candidate_id=source_candidate_id,
         )
         self._session.add(row)
         try:
@@ -195,6 +197,14 @@ class SqlAlchemyCoursePathRepository:
             self._session.rollback()
             raise DomainError("同一方案内已存在同名课程") from None
         return _course_to_data(row)
+
+    def get_course_by_source_candidate(self, candidate_id: int) -> CurriculumCourseData | None:
+        row = self._session.scalar(
+            select(CurriculumCourse).where(
+                CurriculumCourse.source_candidate_id == candidate_id
+            )
+        )
+        return None if row is None else _course_to_data(row)
 
     def update_course(
         self,
@@ -261,6 +271,7 @@ class SqlAlchemyCoursePathRepository:
         to_course_id: int,
         relation_type: str,
         condition_text: str | None,
+        source_candidate_id: int | None = None,
     ) -> CourseRelationData:
         row = CourseRelation(
             workspace_id=workspace_id,
@@ -269,6 +280,7 @@ class SqlAlchemyCoursePathRepository:
             to_course_id=to_course_id,
             relation_type=relation_type,
             condition_text=condition_text,
+            source_candidate_id=source_candidate_id,
             created_by="user",
         )
         self._session.add(row)
@@ -278,6 +290,12 @@ class SqlAlchemyCoursePathRepository:
             self._session.rollback()
             raise DomainError("相同方向与类型的关系已存在") from None
         return _relation_to_data(row)
+
+    def get_relation_by_source_candidate(self, candidate_id: int) -> CourseRelationData | None:
+        row = self._session.scalar(
+            select(CourseRelation).where(CourseRelation.source_candidate_id == candidate_id)
+        )
+        return None if row is None else _relation_to_data(row)
 
     def update_relation(
         self,
