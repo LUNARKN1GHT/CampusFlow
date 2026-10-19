@@ -4,6 +4,7 @@
 缺失信息必须显式列出，不能用推测补造完整顺序。
 """
 
+from collections.abc import Iterable
 from enum import StrEnum
 
 from campusflow.domain.errors import DomainError
@@ -178,6 +179,51 @@ def validate_relation_fields(*, relation_type: str, condition_text: str | None) 
     parsed = validate_relation_type(relation_type)
     _text(condition_text, 1000, "关系说明")
     return parsed
+
+
+def validate_study_status(value: str) -> StudyStatus:
+    try:
+        return StudyStatus(value)
+    except ValueError:
+        raise DomainError("修读状态只能是 completed、in_progress 或 planned") from None
+
+
+def validate_study_record_fields(
+    *,
+    status: str,
+    grade: str | None,
+    credits_earned: float | None,
+    note: str | None,
+) -> StudyStatus:
+    parsed = validate_study_status(status)
+    # 成绩与已得学分只接受用户显式填写；这里不做任何按课程学分的推算。
+    _text(grade, 100, "成绩")
+    _text(note, 500, "备注")
+    if credits_earned is not None and (
+        type(credits_earned) not in (int, float)
+        or credits_earned < 0
+        or credits_earned > 100
+    ):
+        raise DomainError("已得学分必须是不大于 100 的非负数")
+    return parsed
+
+
+# 聚合优先级：已完成 > 在修 > 待修；没有任何记录时状态未知。
+STUDY_STATUS_PRECEDENCE = (
+    StudyStatus.COMPLETED,
+    StudyStatus.IN_PROGRESS,
+    StudyStatus.PLANNED,
+)
+UNKNOWN_STUDY_STATUS = "unknown"
+
+
+def aggregate_study_status(statuses: Iterable[str]) -> str:
+    """按优先级返回课程汇总状态；状态未知不代表未修，必须单独展示。"""
+    present = {validate_study_status(status) for status in statuses}
+    for candidate in STUDY_STATUS_PRECEDENCE:
+        if candidate in present:
+            return candidate.value
+    return UNKNOWN_STUDY_STATUS
 
 
 def profile_missing_fields(

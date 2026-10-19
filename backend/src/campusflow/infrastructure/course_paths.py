@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from campusflow.application.ports.repositories import (
     CourseAliasData,
     CourseRelationData,
+    CourseStudyRecordData,
     CurriculumCourseData,
     CurriculumPlanData,
     LearnerProfileData,
@@ -15,6 +16,7 @@ from campusflow.domain.errors import DomainError
 from campusflow.infrastructure.db.models import (
     CourseAlias,
     CourseRelation,
+    CourseStudyRecord,
     CurriculumCourse,
     CurriculumPlan,
     LearnerProfile,
@@ -89,6 +91,24 @@ def _profile_to_data(row: LearnerProfile) -> LearnerProfileData:
         curriculum_plan_id=row.curriculum_plan_id,
         updated_at=row.updated_at,
     )
+
+
+def _study_record_to_data(row: CourseStudyRecord) -> CourseStudyRecordData:
+    return CourseStudyRecordData(
+        id=row.id,
+        workspace_id=row.workspace_id,
+        curriculum_course_id=row.curriculum_course_id,
+        semester_id=row.semester_id,
+        status=row.status,
+        grade=row.grade,
+        credits_earned=row.credits_earned,
+        note=row.note,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+STUDY_RECORD_CONFLICT_MESSAGE = "该课程在相同学期与状态下已有修读记录"
 
 
 class SqlAlchemyCoursePathRepository:
@@ -370,6 +390,87 @@ class SqlAlchemyCoursePathRepository:
         self._session.flush()
         return True
 
+    def list_study_records(self, plan_id: int) -> list[CourseStudyRecordData]:
+        rows = self._session.scalars(
+            select(CourseStudyRecord)
+            .join(
+                CurriculumCourse,
+                CourseStudyRecord.curriculum_course_id == CurriculumCourse.id,
+            )
+            .where(CurriculumCourse.curriculum_plan_id == plan_id)
+            .order_by(
+                CurriculumCourse.name,
+                CourseStudyRecord.semester_id.nulls_first(),
+                CourseStudyRecord.id,
+            )
+        ).all()
+        return [_study_record_to_data(row) for row in rows]
+
+    def get_study_record(self, record_id: int) -> CourseStudyRecordData | None:
+        row = self._session.get(CourseStudyRecord, record_id)
+        return None if row is None else _study_record_to_data(row)
+
+    def create_study_record(
+        self,
+        workspace_id: int,
+        *,
+        curriculum_course_id: int,
+        semester_id: int | None,
+        status: str,
+        grade: str | None,
+        credits_earned: float | None,
+        note: str | None,
+    ) -> CourseStudyRecordData:
+        row = CourseStudyRecord(
+            workspace_id=workspace_id,
+            curriculum_course_id=curriculum_course_id,
+            semester_id=semester_id,
+            status=status,
+            grade=grade,
+            credits_earned=credits_earned,
+            note=note,
+        )
+        self._session.add(row)
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError(STUDY_RECORD_CONFLICT_MESSAGE) from None
+        return _study_record_to_data(row)
+
+    def update_study_record(
+        self,
+        record_id: int,
+        *,
+        semester_id: int | None,
+        status: str,
+        grade: str | None,
+        credits_earned: float | None,
+        note: str | None,
+    ) -> CourseStudyRecordData | None:
+        row = self._session.get(CourseStudyRecord, record_id)
+        if row is None:
+            return None
+        row.semester_id = semester_id
+        row.status = status
+        row.grade = grade
+        row.credits_earned = credits_earned
+        row.note = note
+        try:
+            self._session.flush()
+        except IntegrityError:
+            self._session.rollback()
+            raise DomainError(STUDY_RECORD_CONFLICT_MESSAGE) from None
+        return _study_record_to_data(row)
+
+    def delete_study_record(self, record_id: int) -> bool:
+        row = self._session.get(CourseStudyRecord, record_id)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
     def plan_impact_counts(self, workspace_id: int, plan_id: int | None) -> dict[str, int]:
         if plan_id is None:
             return {"courses": 0, "relations": 0, "study_records": 0}
@@ -383,10 +484,19 @@ class SqlAlchemyCoursePathRepository:
             .select_from(CourseRelation)
             .where(CourseRelation.curriculum_plan_id == plan_id)
         )
+        study_records = self._session.scalar(
+            select(func.count())
+            .select_from(CourseStudyRecord)
+            .join(
+                CurriculumCourse,
+                CourseStudyRecord.curriculum_course_id == CurriculumCourse.id,
+            )
+            .where(CurriculumCourse.curriculum_plan_id == plan_id)
+        )
         return {
             "courses": int(courses or 0),
             "relations": int(relations or 0),
-            "study_records": 0,
+            "study_records": int(study_records or 0),
         }
 
     def get_profile(self, workspace_id: int) -> LearnerProfileData | None:

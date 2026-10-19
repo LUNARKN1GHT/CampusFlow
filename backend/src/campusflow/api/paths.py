@@ -144,6 +144,61 @@ class ExtractedCandidateOut(BaseModel):
 class CurriculumExtractionOut(BaseModel):
     candidates: list[ExtractedCandidateOut]
     pending_review: bool = True
+
+
+class StudyRecordCreate(BaseModel):
+    curriculum_course_id: int = Field(gt=0)
+    semester_id: int | None = None
+    status: str
+    # 成绩与已得学分只接受用户填写；不根据课程学分推断。
+    grade: str | None = Field(default=None, max_length=100)
+    credits_earned: float | None = Field(default=None, ge=0, le=100)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class StudyRecordUpdate(BaseModel):
+    semester_id: int | None = None
+    status: str | None = None
+    grade: str | None = Field(default=None, max_length=100)
+    credits_earned: float | None = Field(default=None, ge=0, le=100)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class StudyRecordOut(BaseModel):
+    id: int
+    curriculum_plan_id: int
+    curriculum_course_id: int
+    semester_id: int | None
+    semester_name: str | None
+    status: str
+    grade: str | None
+    credits_earned: float | None
+    note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class StudyStatusEntryOut(BaseModel):
+    curriculum_course_id: int
+    course_name: str
+    course_code: str | None
+    status: str
+    record_count: int
+    repeat_record_count: int
+    completed_semester_ids: list[int]
+    in_progress_semester_ids: list[int]
+    planned_semester_ids: list[int]
+    records: list[StudyRecordOut]
+    note: str
+
+
+class StudyStatusOut(BaseModel):
+    plan_id: int
+    courses: list[StudyStatusEntryOut]
+    completed_count: int
+    in_progress_count: int
+    planned_count: int
+    unknown_count: int
     note: str
 
 
@@ -169,6 +224,23 @@ class SwitchPreviewOut(BaseModel):
     course_count: int
     study_record_count: int
     note: str
+
+
+def _study_record_out(view: use_cases.StudyRecordView) -> StudyRecordOut:
+    record = view.record
+    return StudyRecordOut(
+        id=record.id,
+        curriculum_plan_id=view.curriculum_plan_id,
+        curriculum_course_id=record.curriculum_course_id,
+        semester_id=record.semester_id,
+        semester_name=view.semester_name,
+        status=record.status,
+        grade=record.grade,
+        credits_earned=record.credits_earned,
+        note=record.note,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
 
 
 def _profile_out(view: use_cases.ProfileView) -> LearnerProfileOut:
@@ -444,6 +516,118 @@ def extract_curriculum(
             for candidate in saved
         ],
         note="提取结果已保存为待核对候选；确认前不会写入正式课程或依赖关系。",
+    )
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/study-records", response_model=list[StudyRecordOut]
+)
+def list_plan_study_records(
+    plan_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[StudyRecordOut]:
+    return [
+        _study_record_out(view)
+        for view in use_cases.list_study_records(repos, workspace.id, plan_id)
+    ]
+
+
+@router.post(
+    "/curriculum-plans/{plan_id}/study-records",
+    response_model=StudyRecordOut,
+    status_code=201,
+)
+def create_plan_study_record(
+    plan_id: int,
+    payload: StudyRecordCreate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> StudyRecordOut:
+    view = use_cases.create_study_record(
+        repos, workspace.id, plan_id, **payload.model_dump()
+    )
+    return _study_record_out(view)
+
+
+@router.patch(
+    "/curriculum-plans/{plan_id}/study-records/{record_id}",
+    response_model=StudyRecordOut,
+)
+def update_plan_study_record(
+    plan_id: int,
+    record_id: int,
+    payload: StudyRecordUpdate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> StudyRecordOut:
+    current = use_cases.get_study_record(repos, workspace.id, plan_id, record_id)
+    merged = {
+        "semester_id": (
+            payload.semester_id
+            if "semester_id" in payload.model_fields_set
+            else current.record.semester_id
+        ),
+        "status": (
+            payload.status if payload.status is not None else current.record.status
+        ),
+        # 未提交的字段保持原值；修改状态不会补造成绩或已得学分。
+        "grade": (
+            payload.grade if "grade" in payload.model_fields_set else current.record.grade
+        ),
+        "credits_earned": (
+            payload.credits_earned
+            if "credits_earned" in payload.model_fields_set
+            else current.record.credits_earned
+        ),
+        "note": (
+            payload.note if "note" in payload.model_fields_set else current.record.note
+        ),
+    }
+    view = use_cases.update_study_record(
+        repos, workspace.id, plan_id, record_id, **merged
+    )
+    return _study_record_out(view)
+
+
+@router.delete(
+    "/curriculum-plans/{plan_id}/study-records/{record_id}", status_code=204
+)
+def delete_plan_study_record(
+    plan_id: int, record_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> Response:
+    use_cases.delete_study_record(repos, workspace.id, plan_id, record_id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/study-status", response_model=StudyStatusOut
+)
+def get_plan_study_status(
+    plan_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> StudyStatusOut:
+    summary = use_cases.get_study_status(repos, workspace.id, plan_id)
+    return StudyStatusOut(
+        plan_id=summary.plan_id,
+        courses=[
+            StudyStatusEntryOut(
+                curriculum_course_id=entry.course.id,
+                course_name=entry.course.name,
+                course_code=entry.course.code,
+                status=entry.status,
+                record_count=len(entry.records),
+                repeat_record_count=max(0, len(entry.records) - 1),
+                completed_semester_ids=list(entry.completed_semester_ids),
+                in_progress_semester_ids=list(entry.in_progress_semester_ids),
+                planned_semester_ids=list(entry.planned_semester_ids),
+                records=[_study_record_out(view) for view in entry.records],
+                note=entry.note,
+            )
+            for entry in summary.entries
+        ],
+        completed_count=summary.counts["completed"],
+        in_progress_count=summary.counts["in_progress"],
+        planned_count=summary.counts["planned"],
+        unknown_count=summary.counts["unknown"],
+        note=summary.note,
     )
 
 

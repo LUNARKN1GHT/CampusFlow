@@ -123,6 +123,20 @@ class CourseAliasData:
     created_at: datetime
 
 
+@dataclass
+class CourseStudyRecordData:
+    id: int
+    workspace_id: int
+    curriculum_course_id: int
+    semester_id: int | None
+    status: str
+    grade: str | None
+    credits_earned: float | None
+    note: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class CoursePathRepository(Protocol):
     """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。"""
 
@@ -236,6 +250,35 @@ class CoursePathRepository(Protocol):
     ) -> CourseAliasData: ...
 
     def delete_alias(self, alias_id: int) -> bool: ...
+
+    def list_study_records(self, plan_id: int) -> list[CourseStudyRecordData]: ...
+
+    def get_study_record(self, record_id: int) -> CourseStudyRecordData | None: ...
+
+    def create_study_record(
+        self,
+        workspace_id: int,
+        *,
+        curriculum_course_id: int,
+        semester_id: int | None,
+        status: str,
+        grade: str | None,
+        credits_earned: float | None,
+        note: str | None,
+    ) -> CourseStudyRecordData: ...
+
+    def update_study_record(
+        self,
+        record_id: int,
+        *,
+        semester_id: int | None,
+        status: str,
+        grade: str | None,
+        credits_earned: float | None,
+        note: str | None,
+    ) -> CourseStudyRecordData | None: ...
+
+    def delete_study_record(self, record_id: int) -> bool: ...
 
     def get_profile(self, workspace_id: int) -> LearnerProfileData | None: ...
 
