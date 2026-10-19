@@ -86,8 +86,16 @@ TABLES = ", ".join(
         "plan_versions",
         "plan_blocks",
         "plan_drafts",
+        "calendar_event_links",
+        "calendar_operations",
+        "calendar_draft_items",
+        "calendar_drafts",
+        "calendar_oauth_states",
+        "calendar_connections",
     )
 )
+
+TEST_CALENDAR_TOKEN_KEY = "MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="
 
 
 def _check_database_reachable() -> None:
@@ -135,7 +143,11 @@ def client() -> Iterator[TestClient]:
 
         # 测试里关闭周期恢复扫描，避免后台任务干扰用例；启动扫描仍保留
         settings = Settings(
-            _env_file=None, database_url=TEST_DATABASE_URL, recovery_interval_seconds=0
+            _env_file=None,
+            database_url=TEST_DATABASE_URL,
+            recovery_interval_seconds=0,
+            calendar_provider="local",
+            calendar_token_key=TEST_CALENDAR_TOKEN_KEY,
         )
         with TestClient(create_app(settings)) as test_client:
             response = test_client.post(

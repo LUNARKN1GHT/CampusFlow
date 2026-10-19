@@ -77,7 +77,9 @@ def test_create_edit_and_roll_up_subtasks(client: TestClient) -> None:
     assert relations["rollup"] == rollup
 
 
-def test_parent_minutes_are_not_double_counted_in_schedule(client: TestClient) -> None:
+def test_parent_minutes_are_not_double_counted_in_schedule(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     parent = _task(client, "大作业", estimated_minutes=120, remaining_minutes=120)
     client.post(
         f"/api/v1/tasks/{parent['id']}/subtasks",
