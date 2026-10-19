@@ -93,7 +93,9 @@ def test_cycle_blocks_are_not_planned_and_nothing_is_silently_dropped(client: Te
     assert all(item["reason_code"] == "dependency_cycle" for item in draft["unscheduled"])
 
 
-def test_locked_block_conflict_is_visible_and_not_moved(client: TestClient) -> None:
+def test_locked_block_conflict_is_visible_and_not_moved(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     task = _task(client, "锁定任务")
     _availability(client)
     accepted = _accept(client, _generate(client))
@@ -130,7 +132,9 @@ def test_locked_block_conflict_is_visible_and_not_moved(client: TestClient) -> N
     assert ("plan_block", task["id"]) in participants
 
 
-def test_duration_increase_replans_once_without_duplicate_minutes(client: TestClient) -> None:
+def test_duration_increase_replans_once_without_duplicate_minutes(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     task = _task(client, "耗时增加")
     _availability(client)
     accepted = _accept(client, _generate(client))
@@ -191,7 +195,9 @@ def test_accepted_notification_change_does_not_rewrite_ddl(
     assert after["due_time"] == "20:00:00"
 
 
-def test_completed_prerequisite_is_not_double_counted(client: TestClient) -> None:
+def test_completed_prerequisite_is_not_double_counted(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     prerequisite = _task(client, "已完成前置")
     dependent = _task(client, "后续任务")
     client.post(

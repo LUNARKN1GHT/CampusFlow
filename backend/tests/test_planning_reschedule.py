@@ -40,7 +40,7 @@ def _accepted_plan(client: TestClient) -> dict:
     return accepted.json()
 
 
-def test_reschedule_preserves_locked_block(client: TestClient) -> None:
+def test_reschedule_preserves_locked_block(client: TestClient, fixed_planning_clock: None) -> None:
     first = _task(client, "锁定任务")
     _task(client, "可移动任务")
     plan = _accepted_plan(client)
@@ -74,7 +74,9 @@ def test_reschedule_preserves_locked_block(client: TestClient) -> None:
     assert accepted.status_code == 200, accepted.text
 
 
-def test_reschedule_outside_scope_keeps_other_task_blocks(client: TestClient) -> None:
+def test_reschedule_outside_scope_keeps_other_task_blocks(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     scoped = _task(client, "重排任务")
     _task(client, "范围外任务")
     plan = _accepted_plan(client)
@@ -101,7 +103,9 @@ def test_reschedule_outside_scope_keeps_other_task_blocks(client: TestClient) ->
     assert accepted.status_code == 200, accepted.text
 
 
-def test_fully_locked_task_is_not_scheduled_twice(client: TestClient) -> None:
+def test_fully_locked_task_is_not_scheduled_twice(
+    client: TestClient, fixed_planning_clock: None
+) -> None:
     _task(client, "全部锁定")
     plan = _accepted_plan(client)
     block = plan["blocks"][0]
