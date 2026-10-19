@@ -685,3 +685,39 @@ class QaTurn(Base):
     conflicts: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     uncertainties: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class VersionChangeAcceptance(Base):
+    """N014：用户接受的具体字段差异；追加保存，旧候选在事务内标记失效。"""
+
+    __tablename__ = "version_change_acceptances"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "baseline_candidate_id",
+            "comparison_candidate_id",
+            "accepted_fields",
+            name="uq_version_change_acceptance",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    baseline_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    comparison_candidate_id: Mapped[int] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
+    )
+    baseline_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE")
+    )
+    comparison_version_id: Mapped[int] = mapped_column(
+        ForeignKey("material_versions.id", ondelete="CASCADE")
+    )
+    accepted_fields: Mapped[list] = mapped_column(JSONB)
+    reason: Mapped[str] = mapped_column(String(1000))
+    operator: Mapped[str] = mapped_column(String(100))
+    evidence_snapshot: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    previous_review_status: Mapped[str] = mapped_column(String(20))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

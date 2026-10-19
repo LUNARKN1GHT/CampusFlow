@@ -6,7 +6,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from campusflow.api.auth import require_session
@@ -14,7 +14,7 @@ from campusflow.api.deps import get_current_workspace, get_repositories, get_ver
 from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
 from campusflow.application import conversion as conversions
-from campusflow.application import version_applicability
+from campusflow.application import version_acceptance, version_applicability
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.version_relations import VersionRelations
@@ -566,6 +566,99 @@ def get_candidate_applicability(
         ],
         diff=_diff_out(result.diff),
     )
+
+
+class VersionAcceptanceIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    field_names: list[str] = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=1000)
+    acknowledge_conflict: bool = False
+
+
+class VersionAcceptanceOut(BaseModel):
+    id: int
+    baseline_candidate_id: int
+    comparison_candidate_id: int
+    baseline_version_id: int
+    comparison_version_id: int
+    accepted_fields: list[str]
+    reason: str
+    operator: str
+    evidence_snapshot: list[dict]
+    previous_review_status: str
+    created_at: datetime
+    baseline_review_status: str
+    created: bool
+
+
+def _acceptance_out(result, *, created: bool) -> VersionAcceptanceOut:
+    record = result.record
+    return VersionAcceptanceOut(
+        id=record.id,
+        baseline_candidate_id=record.baseline_candidate_id,
+        comparison_candidate_id=record.comparison_candidate_id,
+        baseline_version_id=record.baseline_version_id,
+        comparison_version_id=record.comparison_version_id,
+        accepted_fields=list(record.accepted_fields),
+        reason=record.reason,
+        operator=record.operator,
+        evidence_snapshot=list(record.evidence_snapshot),
+        previous_review_status=record.previous_review_status,
+        created_at=record.created_at,
+        baseline_review_status="superseded" if created else result.baseline_review_status,
+        created=created,
+    )
+
+
+@router.post(
+    "/candidates/{candidate_id}/diff/{other_candidate_id}/accept",
+    response_model=VersionAcceptanceOut,
+    status_code=201,
+)
+def post_version_acceptance(
+    candidate_id: int,
+    other_candidate_id: int,
+    payload: VersionAcceptanceIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    relations: Relations,
+    operator: Annotated[str, Depends(require_session)],
+    response: Response,
+) -> VersionAcceptanceOut:
+    """N014：接受具体字段差异；事务内失效旧候选并保存证据历史。"""
+    result = version_acceptance.accept_change(
+        repos,
+        relations,
+        workspace.id,
+        baseline_candidate_id=candidate_id,
+        comparison_candidate_id=other_candidate_id,
+        field_names=tuple(payload.field_names),
+        reason=payload.reason,
+        operator=operator,
+        acknowledge_conflict=payload.acknowledge_conflict,
+    )
+    response.status_code = 201 if result.created else 200
+    return _acceptance_out(result, created=result.created)
+
+
+@router.get(
+    "/candidates/{candidate_id}/acceptances",
+    response_model=list[VersionAcceptanceOut],
+)
+def get_version_acceptances(
+    candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    relations: Relations,
+) -> list[VersionAcceptanceOut]:
+    use_cases.get_candidate(repos, workspace.id, candidate_id)
+    return [
+        _acceptance_out(
+            version_acceptance.AcceptanceResult(record, False, record.previous_review_status),
+            created=False,
+        )
+        for record in version_acceptance.list_acceptances(relations, workspace.id, candidate_id)
+    ]
 
 
 @router.patch("/candidates/{candidate_id}/review-status", response_model=CandidateReviewDetailOut)
