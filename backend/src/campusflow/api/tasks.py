@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends, Query
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.api.schemas import (
     SourceDetailOut,
+    SplitSuggestionIn,
+    SubtaskBatchIn,
     TaskCreate,
     TaskDependencyIn,
     TaskDependencyOut,
@@ -17,6 +19,7 @@ from campusflow.api.schemas import (
     TaskProgressChangeOut,
     TaskProgressPatch,
     TaskRelationsOut,
+    TaskRollupOut,
     TaskUpdate,
 )
 from campusflow.application import source_detail as source_use_cases
@@ -141,6 +144,47 @@ def list_task_progress_history(
 @router.get("/tasks/{task_id}/relations", response_model=TaskRelationsOut)
 def get_task_relations(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskRelationsOut:
     return TaskRelationsOut.model_validate(use_cases.task_relations(repos, workspace.id, task_id))
+
+
+@router.get("/tasks/{task_id}/subtasks", response_model=list[TaskOut])
+def list_subtasks(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> list[TaskOut]:
+    use_cases.get_task(repos, workspace.id, task_id)
+    return [TaskOut.model_validate(task) for task in repos.tasks.list_subtasks(task_id)]
+
+
+@router.get("/tasks/{task_id}/rollup", response_model=TaskRollupOut)
+def get_subtask_rollup(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskRollupOut:
+    return TaskRollupOut.model_validate(use_cases.subtask_rollup(repos, workspace.id, task_id))
+
+
+@router.post("/tasks/{task_id}/subtasks", response_model=list[TaskOut], status_code=201)
+def create_subtasks(
+    task_id: int, payload: SubtaskBatchIn, workspace: CurrentWorkspace, repos: Repos
+) -> list[TaskOut]:
+    drafts = [
+        use_cases.SubtaskDraft(
+            title=item.title,
+            priority=item.priority,
+            estimated_minutes=item.estimated_minutes,
+            remaining_minutes=item.remaining_minutes,
+            due_date=item.due_date,
+        )
+        for item in payload.items
+    ]
+    return [
+        TaskOut.model_validate(task)
+        for task in use_cases.create_subtasks(repos, workspace.id, task_id, drafts)
+    ]
+
+
+@router.post("/tasks/{task_id}/split-suggestions", response_model=dict)
+def suggest_task_split(
+    task_id: int,
+    payload: SplitSuggestionIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> dict:
+    return use_cases.split_suggestions(repos, workspace.id, task_id, titles=payload.titles)
 
 
 @router.patch("/tasks/{task_id}/parent", response_model=TaskOut)

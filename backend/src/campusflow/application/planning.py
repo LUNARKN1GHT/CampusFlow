@@ -84,11 +84,26 @@ def collect_inputs(
     raw_tasks: list[dict] = []
     tasks: list[PlanningTask] = []
     excluded: list[ExcludedTask] = []
-    for task in repos.tasks.list(workspace_id, semester_id=semester_id):
+    scoped_tasks = repos.tasks.list(workspace_id, semester_id=semester_id)
+    container_ids = {
+        task.parent_task_id for task in scoped_tasks if task.parent_task_id is not None
+    }
+    for task in scoped_tasks:
         progress = TaskProgress(task.progress)
         if progress not in PLANNABLE_PROGRESS:
             excluded.append(
                 ExcludedTask(task_id=task.id, title=task.title, progress=progress.value)
+            )
+            continue
+        if task.id in container_ids:
+            # A004：父任务只做汇总容器，子任务各自排期，避免父子耗时重复计入
+            excluded.append(
+                ExcludedTask(
+                    task_id=task.id,
+                    title=task.title,
+                    progress=progress.value,
+                    reason="container",
+                )
             )
             continue
         due_at, date_only = _due_at(task, timezone)
@@ -118,6 +133,7 @@ def collect_inputs(
                 "due_date": task.due_date.isoformat() if task.due_date else None,
                 "due_time": task.due_time.isoformat() if task.due_time else None,
                 "target_date": task.target_date.isoformat() if task.target_date else None,
+                "parent_task_id": task.parent_task_id,
                 "updated_at": task.updated_at.isoformat(),
             }
         )

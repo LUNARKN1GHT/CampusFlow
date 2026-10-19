@@ -6,7 +6,7 @@
 所有按 ID 的操作校验对象归属当前空间（W006）。
 """
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
@@ -17,6 +17,15 @@ from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
 from campusflow.domain.task_dependencies import cyclic_components, dependency_cycle
+
+
+@dataclass(frozen=True)
+class SubtaskDraft:
+    title: str
+    priority: TaskPriority = TaskPriority.MEDIUM
+    estimated_minutes: int | None = None
+    remaining_minutes: int | None = None
+    due_date: date | None = None
 
 
 def _apply_overdue(repos: Repositories, workspace_id: int, tasks: list[TaskData]) -> list[TaskData]:
@@ -97,6 +106,8 @@ def create_task(
         raise DomainError(error)
     if parent_task_id is not None:
         parent = _require_task_in_workspace(repos, workspace_id, parent_task_id)
+        if parent.parent_task_id is not None:
+            raise DomainError("仅支持一层子任务；请先把任务调整为顶层任务再拆分")
         if course_id is None:
             course_id = parent.course_id
     if course_id is not None:
@@ -194,6 +205,10 @@ def set_parent(
                 if current.parent_task_id is not None
                 else None
             )
+        if parent.parent_task_id is not None:
+            raise DomainError("仅支持一层子任务；目标父任务本身也是子任务")
+        if repos.tasks.list_subtasks(task.id):
+            raise DomainError("该任务已有子任务，不能再设为其他任务的子任务")
     updated = repos.tasks.set_parent(task_id, parent_task_id)
     repos.uow.commit()
     return _apply_overdue(repos, workspace_id, [updated])[0]
@@ -224,6 +239,145 @@ def task_relations(repos: Repositories, workspace_id: int, task_id: int) -> dict
         "subtasks": [_task_ref(item) for item in subtasks],
         "prerequisites": [_task_ref(item) for item in prerequisites if item is not None],
         "dependents": [_task_ref(item) for item in dependents if item is not None],
+        "rollup": subtask_rollup(repos, workspace_id, task.id),
+    }
+
+
+def subtask_rollup(repos: Repositories, workspace_id: int, task_id: int) -> dict:
+    """父任务直接子任务的进度与耗时汇总（A004）。
+
+    只读取子任务，不写回父任务，也不把汇总值当成新的耗时事实。
+    """
+    _require_task_in_workspace(repos, workspace_id, task_id)
+    children = repos.tasks.list_subtasks(task_id)
+    estimated = sum(
+        child.estimated_minutes
+        if child.estimated_minutes is not None
+        else (child.remaining_minutes or 0)
+        for child in children
+    )
+    remaining = sum(
+        0
+        if child.progress in (TaskProgress.DONE, TaskProgress.CANCELLED)
+        else (child.remaining_minutes or 0)
+        for child in children
+    )
+    progress_counts: dict[str, int] = {}
+    for child in children:
+        progress_counts[child.progress.value] = progress_counts.get(child.progress.value, 0) + 1
+    percent_complete = None
+    if estimated > 0:
+        percent_complete = round(max(0, estimated - remaining) * 100 / estimated)
+    return {
+        "subtask_count": len(children),
+        "estimated_minutes": estimated,
+        "remaining_minutes": remaining,
+        "missing_duration_count": sum(1 for child in children if child.remaining_minutes is None),
+        "progress_counts": progress_counts,
+        "percent_complete": percent_complete,
+    }
+
+
+def create_subtasks(
+    repos: Repositories,
+    workspace_id: int,
+    parent_task_id: int,
+    drafts: list[SubtaskDraft],
+) -> list[TaskData]:
+    """在父任务下批量创建可编辑子任务（A004）；子任务保留父任务与课程关联。"""
+    parent = _require_task_in_workspace(repos, workspace_id, parent_task_id)
+    if parent.parent_task_id is not None:
+        raise DomainError("仅支持一层子任务；请先把任务调整为顶层任务再拆分")
+    if not drafts:
+        raise DomainError("至少需要一项子任务")
+    for draft in drafts:
+        if not draft.title.strip():
+            raise DomainError("子任务标题不能为空")
+        error = validate_due(draft.due_date, None)
+        if error:
+            raise DomainError(error)
+        if draft.estimated_minutes is not None and draft.estimated_minutes <= 0:
+            raise DomainError("子任务预计耗时必须大于 0 分钟")
+        if draft.remaining_minutes is not None and draft.remaining_minutes < 0:
+            raise DomainError("子任务剩余耗时不能为负数")
+
+    created = [
+        repos.tasks.create(
+            workspace_id,
+            parent.course_id,
+            draft.title.strip(),
+            None,
+            draft.due_date,
+            None,
+            None,
+            DueSourceType.USER,
+            None,
+            draft.priority,
+            (
+                draft.estimated_minutes
+                if draft.estimated_minutes is not None
+                else draft.remaining_minutes
+            ),
+            (
+                draft.remaining_minutes
+                if draft.remaining_minutes is not None
+                else draft.estimated_minutes
+            ),
+            parent_task_id=parent_task_id,
+        )
+        for draft in drafts
+    ]
+    repos.uow.commit()
+    return _apply_overdue(repos, workspace_id, created)
+
+
+def split_suggestions(
+    repos: Repositories,
+    workspace_id: int,
+    task_id: int,
+    *,
+    titles: list[str] | None = None,
+) -> dict:
+    """生成可编辑的拆分为子任务建议（A004）；只返回草案，不写库。"""
+    task = _require_task_in_workspace(repos, workspace_id, task_id)
+    if task.parent_task_id is not None:
+        raise DomainError("子任务不再拆分；请调整任务层级后再试")
+    names = [title.strip() for title in (titles or []) if title.strip()]
+    if not names:
+        names = [
+            f"阅读与准备《{task.title}》",
+            f"完成《{task.title}》主体",
+            f"检查并提交《{task.title}》",
+        ]
+    if len(names) < 2:
+        raise DomainError("拆分建议至少需要两个子任务")
+
+    total = task.remaining_minutes if task.remaining_minutes is not None else task.estimated_minutes
+    if total is None:
+        amounts: list[int | None] = [None] * len(names)
+        note = "父任务缺少剩余耗时，建议先补充耗时再按建议拆分"
+    else:
+        base, extra = divmod(total, len(names))
+        amounts = [base + (1 if index < extra else 0) for index in range(len(names))]
+        note = "以下为可编辑建议，确认后再创建子任务；父任务耗时不与子任务重复计入"
+    existing = len(repos.tasks.list_subtasks(task_id))
+    if existing:
+        note = f"父任务已有 {existing} 个子任务；{note}"
+    return {
+        "parent_task_id": task.id,
+        "parent_title": task.title,
+        "suggestion": True,
+        "editable": True,
+        "note": note,
+        "items": [
+            {
+                "title": title,
+                "estimated_minutes": amount,
+                "remaining_minutes": amount,
+                "suggested": True,
+            }
+            for title, amount in zip(names, amounts, strict=True)
+        ],
     }
 
 
