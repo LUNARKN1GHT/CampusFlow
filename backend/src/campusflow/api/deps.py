@@ -16,9 +16,11 @@ from campusflow.application.ports.generation import TextGenerator
 from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.application.ports.version_relations import VersionRelations
 from campusflow.domain.errors import DomainError
 from campusflow.infrastructure.index_manifests import SqlIndexManifests
 from campusflow.infrastructure.repositories import build_repositories
+from campusflow.infrastructure.version_relations import SqlVersionRelations
 from campusflow.workers.embeddings import make_embedder
 from campusflow.workers.generation import build_text_generator
 
@@ -31,6 +33,10 @@ def get_session(request: Request) -> Iterator[Session]:
 
 def get_repositories(session: Annotated[Session, Depends(get_session)]) -> Repositories:
     return build_repositories(session)
+
+
+def get_version_relations(session: Annotated[Session, Depends(get_session)]) -> VersionRelations:
+    return SqlVersionRelations(session)
 
 
 def get_current_workspace(

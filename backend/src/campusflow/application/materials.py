@@ -347,6 +347,7 @@ class DeleteImpact:
     linked_fixed_event_ids: list[int] = field(default_factory=list)
     # R006：由本资料候选转换来的课程规则，同样保留并标记来源已失效
     linked_rule_ids: list[int] = field(default_factory=list)
+    version_relation_ids: list[int] = field(default_factory=list)
 
 
 def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
@@ -357,6 +358,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
     candidate_ids = repos.candidates.ids_by_material(workspace_id, material_id)
     linked_event_ids = repos.schedule.list_ids_by_source_candidates(candidate_ids)
     linked_rule_ids = repos.rules.list_ids_by_source_candidates(candidate_ids)
+    version_relation_ids = repos.materials.version_relation_ids(material_id)
     # 未完成的处理作业（D009）：删除会连它们一起清掉，用户删之前应该知道
     # 还有作业在跑。作业是否终态由领域规则判定，这里不重复一套口径。
     unfinished_jobs = [
@@ -370,6 +372,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         candidate_ids=candidate_ids,
         linked_fixed_event_ids=linked_event_ids,
         linked_rule_ids=linked_rule_ids,
+        version_relation_ids=version_relation_ids,
     )
     return DeleteImpact(
         material=material,
@@ -381,6 +384,7 @@ def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: i
         confirm_token=token,
         linked_fixed_event_ids=linked_event_ids,
         linked_rule_ids=linked_rule_ids,
+        version_relation_ids=version_relation_ids,
     )
 
 
@@ -403,6 +407,9 @@ def delete_material(
     将来新增的派生表（例如 M3 的向量索引、R 系列的候选结果）必须同样
     挂在 materials / material_versions 下并声明 CASCADE，才能被这里一起清掉。
     """
+    # 与 N010 创建关系共享资料锁；确认到删除之间不能插入新的关系绕过影响预览。
+    if not repos.materials.lock_for_delete(workspace_id, material_id):
+        raise NotFoundError("资料不存在")
     impact = preview_delete_impact(repos, workspace_id, material_id)
     if impact.confirm_token != confirm_token:
         raise DomainError("影响内容已变化，请重新预览确认")
