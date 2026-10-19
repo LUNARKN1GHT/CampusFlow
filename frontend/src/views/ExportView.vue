@@ -295,6 +295,9 @@ watch(
 watch(fixedEventsAvailable, (available) => {
   if (!available) includeFixedEvents.value = false
 })
+watch(mode, (value) => {
+  if (value === 'plan' && format.value === 'csv') format.value = 'ics'
+})
 
 onMounted(load)
 </script>
@@ -391,9 +394,10 @@ onMounted(load)
         </div>
 
         <div class="segmented" role="group" aria-label="导出格式">
-          <button type="button" class="segmented-item" :class="{ 'is-active': format === 'csv' }" :aria-pressed="format === 'csv'" @click="format = 'csv'">CSV 任务清单</button>
+          <button type="button" class="segmented-item" :class="{ 'is-active': format === 'csv' }" :aria-pressed="format === 'csv'" :disabled="mode === 'plan'" @click="format = 'csv'">CSV 任务清单</button>
           <button type="button" class="segmented-item" :class="{ 'is-active': format === 'ics' }" :aria-pressed="format === 'ics'" @click="format = 'ics'">ICS 日历草案</button>
         </div>
+        <p v-if="mode === 'plan'" class="form-help">计划模式当前只提供 ICS 日历草案；计划清单 CSV 尚未提供，不会生成空文件。</p>
 
         <label class="switch-field">
           <input v-model="includeSourceHints" type="checkbox" />
