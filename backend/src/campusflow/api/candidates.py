@@ -1,17 +1,22 @@
-"""待核对事项 HTTP 路由（R001 列表、R008 核对详情与状态转换、R009 修正与生成入口）。"""
+"""待核对事项 HTTP 路由。
+
+包含 R001 列表、R008 核对详情与状态转换、R009 修正与生成入口、N011 新旧差异。
+"""
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from campusflow.api.auth import require_session
 from campusflow.api.deps import get_current_workspace, get_repositories
+from campusflow.application import candidate_diff as diffs
 from campusflow.application import candidates as use_cases
 from campusflow.application import conversion as conversions
 from campusflow.application.ports.candidates import CandidateSummaryData
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.domain.candidate_diff import DiffStatus, FieldCategory, ScopeComponent
 from campusflow.domain.candidates import FieldOrigin
 from campusflow.domain.states import ReviewStatus
 
@@ -214,6 +219,84 @@ class CandidateReviewDetailOut(BaseModel):
     converted: CandidateConversionOut | None
 
 
+class DiffFieldSideOut(BaseModel):
+    """一侧字段；present=false 表示该侧没有这个字段，而不是字段值为空。"""
+
+    candidate_id: int
+    source_version_id: int
+    present: bool
+    value: Any
+    effective_value: Any
+    origin: FieldOrigin | None
+    effective_origin: FieldOrigin | None
+    explanation: str | None
+    missing_reason: str | None
+    explicitly_removed: bool
+    verifiable: bool
+    evidence: list[CandidateEvidenceOut]
+
+
+class CandidateFieldDifferenceOut(BaseModel):
+    """一个字段在新旧两侧的对照；左侧为基准/旧，右侧为待比较/新。"""
+
+    name: str
+    category: FieldCategory
+    status: DiffStatus
+    left: DiffFieldSideOut
+    right: DiffFieldSideOut
+
+
+class ScopeDifferenceOut(BaseModel):
+    component: ScopeComponent
+    status: DiffStatus
+    left_value: int | str | None
+    right_value: int | str | None
+    left_name: str | None
+    right_name: str | None
+
+
+class ScopeComparisonOut(BaseModel):
+    left: CandidateScopeOut
+    right: CandidateScopeOut
+    differences: list[ScopeDifferenceOut]
+
+
+class CandidateDiffSourceOut(BaseModel):
+    """一侧候选及其来源版本；字段证据由逐字段条目给出。"""
+
+    candidate_id: int
+    source_version_id: int
+    material_id: int
+    material_title: str
+    version_no: int
+    material_archived: bool
+    kind: str
+    review_status: ReviewStatus
+    scope: CandidateScopeOut
+
+
+class DiffSummaryOut(BaseModel):
+    total: int
+    unchanged: int
+    changed: int
+    added: int
+    missing: int
+    explicitly_removed: int
+
+
+class CandidateDiffOut(BaseModel):
+    """只读新旧对照；不判断哪个版本生效，也不自动配对候选。"""
+
+    left_role: Literal["baseline"] = "baseline"
+    right_role: Literal["comparison"] = "comparison"
+    comparison_basis: Literal["effective_value"] = "effective_value"
+    left: CandidateDiffSourceOut
+    right: CandidateDiffSourceOut
+    scope: ScopeComparisonOut
+    fields: list[CandidateFieldDifferenceOut]
+    summary: DiffSummaryOut
+
+
 class ReviewStatusPatch(BaseModel):
     """核对状态转换：只接受 ReviewStatus，与任务执行进度是两套状态。"""
 
@@ -322,11 +405,108 @@ def _to_detail_out(
     )
 
 
+def _diff_scope_out(scope: diffs.ScopeView) -> CandidateScopeOut:
+    return CandidateScopeOut(
+        course_id=scope.course_id,
+        semester_id=scope.semester_id,
+        class_name=scope.class_name,
+        course_name=scope.course_name,
+        semester_name=scope.semester_name,
+    )
+
+
+def _diff_side_out(side: diffs.DiffFieldSide) -> DiffFieldSideOut:
+    return DiffFieldSideOut(
+        candidate_id=side.candidate_id,
+        source_version_id=side.source_version_id,
+        present=side.present,
+        value=side.value,
+        effective_value=side.effective_value,
+        origin=side.origin,
+        effective_origin=side.effective_origin,
+        explanation=side.explanation,
+        missing_reason=side.missing_reason,
+        explicitly_removed=side.explicitly_removed,
+        verifiable=side.verifiable,
+        evidence=[CandidateEvidenceOut.model_validate(item) for item in side.evidence],
+    )
+
+
+def _diff_source_out(source: diffs.DiffSourceView) -> CandidateDiffSourceOut:
+    return CandidateDiffSourceOut(
+        candidate_id=source.candidate_id,
+        source_version_id=source.source_version_id,
+        material_id=source.material_id,
+        material_title=source.material_title,
+        version_no=source.version_no,
+        material_archived=source.material_archived,
+        kind=source.kind.value,
+        review_status=source.review_status,
+        scope=_diff_scope_out(source.scope),
+    )
+
+
+def _diff_out(diff: diffs.CandidateDiff) -> CandidateDiffOut:
+    return CandidateDiffOut(
+        left=_diff_source_out(diff.left),
+        right=_diff_source_out(diff.right),
+        scope=ScopeComparisonOut(
+            left=_diff_scope_out(diff.scope.left),
+            right=_diff_scope_out(diff.scope.right),
+            differences=[
+                ScopeDifferenceOut(
+                    component=item.component,
+                    status=item.status,
+                    left_value=item.left_value,
+                    right_value=item.right_value,
+                    left_name=item.left_name,
+                    right_name=item.right_name,
+                )
+                for item in diff.scope.differences
+            ],
+        ),
+        fields=[
+            CandidateFieldDifferenceOut(
+                name=item.name,
+                category=item.category,
+                status=item.status,
+                left=_diff_side_out(item.left),
+                right=_diff_side_out(item.right),
+            )
+            for item in diff.fields
+        ],
+        summary=DiffSummaryOut(
+            total=diff.summary.total,
+            unchanged=diff.summary.unchanged,
+            changed=diff.summary.changed,
+            added=diff.summary.added,
+            missing=diff.summary.missing,
+            explicitly_removed=diff.summary.explicitly_removed,
+        ),
+    )
+
+
 @router.get("/candidates/{candidate_id}", response_model=CandidateReviewDetailOut)
 def get_candidate_detail(
     candidate_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> CandidateReviewDetailOut:
     return _detail_out(repos, workspace.id, candidate_id)
+
+
+@router.get(
+    "/candidates/{candidate_id}/diff/{other_candidate_id}",
+    response_model=CandidateDiffOut,
+)
+def get_candidate_diff(
+    candidate_id: int,
+    other_candidate_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CandidateDiffOut:
+    """只读新旧差异：candidate_id 为基准/旧，other_candidate_id 为待比较/新。"""
+    return _diff_out(
+        diffs.compare_candidates(repos, workspace.id, candidate_id, other_candidate_id)
+    )
 
 
 @router.patch("/candidates/{candidate_id}/review-status", response_model=CandidateReviewDetailOut)

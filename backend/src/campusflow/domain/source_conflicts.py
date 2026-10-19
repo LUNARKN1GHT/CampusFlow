@@ -5,11 +5,11 @@
 要求，而且用户再也看不到它。这里只判断"取值是否不一致"，不判断"哪个对"。
 """
 
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from campusflow.domain.candidates import CandidateKind, JsonValue, ReviewReason
+from campusflow.domain.values import canonical_json
 
 SOURCE_CONFLICT = "source_conflict"
 
@@ -38,12 +38,8 @@ class FieldConflict:
     entries: tuple[ConflictEntry, ...]
 
 
-def _canonical(value: JsonValue) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)
-
-
 def _display(value: JsonValue) -> str:
-    text = value if isinstance(value, str) else _canonical(value)
+    text = value if isinstance(value, str) else canonical_json(value)
     if len(text) > MAX_DISPLAY_VALUE:
         text = text[:MAX_DISPLAY_VALUE] + "…"
     return text
@@ -61,7 +57,7 @@ def field_conflicts(entries: Sequence[ConflictEntry]) -> tuple[FieldConflict, ..
         groups.setdefault(key, []).append(entry)
     conflicts = []
     for (_, _, field_name), group in groups.items():
-        values = [_canonical(e.value) for e in group if e.value is not None]
+        values = [canonical_json(e.value) for e in group if e.value is not None]
         if len(values) >= 2 and len(set(values)) >= 2:
             conflicts.append(FieldConflict(str(field_name), tuple(group)))
     return tuple(conflicts)
