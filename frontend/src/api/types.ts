@@ -37,8 +37,72 @@ export type Task = {
   priority: TaskPriority
   estimated_minutes: number | null
   remaining_minutes: number | null
+  parent_task_id: number | null
   created_at: string
   updated_at: string
+}
+
+export type TaskLink = {
+  id: number
+  title: string
+  progress: TaskProgress
+  due_date: string | null
+  parent_task_id: number | null
+}
+
+export type TaskRollup = {
+  subtask_count: number
+  estimated_minutes: number
+  remaining_minutes: number
+  missing_duration_count: number
+  progress_counts: Record<string, number>
+  percent_complete: number | null
+}
+
+export type TaskRelations = {
+  task_id: number
+  parent: TaskLink | null
+  subtasks: TaskLink[]
+  prerequisites: TaskLink[]
+  dependents: TaskLink[]
+  rollup: TaskRollup
+}
+
+export type SubtaskInput = {
+  title: string
+  priority?: TaskPriority
+  estimated_minutes?: number | null
+  remaining_minutes?: number | null
+  due_date?: string | null
+}
+
+export type SplitSuggestion = {
+  parent_task_id: number
+  parent_title: string
+  suggestion: boolean
+  editable: boolean
+  note: string
+  items: Array<{
+    title: string
+    estimated_minutes: number | null
+    remaining_minutes: number | null
+    suggested: boolean
+  }>
+}
+
+export type DependencyCheck = {
+  semester_id: number | null
+  valid: boolean
+  checked_tasks: number
+  checked_edges: number
+  cycles: Array<{ task_ids: number[]; titles: string[]; message: string }>
+  missing_prerequisites: Array<Record<string, unknown> & { task_id: number; title: string; code: string; message: string }>
+  cancelled_prerequisites: Array<Record<string, unknown> & { task_id: number; title: string; code: string; message: string }>
+  blocked_tasks: Array<{
+    task_id: number
+    title: string
+    reasons: Array<{ code: string; message: string }>
+  }>
 }
 
 export type TaskProgressChange = {
@@ -491,4 +555,48 @@ export type MergeResult = {
   records: MergeRecord[]
   created: boolean
   preview: MergePreview
+}
+
+export type ReminderKind = 'deadline' | 'review'
+export type ReminderStatus = 'pending' | 'sent' | 'dismissed' | 'cancelled'
+
+export type Reminder = {
+  id: number
+  task_id: number | null
+  kind: ReminderKind
+  message: string
+  status: ReminderStatus
+  scheduled_for: string
+  sent_at: string | null
+  read_at: string | null
+  payload: Record<string, unknown>
+}
+
+export type ReminderSummary = {
+  unread: number
+  sent: number
+  pending: number
+  dismissed: number
+  cancelled: number
+  note: string
+}
+
+export type ReminderRule = {
+  id: number | null
+  task_id: number | null
+  advance_minutes: number
+  repeat_minutes: number | null
+  paused: boolean
+  enabled: boolean
+  version: number
+  is_default: boolean
+  builtin: boolean
+}
+
+export type ReminderRuleInput = {
+  task_id?: number | null
+  advance_minutes: number
+  repeat_minutes: number | null
+  paused: boolean
+  enabled: boolean
 }

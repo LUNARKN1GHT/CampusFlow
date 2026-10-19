@@ -9,10 +9,17 @@ from fastapi import APIRouter, Depends, Query
 from campusflow.api.deps import get_current_workspace, get_repositories
 from campusflow.api.schemas import (
     SourceDetailOut,
+    SplitSuggestionIn,
+    SubtaskBatchIn,
     TaskCreate,
+    TaskDependencyIn,
+    TaskDependencyOut,
     TaskOut,
+    TaskParentIn,
     TaskProgressChangeOut,
     TaskProgressPatch,
+    TaskRelationsOut,
+    TaskRollupOut,
     TaskUpdate,
 )
 from campusflow.application import source_detail as source_use_cases
@@ -52,6 +59,15 @@ def list_tasks(
     ]
 
 
+@router.get("/tasks/dependencies/check", response_model=dict)
+def check_task_dependencies(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict:
+    return use_cases.dependency_check(repos, workspace.id, semester_id=semester_id)
+
+
 @router.post("/tasks", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, workspace: CurrentWorkspace, repos: Repos) -> TaskOut:
     task = use_cases.create_task(
@@ -72,6 +88,7 @@ def create_task(payload: TaskCreate, workspace: CurrentWorkspace, repos: Repos) 
             if payload.remaining_minutes is not None
             else payload.estimated_minutes
         ),
+        parent_task_id=payload.parent_task_id,
     )
     return TaskOut.model_validate(task)
 
@@ -122,6 +139,77 @@ def list_task_progress_history(
         TaskProgressChangeOut.model_validate(change)
         for change in use_cases.list_progress_changes(repos, workspace.id, task_id)
     ]
+
+
+@router.get("/tasks/{task_id}/relations", response_model=TaskRelationsOut)
+def get_task_relations(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskRelationsOut:
+    return TaskRelationsOut.model_validate(use_cases.task_relations(repos, workspace.id, task_id))
+
+
+@router.get("/tasks/{task_id}/subtasks", response_model=list[TaskOut])
+def list_subtasks(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> list[TaskOut]:
+    use_cases.get_task(repos, workspace.id, task_id)
+    return [TaskOut.model_validate(task) for task in repos.tasks.list_subtasks(task_id)]
+
+
+@router.get("/tasks/{task_id}/rollup", response_model=TaskRollupOut)
+def get_subtask_rollup(task_id: int, workspace: CurrentWorkspace, repos: Repos) -> TaskRollupOut:
+    return TaskRollupOut.model_validate(use_cases.subtask_rollup(repos, workspace.id, task_id))
+
+
+@router.post("/tasks/{task_id}/subtasks", response_model=list[TaskOut], status_code=201)
+def create_subtasks(
+    task_id: int, payload: SubtaskBatchIn, workspace: CurrentWorkspace, repos: Repos
+) -> list[TaskOut]:
+    drafts = [
+        use_cases.SubtaskDraft(
+            title=item.title,
+            priority=item.priority,
+            estimated_minutes=item.estimated_minutes,
+            remaining_minutes=item.remaining_minutes,
+            due_date=item.due_date,
+        )
+        for item in payload.items
+    ]
+    return [
+        TaskOut.model_validate(task)
+        for task in use_cases.create_subtasks(repos, workspace.id, task_id, drafts)
+    ]
+
+
+@router.post("/tasks/{task_id}/split-suggestions", response_model=dict)
+def suggest_task_split(
+    task_id: int,
+    payload: SplitSuggestionIn,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> dict:
+    return use_cases.split_suggestions(repos, workspace.id, task_id, titles=payload.titles)
+
+
+@router.patch("/tasks/{task_id}/parent", response_model=TaskOut)
+def set_task_parent(
+    task_id: int, payload: TaskParentIn, workspace: CurrentWorkspace, repos: Repos
+) -> TaskOut:
+    task = use_cases.set_parent(repos, workspace.id, task_id, parent_task_id=payload.parent_task_id)
+    return TaskOut.model_validate(task)
+
+
+@router.post("/tasks/{task_id}/dependencies", response_model=TaskDependencyOut, status_code=201)
+def add_task_dependency(
+    task_id: int, payload: TaskDependencyIn, workspace: CurrentWorkspace, repos: Repos
+) -> TaskDependencyOut:
+    link = use_cases.add_dependency(
+        repos, workspace.id, task_id, depends_on_task_id=payload.depends_on_task_id
+    )
+    return TaskDependencyOut.model_validate(link)
+
+
+@router.delete("/tasks/{task_id}/dependencies/{depends_on_task_id}", status_code=204)
+def remove_task_dependency(
+    task_id: int, depends_on_task_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> None:
+    use_cases.remove_dependency(repos, workspace.id, task_id, depends_on_task_id)
 
 
 @router.get("/tasks/{task_id}/source", response_model=SourceDetailOut)

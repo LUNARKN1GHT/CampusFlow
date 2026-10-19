@@ -9,10 +9,20 @@ import type {
   FixedEventOccurrence,
   Semester,
   SemesterInput,
+  DependencyCheck,
+  Reminder,
+  ReminderRule,
+  ReminderRuleInput,
+  ReminderStatus,
+  ReminderSummary,
+  SplitSuggestion,
+  SubtaskInput,
   Task,
   TaskInput,
   TaskProgress,
   TaskProgressChange,
+  TaskRelations,
+  TaskRollup,
 } from './types'
 
 function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
@@ -43,6 +53,14 @@ export const tasksApi = {
   update: (id: number, input: Partial<TaskInput>) => apiRequest<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   setProgress: (id: number, progress: TaskProgress, reason: string | null) => apiRequest<Task>(`/tasks/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress, reason }) }),
   progressHistory: (id: number) => apiRequest<TaskProgressChange[]>(`/tasks/${id}/progress-history`),
+  relations: (id: number) => apiRequest<TaskRelations>(`/tasks/${id}/relations`),
+  rollup: (id: number) => apiRequest<TaskRollup>(`/tasks/${id}/rollup`),
+  subtasks: (id: number) => apiRequest<Task[]>(`/tasks/${id}/subtasks`),
+  createSubtasks: (id: number, items: SubtaskInput[]) => apiRequest<Task[]>(`/tasks/${id}/subtasks`, { method: 'POST', body: JSON.stringify({ items }) }),
+  splitSuggestions: (id: number) => apiRequest<SplitSuggestion>(`/tasks/${id}/split-suggestions`, { method: 'POST', body: JSON.stringify({}) }),
+  addDependency: (id: number, dependsOnTaskId: number) => apiRequest<{ id: number }>(`/tasks/${id}/dependencies`, { method: 'POST', body: JSON.stringify({ depends_on_task_id: dependsOnTaskId }) }),
+  removeDependency: (id: number, dependsOnTaskId: number) => apiRequest<void>(`/tasks/${id}/dependencies/${dependsOnTaskId}`, { method: 'DELETE' }),
+  dependencyCheck: (semesterId?: number) => apiRequest<DependencyCheck>(`/tasks/dependencies/check${queryString({ semester_id: semesterId })}`),
 }
 
 export const scheduleApi = {
@@ -54,4 +72,22 @@ export const scheduleApi = {
   listSlots: () => apiRequest<AvailabilitySlot[]>('/availability-slots'),
   createSlot: (input: AvailabilitySlotInput) => apiRequest<AvailabilitySlot>('/availability-slots', { method: 'POST', body: JSON.stringify(input) }),
   deleteSlot: (id: number) => apiRequest<void>(`/availability-slots/${id}`, { method: 'DELETE' }),
+}
+
+export const remindersApi = {
+  list: (filters: { unreadOnly?: boolean; status?: ReminderStatus | null } = {}) => apiRequest<Reminder[]>(
+    `/reminders${queryString({
+      unread_only: filters.unreadOnly ? true : null,
+      status: filters.status ?? null,
+    })}`,
+  ),
+  summary: () => apiRequest<ReminderSummary>('/reminders/summary'),
+  action: (id: number, action: 'read' | 'dismiss') => apiRequest<{ id: number; status: ReminderStatus }>(
+    `/reminders/${id}/action`,
+    { method: 'POST', body: JSON.stringify({ action }) },
+  ),
+  listRules: () => apiRequest<ReminderRule[]>('/reminders/rules'),
+  createRule: (input: ReminderRuleInput) => apiRequest<ReminderRule>('/reminders/rules', { method: 'POST', body: JSON.stringify(input) }),
+  updateRule: (id: number, input: ReminderRuleInput) => apiRequest<ReminderRule>(`/reminders/rules/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  deleteRule: (id: number) => apiRequest<void>(`/reminders/rules/${id}`, { method: 'DELETE' }),
 }

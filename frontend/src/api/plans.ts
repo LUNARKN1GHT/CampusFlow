@@ -108,11 +108,43 @@ export type PlanAssumptionsInput = {
   buffer_minutes?: number | null
 }
 
+export type PlanRangeType = 'today' | 'this_week' | 'two_weeks' | 'custom'
+
 export type GeneratePlanInput = {
   semester_id?: number | null
+  range_type?: PlanRangeType
   start_date?: string | null
   end_date?: string | null
   assumptions?: PlanAssumptionsInput
+}
+
+export type AdjustmentSuggestion = {
+  code: string
+  message: string
+  task_id?: number
+  field?: string
+}
+
+export type AdjustmentSummary = {
+  has_plan: boolean
+  has_changes: boolean
+  auto_applied: boolean
+  requires_confirmation: boolean
+  current_plan_id: number | null
+  current_plan_version: number | null
+  affected_task_ids: number[]
+  affected_all_tasks: boolean
+  suggested_task_ids: number[]
+  suggestions: AdjustmentSuggestion[]
+  message: string
+}
+
+export type RescheduleInput = {
+  semester_id?: number | null
+  start_date?: string | null
+  end_date?: string | null
+  task_ids?: number[] | null
+  reason?: string | null
 }
 
 export type PlanOverview = {
@@ -162,5 +194,17 @@ export const plansApi = {
     apiRequest<PlanDraft>(`/plans/blocks/${id}/lock`, {
       method: 'POST',
       body: JSON.stringify({ locked, expected_version: expectedVersion }),
+    }),
+  adjustments: (semesterId?: number) =>
+    apiRequest<AdjustmentSummary>(`/plans/adjustments${semesterId ? `?semester_id=${semesterId}` : ''}`),
+  createAdjustmentDraft: (input: RescheduleInput = {}) =>
+    apiRequest<PlanDraft>('/plans/adjustments/draft', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  reschedule: (input: RescheduleInput = {}) =>
+    apiRequest<PlanDraft>('/plans/reschedule', {
+      method: 'POST',
+      body: JSON.stringify(input),
     }),
 }

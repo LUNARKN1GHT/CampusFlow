@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 
 import { ApiError, errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
-import type { PlanBlock, PlanConflict, PlanDraft } from '../api/plans'
+import type { AdjustmentSummary, PlanBlock, PlanConflict, PlanDraft, PlanRangeType } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
 
 const draft = ref<PlanDraft | null>(null)
@@ -11,6 +11,15 @@ const current = ref<PlanDraft | null>(null)
 const loading = ref(true)
 const generating = ref(false)
 const accepting = ref(false)
+const rescheduling = ref(false)
+const adjustmentLoading = ref(false)
+const adjustments = ref<AdjustmentSummary | null>(null)
+const acceptedNotice = ref('')
+const rangeForm = reactive({
+  type: 'two_weeks' as PlanRangeType,
+  start: '',
+  end: '',
+})
 const busyBlockId = ref<number | null>(null)
 const error = ref('')
 const actionError = ref('')
@@ -31,6 +40,8 @@ const constraintLabels: Record<string, string> = {
   buffer: '提交缓冲',
   deadline: '截止',
   estimated_duration: '耗时估计',
+  dependency: '必要依赖',
+  preserved: '保留安排',
 }
 
 const statusLabels: Record<string, string> = { draft: '待接受草案', accepted: '当前计划', superseded: '已被替代' }
@@ -102,6 +113,21 @@ function zonedInputToIso(value: string): string {
   return new Date(asUtc - (secondWall - (asUtc - offset))).toISOString()
 }
 
+const currentBlockKeys = computed(() => new Set(
+  (current.value?.blocks ?? []).map((block) => `${block.task_id}|${block.starts_at}|${block.ends_at}`),
+))
+
+/** 与当前计划相同的时间块标为保留；其余标为新安排或移动。 */
+function blockState(block: PlanBlock): 'preserved' | 'moved' {
+  if (block.constraint_source.some((source) => source.kind === 'preserved')) return 'preserved'
+  return currentBlockKeys.value.has(`${block.task_id}|${block.starts_at}|${block.ends_at}`)
+    ? 'preserved'
+    : 'moved'
+}
+
+const preservedBlocks = computed(() => (draft.value?.blocks ?? []).filter((block) => blockState(block) === 'preserved'))
+const movedBlocks = computed(() => (draft.value?.blocks ?? []).filter((block) => blockState(block) === 'moved'))
+
 const blockingConflicts = computed(() =>
   (draft.value?.conflicts ?? []).filter((item) => item.severity === 'conflict'),
 )
@@ -154,26 +180,83 @@ async function load() {
   } finally {
     loading.value = false
   }
+  await loadAdjustments()
+}
+
+async function loadAdjustments() {
+  if (!current.value) {
+    adjustments.value = null
+    return
+  }
+  adjustmentLoading.value = true
+  try {
+    adjustments.value = await plansApi.adjustments()
+  } catch {
+    adjustments.value = null
+  } finally {
+    adjustmentLoading.value = false
+  }
+}
+
+function assumptionsPayload() {
+  return {
+    default_duration_minutes: assumptions.default_duration_minutes
+      ? Number(assumptions.default_duration_minutes)
+      : null,
+    segment_minutes: assumptions.segment_minutes ? Number(assumptions.segment_minutes) : null,
+    buffer_minutes: assumptions.buffer_minutes ? Number(assumptions.buffer_minutes) : null,
+  }
 }
 
 async function generate() {
   generating.value = true
   error.value = ''
   actionError.value = ''
+  acceptedNotice.value = ''
+  if (rangeForm.type === 'custom' && (!rangeForm.start || !rangeForm.end)) {
+    actionError.value = '自定义区间需要同时选择开始和结束日期'
+    generating.value = false
+    return
+  }
   try {
     draft.value = await plansApi.generate({
-      assumptions: {
-        default_duration_minutes: assumptions.default_duration_minutes
-          ? Number(assumptions.default_duration_minutes)
-          : null,
-        segment_minutes: assumptions.segment_minutes ? Number(assumptions.segment_minutes) : null,
-        buffer_minutes: assumptions.buffer_minutes ? Number(assumptions.buffer_minutes) : null,
-      },
+      range_type: rangeForm.type,
+      start_date: rangeForm.type === 'custom' ? rangeForm.start : null,
+      end_date: rangeForm.type === 'custom' ? rangeForm.end : null,
+      assumptions: assumptionsPayload(),
     })
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
     generating.value = false
+  }
+}
+
+async function createAdjustmentDraft() {
+  rescheduling.value = true
+  actionError.value = ''
+  acceptedNotice.value = ''
+  try {
+    draft.value = await plansApi.createAdjustmentDraft({})
+    await loadAdjustments()
+  } catch (caught) {
+    actionError.value = errorMessage(caught)
+  } finally {
+    rescheduling.value = false
+  }
+}
+
+async function reschedulePlan() {
+  rescheduling.value = true
+  actionError.value = ''
+  acceptedNotice.value = ''
+  try {
+    draft.value = await plansApi.reschedule({})
+    await loadAdjustments()
+  } catch (caught) {
+    actionError.value = errorMessage(caught)
+  } finally {
+    rescheduling.value = false
   }
 }
 
@@ -185,6 +268,8 @@ async function accept() {
     const accepted = await plansApi.accept(draft.value.id, draft.value.version)
     draft.value = accepted
     current.value = accepted
+    acceptedNotice.value = `已接受 v${accepted.version}，当前计划与刚才预览的 ${accepted.blocks.length} 段时间块一致。`
+    await loadAdjustments()
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
@@ -248,13 +333,16 @@ onMounted(load)
     <div class="page-heading page-heading-row">
       <div>
         <p class="eyebrow">任务与计划</p>
-        <h1>两周学习计划</h1>
-        <p class="intro">先按固定日程、明确截止和可用时间生成草案；确认后才成为当前计划。</p>
-        <p class="form-help">调整时间块不会改写任务原始 DDL。未接受前不会影响现有安排。</p>
+        <h1>学习计划</h1>
+        <p class="intro">按今天、本周、未来两周或自定义区间生成草案；确认后才成为当前计划。</p>
+        <p class="form-help">调整时间块不会改写任务原始 DDL。未接受前不会影响现有安排；锁定块会在局部重排时保留。</p>
       </div>
       <div class="page-actions">
         <button type="button" :disabled="generating" @click="generate">
-          {{ generating ? '生成中…' : '生成未来两周草案' }}
+          {{ generating ? '生成中…' : '生成草案' }}
+        </button>
+        <button v-if="current" type="button" class="button-secondary" :disabled="rescheduling" @click="reschedulePlan">
+          {{ rescheduling ? '重排中…' : '保留锁定块重排' }}
         </button>
         <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" @click="showCurrentPlan">
           查看当前计划
@@ -265,7 +353,21 @@ onMounted(load)
     <ApiFeedback v-if="error" :message="error" @retry="load" />
     <ApiFeedback v-if="actionError" :message="actionError" title="操作未完成" @retry="load" />
 
-    <section class="panel stack-form" aria-label="规划假设">
+    <section class="panel stack-form" aria-label="规划区间与假设">
+      <div>
+        <p class="eyebrow">规划区间</p>
+        <p class="form-help">区间按工作空间时区解释；本周为周一至周日，可跨月。自定义区间必须同时选择起止日期。</p>
+      </div>
+      <div class="form-grid form-grid-3">
+        <label>区间<select v-model="rangeForm.type" aria-label="规划区间">
+          <option value="today">今天</option>
+          <option value="this_week">本周</option>
+          <option value="two_weeks">未来两周</option>
+          <option value="custom">自定义</option>
+        </select></label>
+        <label>开始日期<input v-model="rangeForm.start" type="date" :disabled="rangeForm.type !== 'custom'" /></label>
+        <label>结束日期<input v-model="rangeForm.end" type="date" :disabled="rangeForm.type !== 'custom'" /></label>
+      </div>
       <div>
         <p class="eyebrow">可选假设</p>
         <p class="form-help">留空表示不假设缺失信息；选择后的假设会随草案明确展示。</p>
@@ -279,7 +381,7 @@ onMounted(load)
 
     <section v-if="loading" class="panel compact-empty">正在读取计划…</section>
     <section v-else-if="!draft" class="panel compact-empty">
-      尚未生成计划草案。设置可用时间并添加带耗时的任务后，点击“生成未来两周草案”。
+      尚未生成计划草案。设置可用时间并添加带耗时的任务后，选择区间并点击“生成草案”。
     </section>
 
     <template v-else>
@@ -296,11 +398,40 @@ onMounted(load)
           部分排入 {{ draft.coverage.tasks_partial }}，未排入 {{ draft.coverage.tasks_unscheduled }}，
           不参与 {{ draft.coverage.tasks_excluded }}。
         </p>
+        <p v-if="draft.status === 'draft'" class="inline-notice">
+          预览：保留 {{ preservedBlocks.length }} 段时间块，新安排或移动 {{ movedBlocks.length }} 段。接受后当前计划将与本预览一致。
+        </p>
+        <p v-if="acceptedNotice" class="inline-notice" role="status">{{ acceptedNotice }}</p>
         <div class="page-actions" v-if="draft.status === 'draft'">
           <button type="button" :disabled="accepting" @click="accept">
             {{ accepting ? '接受中…' : '接受为当前计划' }}
           </button>
         </div>
+      </section>
+
+      <section v-if="adjustments?.has_changes" class="panel" aria-label="调整建议">
+        <div class="section-heading">
+          <div><p class="eyebrow">变化检测</p><h2>需要调整吗？</h2></div>
+          <span class="count-badge">{{ adjustments.suggestions.length }} 条建议</span>
+        </div>
+        <p>{{ adjustments.message }}</p>
+        <ul class="plain-list">
+          <li v-for="(suggestion, index) in adjustments.suggestions" :key="index">{{ suggestion.message }}</li>
+        </ul>
+        <p class="form-help">
+          受影响任务：{{ adjustments.affected_all_tasks ? '全部任务' : (adjustments.affected_task_ids.join('、') || '未定位') }}。
+          当前计划 v{{ adjustments.current_plan_version }} 尚未修改。
+        </p>
+        <div class="page-actions">
+          <button type="button" :disabled="rescheduling || adjustmentLoading" @click="createAdjustmentDraft">
+            {{ rescheduling ? '生成中…' : '生成本地调整草案' }}
+          </button>
+          <button type="button" class="text-button" :disabled="adjustmentLoading" @click="loadAdjustments">重新检查</button>
+        </div>
+      </section>
+
+      <section v-else-if="adjustments?.has_plan" class="panel compact-empty" aria-label="调整建议">
+        {{ adjustments.message }}
       </section>
 
       <section v-if="draft.conflicts.length" class="panel" aria-label="冲突与风险">
@@ -352,6 +483,7 @@ onMounted(load)
                 <strong>{{ timeText(block.starts_at) }}–{{ timeText(block.ends_at) }}</strong>
                 <span>{{ block.title }}</span>
                 <span class="status-pill">{{ block.minutes }} 分钟</span>
+                <span class="status-pill">{{ blockState(block) === 'preserved' ? '保留安排' : '新安排 / 移动' }}</span>
                 <span v-if="block.locked" class="status-pill">已锁定</span>
               </div>
               <p>{{ block.reason }}</p>

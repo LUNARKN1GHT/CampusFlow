@@ -14,6 +14,7 @@ const availableItems = [
   { label: '智能问答', to: '/qa' },
   { label: '任务', to: '/tasks' },
   { label: '学习计划', to: '/plan' },
+  { label: '提醒', to: '/reminders' },
   { label: '设置', to: '/settings' },
 ]
 

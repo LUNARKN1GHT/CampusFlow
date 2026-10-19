@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from campusflow.application.candidates import get_candidate
 from campusflow.application.ports.repositories import Repositories
 from campusflow.application.ports.version_relations import VersionAcceptanceData, VersionRelations
+from campusflow.application.reminders import sync_reminders
 from campusflow.application.version_applicability import assess_applicability
 from campusflow.domain.candidate_diff import DiffStatus
 from campusflow.domain.candidates import ReviewChange
@@ -114,6 +115,8 @@ def accept_change(
             evidence_snapshot=evidence,
             previous_review_status=baseline.review_status.value,
         )
+        # 通知变更接受后按仍有效的任务字段重算提醒，旧窗口不再保留
+        sync_reminders(repos, workspace_id)
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()

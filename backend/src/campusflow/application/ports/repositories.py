@@ -81,6 +81,8 @@ class TaskData:
     updated_at: datetime
     # R004：由候选核对转换而来的任务保留候选关联，用于幂等与来源详情
     source_candidate_id: int | None = None
+    # A001：包含关系。子任务仍保留自己的来源关联，不被父任务覆盖。
+    parent_task_id: int | None = None
     # 读取时按工作空间时区派生，不落库
     overdue: bool = False
 
@@ -105,6 +107,15 @@ class TaskProgressChangeData:
     previous_remaining_minutes: int | None
     new_remaining_minutes: int | None
     changed_at: datetime
+
+
+@dataclass
+class TaskDependencyData:
+    id: int
+    workspace_id: int
+    task_id: int
+    depends_on_task_id: int
+    created_at: datetime
 
 
 @dataclass
@@ -515,6 +526,23 @@ class TaskRepository(Protocol):
 
     def list_progress_changes(self, task_id: int) -> list[TaskProgressChangeData]: ...
 
+    # A001：包含关系与依赖关系分开维护
+    def set_parent(self, task_id: int, parent_task_id: int | None) -> TaskData | None: ...
+
+    def list_subtasks(self, parent_task_id: int) -> list[TaskData]: ...
+
+    def list_dependencies(self, task_id: int) -> list[TaskDependencyData]: ...
+
+    def list_dependents(self, depends_on_task_id: int) -> list[TaskDependencyData]: ...
+
+    def list_workspace_dependencies(self, workspace_id: int) -> list[TaskDependencyData]: ...
+
+    def add_dependency(
+        self, workspace_id: int, task_id: int, depends_on_task_id: int
+    ) -> TaskDependencyData: ...
+
+    def remove_dependency(self, task_id: int, depends_on_task_id: int) -> bool: ...
+
 
 class MaterialRepository(Protocol):
     def get(self, material_id: int) -> MaterialData | None: ...
@@ -843,6 +871,111 @@ class PlanRepository(Protocol):
 
 
 @dataclass
+class ReminderRuleData:
+    id: int
+    workspace_id: int
+    task_id: int | None
+    advance_minutes: int
+    repeat_minutes: int | None
+    paused: bool
+    enabled: bool
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class ReminderTriggerData:
+    id: int
+    workspace_id: int
+    rule_id: int | None
+    task_id: int | None
+    kind: str
+    dedupe_key: str
+    scheduled_for: datetime
+    message: str
+    status: str
+    payload: dict
+    created_at: datetime
+    updated_at: datetime
+    sent_at: datetime | None
+    read_at: datetime | None
+
+
+class ReminderRepository(Protocol):
+    def list_rules(self, workspace_id: int) -> list[ReminderRuleData]: ...
+
+    def get_rule(self, rule_id: int) -> ReminderRuleData | None: ...
+
+    def get_task_rule(self, workspace_id: int, task_id: int) -> ReminderRuleData | None: ...
+
+    def get_default_rule(self, workspace_id: int) -> ReminderRuleData | None: ...
+
+    def create_rule(
+        self,
+        workspace_id: int,
+        *,
+        task_id: int | None,
+        advance_minutes: int,
+        repeat_minutes: int | None,
+        paused: bool,
+        enabled: bool,
+    ) -> ReminderRuleData: ...
+
+    def update_rule(
+        self,
+        rule_id: int,
+        *,
+        advance_minutes: int,
+        repeat_minutes: int | None,
+        paused: bool,
+        enabled: bool,
+    ) -> ReminderRuleData | None: ...
+
+    def delete_rule(self, rule_id: int) -> bool: ...
+
+    def list_triggers(
+        self,
+        workspace_id: int,
+        *,
+        statuses: tuple[str, ...] | None = None,
+        unread_only: bool = False,
+        limit: int = 200,
+    ) -> list[ReminderTriggerData]: ...
+
+    def get_trigger(self, trigger_id: int) -> ReminderTriggerData | None: ...
+
+    def upsert_triggers(self, rows: list[dict]) -> list[ReminderTriggerData]:
+        """按 dedupe_key 幂等插入；仍需要的已取消触发恢复为待发送。"""
+        ...
+
+    def set_trigger_status(
+        self,
+        trigger_id: int,
+        *,
+        status: str,
+        read_at: datetime | None = None,
+        sent_at: datetime | None = None,
+    ) -> ReminderTriggerData | None: ...
+
+    def cancel_pending_for_task(self, workspace_id: int, task_id: int) -> int: ...
+
+    def cancel_pending_not_in_keys(
+        self, workspace_id: int, task_id: int, keep_keys: set[str]
+    ) -> int:
+        """撤消失效触发，避免同一事项同时保留两套提醒。"""
+        ...
+
+    def cancel_pending_reviews(self, workspace_id: int) -> int:
+        """只撤消工作空间级待核对提醒，不碰任务来源失效提醒。"""
+        ...
+
+    def restore_future_cancelled(self, workspace_id: int, task_id: int, now: datetime) -> int: ...
+
+    def mark_due_sent(self, workspace_id: int, now: datetime) -> int: ...
+
+
+@dataclass
 class Repositories:
     """一组仓储与事务控制，由 API 依赖组装。"""
 
@@ -856,4 +989,5 @@ class Repositories:
     candidates: CandidateRepository
     rules: RuleRepository
     plans: PlanRepository
+    reminders: ReminderRepository
     uow: UnitOfWork
