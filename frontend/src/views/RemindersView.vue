@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 提醒页：按全部／未读／已读查看提醒并标为已读或忽略，同时维护默认与任务单独提醒规则。
+ * 流程：读取列表时后端先同步生成提醒；修改规则后重算待发送记录，发送过或已忽略的历史保留。
+ * 约束：提醒只用于提示，不改变任务 DDL、核对状态或计划；没有提醒也不代表没有待办或冲突。
+ */
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import { remindersApi, tasksApi } from '../api/business'
@@ -72,6 +77,8 @@ function listFilter(): { unreadOnly?: boolean; status?: ReminderStatus } {
   return {}
 }
 
+// 后端只有 unread_only 和 status 两种筛选；"已读"先取已发送记录，再前端排除未读，
+// 避免把待发送、已撤销等非发送状态误算成已读。
 function applyReminders(items: Reminder[]): void {
   reminders.value = view.value === 'read'
     ? items.filter((item) => item.read_at !== null)
@@ -136,6 +143,8 @@ async function act(reminder: Reminder, action: 'read' | 'dismiss'): Promise<void
   }
 }
 
+// scheduled_for 是提醒窗口时间，不一定是截止时刻；date_only 时只显示日期，
+// 避免把窗口计算或同步时刻误当成任务截止时刻。
 function formatScheduled(reminder: Reminder): string {
   const dateOnly = reminder.payload?.date_only === true
   return new Intl.DateTimeFormat('zh-CN', dateOnly
@@ -155,6 +164,7 @@ function advanceText(minutes: number): string {
   return friendly === `${minutes} 分钟` ? friendly : `${minutes} 分钟（${friendly}）`
 }
 
+// task_id 为空的是工作空间级提醒（如待核对汇总），不对应单个任务。
 function taskTitle(taskId: number | null): string {
   if (taskId === null) return '工作空间提醒'
   return taskMap.value.get(taskId)?.title ?? `任务 #${taskId}`
@@ -164,6 +174,7 @@ function repeatText(rule: ReminderRule): string {
   return rule.repeat_minutes === null ? '不重复' : `每 ${advanceText(rule.repeat_minutes)}重复一次`
 }
 
+// 内置默认规则可能尚未落库（id 为空），保存时走创建；已有记录则按版本更新。
 function syncDefaultForm(): void {
   const rule = defaultRule.value
   Object.assign(defaultForm, {
@@ -184,6 +195,7 @@ async function reloadRules(): Promise<void> {
   rules.value = await remindersApi.listRules()
 }
 
+// 规则变化只重算待发送提醒，已发送／已忽略记录保留，任务截止与计划内容不受影响。
 async function saveDefaultRule(): Promise<void> {
   defaultSaving.value = true
   defaultError.value = ''
@@ -212,6 +224,7 @@ async function saveDefaultRule(): Promise<void> {
   }
 }
 
+// 新规则继承默认规则的提前量，但不继承重复间隔，避免无意中开启重复提醒。
 function resetRuleForm(): void {
   Object.assign(ruleForm, {
     task_id: '',
@@ -270,6 +283,7 @@ async function saveTaskRule(): Promise<void> {
   }
 }
 
+// 规则更新接口要求提交整组字段，因此保留原有提前量与重复间隔，只翻转暂停状态。
 async function toggleRulePaused(rule: ReminderRule): Promise<void> {
   if (rule.id === null) return
   ruleError.value = ''
@@ -443,6 +457,7 @@ onMounted(load)
           <button v-if="editingRuleId !== null" type="button" class="text-button" @click="resetRuleForm">取消编辑</button>
         </div>
         <form v-if="tasks.length" class="stack-form" @submit.prevent="saveTaskRule">
+          <!-- 新建时只列出还没有单独规则的任务；已有规则的通过上方卡片编辑。 -->
           <label>任务<select v-model="ruleForm.task_id" :disabled="editingRuleId !== null" required><option value="" disabled>请选择任务</option><option v-for="task in (editingRuleId === null ? tasksWithoutRule : tasks)" :key="task.id" :value="task.id">{{ task.title }}{{ task.due_date ? ` · ${task.due_date}` : '' }}</option></select></label>
           <div class="form-grid">
             <label>任务提前量（分钟）<input v-model.number="ruleForm.advance_minutes" type="number" min="0" max="10080" required /></label>

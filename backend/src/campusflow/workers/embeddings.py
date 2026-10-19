@@ -15,6 +15,7 @@ _FACTORY = None
 
 
 def profile_from_settings(settings: Settings) -> EmbeddingProfile:
+    """配置身份只由型号、代次与维度决定；运行期不改写，换模型即换身份。"""
     return EmbeddingProfile(
         model=settings.embedding_model,
         revision=settings.embedding_revision,
@@ -23,6 +24,7 @@ def profile_from_settings(settings: Settings) -> EmbeddingProfile:
 
 
 def build_embedder(settings: Settings) -> ZhipuEmbedder:
+    """缺密钥直接失败，不退回假向量；构造适配器本身不联网。"""
     if not settings.zhipu_api_key:
         raise ValueError("缺少 ZHIPU_API_KEY，不能调用真实向量模型")
     return ZhipuEmbedder(
@@ -43,6 +45,8 @@ class DemoEmbedder:
         return self._profile
 
     def embed(self, text: str) -> EmbeddedText:
+        # 按配置身份与文字派生固定向量，保证测试可复现；结果只用于演示与验收，
+        # 不能当作真实语义相似度或模型结论。
         self._profile.validate_text(text)
         seed = hashlib.sha256(f"{self._profile.id}\x00{text}".encode()).digest()
         need = self._profile.dimensions * 4
@@ -70,6 +74,7 @@ def set_embedder_factory(factory) -> None:
 
 
 def make_embedder(settings: Settings) -> Embedder:
+    """Worker 每次索引作业调用；未注入工厂时走真实适配器。"""
     if _FACTORY is not None:
         return _FACTORY(settings)
     return build_embedder(settings)

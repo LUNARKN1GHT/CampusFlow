@@ -34,6 +34,7 @@ INVALID_CITATION_MESSAGES = {
 
 
 def stable_citation_id(material_id: int, version_id: int, block_id: str) -> str:
+    """由资料、版本与块共同派生引用 ID；同一输入稳定，换版本或换块必然不同。"""
     if any(type(value) is not int or value <= 0 for value in (material_id, version_id)):
         raise DomainError("引用必须绑定有效的资料与版本编号")
     if not isinstance(block_id, str) or not block_id:
@@ -44,6 +45,11 @@ def stable_citation_id(material_id: int, version_id: int, block_id: str) -> str:
 
 @dataclass(frozen=True)
 class Citation:
+    """一条可回溯引用；ID 必须能由资料、版本与块重新算出，摘录长度必须等于范围。
+
+    ``excerpt`` 是原文切片，不是模型转述；只要位置或文字被改写，构造时就会拒绝。
+    """
+
     id: str
     material_id: int
     version_id: int
@@ -75,6 +81,7 @@ class Citation:
 
     @classmethod
     def from_candidate(cls, candidate: RetrievalCandidate) -> "Citation":
+        """只能从本次检索候选建立引用，不接受模型自造或候选集之外的编号。"""
         block = candidate.block
         return cls(
             id=stable_citation_id(candidate.material_id, block.version_id, block.id),
@@ -98,6 +105,8 @@ class Citation:
 
 @dataclass(frozen=True)
 class RevalidatedCitation:
+    """读取旧回答时重新核对后的引用状态；只有 VALID 才允许继续当作可验证依据。"""
+
     citation: Citation
     status: CitationStatus
 
@@ -172,6 +181,7 @@ def citation_to_dict(citation: Citation) -> dict:
 
 
 def citation_from_dict(data: object) -> Citation:
+    """从保存的快照重建引用；结构缺项或 ID/摘录不一致时抛领域错误，不返回半条引用。"""
     if not isinstance(data, dict) or not isinstance(data.get("location"), dict):
         raise DomainError("保存的引用结构无效")
     location = data["location"]

@@ -2,6 +2,7 @@
 
 W005：当前会话的空间解析收敛到应用层——API 依赖只调用这里的用例，
 不再直接操作 ORM 模型。默认空间的创建由仓储层配合数据库唯一约束保证并发安全。
+默认时区用于解释无偏移日期时间，用户可在设置中修改。
 """
 
 from campusflow.application.ports.repositories import Repositories, WorkspaceData

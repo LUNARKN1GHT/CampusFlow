@@ -28,18 +28,26 @@ from campusflow.infrastructure.index_manifests import SqlIndexManifests
 
 
 class SqlRetrievalCandidates:
+    """范围候选读取器：过滤条件全部进 SQL，排序与回答留给后续用例。
+
+    当前不使用近似最近邻查询：范围内的块全部取回后在应用层排序；向量列另有
+    余弦 HNSW 索引（Q004），本读取器不依赖该索引。
+    """
+
     def __init__(self, session: Session):
         self.session = session
 
     def collect(
         self, workspace_id: int, scope: RetrievalScope, profile_id: str
     ) -> ScopedCandidates:
+        """返回范围内的当前版本候选块；不可用版本单独记录，不混入候选。"""
         profile = SqlEmbeddingProfiles(self.session).get(profile_id)
         if profile is None:
             # 从未登记过该配置就不会有对应向量；返回空候选让回答层明确说“未发现”，
             # 而不是把“尚未索引/配置未使用过”误报成业务错误。
             return ScopedCandidates(workspace_id, scope, profile_id, (), ())
         if profile.dimensions != 1024:
+            # 索引与检索固定使用 1024 维配置；其他维度视为调用方配置错误。
             raise DomainError("检索必须使用已登记的 1024 维向量配置")
         newer = aliased(MaterialVersion)
         has_newer = (
@@ -67,6 +75,7 @@ class SqlRetrievalCandidates:
                 & (IndexManifest.workspace_id == workspace_id)
                 & (IndexManifest.profile_id == profile_id),
             )
+            # 只取当前版本：旧版本即使索引完整，也不再参与本次检索。
             .where(Material.workspace_id == workspace_id, Material.archived.is_(False), ~has_newer)
             .order_by(Material.id, MaterialVersion.id)
             # 与修改/删除共用资料行锁；所有资料按 ID 顺序锁定后再校验片段。
@@ -86,7 +95,10 @@ class SqlRetrievalCandidates:
         manifests = SqlIndexManifests(self.session)
         for material, version_id, version_no, manifest in self.session.execute(statement).all():
             try:
+                # summary 默认重算快照，确认来源与解析覆盖在读取时仍未变化。
                 progress = manifests.summary(workspace_id, manifest.id)
+                # 只读清单内且已完成的块，清单外的旧向量不得混入候选。
+                # 固定排序键让相同数据得到稳定候选顺序，便于复现排序与引用。
                 rows = self.session.scalars(
                     select(IndexedBlock)
                     .where(
@@ -106,6 +118,7 @@ class SqlRetrievalCandidates:
                 current = []
                 for row in rows:
                     source = manifests.blocks._source(workspace_id, row.source_chunk_id)
+                    # 逐块复核原文指纹、偏移与向量配置；不符时排除整个版本。
                     block = RetrievalBlock(
                         row.block_id,
                         row.source_chunk_id,

@@ -64,6 +64,7 @@ RELATION_SPEC = ExtractionSpec(
 )
 
 _TERM_PATTERNS = (
+    # 把常见学期表述归一化为季节；无法命中时保留未知，不按课程顺序推断。
     (re.compile(r"秋|秋季|上学期|第\s*1\s*学期|第一学期|fall|autumn", re.IGNORECASE), "fall"),
     (re.compile(r"春|春季|下学期|第\s*2\s*学期|第二学期|spring", re.IGNORECASE), "spring"),
     (re.compile(r"夏|暑期|夏季|summer", re.IGNORECASE), "summer"),
@@ -90,6 +91,7 @@ def _evidence_texts(field: CandidateField, sources: dict[int, str]) -> list[str]
 def _check_course(
     draft: CandidateDraft, sources: dict[int, str], plan_course_names: set[str]
 ) -> CandidateDraft:
+    """校验课程字段证据与学分，并把开课说明归一化为季节列表（仍待核对）。"""
     by_name = {field.name: field for field in draft.fields}
     generated: list[ReviewReason] = [
         ReviewReason(
@@ -112,8 +114,10 @@ def _check_course(
     if not any(name_field.value in text for text in _evidence_texts(name_field, sources)):
         raise InvalidModelOutput("课程名称必须逐字出现在证据中")
     credits = by_name["credits"].value
+    # 学分只接受非负数值；负数或非数字直接拒绝，不按常识补足。
     if credits is not None and (type(credits) not in (int, float) or credits < 0):
         raise InvalidModelOutput("学分必须是非负数")
+    # 方案内没有同名课不拒绝候选，而是提示确认后新建或先核对是否重复。
     if normalize_course_name(name_field.value) not in plan_course_names:
         generated.append(
             ReviewReason(
@@ -135,6 +139,7 @@ def _check_course(
                 )
             )
         else:
+            # 派生季节标为 inferred，证据沿用原文说明，确认后才会用于学期试排。
             fields.append(
                 CandidateField(
                     "offered_terms",
@@ -157,6 +162,7 @@ def _check_course(
 
 
 def _normalize_relation_type(value: object) -> RelationType:
+    """只接受可解释为三类关系之一的原文；无法判定时拒绝，不按顺序猜测。"""
     if not isinstance(value, str):
         raise InvalidModelOutput("关系类型必须是原文文本")
     relation = parse_relation_type_text(value)
@@ -168,6 +174,7 @@ def _normalize_relation_type(value: object) -> RelationType:
 def _check_relation(
     draft: CandidateDraft, sources: dict[int, str], plan_course_names: set[str]
 ) -> CandidateDraft:
+    """校验两端课程逐字来自证据；方案内无同名课程时只标注，正式依赖另行转换。"""
     by_name = {field.name: field for field in draft.fields}
     generated: list[ReviewReason] = [
         ReviewReason(
@@ -185,6 +192,7 @@ def _check_relation(
         if not _evidence_texts(field, sources):
             raise InvalidModelOutput("关系字段必须保留自身证据中的原文")
     _normalize_relation_type(by_name["relation_type"].value)
+    # 这里只校验类型可解释；候选仍保留原文，正式关系在转换用例中写入。
     for name in ("from_course_name", "to_course_name"):
         value = by_name[name].value
         if not isinstance(value, str) or not any(
@@ -218,7 +226,10 @@ def extract_curriculum_drafts(
     include_courses: bool = True,
     include_relations: bool = True,
 ) -> list[CandidateDraft]:
-    """先授权后生成；返回尚未保存的课程与关系候选。"""
+    """先授权后生成；返回尚未保存的课程与关系候选。
+
+    至少选择一种类型；方案归属先校验，资料与版本由生成入口再校验。
+    """
     get_plan(repos, workspace_id, plan_id)
     if not include_courses and not include_relations:
         raise DomainError("至少选择一种提取类型")
@@ -226,6 +237,7 @@ def extract_curriculum_drafts(
         chunk.id: chunk.text
         for chunk in list_version_chunks(repos, workspace_id, material_id, version_no)
     }
+    # 同名判断使用标准化名称，仅用于提示方案内是否已有课程，不自动绑定。
     plan_names = {
         normalize_course_name(course.name) for course in repos.paths.list_courses(plan_id)
     }

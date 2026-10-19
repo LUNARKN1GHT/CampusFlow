@@ -21,6 +21,11 @@ from campusflow.domain.states import (
 
 
 class UnitOfWork(Protocol):
+    """事务边界由用例控制；仓储方法只 flush，不隐式提交。
+
+    业务步骤全部成功后才 commit；异常路径由调用方 rollback，避免半成品写库。
+    """
+
     def commit(self) -> None: ...
 
     def rollback(self) -> None: ...
@@ -138,7 +143,11 @@ class CourseStudyRecordData:
 
 
 class CoursePathRepository(Protocol):
-    """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。"""
+    """C002 起：培养方案与个人方案；E81 的关系分析复用同一仓储边界。
+
+    只按 ID 读取的方法不带空间条件，调用方必须校验 workspace_id；
+    删除只返回是否命中，关联影响预览与失效处理由用例完成。
+    """
 
     def list_plans(self, workspace_id: int) -> list[CurriculumPlanData]: ...
 
@@ -524,6 +533,11 @@ class ProcessingJobAttemptData:
 
 
 class JobRepository(Protocol):
+    """后台作业状态；同样只 flush，队列消息只是通知，数据库才是事实来源。
+
+    只按 ID 读取的方法由调用方校验空间归属；claim 是防止重复执行的关键原子入口。
+    """
+
     def create(
         self, workspace_id: int, material_id: int, version_id: int, stage: str
     ) -> ProcessingJobData: ...
@@ -629,9 +643,13 @@ class JobRepository(Protocol):
 
 
 class SemesterRepository(Protocol):
+    """学期；归档只切换标记，不删除或改写关联课程、任务与日程。"""
+
     def list(self, workspace_id: int, *, include_archived: bool = False) -> list[SemesterData]: ...
 
-    def get(self, semester_id: int) -> SemesterData | None: ...
+    def get(self, semester_id: int) -> SemesterData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
 
     def create(
         self, workspace_id: int, name: str, start_date: date, end_date: date
@@ -641,6 +659,8 @@ class SemesterRepository(Protocol):
 
 
 class WorkspaceRepository(Protocol):
+    """工作空间与个人容量/时区设置；默认空间全库最多一个。"""
+
     def get(self, workspace_id: int) -> WorkspaceData | None: ...
 
     def get_or_create_default(self, name: str, timezone: str) -> WorkspaceData:
@@ -660,9 +680,13 @@ class WorkspaceRepository(Protocol):
 
 
 class CourseRepository(Protocol):
+    """课程；学期归档不改变查询结果，历史课程仍可读取。"""
+
     def list(self, workspace_id: int, semester_id: int | None = None) -> list[CourseData]: ...
 
-    def get(self, course_id: int) -> CourseData | None: ...
+    def get(self, course_id: int) -> CourseData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
 
     def create(
         self,
@@ -687,6 +711,12 @@ class CourseRepository(Protocol):
 
 
 class TaskRepository(Protocol):
+    """任务、进度历史与依赖；只按 ID 的读取由用例校验空间归属。
+
+    删除任务会级联清理进度历史与依赖，其它关联按外键规则置空；
+    来源失效需要显式留痕，不能只置空来源字段。
+    """
+
     def list(
         self,
         workspace_id: int,
@@ -738,7 +768,9 @@ class TaskRepository(Protocol):
 
     def set_progress(
         self, task_id: int, progress: TaskProgress, reason: str | None
-    ) -> TaskData | None: ...
+    ) -> TaskData | None:
+        """更新执行进度并追加变更历史；逾期由时间与完成情况派生，不写进进度。"""
+        ...
 
     def list_by_source_material(self, material_id: int) -> list[TaskData]: ...
 
@@ -779,9 +811,19 @@ class TaskRepository(Protocol):
 
 
 class MaterialRepository(Protocol):
-    def get(self, material_id: int) -> MaterialData | None: ...
+    """资料、版本与片段；只按 ID 的读取由调用方校验空间归属。
 
-    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool: ...
+    删除资料会级联删除版本与片段，但关联任务、规则、候选的失效处理由用例完成；
+    归档只改标记，已归档资料不参与检索。
+    """
+
+    def get(self, material_id: int) -> MaterialData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
+
+    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
+        """删除前锁资料行并确认空间归属，避免与解析/索引写回并发。"""
+        ...
 
     def version_relation_ids(self, material_id: int) -> list[int]: ...
 
@@ -880,11 +922,15 @@ class MaterialRepository(Protocol):
 
 
 class ScheduleRepository(Protocol):
+    """固定日程与每周可用时间；只按 ID 的读取由调用方校验空间归属。"""
+
     def list_fixed_events(
         self, workspace_id: int, *, semester_id: int | None = None
     ) -> list[FixedEventData]: ...
 
-    def get_fixed_event(self, event_id: int) -> FixedEventData | None: ...
+    def get_fixed_event(self, event_id: int) -> FixedEventData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
 
     def get_fixed_event_by_source_candidate(self, candidate_id: int) -> FixedEventData | None:
         """按来源候选查已转换的固定日程（R005 幂等）。"""
@@ -939,6 +985,8 @@ class ScheduleRepository(Protocol):
 
 
 class RuleRepository(Protocol):
+    """课程规则；来源候选唯一，重复转换返回既有规则而不是新建。"""
+
     def create(
         self,
         workspace_id: int,
@@ -1031,6 +1079,11 @@ class PlanDraftData:
 
 
 class PlanRepository(Protocol):
+    """计划草案、时间块与版本历史；同一空间/学期最多一份已接受计划。
+
+    草案与当前计划分离：生成与局部重排不改当前计划，接受时才切换状态。
+    """
+
     def create_draft(
         self,
         workspace_id: int,
@@ -1047,7 +1100,9 @@ class PlanRepository(Protocol):
         coverage: dict,
     ) -> PlanDraftData: ...
 
-    def get_draft(self, draft_id: int) -> PlanDraftData | None: ...
+    def get_draft(self, draft_id: int) -> PlanDraftData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
 
     def list_drafts(
         self, workspace_id: int, *, semester_id: int | None = None
@@ -1095,7 +1150,9 @@ class PlanRepository(Protocol):
 
     def supersede_others(
         self, workspace_id: int, *, semester_id: int | None, keep_draft_id: int
-    ) -> None: ...
+    ) -> None:
+        """接受新计划时把同范围其他已接受计划标为被替代，保留历史可查。"""
+        ...
 
     def add_version(
         self, draft_id: int, *, version_no: int, change: str, snapshot: dict
@@ -1137,13 +1194,21 @@ class ReminderTriggerData:
 
 
 class ReminderRepository(Protocol):
+    """提醒规则与触发记录；触发按 dedupe_key 幂等，读取时同步、无独立推送进程。"""
+
     def list_rules(self, workspace_id: int) -> list[ReminderRuleData]: ...
 
-    def get_rule(self, rule_id: int) -> ReminderRuleData | None: ...
+    def get_rule(self, rule_id: int) -> ReminderRuleData | None:
+        """只按 ID 读取；调用方必须自行校验空间归属。"""
+        ...
 
-    def get_task_rule(self, workspace_id: int, task_id: int) -> ReminderRuleData | None: ...
+    def get_task_rule(self, workspace_id: int, task_id: int) -> ReminderRuleData | None:
+        """没有任务级规则时返回 None，由调用方回退到默认规则。"""
+        ...
 
-    def get_default_rule(self, workspace_id: int) -> ReminderRuleData | None: ...
+    def get_default_rule(self, workspace_id: int) -> ReminderRuleData | None:
+        """尚未保存默认规则时返回 None，由调用方使用内置默认值。"""
+        ...
 
     def create_rule(
         self,

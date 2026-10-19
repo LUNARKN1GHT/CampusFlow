@@ -1,4 +1,8 @@
-"""N004：只使用标准库、固定已检查 IP 的有界网页抓取。"""
+"""N004：只使用标准库、固定已检查 IP 的有界网页抓取。
+
+只有显式调用才联网：逐跳校验并固定公网地址（防 SSRF），限制正文大小
+与整条链路的总等待时间；不执行脚本、不登录、不携带 Cookie 或代理。
+"""
 
 from __future__ import annotations
 
@@ -26,6 +30,8 @@ _SPECIAL_NETWORKS = tuple(
 
 @dataclass(frozen=True)
 class FetchLimits:
+    """单次抓取上限：正文字节数、跳转次数，以及解析、连接、读取共用的总等待秒数。"""
+
     max_bytes: int = 2 * 1024 * 1024
     max_redirects: int = 3
     timeout_seconds: float = 15.0
@@ -44,6 +50,8 @@ class FetchLimits:
 
 @dataclass(frozen=True)
 class _Target:
+    """规范化目标：协议、IDNA 后的小写主机、默认端口，以及已编码的 path+query。"""
+
     url: str
     scheme: str
     host: str
@@ -52,6 +60,8 @@ class _Target:
 
 
 def _target(url: str) -> _Target:
+    """把用户输入规范化为可比较的抓取目标；凭据、非默认端口与控制字符一律拒绝。"""
+
     if (
         not isinstance(url, str)
         or not url
@@ -70,15 +80,20 @@ def _target(url: str) -> _Target:
             or "%" in parts.hostname
         ):
             raise ValueError
+        # 主机名转 ASCII（IDNA）并去掉结尾点，保证同一主机只有一种可比较写法。
         host = parts.hostname.rstrip(".").encode("idna").decode("ascii").lower()
         port = parts.port if parts.port is not None else (443 if parts.scheme == "https" else 80)
+        # 只允许协议默认端口，避免把抓取器当成任意端口探测器。
         if port != (443 if parts.scheme == "https" else 80):
             raise ValueError
+        # 本机与内网后缀直接拒绝，不交给 DNS 解析。
         if not host or host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
             raise WebFetchError("blocked_address", "不能读取本机或内网网址")
         authority = f"[{host}]" if ":" in host else host
+        # 保留已有百分号编码（safe 含 %），避免把 %20 二次编码成 %2520。
         path = quote(parts.path or "/", safe="/%:@!$&'()*+,;=-._~")
         query = quote(parts.query, safe="/%?:@!$&'()*+,;=-._~")
+        # 丢弃 #片段：片段不会发往服务器，也不参与跳转循环判断。
         canonical = urlunsplit((parts.scheme, authority, path, query, ""))
         return _Target(canonical, parts.scheme, host, port, path + (f"?{query}" if query else ""))
     except (ValueError, UnicodeError) as exc:
@@ -90,10 +105,13 @@ def _target(url: str) -> _Target:
 
 
 def _check_address(address: str) -> None:
+    """要求地址是公网单播；字面 IP 与 DNS 结果共用本检查，混合公私网答案整体拒绝。"""
+
     try:
         ip = ipaddress.ip_address(address)
     except ValueError:
         raise WebFetchError("blocked_address", "网址未解析到可验证的公网地址") from None
+    # is_global 之外再排除协议保留段（含 6to4、Teredo、192.0.0.0/24 等）。
     if (
         not ip.is_global
         or ip.is_multicast
@@ -106,6 +124,8 @@ def _check_address(address: str) -> None:
 
 
 class _Request:
+    """一次抓取的共享截止时间；取消或超时后关闭 socket，阻断后台线程继续读写。"""
+
     def __init__(self, timeout: float):
         self.deadline = time.monotonic() + timeout
         self.cancelled = threading.Event()
@@ -113,12 +133,16 @@ class _Request:
         self.sock: socket.socket | None = None
 
     def remaining(self) -> float:
+        """返回距总截止时间的剩余秒数；已取消或已超时即抛 timeout。"""
+
         remaining = self.deadline - time.monotonic()
         if self.cancelled.is_set() or remaining <= 0:
             raise WebFetchError("timeout", "网页读取超时，请稍后重试或粘贴原文")
         return remaining
 
     def track(self, sock: socket.socket) -> None:
+        """登记当前 socket；若抓取已被取消则立即关闭并抛 timeout。"""
+
         with self.lock:
             if self.cancelled.is_set():
                 sock.close()
@@ -126,6 +150,8 @@ class _Request:
             self.sock = sock
 
     def abort(self) -> None:
+        """取消抓取并关闭已登记 socket；可从其它线程调用，用于打断阻塞的读取。"""
+
         with self.lock:
             self.cancelled.set()
             if self.sock is not None:
@@ -137,6 +163,8 @@ class _Request:
 
 
 class _PinnedConnection(http.client.HTTPConnection):
+    """连接已验证 DNS 结果的 socket；TLS 仍按原始主机名校验证书，不再查 DNS。"""
+
     def __init__(self, target: _Target, address: tuple, request: _Request):
         super().__init__(target.host, target.port, timeout=request.remaining())
         self.target = target
@@ -153,6 +181,7 @@ class _PinnedConnection(http.client.HTTPConnection):
         # sockaddr 来自已验证的 DNS 结果；这里绝不能再用域名调用 create_connection。
         sock.connect(sockaddr)
         if self.target.scheme == "https":
+            # 连接的是 IP，但证书仍按用户访问的主机名校验，验证失败不降级。
             context = ssl.create_default_context()
             sock = context.wrap_socket(
                 sock, server_hostname=self.target.host, do_handshake_on_connect=False
@@ -164,6 +193,8 @@ class _PinnedConnection(http.client.HTTPConnection):
 
 
 def _resolve(target: _Target, request: _Request) -> list[tuple]:
+    """解析主机并逐项检查；任一结果不是公网单播地址就拒绝整个目标。"""
+
     # 字面 IP 也先检查，避免将明显内网地址交给解析器。
     try:
         ipaddress.ip_address(target.host)
@@ -172,6 +203,7 @@ def _resolve(target: _Target, request: _Request) -> list[tuple]:
     else:
         _check_address(target.host)
     request.remaining()
+    # getaddrinfo 不可取消：调用前后都核对截止时间，超时后不再使用其结果。
     addresses = socket.getaddrinfo(target.host, target.port, type=socket.SOCK_STREAM)
     request.remaining()
     if not addresses:
@@ -180,19 +212,26 @@ def _resolve(target: _Target, request: _Request) -> list[tuple]:
         if family not in {socket.AF_INET, socket.AF_INET6} or socktype != socket.SOCK_STREAM:
             raise WebFetchError("blocked_address", "网址未解析到可验证的公网地址")
         _check_address(sockaddr[0])
+        # 带区域标识（如 %eth0）的 IPv6 只在本机链路有效，不能作为公网来源。
         if family == socket.AF_INET6 and sockaddr[3] != 0:
             raise WebFetchError("blocked_address", "不能读取带本地区域标识的地址")
     return addresses
 
 
 class PublicWebFetcher:
-    """显式调用才联网；无代理、Cookie、凭据、自动爬取或自动重试。"""
+    """显式调用才联网；无代理、Cookie、凭据、自动爬取或自动重试。
+
+    每一次跳转都重新解析并校验地址，整条链路共用同一个截止时间。
+    """
 
     def __init__(self, limits: FetchLimits | None = None):
         self.limits = limits or FetchLimits()
 
     def fetch(self, requested_url: str) -> FetchedWebPage:
+        """抓取一个公开网页；解析、连接与读取共用一个截止时间，可预期失败转为 WebFetchError。"""
+
         target = _target(requested_url)
+        # 非阻塞占用并发槽：容量用尽立即返回 busy，不排队拖住请求线程。
         if not _SLOTS.acquire(blocking=False):
             raise WebFetchError("busy", "网页读取繁忙，请稍后重试")
         request = _Request(self.limits.timeout_seconds)
@@ -213,6 +252,7 @@ class PublicWebFetcher:
                 request.abort()
                 _SLOTS.release()
 
+        # DNS 调用无法取消，放到守护线程执行；主线程只等到总截止时间。
         worker = threading.Thread(target=run, name="public-web-fetch", daemon=True)
         try:
             worker.start()
@@ -227,16 +267,21 @@ class PublicWebFetcher:
             request.abort()
 
     def _fetch(self, initial: _Target, request: _Request) -> FetchedWebPage:
+        """按跳抓取：每跳重新解析并固定地址，跳转不能进入私网、越出 HTTP/HTTPS 或循环。"""
+
         target = initial
         visited: set[str] = set()
         for hop in range(self.limits.max_redirects + 1):
             request.remaining()
+            # 同一链路内重复 URL 视为跳转循环，直接拒绝而不是再次请求。
             if target.url in visited:
                 raise WebFetchError("redirect_limit", "网页跳转循环，请使用最终公开网址")
             visited.add(target.url)
             addresses = _resolve(target, request)
+            # 只连接首个已验证地址：不再按域名解析，避免 DNS 重绑定到内网。
             connection = _PinnedConnection(target, addresses[0], request)
             try:
+                # 固定请求头：不发送 Cookie/Authorization，也不接受压缩编码。
                 connection.request(
                     "GET",
                     target.path,
@@ -261,6 +306,7 @@ class PublicWebFetcher:
                     target = _target(urljoin(target.url, location))
                     continue
                 if response.status in {401, 403}:
+                    # 需要登录的页面不是公开通知，直接提示改用文件或粘贴原文。
                     raise WebFetchError(
                         "access_denied", "网页需要登录或拒绝访问，请上传文件或粘贴原文"
                     )
@@ -275,6 +321,7 @@ class PublicWebFetcher:
                     )
                 lengths = response.headers.get_all("Content-Length", [])
                 if lengths:
+                    # 声明长度必须唯一且可解析；实际读取也会限长，二者不一致即失败。
                     if len(lengths) != 1 or not lengths[0].isascii() or not lengths[0].isdigit():
                         raise WebFetchError("invalid_response", "网页响应长度无效")
                     if int(lengths[0]) > self.limits.max_bytes:
@@ -284,6 +331,7 @@ class PublicWebFetcher:
                 body = bytearray()
                 while True:
                     request.remaining()
+                    # 多读 1 字节足以判定超限，不会把超大响应整体读进内存。
                     chunk = response.read1(min(65536, self.limits.max_bytes + 1 - len(body)))
                     if not chunk:
                         break
@@ -295,6 +343,8 @@ class PublicWebFetcher:
                 if lengths and len(body) != int(lengths[0]):
                     raise WebFetchError("invalid_response", "网页内容传输不完整，请重试")
                 request.remaining()
+                # requested_url 保留用户输入，final_url 记录跳转后的实际地址；
+                # 抓取时间由调用方另行记录，不能当作网页发布时间。
                 return FetchedWebPage(
                     initial.url,
                     target.url,

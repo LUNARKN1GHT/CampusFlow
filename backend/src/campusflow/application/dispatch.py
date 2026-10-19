@@ -7,6 +7,7 @@
 - 事务回滚（未提交）的资料不会有投递，Worker 不可能处理到未提交数据。
 
 投递失败不抛异常：记录保持待投递，由补偿扫描（J004）重投，不影响建档结果。
+投递只负责入队，作业执行与结果记录由 Worker 负责。
 """
 
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ def dispatch_job(repos: Repositories, queue: JobQueue, job_id: int) -> bool:
     """按阶段投递单个作业（Q004）。
 
     成功登记 enqueued_at；队列不可用时只累加尝试次数并保留待投递记录，返回 False。
-    未知阶段不投递：队列里不应出现没有任何 Worker 能执行的作业。
+    没有对应 Worker 入口的阶段不投递，直接记为不可重试失败。
     """
     job = repos.jobs.get(job_id)
     if job is None:
@@ -41,6 +42,7 @@ def dispatch_job(repos: Repositories, queue: JobQueue, job_id: int) -> bool:
     elif job.stage == JobStage.EMBED:
         enqueue = queue.enqueue_index
     else:
+        # 目前只有解析与索引阶段有 Worker 入口；其余阶段没有可执行处理器，标记为不可重试。
         repos.jobs.record_attempt(
             job_id,
             status=JobStatus.FAILED,
@@ -85,6 +87,7 @@ def dispatch_pending_jobs(
     else:
         targets = job_ids
     delivered = failed = 0
+    # 逐个作业投递并各自提交，单个失败不影响其它作业的投递结果。
     for job_id in targets:
         if dispatch_job(repos, queue, job_id):
             delivered += 1

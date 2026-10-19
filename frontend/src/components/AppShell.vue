@@ -1,10 +1,12 @@
 <script setup lang="ts">
+// 受保护页面主布局：侧边导航＋顶栏；导航只列已实现入口，未开放能力不显示为可点击项。
 import { useRouter } from 'vue-router'
 
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
 const { state, logout } = useAuth()
+// active-class 置空、只用 exact-active-class：子路径页不会同时高亮父级入口。
 const availableItems = [
   { label: '总览', to: '/' },
   { label: '课程', to: '/courses' },
@@ -24,6 +26,7 @@ const availableItems = [
 const futureItems: string[] = []
 
 async function signOut() {
+  // logout 即使请求失败也会清空本地会话；replace 避免回退到受保护页面。
   await logout()
   await router.replace('/login')
 }

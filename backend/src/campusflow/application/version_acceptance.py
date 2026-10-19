@@ -1,4 +1,8 @@
-"""N014：用户接受字段差异，事务内标记旧候选失效并保存证据历史。"""
+"""N014：用户接受字段差异，事务内标记旧候选失效并保存证据历史。
+
+接受必须由用户显式选字段并填写原因；不会自动接受整份新版本。判定为
+冲突或需核对时还要显式确认。同一组字段重复提交返回既有记录，不重复写。
+"""
 
 from dataclasses import dataclass
 
@@ -55,6 +59,12 @@ def accept_change(
     operator: str,
     acknowledge_conflict: bool = False,
 ) -> AcceptanceResult:
+    """接受用户选定的字段差异，并把旧候选标记为已失效。
+
+    字段必须确实出现在差异中且确有变化；判定为 conflict/requires_review 时
+    需要显式确认。写入事务内锁工作空间、更新状态、保存逐字段证据快照并
+    重算提醒，任一步失败整体回滚。
+    """
     if not field_names:
         raise DomainError("请选择要接受的字段差异")
     if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1000:
@@ -71,6 +81,7 @@ def accept_change(
     unchanged = [name for name in names if by_name[name].status is DiffStatus.UNCHANGED]
     if unchanged:
         raise DomainError("以下字段没有变化，无需接受：" + "、".join(unchanged))
+    # 非 applicable 时不能静默接受：先展示判定原因，由用户显式确认冲突。
     if applicability.status != "applicable" and not acknowledge_conflict:
         reasons = "；".join(item.message for item in applicability.reasons)
         raise DomainError(f"当前版本判定为{applicability.status}：{reasons}；请核对后显式确认冲突")
@@ -78,6 +89,7 @@ def accept_change(
     existing = store.find_acceptance(
         workspace_id, baseline_candidate_id, comparison_candidate_id, names
     )
+    # 幂等键是“基准候选 + 新候选 + 字段集合”，字段顺序不影响；重复提交不重写。
     if existing is not None:
         return AcceptanceResult(existing, False, existing.previous_review_status)
 
@@ -101,6 +113,7 @@ def accept_change(
         for name in names
     )
     try:
+        # 先锁工作空间再写状态与历史，避免并发接受产生两套有效记录。
         store.lock_workspace(workspace_id)
         repos.candidates.set_review_status(workspace_id, baseline_candidate_id, change)
         record = store.create_acceptance(

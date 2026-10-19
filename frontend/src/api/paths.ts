@@ -1,3 +1,6 @@
+// 课程路径：培养方案版本、课程与三类关系、别名、修读记录，以及图／顺序／下一步／学期试排分析。
+// 分析接口都是只读计算结果，不落库；缺规则时返回 limitations 而不是伪造结论。
+
 import { apiRequest } from './client'
 import type {
   AliasResolution,
@@ -59,6 +62,7 @@ export const pathsApi = {
   profile: () => apiRequest<LearnerProfile>('/learning-profile'),
   updateProfile: (input: { major: string | null; grade_year: number | null; curriculum_plan_id: number | null }) =>
     apiRequest<LearnerProfile>('/learning-profile', { method: 'PUT', body: JSON.stringify(input) }),
+  // 切换培养方案前的影响预览（关联数、课程数、修读记录数），不写库；确认仍走 updateProfile。
   switchPreview: (planId: number) =>
     apiRequest<SwitchPreview>(`/learning-profile/switch-preview${queryString({ plan_id: planId })}`),
   listCourses: (planId: number) =>
@@ -81,6 +85,7 @@ export const pathsApi = {
     apiRequest<CourseAlias>(`/curriculum-plans/${planId}/aliases`, { method: 'POST', body: JSON.stringify(input) }),
   deleteAlias: (planId: number, aliasId: number) =>
     apiRequest<void>(`/curriculum-plans/${planId}/aliases/${aliasId}`, { method: 'DELETE' }),
+  // 严格按名称／别名匹配指定学期与教学班，不做模糊猜测；结果只是建议，不改动原适用范围。
   resolveAlias: (planId: number, name: string, scope: { semesterId?: number | null; className?: string | null } = {}) =>
     apiRequest<AliasResolution>(`/curriculum-plans/${planId}/aliases/resolve${queryString({ name, semester_id: scope.semesterId, class_name: scope.className })}`),
   listStudyRecords: (planId: number) =>
@@ -93,12 +98,16 @@ export const pathsApi = {
     apiRequest<void>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'DELETE' }),
   studyStatus: (planId: number) =>
     apiRequest<CourseStudyStatusSummary>(`/curriculum-plans/${planId}/study-status`),
+  // 只读图：节点、三类边与证据，并单列成环／矛盾／缺项／待核对问题。
   graph: (planId: number) =>
     apiRequest<CourseGraph>(`/curriculum-plans/${planId}/graph`),
+  // 只对强制先修分层；成环或缺项时 blocked=true，不返回伪造的完整顺序。
   order: (planId: number) =>
     apiRequest<CourseOrder>(`/curriculum-plans/${planId}/order`),
+  // 区分未满足条件与不阻塞的建议先学，建议项不视为硬性门槛。
   nextCourses: (planId: number) =>
     apiRequest<NextCourses>(`/curriculum-plans/${planId}/next`),
+  // POST 只为传结构化参数，不保存排课结果；固定声明不构成选课或毕业审核。
   semesterPlan: (planId: number, input: SemesterPlanInput) =>
     apiRequest<SemesterPlan>(`/curriculum-plans/${planId}/semester-plan`, {
       method: 'POST',

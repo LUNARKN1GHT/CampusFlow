@@ -1,4 +1,7 @@
-"""X003：任务原文字段提取、耗时建议与截止信息完整性检查。"""
+"""X003：任务原文字段提取、耗时建议与截止信息完整性检查。
+
+所有字段保留原文摘录；缺失字段记录原因，不补年份、时刻或时区。
+"""
 
 from dataclasses import replace
 
@@ -65,7 +68,9 @@ def check_task_fields(draft: CandidateDraft) -> CandidateDraft:
             generated.append(reason)
         elif not any(field.value in evidence.quote for evidence in field.evidence):
             raise InvalidModelOutput("任务字段必须保留自身证据中的原文，不接受补写或改写")
+    # TASK_SPEC 将 due_text 定义为必填，缺失已在 X002 结构校验阶段拒绝。
     due_text = next(field.value for field in draft.fields if field.name == "due_text")
+    # 完整性检查只标注待核对原因，不换算日期或构造截止时间。
     generated.extend(deadline_review_reasons(due_text))
     keys = {(r.code, r.field) for r in generated}
     reasons = generated + [r for r in draft.review_reasons if (r.code, r.field) not in keys]

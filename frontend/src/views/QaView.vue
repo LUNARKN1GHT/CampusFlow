@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 智能问答页：按学期／课程／教学班确定检索范围，创建或续用会话提问，并分开展示回答、引用与覆盖提示。
+ * 流程：选择范围 → 提问（无会话时新建，范围变更时先显式切换）→ 每轮保存范围与引用快照 → 打开引用定位资料库原文。
+ * 约束：范围由服务端再次校验；旧轮次引用按当前来源状态重新核对，失效引用不可点击，也不计为可验证依据。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -52,6 +57,7 @@ const invalidCitationCount = computed(() =>
     0,
   ),
 )
+// 会话创建时绑定范围；筛选被改动后必须显式切换范围，避免追问把不同学期／课程的依据混在一起。
 const scopeChanged = computed(() => {
   if (!conversation.value) return false
   return (
@@ -79,6 +85,7 @@ async function loadOptions() {
   }
 }
 
+// 读取会话详情时后端会重新核对每轮引用；已失效引用仍随轮次返回，只是不能再跳转到原文。
 async function loadConversation(id: number) {
   loading.value = true
   error.value = ''
@@ -130,10 +137,12 @@ async function ask() {
       conversation.value = await qaApi.createConversation(currentScope.value, mode.value)
       conversations.value.unshift(conversation.value)
     } else if (scopeChanged.value) {
+      // 先切换会话范围再提问；切换只影响后续追问，旧回答仍保留各自的范围快照。
       conversation.value = await qaApi.switchScope(conversation.value.id, currentScope.value)
     }
     await qaApi.sendMessage(conversation.value.id, question.value.trim())
     question.value = ''
+    // 丢弃发送响应，重新读取会话，确保引用状态、覆盖提示与冲突数量是最新快照。
     await loadConversation(conversation.value.id)
   } catch (cause) {
     error.value = errorMessage(cause)
@@ -142,6 +151,7 @@ async function ask() {
   }
 }
 
+// 失效引用没有可验证的原文位置，禁止跳转到资料库，避免把旧摘录当成当前内容。
 function openCitation(citation: QaCitation) {
   if (!citation.valid) return
   router.push({
@@ -222,6 +232,7 @@ onMounted(loadOptions)
       <p class="form-help">范围由服务端再次校验；未标清所选范围的资料不会参与回答。切换范围只影响后续追问，旧回答仍标记原范围。</p>
     </section>
 
+    <!-- 旧轮次引用会因来源删除、归档或换版而失效；这里只提示，不改写历史回答。 -->
     <section v-if="invalidCitationCount" class="panel warning-panel" role="status">
       <strong>有 {{ invalidCitationCount }} 条旧引用已失效</strong>
       <p>来源可能已删除、归档或产生新版本，不能再作为可验证依据。请重新检索，或到资料库补充资料。</p>
@@ -256,6 +267,7 @@ onMounted(loadOptions)
             <span class="status-pill">{{ turn.intent }}</span>
           </header>
 
+          <!-- insufficient 表示当前范围没有可用依据，只能说明“未发现”；不能据此推断“没有作业／没有冲突”。 -->
           <div v-if="turn.insufficient" class="qa-empty" role="status">
             <strong>现有资料中未发现足以回答的依据</strong>
             <p>{{ turn.answer }}</p>
@@ -267,6 +279,7 @@ onMounted(loadOptions)
           </div>
           <p v-else class="qa-answer">{{ turn.answer }}</p>
 
+          <!-- 覆盖提示区分部分覆盖、索引不可用与尚未索引；部分识别失败必须对用户可见。 -->
           <ul v-if="turn.coverage.length" class="notice-list">
             <li v-for="notice in turn.coverage" :key="`${notice.kind}-${notice.material_id}`" class="notice-item" :data-kind="notice.kind">
               <span class="status-pill" :data-status="notice.kind === 'partial' ? 'partial' : 'failed'">{{ coverageLabel(notice.kind) }}</span>
@@ -274,6 +287,7 @@ onMounted(loadOptions)
             </li>
           </ul>
 
+          <!-- 只有 valid 引用可点击定位；失效卡片保留展示原因，便于核对来源状态。 -->
           <div v-if="turn.citations.length" class="citation-grid">
             <button
               v-for="citation in turn.citations"

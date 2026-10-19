@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 开发环境连接检查页：只请求 /api/v1/health，展示 API 进程是否可访问。
+ * 健康检查只表示进程存活，不代表数据库就绪、业务草案可用或外部同步成功。
+ * 检查失败时提示按开发文档启动后端，可手动重新检查。
+ */
 import { computed, onMounted, ref } from 'vue'
 import { checkApiHealth } from '../api/health'
 
@@ -12,6 +17,7 @@ const statusText = computed(() => ({
 async function refresh() {
   state.value = 'checking'
   try {
+    // 校验返回的 status/service 字段；连接成功也仅说明 API 进程可达。
     await checkApiHealth()
     state.value = 'connected'
   } catch {

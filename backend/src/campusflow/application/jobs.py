@@ -1,8 +1,9 @@
-"""处理作业的运维用例（J005）。
+"""处理作业的运维用例（J005/Q004）：查询、超时回收、重投与恢复扫描。
 
 超时回收：Worker 进程崩溃、被强杀或卡死时，作业会一直停在"处理中"，
 前端就永远等不到终态。这里把超过阈值的处理中作业标记为可重试失败，
-让它回到可被重新投递的状态，而不是无限期停留。
+让它回到可被重新投递的状态，而不是无限期停留。索引作业按心跳判断超时，
+且不改写资料解析状态；自动重投只针对有额度剩余的索引作业。
 """
 
 import logging
@@ -53,6 +54,7 @@ def list_job_attempts(
 def list_material_jobs(
     repos: Repositories, workspace_id: int, material_id: int
 ) -> list[ProcessingJobData]:
+    """资料的处理作业列表：先校验空间归属，再按版本/创建时间倒序返回。"""
     material = repos.materials.get(material_id)
     if material is None:
         raise NotFoundError("资料不存在")
@@ -96,6 +98,7 @@ def reclaim_stale_jobs(
         )
         if job.stage == JobStage.PARSE:
             repos.materials.set_status(job.material_id, MaterialStatus.FAILED)
+        # 作业可能已被资料删除连带清掉，此时没有可回收的记录，跳过即可。
         if updated is not None:
             reclaimed.append(updated)
     repos.uow.commit()
@@ -123,7 +126,7 @@ def retry_auto_jobs(repos: Repositories, queue: JobQueue | None, *, max_auto_ret
     """自动重投索引作业（Q004），返回重投数量。
 
     `prepare_auto_retry` 用条件更新原子地"占用"一次自动重投额度，
-    并发的多个扫描进程不会把同一作业重投两次。
+    并发的多个扫描进程不会把同一作业重投两次；额度用尽后只保留人工重试入口。
     """
     count = 0
     for job in repos.jobs.list_auto_retryable(

@@ -10,5 +10,9 @@ from campusflow.domain.candidates import JsonValue
 
 
 def canonical_json(value: JsonValue) -> str:
-    """把已校验的字段取值转成可比较文本；调用方负责保证取值可序列化。"""
+    """把已校验的字段取值转成可比较文本；调用方负责保证取值可序列化。
+
+    只用于相等判断与内容指纹，不用于展示：键排序让语义相同的字典得到相同
+    文本，``allow_nan=False`` 让 NaN／Infinity 直接报错而不是留下不可比较值。
+    """
     return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)

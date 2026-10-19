@@ -1,3 +1,6 @@
+// 学习计划草案、接受、时间块移动／锁定、变化建议与局部重排。
+// 草案生成与重排都不改动当前已接受计划；接受、移动、锁定用 expected_version 做乐观并发控制，过期返回 409。
+
 import { apiRequest } from './client'
 
 export type PlanConstraint = {
@@ -52,6 +55,7 @@ export type PlanAssumption = {
 
 export type PlanConflict = {
   type: string
+  // conflict 是确定冲突（如固定日程重叠），risk 是基于耗时估计的风险。
   severity: 'conflict' | 'risk'
   message: string
   suggestion: string
@@ -74,6 +78,7 @@ export type PlanCoverage = {
   tasks_partial: number
   tasks_unscheduled: number
   tasks_excluded: number
+  // checks 为已执行的检查项，not_checked 为因字段缺失等原因未执行的检查，需在界面说明限制。
   checks: string[]
   not_checked: string[]
   notes: string[]
@@ -87,8 +92,10 @@ export type PlanDraft = {
   range_start: string
   range_end: string
   timezone: string
+  // draft 待接受、accepted 当前计划、superseded 已被后续计划替代。
   status: 'draft' | 'accepted' | 'superseded'
   version: number
+  // 排期输入指纹：用于变化检测与重排比对，不面向用户展示。
   input_fingerprint: string
   assumptions: PlanAssumption[]
   gaps: PlanGap[]
@@ -169,22 +176,26 @@ export type PlanOverview = {
   conflict_count: number
 }
 
+// 生成只产生新草案，不替换当前计划；时间不足时以未排入与缺口呈现，不做整空间回退。
 export const plansApi = {
   generate: (input: GeneratePlanInput = {}) =>
     apiRequest<PlanDraft>('/plans/drafts', { method: 'POST', body: JSON.stringify(input) }),
   list: (semesterId?: number) =>
     apiRequest<PlanDraft[]>(`/plans/drafts${semesterId ? `?semester_id=${semesterId}` : ''}`),
   get: (id: number) => apiRequest<PlanDraft>(`/plans/drafts/${id}`),
+  // 接受前校验版本与是否已有更新的已接受计划；返回 409 时需刷新后重新操作。
   accept: (id: number, expectedVersion: number) =>
     apiRequest<PlanDraft>(`/plans/drafts/${id}/accept`, {
       method: 'POST',
       body: JSON.stringify({ expected_version: expectedVersion }),
     }),
+  // 没有当前计划时返回 null，不自动生成。
   current: (semesterId?: number) =>
     apiRequest<PlanDraft | null>(`/plans/current${semesterId ? `?semester_id=${semesterId}` : ''}`),
   conflicts: (id: number) => apiRequest<PlanConflict[]>(`/plans/drafts/${id}/conflicts`),
   overview: (semesterId?: number) =>
     apiRequest<PlanOverview>(`/plans/overview${semesterId ? `?semester_id=${semesterId}` : ''}`),
+  // 只移动计划时间块，不改任务原始截止；版本过期时后端拒绝，调用方需重新加载草案再操作。
   moveBlock: (id: number, startsAt: string, endsAt: string, expectedVersion: number) =>
     apiRequest<PlanDraft>(`/plans/blocks/${id}`, {
       method: 'PATCH',
@@ -195,13 +206,16 @@ export const plansApi = {
       method: 'POST',
       body: JSON.stringify({ locked, expected_version: expectedVersion }),
     }),
+  // 只读变化检测：auto_applied=false，仅返回建议与受影响任务。
   adjustments: (semesterId?: number) =>
     apiRequest<AdjustmentSummary>(`/plans/adjustments${semesterId ? `?semester_id=${semesterId}` : ''}`),
+  // 仅在用户请求后生成待接受草案，接受前当前计划不变。
   createAdjustmentDraft: (input: RescheduleInput = {}) =>
     apiRequest<PlanDraft>('/plans/adjustments/draft', {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  // 保留锁定块与范围外时间块，只重排范围内未锁定任务；结果同样需要用户接受。
   reschedule: (input: RescheduleInput = {}) =>
     apiRequest<PlanDraft>('/plans/reschedule', {
       method: 'POST',

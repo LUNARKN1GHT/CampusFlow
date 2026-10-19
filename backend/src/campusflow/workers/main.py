@@ -28,7 +28,11 @@ from campusflow.workers.safe_worker import SafeWorker
 
 
 def build_parser_registry(settings: Settings, *, demo: bool = False) -> ParserRegistry:
-    """与真实 Worker 共用装配，避免各解析器只在独立测试中生效。"""
+    """与真实 Worker 共用装配，避免各解析器只在独立测试中生效。
+
+    演示模式只允许测试库并使用假视觉解析；真实模式缺密钥直接拒绝启动，
+    不会在没有模型配置时悄悄退回假识别。
+    """
     if demo:
         database = make_url(settings.database_url).database or ""
         if not database.endswith("_test"):
@@ -73,6 +77,8 @@ def main() -> None:
         )
     try:
         settings = Settings()
+        # 启动顺序：先注入模型与解析器装配，再连通 Redis，最后开始消费；
+        # 解析器或连接配置不成立时直接退出，不进入消费循环。
         if args.demo:
             _require_test_database(settings)
             set_embedder_factory(build_demo_embedder)
@@ -83,6 +89,7 @@ def main() -> None:
             settings.redis_url, socket_connect_timeout=3, socket_timeout=5
         )
         connection.ping()
+        # 同时消费解析与索引队列，按列表顺序取任务；burst 模式清空当前队列后退出。
         SafeWorker(
             [QUEUE_NAME, INDEX_QUEUE_NAME], connection=connection, log_job_description=False
         ).work(burst=args.burst)

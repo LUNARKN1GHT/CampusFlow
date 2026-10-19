@@ -21,6 +21,11 @@ from campusflow.domain.calendar import (
 
 
 class LocalCalendarProvider:
+    """进程内模拟供应商：无网络、无持久化，重启即清空。
+
+    幂等键与 etag 语义对齐 Google 适配器，但结果只用于验收，不代表真实同步。
+    """
+
     name = "local"
 
     def __init__(self) -> None:
@@ -31,9 +36,11 @@ class LocalCalendarProvider:
 
     # ---- 测试辅助：按调用顺序注入一次失败 ---------------------------------
     def fail_next(self, kind: str) -> None:
+        """按调用顺序排队注入一次故障，供验收覆盖未知、冲突与权限分支。"""
         self._failures.append(kind)
 
     def reset(self) -> None:
+        """清空模拟事件、幂等索引与待注入故障。"""
         self.events.clear()
         self.operation_index.clear()
         self._failures.clear()
@@ -61,9 +68,11 @@ class LocalCalendarProvider:
 
     # ---- 端口实现 ---------------------------------------------------------
     def authorization_url(self, *, state: str, redirect_uri: str) -> str:
+        """直接返回带 state 与固定授权码的回调地址，不跳转真实授权页。"""
         return f"{redirect_uri}?state={quote(state)}&code=student%40example.com"
 
     def exchange_code(self, *, code: str, redirect_uri: str) -> OAuthTokenSet:
+        """按邮箱构造固定令牌；以 error 开头的授权码模拟权限失败。"""
         if code.startswith("error"):
             raise CalendarProviderError(CalendarErrorCategory.PERMISSION)
         email = code if "@" in code else "student@example.com"
@@ -76,6 +85,7 @@ class LocalCalendarProvider:
         )
 
     def refresh(self, *, refresh_token: str) -> OAuthTokenSet:
+        """从本地刷新令牌还原邮箱，并续发一小时有效的访问令牌。"""
         email = refresh_token.removeprefix("local-refresh-")
         return OAuthTokenSet(
             access_token=f"local-access-{email}",
@@ -89,11 +99,13 @@ class LocalCalendarProvider:
         return None
 
     def ensure_calendar(self, *, access_token: str, timezone: str) -> str:
+        """固定返回本地日历标识，不创建真实日历。"""
         return "campusflow-local"
 
     def create_event(
         self, *, access_token: str, calendar_id: str, event: CalendarEventPayload
     ) -> ProviderEventResult:
+        """按 operation_key 幂等：重复创建返回既有事件并标记 existed。"""
         kind = self._maybe_fail(write=True)
         existing = self.operation_index.get(event.operation_key)
         if existing is not None:
@@ -116,6 +128,7 @@ class LocalCalendarProvider:
         }
         self.operation_index[event.operation_key] = external_id
         if kind == "unknown_after_write":
+            # 事件已保存但响应丢失：重试会命中幂等索引，对账应返回同一条。
             raise CalendarUnknownResult("模拟写入成功但响应丢失")
         return ProviderEventResult(external_event_id=external_id, etag=etag)
 
@@ -128,6 +141,7 @@ class LocalCalendarProvider:
         etag: str | None,
         event: CalendarEventPayload,
     ) -> ProviderEventResult:
+        """etag 不匹配时返回冲突，模拟供应商的乐观并发校验。"""
         kind = self._maybe_fail(write=True)
         row = self.events.get(external_event_id)
         if row is None:
@@ -149,6 +163,7 @@ class LocalCalendarProvider:
         )
         self.operation_index[event.operation_key] = external_event_id
         if kind == "unknown_after_write":
+            # 更新已生效但响应丢失：保留新 etag，对账可确认成功。
             raise CalendarUnknownResult("模拟更新成功但响应丢失")
         return ProviderEventResult(external_event_id=external_event_id, etag=new_etag)
 
@@ -160,6 +175,7 @@ class LocalCalendarProvider:
         external_event_id: str,
         etag: str | None,
     ) -> None:
+        """删除不存在的事件返回未找到；etag 不匹配返回冲突。"""
         kind = self._maybe_fail(write=True)
         row = self.events.get(external_event_id)
         if row is None:
@@ -168,11 +184,13 @@ class LocalCalendarProvider:
             raise CalendarProviderError(CalendarErrorCategory.CONFLICT)
         self.events.pop(external_event_id, None)
         if kind == "unknown_after_write":
+            # 删除已生效但响应丢失：对账查不到事件时应记为成功。
             raise CalendarUnknownResult("模拟删除成功但响应丢失")
 
     def find_event(
         self, *, access_token: str, calendar_id: str, operation_key: str
     ) -> ProviderEventResult | None:
+        """按 operation_key 查找已写入事件，模拟超时后的对账查询。"""
         external_id = self.operation_index.get(operation_key)
         if external_id is None or external_id not in self.events:
             return None

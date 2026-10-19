@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 登录页：提交本机单用户会话凭据，成功后返回 redirect 指定的站内路径。
+ * `expired=1` 由会话失效处理跳转而来，只提示“会话已失效”，不在此页展示任何私有页面数据。
+ * 约束：redirect 只接受以 / 开头的站内路径，防止被外部地址利用。
+ */
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -12,6 +17,7 @@ const username = ref('student')
 const password = ref('')
 const busy = ref(false)
 const error = ref('')
+// 401 时 api/client 派发会话失效事件并跳转 /login?expired=1；这里只负责提示。
 const expired = computed(() => route.query.expired === '1')
 
 async function submit() {
@@ -19,6 +25,7 @@ async function submit() {
   error.value = ''
   try {
     await login(username.value, password.value)
+    // 只接受站内绝对路径，避免开放重定向；没有合法 redirect 时回到总览。
     const redirect = typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
       ? route.query.redirect
       : '/'

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 资料库页：导入（粘贴文本／文件／公开网页）、按筛选查看处理状态，并进入原文、归档与删除流程。
+ * 流程：上传后逐项展示建档／重复／失败结果；处理中资料每 3 秒刷新解析作业，超过 10 分钟暂停自动刷新、改为手动。
+ * 约束：状态与未覆盖范围只取自后端作业，不做本地推断；归档与删除分别处理，删除前必须先看影响预览。
+ */
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -131,6 +136,7 @@ function formatDateTime(value: string): string {
 
 async function ensureJob(material: Material) {
   try {
+    // 只取 parse 阶段最新作业；同步导入（如粘贴文本）没有作业时清除本地关联，避免轮询旧记录。
     const latest = (await jobsApi.forMaterial(material.id)).find((job) => job.stage === 'parse')
     delete jobErrors[material.id]
     if (latest) {
@@ -213,6 +219,7 @@ async function retry(material: Material) {
       error.value = '暂未读取到处理作业，请刷新后重试。'
       return
     }
+    // 重试复用同一作业记录，后端只补齐未识别的范围，不会重复建档。
     jobs[jobId] = await jobsApi.retry(jobId)
     await refresh()
   } catch (caught) {
@@ -289,6 +296,8 @@ async function submitUpload() {
     })
     uploadResults.value = result.results
     fallbackNotice.value = ''
+    // 逐文件结果：material 为已建档，duplicate_of 为复用已有资料（未重复建档），error 为该文件失败；
+    // 失败文件不建档且不影响其它文件，只有建档成功的项才登记作业并进入轮询。
     result.results.forEach((item) => {
       if (item.material && item.job_id) {
         jobByMaterial[item.material.id] = item.job_id
@@ -314,6 +323,7 @@ async function submitText() {
   successMessage.value = ''
   uploadResults.value = null
   try {
+    // 粘贴文本同步完成切分并直接返回片段，不创建解析作业，因此不会触发轮询。
     const result = await materialsApi.importText({
       title: textForm.title.trim(),
       content: textForm.content,
@@ -344,6 +354,7 @@ async function submitWeb() {
   successMessage.value = ''
   uploadResults.value = null
   try {
+    // 网页快照与解析作业由后端一起创建，成功后靠作业轮询更新处理状态。
     const result = await materialsApi.importWeb({
       url: webForm.url.trim(),
       title: webForm.title.trim(),
@@ -392,6 +403,7 @@ function useWebFallback(target: 'text' | 'files') {  const notice = fallbackNoti
   fallbackNotice.value = notice
 }
 
+// 网页资料部分成功或失败时，把已知元数据带入替代入口，避免重复填写，同时保留未覆盖范围提示。
 function useMaterialFallback(material: Material, target: 'text' | 'files') {
   if (target === 'text') {
     Object.assign(textForm, {
@@ -511,6 +523,7 @@ onBeforeUnmount(stopPolling)
         </form>
 
         <p v-if="uploadResults" :class="uploadResults.some((item) => item.error) ? 'inline-notice' : 'form-help'" role="status">{{ uploadSummary }}</p>
+        <!-- 逐文件结果逐条展示：失败项不并入成功数，重复项不新建资料。 -->
         <ul v-if="uploadResults" class="upload-results">
           <li v-for="(item, index) in uploadResults" :key="index">
             <strong>{{ item.filename }}</strong>
@@ -549,6 +562,7 @@ onBeforeUnmount(stopPolling)
               <p v-if="material.publisher">发布方：{{ material.publisher }}{{ material.published_at ? ` · ${material.published_at.slice(0, 10)}` : '' }}</p>
               <p v-if="jobErrors[material.id]" class="form-error" role="alert">{{ jobErrors[material.id] }}</p>
 
+              <!-- 部分成功必须展示未覆盖范围与失败原因；缺失内容不能被当作“没有要求”。 -->
               <div v-if="material.status === 'partial'" class="coverage-box">
                 <strong>部分成功 · 未覆盖范围</strong>
                 <p>{{ jobFor(material)?.scope ?? jobErrors[material.id] ?? '未返回覆盖范围，请刷新查询处理详情。' }}</p>
@@ -596,6 +610,7 @@ onBeforeUnmount(stopPolling)
         @close="sourceMaterial = null"
       />
 
+      <!-- 删除影响预览与确认令牌在子组件内完成；确认只覆盖预览展示过的范围，内容变化需重新预览。 -->
       <MaterialLifecycle
         v-if="lifecycleMaterial"
         :key="lifecycleMaterial.id"

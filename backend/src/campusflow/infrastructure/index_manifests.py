@@ -45,6 +45,8 @@ def _identity(snapshot: dict) -> str:
 
 
 class SqlIndexManifests:
+    """完整索引清单存储；清单 ID 由规范化快照哈希得到，重复准备是幂等的。"""
+
     def __init__(self, session: Session):
         self.session = session
         self.blocks = SqlIndexedBlocks(session)
@@ -52,6 +54,7 @@ class SqlIndexManifests:
     def _snapshot(
         self, workspace_id: int, version_id: int, profile_id: str, config: ChunkingConfig
     ) -> tuple[dict, list[RetrievalBlock]]:
+        """锁定资料、版本与片段后生成完整快照；归档、旧版本或配置超限直接拒绝。"""
         profile = self.blocks._profile(profile_id)
         if config.max_bytes > profile.max_input_bytes:
             raise DomainError("分块设置超过模型配置输入上限")
@@ -118,6 +121,7 @@ class SqlIndexManifests:
     ) -> str:
         """从数据库完整来源生成快照；清单和所有初始块同事务提交。"""
         snapshot, blocks = self._snapshot(workspace_id, version_id, profile_id, config)
+        # 清单 ID 是快照内容的哈希：相同来源与配置重复准备视为同一份清单。
         key = _identity(snapshot)
         for block in blocks:
             self.blocks.register(workspace_id, profile_id, block)
@@ -137,6 +141,7 @@ class SqlIndexManifests:
     def _current(
         self, workspace_id: int, manifest_id: str, *, verify_snapshot: bool = True
     ) -> IndexManifest:
+        """读取清单并校验哈希；verify_snapshot 为真时重算快照确认来源未变。"""
         row = self.session.scalar(
             select(IndexManifest)
             .where(
@@ -163,6 +168,7 @@ class SqlIndexManifests:
     def summary(
         self, workspace_id: int, manifest_id: str, *, verify_snapshot: bool = True
     ) -> IndexProgressSummary:
+        """按完整清单汇总进度；只有全部块成功且解析覆盖已知无遗漏才算完全可检索。"""
         manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
         snapshot = manifest.snapshot
         ids = snapshot["block_ids"]
@@ -177,6 +183,7 @@ class SqlIndexManifests:
             .execution_options(populate_existing=True)
         )
         known, uncovered = validated_index_coverage(snapshot["coverage"], len(snapshot["sources"]))
+        # 分母始终是完整块清单；缺记录按待处理计，覆盖未知或未覆盖都不能算完整。
         return summarize_index_progress(
             ids,
             [
@@ -232,6 +239,7 @@ class SqlIndexManifests:
         max_attempts: int = MAX_BLOCK_ATTEMPTS,
         verify_snapshot: bool = True,
     ) -> BlockClaim | None:
+        """从当前清单的块中领取一个；租约回收与尝试次数上限由块存储执行。"""
         manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
         return self.blocks.claim_next(
             workspace_id,
@@ -249,6 +257,7 @@ class SqlIndexManifests:
         *,
         verify_snapshot: bool = True,
     ) -> None:
+        """拒绝不属于当前清单或配置的凭证，防止旧清单结果写回。"""
         manifest = self._current(workspace_id, manifest_id, verify_snapshot=verify_snapshot)
         if (
             claim.profile_id != manifest.profile_id
@@ -265,6 +274,7 @@ class SqlIndexManifests:
         *,
         verify_snapshot: bool = True,
     ) -> bool:
+        """保存成功向量；凭证过期或被其他执行者替换时返回 False。"""
         self._check_claim(workspace_id, manifest_id, claim, verify_snapshot=verify_snapshot)
         return self.blocks.save_success(
             workspace_id, claim.profile_id, claim.block_id, result, token=claim.token
@@ -280,6 +290,7 @@ class SqlIndexManifests:
         max_attempts: int = MAX_BLOCK_ATTEMPTS,
         verify_snapshot: bool = True,
     ) -> bool:
+        """记录安全失败码；次数用尽后由块存储转为终态失败。"""
         self._check_claim(workspace_id, manifest_id, claim, verify_snapshot=verify_snapshot)
         return self.blocks.save_failure(
             workspace_id,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 统一失败提示：role=alert 负责播报，重试按钮的加载状态由调用方通过 busy 传入。
 defineProps<{ message: string; busy?: boolean; title?: string }>()
 defineEmits<{ retry: [] }>()
 </script>

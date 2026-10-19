@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 待核对列表：按核对状态、事项类型、学期／课程、来源资料与缺失原因筛选候选，并打开详情逐条核对。
+ * 状态筛选默认待核对；“全部状态”会显式传入四种状态，因为后端省略 status 时只返回待核对。
+ * 核对状态与任务执行进度是两套状态；列表只展示候选摘要，逐字段取值、证据与操作由 ReviewDetail 负责。
+ */
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import { coursesApi, semestersApi } from '../api/business'
@@ -67,6 +72,7 @@ async function load() {
   error.value = ''
   try {
     const current = currentFilters()
+    // 汇总计数不随状态与原因筛选变化（下拉里的原因选项取自 by_reason），但跟随类型、课程、学期与来源资料。
     const summaryFilters = {
       kind: current.kind,
       courseId: current.courseId,
@@ -130,6 +136,7 @@ onMounted(load)
               </div>
               <p>{{ scopeText(candidate) }} · 来源：资料 #{{ candidate.source_material_id }} · 版本 #{{ candidate.version_no }}</p>
               <div v-if="candidate.review_reasons.length" class="chip-list">
+                <!-- 缺失原因由后端给出代码与说明，前端只做标签映射，不推断补齐。 -->
                 <span v-for="reason in candidate.review_reasons" :key="`${reason.code}-${reason.field ?? ''}`" class="reason-chip">{{ reason.message }}</span>
               </div>
             </div>
@@ -139,6 +146,7 @@ onMounted(load)
         <div v-else class="compact-empty">{{ summary.total ? '没有符合当前筛选的候选事项。' : '还没有提取结果，先从资料库上传通知或课件并提取候选事项。' }}</div>
       </section>
 
+      <!-- key 绑定候选 ID：切换候选时重建详情，避免沿用上一条的修正表单与提示。 -->
       <ReviewDetail
         v-if="selectedId !== null"
         :key="selectedId"

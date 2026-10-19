@@ -30,6 +30,8 @@ class RankingMode(StrEnum):
 
 @dataclass(frozen=True)
 class RankedCandidate:
+    """排序结果；keyword/vector 分列保留便于评估，``score`` 只在本次排序模式下有意义。"""
+
     candidate: RetrievalCandidate
     keyword_score: float
     vector_score: float | None
@@ -69,6 +71,7 @@ def keyword_score(query: str, text: str) -> float:
     matched = unique_query & set(text_terms)
     if not matched:
         return 0.0
+    # 单词重复命中最多计 5 次，避免长文档靠堆词而不是覆盖问题要点拿高分。
     weighted_hits = sum(min(text_terms[term], 5) * (1 + 0.25 * (len(term) - 1)) for term in matched)
     coverage = len(matched) / len(unique_query)
     exact = 1.0 if query.casefold().strip() in text.casefold() else 0.0
@@ -76,6 +79,7 @@ def keyword_score(query: str, text: str) -> float:
 
 
 def _candidate_key(candidate: RetrievalCandidate) -> tuple[int, int, str]:
+    """同分时的兜底排序键：资料、版本、块编号，保证重复调用顺序一致。"""
     return (candidate.material_id, candidate.block.version_id, candidate.block.id)
 
 
@@ -128,6 +132,7 @@ def rank_candidates(
     elif mode == RankingMode.VECTOR:
         scores = vector_scores
     else:
+        # 混合模式用 RRF 比较名次而不是原始分：关键词分与余弦分不可通约，不能直接相加。
         keyword_order = _rank_order(keyword_scores, items)
         vector_order = _rank_order(vector_scores, items)
         keyword_rank = {block_id: rank for rank, block_id in enumerate(keyword_order, 1)}

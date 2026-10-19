@@ -1,6 +1,7 @@
-"""M5 排期输入汇总：确认任务、固定日程、可用时间与偏好（P002）。
+"""学习计划用例：收集排期输入、生成与接受草案、局部重排与时间块调整（M5、A005–A007）。
 
-原始数据只读；输入快照用于版本核对，不参与业务判断。
+草案在用户显式接受前不改变当前计划；接受时重算输入指纹，防止过期草案覆盖新数据。
+输入按工作空间时区解释；未排入任务、缺口与冲突随结果返回，不隐藏也不强行补齐。
 """
 
 from __future__ import annotations
@@ -46,6 +47,8 @@ PLANNABLE_PROGRESS = (
 
 @dataclass
 class CollectedPlanInput:
+    """一次排期收集结果：领域输入、用于变化对照的原始快照与输入指纹。"""
+
     inputs: PlanningInput
     snapshot: dict
     fingerprint: str
@@ -79,6 +82,11 @@ def collect_inputs(
     segment_minutes: int = 90,
     preserved_blocks: tuple[PreservedBlock, ...] = (),
 ) -> CollectedPlanInput:
+    """汇总参与排期的任务、依赖、固定日程、可用时间和容量偏好（P002、A003）。
+
+    只读：未开始、进行中与受阻任务进入排期；已完成、已取消及作为容器的父任务列入排除项。
+    只有日期的截止以当天结束为上限并标记，耗时缺失保留为待补充，不按 0 分钟计算。
+    """
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
     settings = get_settings(repos, workspace_id)
@@ -161,6 +169,7 @@ def collect_inputs(
             title = f"任务 {link.depends_on_task_id}"
         else:
             title = prerequisite.title
+            # 先看实时进度（完成/取消），再判断是否越出本次排期范围。
             if prerequisite.progress == TaskProgress.DONE:
                 state = "done"
             elif prerequisite.progress == TaskProgress.CANCELLED:
@@ -302,9 +311,10 @@ def generate_draft(
     preserved_blocks: tuple[PreservedBlock, ...] = (),
     change: str = "generated",
 ):
-    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。
+    """生成并保存可接受草案（P002–P013）；未接受前不改变当前计划。
 
-    A005：preserved_blocks 原样带入新草案并占用可用时间，对应任务只排剩余分钟。
+    A005：preserved_blocks 原样带入并占用可用时间，对应任务只排剩余分钟；
+    未排入任务、缺口与冲突写入草案，接受前可逐项核对。
     """
     if range_end < range_start:
         raise DomainError("规划结束日期不得早于开始日期")
@@ -319,7 +329,9 @@ def generate_draft(
         preserved_blocks=preserved_blocks,
     )
     resolved = resolve_assumptions(collected.inputs, options or AssumptionOptions())
+    # 先按必要依赖拓扑排序，再按截止与优先级分配；不可满足的依赖不会被强行排入。
     allocation = allocate_tasks(collected.inputs, resolved)
+    # 汇总未排原因、容量缺口与检查覆盖，保证每个输入任务都有去向（P008）。
     outcome: PlanOutcome = build_outcome(collected.inputs, resolved, allocation)
     preserved_blocks_suggestions = tuple(
         BlockSuggestion(
@@ -412,7 +424,11 @@ def accept_draft(
     expected_version: int,
     now: datetime | None = None,
 ):
-    """接受草案：校验输入版本和草案版本，过期请求不覆盖较新计划（P013）。"""
+    """接受草案使其成为当前计划（P013）；只有用户显式接受才会调用。
+
+    重新收集输入并比对指纹，拒绝过期草案；expected_version 防止并发覆盖。
+    较新的已接受计划不会被旧草案覆盖；接受后才重算提醒，任务 DDL 始终不变。
+    """
     draft = get_draft(repos, workspace_id, draft_id)
     if draft.status != "draft":
         raise ConflictError("只有待接受状态的草案可以接受")
@@ -430,6 +446,7 @@ def accept_draft(
     if collected.fingerprint != draft.input_fingerprint:
         raise ConflictError("排期输入已变化，请重新生成草案后再接受")
     current = repos.plans.get_current(workspace_id, semester_id=draft.semester_id)
+    # 已接受时间晚于本草案创建时间的计划优先，避免旧草案回退当前安排。
     if (
         current is not None
         and current.id != draft.id
@@ -504,6 +521,7 @@ def reschedule_plan(
         block_start = block.starts_at.astimezone(timezone).date()
         block_end = block.ends_at.astimezone(timezone).date()
         outside_range = block_start < effective_start or block_end > effective_end
+        # 锁定块、范围外的块与范围外任务的块原样保留；只重新分配范围内未锁定任务。
         keep = (
             block.locked
             or outside_range
@@ -645,7 +663,10 @@ def _snapshot_diff(old: dict, new: dict) -> tuple[list[dict], set[int], bool]:
 def adjustment_suggestions(
     repos: Repositories, workspace_id: int, *, semester_id: int | None = None
 ) -> dict:
-    """比较当前输入与已接受计划，只提出调整建议（A006）；不生成草案、不改计划。"""
+    """比较当前输入与已接受计划，只提出调整建议（A006）；不生成草案、不改计划。
+
+    返回的 auto_applied 恒为 false；是否生成调整草案由用户再次确认。
+    """
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
     current = current_plan(repos, workspace_id, semester_id=semester_id)
@@ -717,7 +738,10 @@ def create_adjustment_draft(
     task_ids: list[int] | None = None,
     now: datetime | None = None,
 ):
-    """用户显式确认后才生成调整草案（A006）；仍不影响当前计划直到接受。"""
+    """用户显式确认后才生成调整草案（A006）；仍不影响当前计划直到接受。
+
+    未指定 task_ids 时采用建议范围；全部任务受影响时重排整个区间。
+    """
     summary = adjustment_suggestions(repos, workspace_id, semester_id=semester_id)
     if not summary["has_plan"]:
         raise NotFoundError("当前没有已接受的计划，无法生成调整草案")
@@ -746,7 +770,10 @@ def overview(
     semester_id: int | None = None,
     now: datetime | None = None,
 ) -> dict:
-    """近期任务与今日安排总览（P018）；只读，不修改计划。"""
+    """近期任务与今日安排总览（P018）；只读，不修改计划。
+
+    今日时间块与未排入计数只来自当前已接受计划；没有计划时时间块为空，但仍列出近期任务。
+    """
     from campusflow.application import tasks as task_use_cases
     from campusflow.domain.states import ReviewStatus
 
@@ -857,6 +884,7 @@ def _require_adjustable_block(repos: Repositories, workspace_id: int, block_id: 
     if block is None:
         raise NotFoundError("时间块不存在")
     draft = get_draft(repos, workspace_id, block.draft_id)
+    # 只有已接受计划中的块可以移动或锁定；草案块需先接受。
     if draft.status != "accepted":
         raise DomainError("只有已接受计划中的时间块可以调整")
     return block, draft
@@ -872,7 +900,11 @@ def move_block(
     expected_version: int,
     now: datetime | None = None,
 ):
-    """移动已接受计划的时间块：不改变任务 DDL，不占用固定日程或已有时间块（P014）。"""
+    """移动已接受计划的时间块：不改变任务 DDL，不占用固定日程或已有时间块（P014）。
+
+    输入按工作空间时区解释：无偏移按墙上时间解析（DST 缺失/歧义报错），带偏移保留时间点。
+    越出计划范围、与固定日程或其他块重叠、移动到过去（调用方提供 now 时）都会被拒绝。
+    """
     block, draft = _require_adjustable_block(repos, workspace_id, block_id)
     settings = get_settings(repos, workspace_id)
     timezone = ZoneInfo(settings.timezone)
@@ -942,7 +974,10 @@ def set_block_lock(
     locked: bool,
     expected_version: int,
 ):
-    """锁定或解锁已接受计划的时间块（P014）。"""
+    """锁定或解锁已接受计划的时间块（P014）。
+
+    锁定只影响后续重排是否原样保留该块，不改变时间块本身或任务 DDL。
+    """
     block, draft = _require_adjustable_block(repos, workspace_id, block_id)
     snapshot = _snapshot_with_block(
         draft,

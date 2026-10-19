@@ -30,7 +30,10 @@ _SENSITIVE_PATTERNS = [
 
 
 def sanitize_error_reason(raw: str | None) -> str | None:
-    """清洗错误原因：不含密钥或原始隐私全文，超长截断（J001 验收）。"""
+    """清洗错误原因：不含密钥或原始隐私全文，超长截断（J001 验收）。
+
+    先替换敏感片段再截断：输出长度受限时，已识别的敏感串都已替换完毕。
+    """
     if raw is None:
         return None
     sanitized = raw
@@ -52,6 +55,7 @@ def is_retryable(error: BaseException) -> bool:
 
 def timeout_reason(timeout_seconds: int) -> str:
     """超时回收说明：让"处理中"变成长时间停留的情况可见（J005）。"""
+    # 不足一分钟也显示 1 分钟，避免写出"超过 0 分钟"这种无法理解的说明。
     minutes = max(1, timeout_seconds // 60)
     return f"处理超时：超过 {minutes} 分钟未完成，已标记为可重试失败"
 

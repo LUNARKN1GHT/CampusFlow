@@ -1,4 +1,8 @@
-"""M7 应用内提醒 HTTP 路由（A010）。"""
+"""应用内提醒 HTTP 路由（A010）。
+
+系统没有独立推送进程：读取列表或摘要时按当前规则同步生成提醒。提醒只是
+提示，不代表任务完成或冲突结论；没有提醒也不等于没有待办。
+"""
 
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -80,6 +84,7 @@ def list_reminders(
     unread_only: Annotated[bool, Query()] = False,
     status: Annotated[Literal["pending", "sent", "dismissed", "cancelled"] | None, Query()] = None,
 ) -> list[ReminderTriggerOut]:
+    """读取前先按当前规则与窗口同步（幂等）；unread_only 只看已发送未读。"""
     statuses = (status,) if status is not None else None
     return [
         ReminderTriggerOut.model_validate(item)
@@ -91,6 +96,7 @@ def list_reminders(
 
 @router.get("/reminders/summary", response_model=ReminderSummaryOut)
 def reminder_summary(workspace: CurrentWorkspace, repos: Repos) -> ReminderSummaryOut:
+    """计数基于最近触发记录；固定 note 说明空提醒不代表没有待办或冲突。"""
     return ReminderSummaryOut.model_validate(use_cases.reminder_summary(repos, workspace.id))
 
 
@@ -101,6 +107,7 @@ def trigger_action(
     workspace: CurrentWorkspace,
     repos: Repos,
 ) -> ReminderActionResultOut:
+    """read 仅标记已读，dismiss 表示忽略；都不改变任务进度、截止或计划。"""
     return ReminderActionResultOut.model_validate(
         use_cases.set_trigger_action(repos, workspace.id, trigger_id, action=payload.action)
     )
@@ -117,6 +124,7 @@ def list_rules(workspace: CurrentWorkspace, repos: Repos) -> list[ReminderRuleOu
 def create_rule(
     payload: ReminderRuleIn, workspace: CurrentWorkspace, repos: Repos
 ) -> ReminderRuleOut:
+    """task_id 为空创建默认规则；同一范围只允许一条，重复创建返回 409。"""
     rule = use_cases.create_rule(
         repos,
         workspace.id,
@@ -133,6 +141,7 @@ def create_rule(
 def update_rule(
     rule_id: int, payload: ReminderRuleIn, workspace: CurrentWorkspace, repos: Repos
 ) -> ReminderRuleOut:
+    """只更新提前量、重复、暂停与启用；请求里的 task_id 不生效，范围不能改。"""
     use_cases.update_rule(
         repos,
         workspace.id,
@@ -147,10 +156,12 @@ def update_rule(
 
 @router.delete("/reminders/rules/{rule_id}", status_code=204)
 def delete_rule(rule_id: int, workspace: CurrentWorkspace, repos: Repos) -> None:
+    """删除任务级规则后该任务回退默认规则；删除默认规则后回退内置默认。"""
     use_cases.delete_rule(repos, workspace.id, rule_id)
 
 
 def _rule_out(repos: Repositories, workspace_id: int, rule_id: int) -> ReminderRuleOut:
+    # 用例只返回规则本身，is_default 等派生字段从列表视图补齐。
     for item in use_cases.list_rules(repos, workspace_id):
         if item["id"] == rule_id:
             return ReminderRuleOut.model_validate(item)

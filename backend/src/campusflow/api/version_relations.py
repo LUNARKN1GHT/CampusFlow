@@ -1,4 +1,8 @@
-"""N010 创建/查询版本关系，变更接受及对照界面分别留 N014/N017。"""
+"""资料版本关系 HTTP 路由（N010）。
+
+只记录用户声明的替代或关联及两端快照，不判定版本生效，也不改写原文、
+片段或正式事项；变更接受与对照界面分别留给 N014/N017。
+"""
 
 from datetime import datetime
 from typing import Annotated, Literal
@@ -41,6 +45,7 @@ class RelationOut(BaseModel):
     metadata_changed: bool
     source_archived: bool
     target_archived: bool
+    # 关系只是待核对记录：固定声明未生效且需要复核，不能当作已完成的替代。
     replacement_effective: Literal[False] = False
     review_required: Literal[True] = True
     origin: Literal["user"] = "user"
@@ -75,6 +80,10 @@ def record_relation(
     actor: Actor,
     response: Response,
 ) -> RelationOut:
+    """记录用户声明的版本关系；两端必须属于当前空间且资料未归档。
+
+    同一对版本与说明重复提交按幂等返回既有记录（200）；说明不同则拒绝覆盖。
+    """
     view, created = use_cases.record_relation(
         repos,
         store,
@@ -93,4 +102,5 @@ def record_relation(
 def list_relations(
     version_id: int, workspace: CurrentWorkspace, store: Relations
 ) -> list[RelationOut]:
+    """只读；附带当前范围比较与归档状态，不修改版本或关系。"""
     return [_out(view) for view in use_cases.list_relations(store, workspace.id, version_id)]

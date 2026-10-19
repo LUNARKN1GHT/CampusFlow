@@ -1,4 +1,4 @@
-"""个人工作空间学习偏好用例。"""
+"""个人工作空间学习偏好：时区、每日/每周学习容量、休息与提交缓冲。"""
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -23,6 +23,10 @@ def update_settings(
     buffer_minutes: int,
     weekly_capacity_minutes: int | None = None,
 ) -> WorkspaceData:
+    """更新工作空间偏好并校验取值范围；时区必须是合法 IANA 名称。
+
+    weekly_capacity_minutes 传 None 表示保留原值（不是清空），其余字段为最终值。
+    """
     current = get_settings(repos, workspace_id)
     try:
         ZoneInfo(timezone)

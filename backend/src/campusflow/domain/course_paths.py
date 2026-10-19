@@ -94,6 +94,7 @@ def validate_profile_fields(
 def validate_course_fields(
     *, name: str, code: str | None, credits: float | None, offered_terms: list[str]
 ) -> list[str]:
+    """校验课程字段并去重开课季节，按首次出现顺序返回规范化列表。"""
     _text(name, 200, "课程名称", required=True)
     _text(code, 50, "课程代码")
     if credits is not None and (type(credits) not in (int, float) or credits < 0 or credits > 100):
@@ -139,6 +140,7 @@ def alias_scope_applies(
     return True
 
 
+# 只收录明确无歧义的说法；未命中的表述返回 None 交回人工核对，不做近似猜测。
 _RELATION_TEXT_ALIASES = {
     "prerequisite": RelationType.PREREQUISITE,
     "强制先修": RelationType.PREREQUISITE,

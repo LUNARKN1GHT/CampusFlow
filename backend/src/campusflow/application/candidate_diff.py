@@ -120,6 +120,7 @@ class _Side:
 def _load_side(repos: Repositories, workspace_id: int, candidate: CandidateData) -> _Side:
     version = repos.materials.get_version(candidate.source_version_id)
     material = repos.materials.get(version.material_id) if version is not None else None
+    # 来源版本或资料不属于当前空间时按不存在处理，不返回其标题与字段。
     if version is None or material is None or material.workspace_id != workspace_id:
         raise NotFoundError("候选来源资料不存在")
     chunks = {chunk.id: chunk for chunk in repos.materials.list_chunks(version.id)}
@@ -260,7 +261,11 @@ def compare_candidates(
     left_candidate_id: int,
     right_candidate_id: int,
 ) -> CandidateDiff:
-    """比较两个显式指定的同类型候选；left 是基准/旧，right 是待比较/新。"""
+    """比较两个显式指定的同类型候选；left 是基准/旧，right 是待比较/新。
+
+    只回答字段是否不同，不判断哪一侧生效；不写库、不提交事务。
+    同类型约束避免把任务的截止字段与日程的开始字段放在一起比较。
+    """
     if left_candidate_id == right_candidate_id:
         raise DomainError("不能比较同一个候选事项")
     left_candidate = get_candidate(repos, workspace_id, left_candidate_id)
@@ -294,6 +299,7 @@ def compare_candidates(
                 right=right_side,
             )
         )
+    # 范围按学期、课程、教学班逐项比较；规则正文里的文字范围仍作为普通字段比较。
     scope = ScopeComparison(
         left=left.header.scope,
         right=right.header.scope,

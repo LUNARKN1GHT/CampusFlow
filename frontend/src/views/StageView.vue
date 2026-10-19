@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/*
+ * 通用占位页：接收 title 与 description，展示“入口已就位、功能尚未开放”。
+ * 不提供保存或编辑，避免把演示数据误认为真实业务数据；当前路由表未直接引用该组件。
+ */
 defineProps<{ title: string; description: string }>()
 </script>
 

@@ -41,6 +41,7 @@ def validate_upload(
     if extension in {"doc", "docm", "dot", "dotx", "dotm"}:
         return None, "暂不支持此 Word 格式，请另存为普通 .docx 后上传"
     if extension == "docx":
+        # ZIP 魔数不足以证明是 Word 文档，DOCX 必须再走包结构校验。
         error = validate_docx(content)
         return (None, error) if error else (UploadValidation("docx", DOCX_MIME), None)
     if extension not in _UPLOAD_RULES:

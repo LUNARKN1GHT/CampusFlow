@@ -1,4 +1,4 @@
-"""N010 SQLAlchemy 关系存储，事务由应用用例提交。"""
+"""N010/N014 版本关系与变更接受存储；记录只追加，事务由应用用例提交。"""
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -36,10 +36,13 @@ def _data(row: MaterialVersionRelation) -> VersionRelationData:
 
 
 class SqlVersionRelations:
+    """关系与接受记录存储；唯一键承担幂等，生效判断留给应用用例。"""
+
     def __init__(self, session: Session):
         self.session = session
 
     def lock_workspace(self, workspace_id: int) -> None:
+        """锁工作空间行，串行化同空间的关系创建与接受提交。"""
         if (
             self.session.scalar(
                 select(Workspace.id).where(Workspace.id == workspace_id).with_for_update()
@@ -51,6 +54,7 @@ class SqlVersionRelations:
     def context(
         self, workspace_id: int, version_id: int, *, lock: bool = False
     ) -> VersionContext | None:
+        """读取资料与版本，可选加行锁；归档判断由用例负责。"""
         material_id = self.session.scalar(
             select(MaterialVersion.material_id).where(MaterialVersion.id == version_id)
         )
@@ -62,6 +66,7 @@ class SqlVersionRelations:
         material = self.session.scalar(query.execution_options(populate_existing=True))
         if material is None:
             return None
+        # 先锁资料再锁版本，与关系创建的固定加锁顺序保持一致。
         query = select(MaterialVersion).where(
             MaterialVersion.id == version_id, MaterialVersion.material_id == material.id
         )
@@ -77,6 +82,7 @@ class SqlVersionRelations:
     def find(
         self, workspace_id: int, source_id: int, target_id: int, kind: VersionRelationKind
     ) -> VersionRelationData | None:
+        """按方向与类型查找既有关系；说明不一致时由用例拒绝覆盖。"""
         row = self.session.scalar(
             select(MaterialVersionRelation).where(
                 MaterialVersionRelation.workspace_id == workspace_id,
@@ -98,6 +104,7 @@ class SqlVersionRelations:
         source_snapshot: dict,
         target_snapshot: dict,
     ) -> VersionRelationData:
+        """追加关系并保存两端发布信息快照；本层不判断替代是否生效。"""
         row = MaterialVersionRelation(
             workspace_id=workspace_id,
             source_version_id=source_id,
@@ -113,6 +120,7 @@ class SqlVersionRelations:
         return _data(row)
 
     def list_for_version(self, workspace_id: int, version_id: int) -> list[VersionRelationData]:
+        """返回以该版本为来源或目标的全部关系，按创建顺序。"""
         rows = self.session.scalars(
             select(MaterialVersionRelation)
             .where(
@@ -133,6 +141,8 @@ class SqlVersionRelations:
         comparison_candidate_id: int,
         accepted_fields: tuple[str, ...],
     ) -> VersionAcceptanceData | None:
+        """按两侧候选与字段集合查找既有接受记录，支撑重复提交幂等。"""
+        # 字段集合已在用例中排序去重，这里按 JSONB 数组等值比较。
         row = self.session.scalar(
             select(VersionChangeAcceptance).where(
                 VersionChangeAcceptance.workspace_id == workspace_id,
@@ -157,6 +167,7 @@ class SqlVersionRelations:
         evidence_snapshot: tuple[dict, ...],
         previous_review_status: str,
     ) -> VersionAcceptanceData:
+        """追加逐字段证据快照；旧候选失效与提醒重算由用例在同一事务完成。"""
         row = VersionChangeAcceptance(
             workspace_id=workspace_id,
             baseline_candidate_id=baseline_candidate_id,
@@ -174,6 +185,7 @@ class SqlVersionRelations:
         return _acceptance_data(row)
 
     def list_acceptances(self, workspace_id: int, candidate_id: int) -> list[VersionAcceptanceData]:
+        """返回与候选相关的接受记录（基准或新侧），按写入顺序。"""
         rows = self.session.scalars(
             select(VersionChangeAcceptance)
             .where(

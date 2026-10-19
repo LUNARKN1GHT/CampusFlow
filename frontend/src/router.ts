@@ -18,6 +18,8 @@ import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
 import VersionChangeView from './views/VersionChangeView.vue'
 
+// 路由表与登录守卫：受保护页面统一挂在 AppShell 下，未登录跳登录页并保留 redirect 目标。
+// 会话检查复用 useAuth 的缓存与并发去重；已登录访问登录页回到总览，未知路径回首页。
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -92,6 +94,7 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
+// 子路由不重复声明 meta，requiresAuth 由父级记录合并到 to.meta。
 router.beforeEach(async (to) => {
   const { state, checkSession } = useAuth()
   if (to.meta.requiresAuth) {

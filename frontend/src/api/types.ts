@@ -1,3 +1,6 @@
+// 共享的后端请求／响应类型：字段与 /api/v1 契约一一对应，枚举取值由后端产生。
+// 这里只声明结构，不做运行时校验；状态判断以后端返回值与 allowed_* 字段为准。
+
 export type Semester = {
   id: number
   name: string
@@ -15,6 +18,7 @@ export type Course = {
   class_name: string | null
 }
 
+// 任务执行进度；与候选核对状态（ReviewStatus）是两条独立状态轴，不可互相写入。
 export type TaskProgress = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type DueSourceType = 'user' | 'document' | 'inferred'
@@ -22,6 +26,7 @@ export type DueSourceType = 'user' | 'document' | 'inferred'
 export type Task = {
   id: number
   course_id: number | null
+  // none 表示手工创建；invalidated 表示来源资料已删除，任务保留但引用不可再验证（归档不置为失效）。
   source_state: 'available' | 'invalidated' | 'none'
   source_invalidated_at: string | null
   source_invalidated_note: string | null
@@ -56,6 +61,7 @@ export type TaskRollup = {
   remaining_minutes: number
   missing_duration_count: number
   progress_counts: Record<string, number>
+  // 没有可估算工时时为 null，界面不应显示为 0%。
   percent_complete: number | null
 }
 
@@ -76,6 +82,7 @@ export type SubtaskInput = {
   due_date?: string | null
 }
 
+// 拆分建议只读：suggestion／editable 均为建议语义，确认后才批量创建子任务。
 export type SplitSuggestion = {
   parent_task_id: number
   parent_title: string
@@ -92,6 +99,7 @@ export type SplitSuggestion = {
 
 export type DependencyCheck = {
   semester_id: number | null
+  // valid=false 表示存在阻塞项（成环、缺失或已取消前置）；检查只读，不修改任务或依赖。
   valid: boolean
   checked_tasks: number
   checked_edges: number
@@ -128,6 +136,7 @@ export type FixedEvent = {
   repeat_until: string | null
 }
 
+// 每周重复展开后的单个实例，不是可编辑的存储对象；编辑仍针对 FixedEvent。
 export type FixedEventOccurrence = {
   source_event_id: number
   course_id: number | null
@@ -139,6 +148,7 @@ export type FixedEventOccurrence = {
 
 export type AvailabilitySlot = {
   id: number
+  // 0 表示周一、6 表示周日；时段按工作空间时区解释且不跨午夜。
   day_of_week: number
   start_time: string
   end_time: string
@@ -385,6 +395,7 @@ export type WorkspaceSettings = {
 }
 
 export type MaterialSourceType = 'pdf' | 'image' | 'text' | 'word' | 'web'
+// partial 表示部分解析／索引成功，未覆盖范围必须显式提示，不能当作完整可用。
 export type MaterialStatus = 'pending' | 'processing' | 'done' | 'partial' | 'failed'
 
 export type Material = {
@@ -433,6 +444,7 @@ export type ProcessingJob = {
   version_id: number
   stage: JobStage
   status: JobStatus
+  // is_terminal 之后不再自动推进；retryable 决定界面是否提供重试入口。
   is_terminal: boolean
   retryable: boolean
   scope: string | null
@@ -520,6 +532,7 @@ export type MaterialUploadParams = {
   allow_duplicate: boolean
 }
 
+// 候选核对状态：superseded 是被新版本取代而失效，不是用户主动忽略；已失效只能退回待核对。
 export type ReviewStatus = 'pending' | 'confirmed' | 'ignored' | 'superseded'
 export type CandidateKind = 'task' | 'event' | 'rule'
 
@@ -544,6 +557,7 @@ export type CandidateSummary = {
   created_at: string
 }
 
+// 字段出处：document 原文规定、user 用户补充、inferred 系统推断、suggestion 规划建议。
 export type FieldOrigin = 'document' | 'user' | 'inferred' | 'suggestion'
 
 export type CandidateEvidence = {
@@ -558,6 +572,7 @@ export type CandidateFieldView = {
   name: string
   value: unknown
   origin: FieldOrigin
+  // effective_* 是叠加用户修正后的生效值；verifiable 只表示引用仍能定位到原文，不代表语义正确。
   effective_value: unknown
   effective_origin: FieldOrigin
   explanation: string | null
@@ -613,6 +628,7 @@ export type CandidateReviewDetail = {
   review_reasons: CandidateReason[]
   review_changes: CandidateReviewChange[]
   missing_required_fields: string[]
+  // 由后端按当前核对状态给出；界面只渲染这里的操作，不要自行推断可转换状态。
   allowed_transitions: ReviewStatus[]
   converted: CandidateConversion | null
 }
@@ -640,6 +656,7 @@ export type DiffFieldSide = {
 export type DiffField = {
   name: string
   category: string
+  // explicitly_removed 是新侧确认删除；missing 只是新侧没有该值，不能当作已删除。
   status: 'unchanged' | 'changed' | 'added' | 'missing' | 'explicitly_removed'
   left: DiffFieldSide
   right: DiffFieldSide
@@ -677,6 +694,7 @@ export type VersionApplicability = {
   status: 'applicable' | 'conflict' | 'requires_review'
   recommended_candidate_id: number | null
   review_required: boolean
+  // 适用性判定是只读的，永远不落库；接受变更仍需显式调用 accept。
   applied: false
   relation_id: number | null
   relation_kind: string | null
@@ -736,6 +754,7 @@ export type DuplicateReport = {
   kind: CandidateKind
   suggestions: DuplicateSuggestion[]
   excluded: { candidate_id: number; code: string; message: string }[]
+  // 始终 false：建议不自动合并，需用户预览后显式确认。
   auto_merge: false
 }
 
@@ -758,6 +777,7 @@ export type MergePreview = {
   target_progress: string | null
   kept_fields: Record<string, unknown>
   sources: MergeSource[]
+  // 预览令牌：合并请求必须回传，令牌限定本次展示过的合并范围。
   token: string
   auto_merge: false
 }
@@ -807,6 +827,7 @@ export type ReminderSummary = {
 }
 
 export type ReminderRule = {
+  // id 为 null 且 builtin=true 表示尚未保存的内置默认规则，首次保存时才创建记录。
   id: number | null
   task_id: number | null
   advance_minutes: number

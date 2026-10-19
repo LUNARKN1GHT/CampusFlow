@@ -1,4 +1,8 @@
-"""M8：培养方案、个人方案与后续课程路径用例。"""
+"""M8：培养方案、课程关系、修读状态与课程路径用例。
+
+所有读写都限定当前工作空间；分析只使用已确认的正式关系，未转换候选、
+缺项与矛盾只产生阻塞原因，不进入依赖图或学习顺序。
+"""
 
 from dataclasses import dataclass
 
@@ -50,6 +54,7 @@ def list_plans(repos: Repositories, workspace_id: int) -> list[CurriculumPlanDat
 
 
 def get_plan(repos: Repositories, workspace_id: int, plan_id: int) -> CurriculumPlanData:
+    """读取当前空间内的方案；其他空间的方案按不存在处理，避免越权或误用。"""
     plan = repos.paths.get_plan(plan_id)
     if plan is None or plan.workspace_id != workspace_id:
         raise NotFoundError("培养方案不存在")
@@ -336,6 +341,7 @@ def create_alias(
     class_name: str | None,
     semester_id: int | None,
 ) -> CourseAliasData:
+    """保存显式别名及其可选教学班/学期范围；别名只参与匹配，不改写正式课程。"""
     get_course(repos, workspace_id, plan_id, curriculum_course_id)
     validate_alias_text(alias)
     if class_name is not None and (not class_name.strip() or len(class_name) > 100):
@@ -384,6 +390,7 @@ def _semester_names(
     repos: Repositories, workspace_id: int, semester_ids: list[int | None]
 ) -> dict[int, str]:
     names: dict[int, str] = {}
+    # 只解析当前空间的学期名；其他空间或不存在的学期不返回名称。
     for semester_id in sorted({sid for sid in semester_ids if sid is not None}):
         semester = repos.semesters.get(semester_id)
         if semester is not None and semester.workspace_id == workspace_id:
@@ -532,6 +539,8 @@ class StudyStatusEntry:
 
 @dataclass(frozen=True)
 class StudyStatusSummary:
+    """逐课汇总与计数；unknown 表示没有修读记录，不代表未修或已修。"""
+
     plan_id: int
     entries: tuple[StudyStatusEntry, ...]
     counts: dict[str, int]
@@ -568,6 +577,7 @@ def get_study_status(repos: Repositories, workspace_id: int, plan_id: int) -> St
     entries: list[StudyStatusEntry] = []
     for course in courses:
         records = tuple(grouped.get(course.id, []))
+        # 没有记录的课程同样列出并计为 unknown，不能从汇总或计数中消失。
         status = aggregate_study_status(view.record.status for view in records)
         counts[status] += 1
         entries.append(
@@ -603,6 +613,8 @@ def _semester_ids(records: tuple[StudyRecordView, ...], status: str) -> tuple[in
 
 @dataclass(frozen=True)
 class AliasResolution:
+    """严格名称/别名解析结果；matched 也只表示唯一候选，不自动绑定。"""
+
     status: str
     matches: tuple[CurriculumCourseData, ...]
     matched_by: str | None
@@ -628,6 +640,7 @@ def resolve_course_name(
     target = normalize_course_name(name)
     courses = {course.id: course for course in repos.paths.list_courses(plan_id)}
     matched: dict[int, str] = {}
+    # 正式课名优先命中；别名只补充未命中的课程，不能覆盖同名正式课程。
     for course in courses.values():
         if normalize_course_name(course.name) == target:
             matched[course.id] = "name"
@@ -641,6 +654,7 @@ def resolve_course_name(
             semester_id=semester_id,
         ):
             continue
+        # 同一课程已由课名命中时保留 "name"，作为更强的匹配依据。
         matched.setdefault(alias.curriculum_course_id, "alias")
     matches = tuple(courses[course_id] for course_id in matched if course_id in courses)
     if len(matches) == 1:
@@ -673,6 +687,7 @@ def get_profile(repos: Repositories, workspace_id: int) -> ProfileView:
     plan = None
     if profile.curriculum_plan_id is not None:
         plan = repos.paths.get_plan(profile.curriculum_plan_id)
+        # 指向其他空间的方案不展示，让缺失项提示用户重新选择。
         if plan is not None and plan.workspace_id != workspace_id:
             plan = None
     return ProfileView(
@@ -766,6 +781,8 @@ class PlanGraph:
 
 @dataclass(frozen=True)
 class PlanAnalysis:
+    """一次只读分析的聚合结果：图、顺序、下一步、学期建议与修读汇总。"""
+
     plan: CurriculumPlanData
     graph: PlanGraph
     order: TopoResult
@@ -775,6 +792,7 @@ class PlanAnalysis:
 
 
 def _candidate_evidence(repos: Repositories, candidate) -> tuple[dict, ...]:
+    """把来源候选的逐字段证据去重成边证据；版本缺失时仍返回引用本身。"""
     version = repos.materials.get_version(candidate.source_version_id)
     material_id = None if version is None else version.material_id
     items: list[dict] = []
@@ -814,6 +832,7 @@ def _relation_candidate_issues(
     for candidate in repos.candidates.list_all(workspace_id, CandidateKind.COURSE_RELATION):
         if candidate.draft.scope.curriculum_plan_id != plan_id:
             continue
+        # 已忽略或已失效的候选不再代表现行声明，不作为待核对项提示。
         if candidate.review_status in (ReviewStatus.IGNORED, ReviewStatus.SUPERSEDED):
             continue
         fields = {field.name: field for field in candidate.effective_draft().fields}
@@ -844,6 +863,7 @@ def _relation_candidate_issues(
             )
             for name in names
         ]
+        # 名称必须能在本方案内唯一匹配；否则按缺项阻塞，不猜测到某门课程。
         if any(item.status != "matched" for item in resolved):
             missing.append(
                 GraphProblem(
@@ -855,6 +875,7 @@ def _relation_candidate_issues(
             continue
         source, target = (item.matches[0].id for item in resolved)
         types = formal_by_pair.get((source, target), set())
+        # 已有不同正式类型时记冲突；否则只是尚未转换的待核对候选。
         if types and relation_type not in types:
             pending.append(
                 GraphProblem(
@@ -882,6 +903,7 @@ def build_plan_graph(repos: Repositories, workspace_id: int, plan_id: int) -> Pl
     course_rows = repos.paths.list_courses(plan_id)
     status_summary = get_study_status(repos, workspace_id, plan_id)
     status_by_course = {entry.course.id: entry for entry in status_summary.entries}
+    # 修读状态取自已填记录；没有记录时显式 unknown，不推断为未修或已修。
     courses = tuple(
         GraphCourse(
             course.id,
@@ -919,6 +941,7 @@ def build_plan_graph(repos: Repositories, workspace_id: int, plan_id: int) -> Pl
     ]
     if not complete:
         limitations.append("图中存在环、缺项、矛盾或未转换候选，完整顺序与学期建议保持阻塞。")
+    # 边证据只跟随由候选转换来的正式关系；候选或版本缺失时仍保留关系本身。
     return PlanGraph(
         plan,
         GraphResult(
@@ -952,6 +975,7 @@ def analyze_plan(
 ) -> PlanAnalysis:
     """一次读取图、顺序、下一步与学期建议；问题只阻塞结论，不改写数据。"""
     graph = build_plan_graph(repos, workspace_id, plan_id)
+    # 任何环、类型矛盾、缺项或未转换候选都阻塞完整顺序，不返回部分层次。
     blocked = bool(
         graph.graph.cycles or graph.graph.conflicts or graph.graph.missing or graph.graph.pending
     )
@@ -968,6 +992,7 @@ def analyze_plan(
             ),
         )
     next_items = next_courses(graph.graph.courses, graph.graph.relations)
+    # 下一步只看正式关系与修读状态；是否可执行由调用方结合 blocked 一并展示。
     if blocked:
         semester = SemesterSuggestion(
             (),
@@ -975,6 +1000,7 @@ def analyze_plan(
             tuple(graph.graph.limitations) + ("存在未核对问题，未生成学期方案。",),
         )
     else:
+        # 未显式给上限时回落到方案设置；方案也没有时由 domain 降级并声明限制。
         semester = suggest_terms(
             graph.graph.courses,
             graph.graph.relations,

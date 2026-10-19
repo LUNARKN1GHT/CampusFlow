@@ -1,4 +1,7 @@
-"""M9 外部日历持久化实现（SQLAlchemy）。"""
+"""M9 外部日历持久化（SQLAlchemy）：连接、OAuth state、草案、执行记录与事件映射。
+
+令牌字段只保存 Fernet 密文；本层只 flush 不提交，事务边界由应用用例控制。
+"""
 
 from __future__ import annotations
 
@@ -146,6 +149,8 @@ def _link_to_data(row: CalendarEventLink) -> CalendarEventLinkData:
 
 
 class SqlCalendarStore(CalendarStore):
+    """CalendarStore 的数据库实现；写入后由调用方决定何时提交或回滚。"""
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -158,6 +163,7 @@ class SqlCalendarStore(CalendarStore):
     def find_connection(
         self, workspace_id: int, provider: str, account_email: str
     ) -> CalendarConnectionData | None:
+        """按账户身份查找连接；同一工作空间与账户只有一条连接（唯一约束）。"""
         row = self._session.scalar(
             select(CalendarConnection).where(
                 CalendarConnection.workspace_id == workspace_id,
@@ -179,6 +185,7 @@ class SqlCalendarStore(CalendarStore):
         refresh_token_ciphertext: str | None,
         token_expires_at: datetime,
     ) -> CalendarConnectionData:
+        """新建 active 连接；调用方必须传入已加密的令牌，本层不接触明文。"""
         row = CalendarConnection(
             workspace_id=workspace_id,
             provider=provider,
@@ -203,6 +210,7 @@ class SqlCalendarStore(CalendarStore):
         token_expires_at: datetime,
         scopes: str,
     ) -> CalendarConnectionData | None:
+        """更新令牌密文并恢复 active；refresh token 的保留由调用方负责。"""
         row = self._session.get(CalendarConnection, connection_id)
         if row is None:
             return None
@@ -228,12 +236,14 @@ class SqlCalendarStore(CalendarStore):
     def set_connection_status(
         self, connection_id: int, status: ConnectionStatus
     ) -> CalendarConnectionData | None:
+        """切换连接状态；撤销时清空令牌密文并记录 revoked_at。"""
         row = self._session.get(CalendarConnection, connection_id)
         if row is None:
             return None
         row.status = status.value
         if status == ConnectionStatus.REVOKED:
             row.revoked_at = datetime.now(UTC)
+            # 撤销后不再保留可解密的旧令牌，任何待写操作都会因连接状态被拒绝。
             row.access_token_ciphertext = None
             row.refresh_token_ciphertext = None
         self._session.flush()
@@ -263,6 +273,7 @@ class SqlCalendarStore(CalendarStore):
         return [_connection_to_data(row) for row in rows]
 
     def get_credentials(self, connection_id: int) -> CalendarCredentialsData | None:
+        """只返回令牌密文与过期时间；解密和有效性判断由应用层完成。"""
         row = self._session.get(CalendarConnection, connection_id)
         if row is None:
             return None
@@ -281,6 +292,7 @@ class SqlCalendarStore(CalendarStore):
         redirect_uri: str,
         expires_at: datetime,
     ) -> CalendarOAuthStateData:
+        """保存 state 哈希与回调地址；原始 state 只在授权地址中出现，不落库。"""
         row = CalendarOAuthState(
             workspace_id=workspace_id,
             provider=provider,
@@ -295,6 +307,7 @@ class SqlCalendarStore(CalendarStore):
     def consume_oauth_state(
         self, workspace_id: int, state_hash: str, *, now: datetime
     ) -> CalendarOAuthStateData | None:
+        """命中未消费且未过期的哈希后写入 consumed_at；过期或重复返回 None。"""
         row = self._session.scalar(
             select(CalendarOAuthState).where(
                 CalendarOAuthState.workspace_id == workspace_id,
@@ -305,6 +318,7 @@ class SqlCalendarStore(CalendarStore):
         )
         if row is None:
             return None
+        # 消费即落库标记；同一 state 的重复回调此后都查不到可用记录。
         row.consumed_at = now
         self._session.flush()
         return _oauth_state_to_data(row)
@@ -322,6 +336,7 @@ class SqlCalendarStore(CalendarStore):
         note: str | None,
         items: list[dict],
     ) -> CalendarDraftData:
+        """新建草案并按传入顺序写入条目 position，读取顺序与确认顺序一致。"""
         draft = CalendarDraft(
             workspace_id=workspace_id,
             connection_id=connection_id,
@@ -363,6 +378,7 @@ class SqlCalendarStore(CalendarStore):
         return _draft_to_data(row, self.list_draft_items(row.id))
 
     def lock_draft(self, draft_id: int) -> CalendarDraftData | None:
+        """行锁读取草案，防止同一草案被并发执行或重试、重复写入外部事件。"""
         row = self._session.scalar(
             select(CalendarDraft).where(CalendarDraft.id == draft_id).with_for_update()
         )
@@ -383,6 +399,7 @@ class SqlCalendarStore(CalendarStore):
         expires_at: datetime,
         note: str | None,
     ) -> CalendarDraftData | None:
+        """保存确认指纹、选中条目与有效期；重确认升版本由用例传入。"""
         row = self._session.get(CalendarDraft, draft_id)
         if row is None:
             return None
@@ -406,6 +423,7 @@ class SqlCalendarStore(CalendarStore):
         return _draft_to_data(row, self.list_draft_items(row.id))
 
     def list_draft_items(self, draft_id: int) -> list[CalendarDraftItemData]:
+        """按 position 与编号返回条目，保证预览、确认与执行看到同一顺序。"""
         rows = self._session.scalars(
             select(CalendarDraftItem)
             .where(CalendarDraftItem.draft_id == draft_id)
@@ -414,6 +432,7 @@ class SqlCalendarStore(CalendarStore):
         return [_item_to_data(row) for row in rows]
 
     def cancel_pending_drafts(self, connection_id: int) -> int:
+        """把连接下所有未完成草案置为 cancelled，返回取消数量；已完成的不受影响。"""
         rows = self._session.scalars(
             select(CalendarDraft).where(
                 CalendarDraft.connection_id == connection_id,
@@ -446,6 +465,7 @@ class SqlCalendarStore(CalendarStore):
         idempotency_key: str,
         started_at: datetime,
     ) -> CalendarOperationData:
+        """新建 pending 执行记录；幂等键唯一约束防止同一操作被写入两次。"""
         row = CalendarOperation(
             workspace_id=workspace_id,
             draft_id=draft_id,
@@ -460,6 +480,7 @@ class SqlCalendarStore(CalendarStore):
         return _operation_to_data(row)
 
     def find_operation_by_key(self, idempotency_key: str) -> CalendarOperationData | None:
+        """按幂等键查找既有执行；已成功项在重试时直接跳过。"""
         row = self._session.scalar(
             select(CalendarOperation).where(CalendarOperation.idempotency_key == idempotency_key)
         )
@@ -482,6 +503,7 @@ class SqlCalendarStore(CalendarStore):
         finished_at: datetime,
         increment_attempt: bool = False,
     ) -> CalendarOperationData | None:
+        """写入逐项执行结果；increment_attempt 为真时累加重试次数。"""
         row = self._session.get(CalendarOperation, operation_id)
         if row is None:
             return None
@@ -500,6 +522,7 @@ class SqlCalendarStore(CalendarStore):
     def list_operations(
         self, workspace_id: int, *, draft_id: int | None = None
     ) -> list[CalendarOperationData]:
+        """按创建顺序返回执行记录；可按草案过滤，供界面稳定展示。"""
         stmt = select(CalendarOperation).where(CalendarOperation.workspace_id == workspace_id)
         if draft_id is not None:
             stmt = stmt.where(CalendarOperation.draft_id == draft_id)
@@ -512,6 +535,7 @@ class SqlCalendarStore(CalendarStore):
         source_type: CalendarSourceType,
         source_id: int,
     ) -> CalendarEventLinkData | None:
+        """只返回 active 映射；已删除或外部缺失的来源需要重新生成草案。"""
         row = self._session.scalar(
             select(CalendarEventLink).where(
                 CalendarEventLink.connection_id == connection_id,
@@ -543,6 +567,7 @@ class SqlCalendarStore(CalendarStore):
         source_snapshot: dict,
         state: str = "active",
     ) -> CalendarEventLinkData:
+        """按连接与来源 upsert 唯一映射，更新外部标识、内容指纹与来源快照。"""
         row = self._session.scalar(
             select(CalendarEventLink).where(
                 CalendarEventLink.connection_id == connection_id,
@@ -578,6 +603,7 @@ class SqlCalendarStore(CalendarStore):
     def mark_link_deleted(
         self, connection_id: int, source_type: CalendarSourceType, source_id: int
     ) -> None:
+        """外部事件删除成功后保留映射行并标记 deleted，便于追溯历史。"""
         row = self._session.scalar(
             select(CalendarEventLink).where(
                 CalendarEventLink.connection_id == connection_id,
@@ -592,6 +618,7 @@ class SqlCalendarStore(CalendarStore):
     def mark_link_external_missing(
         self, connection_id: int, source_type: CalendarSourceType, source_id: int
     ) -> None:
+        """外部事件已不存在时标记，不删除内部任务或计划块，也不改写其内容。"""
         row = self._session.scalar(
             select(CalendarEventLink).where(
                 CalendarEventLink.connection_id == connection_id,

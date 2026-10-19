@@ -1,4 +1,4 @@
-"""资料领域规则（D001、D004、J007、D009）。"""
+"""资料版本、来源失效与粘贴文本切分的领域规则（D001、D004、J007、D009）。纯函数。"""
 
 import re
 
@@ -20,6 +20,7 @@ SOURCE_STATE_NONE = "none"
 # 失效说明长度上限，与 tasks.source_invalidated_note 列宽一致
 MAX_SOURCE_NOTE_LENGTH = 300
 
+# 空行（可含空白）作为段落边界；单个换行仍属于同一段，保留段内换行。
 _BLANK_LINE = re.compile(r"\n\s*\n")
 
 
@@ -99,6 +100,7 @@ def deletion_confirmation_token(
 
     预览与执行必须基于同一份影响内容；任何一项变化（版本、片段数、
     关联任务、候选、日程、规则与版本关联）都会使旧确认失效，防止用过期的确认执行新的删除。
+    截断哈希只用于比对影响集合是否变化，不作为安全凭证。
     """
     import hashlib
     import json

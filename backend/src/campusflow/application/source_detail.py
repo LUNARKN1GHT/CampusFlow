@@ -38,6 +38,7 @@ def _citations(
         else:
             verifiable = False
     if (
+        # 声称来自原文或推断的字段若一条可验证证据都没有，不能显示为可核对。
         field.origin in (FieldOrigin.DOCUMENT, FieldOrigin.INFERRED)
         and field.value is not None
         and not citations
@@ -103,6 +104,7 @@ def _attach_candidate(repos: Repositories, workspace_id: int, detail: SourceDeta
 
 
 def task_source_detail(repos: Repositories, workspace_id: int, task_id: int) -> SourceDetail:
+    """任务来源详情；手动任务保持 manual，来源失效后仍保留失效说明。"""
     task = repos.tasks.get(task_id)
     if task is None:
         raise NotFoundError("任务不存在")
@@ -131,6 +133,7 @@ def task_source_detail(repos: Repositories, workspace_id: int, task_id: int) -> 
 
 
 def event_source_detail(repos: Repositories, workspace_id: int, event_id: int) -> SourceDetail:
+    """固定日程来源详情；资料级字段留空，只用来源候选补齐原始字段与修正。"""
     event = repos.schedule.get_fixed_event(event_id)
     if event is None:
         raise NotFoundError("固定日程不存在")

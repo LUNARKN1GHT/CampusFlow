@@ -35,6 +35,11 @@ class ReviewChangeRecord:
 
 @dataclass(frozen=True)
 class CandidateData:
+    """候选的原始字段、核对状态与全部修正/状态变更历史。
+
+    原始 draft 与证据只读；effective_draft 才叠加用户修正，确认校验用它。
+    """
+
     id: int
     workspace_id: int
     source_version_id: int
@@ -99,11 +104,19 @@ class MergeRecordData:
 
 
 class CandidateRepository(Protocol):
-    def create(
-        self, workspace_id: int, version_id: int, draft: CandidateDraft
-    ) -> CandidateData: ...
+    """候选、字段修正与核对历史的持久化边界。
 
-    def get(self, workspace_id: int, candidate_id: int) -> CandidateData | None: ...
+    所有方法都带 workspace_id 并在 SQL 中限定空间；读取跨空间按不存在返回 None。
+    写入只追加记录，原始提取值与证据不可改写。
+    """
+
+    def create(self, workspace_id: int, version_id: int, draft: CandidateDraft) -> CandidateData:
+        """保存新候选；新候选固定为待核对，不继承其他状态。"""
+        ...
+
+    def get(self, workspace_id: int, candidate_id: int) -> CandidateData | None:
+        """读取候选及其修正/核对历史；跨空间与不存在都返回 None。"""
+        ...
 
     def list_by_version(self, workspace_id: int, version_id: int) -> list[CandidateData]: ...
 
@@ -128,15 +141,21 @@ class CandidateRepository(Protocol):
         """
         ...
 
-    def ids_by_material(self, workspace_id: int, material_id: int) -> list[int]: ...
+    def ids_by_material(self, workspace_id: int, material_id: int) -> list[int]:
+        """列出资料关联的候选编号（删除影响预览用）。"""
+        ...
 
     def add_field_revision(
         self, workspace_id: int, candidate_id: int, revision: FieldRevision
-    ) -> FieldRevisionRecord: ...
+    ) -> FieldRevisionRecord:
+        """追加一条字段修正，不改写原始提取值与证据。"""
+        ...
 
     def set_review_status(
         self, workspace_id: int, candidate_id: int, change: ReviewChange
-    ) -> ReviewChangeRecord: ...
+    ) -> ReviewChangeRecord:
+        """写入核对状态并追加一条状态变更历史，不修改字段。"""
+        ...
 
     def list_by_scope(
         self,
@@ -156,7 +175,9 @@ class CandidateRepository(Protocol):
 
     def find_merge(
         self, workspace_id: int, target_candidate_id: int, source_candidate_id: int
-    ) -> MergeRecordData | None: ...
+    ) -> MergeRecordData | None:
+        """按合并方向查既有记录；反向存在不算同一合并，避免误判幂等。"""
+        ...
 
     def create_merge(
         self,
@@ -171,6 +192,8 @@ class CandidateRepository(Protocol):
         source_snapshot: dict,
         reason: str,
         operator: str,
-    ) -> MergeRecordData: ...
+    ) -> MergeRecordData:
+        """保存合并记录与来源快照；调用方负责迁移时间块、失效来源候选。"""
+        ...
 
     def list_merges(self, workspace_id: int, candidate_id: int) -> list[MergeRecordData]: ...

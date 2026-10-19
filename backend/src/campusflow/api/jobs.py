@@ -104,6 +104,7 @@ def _to_out(job: ProcessingJobData) -> JobOut:
 def list_material_jobs(
     material_id: Annotated[int, Query(gt=0)], workspace: CurrentWorkspace, repos: Repos
 ) -> list[JobOut]:
+    """先校验资料属于当前空间；跨空间与不存在同样返回 404。"""
     return [_to_out(job) for job in use_cases.list_material_jobs(repos, workspace.id, material_id)]
 
 
@@ -116,6 +117,7 @@ def get_job(job_id: int, workspace: CurrentWorkspace, repos: Repos) -> JobOut:
 def list_job_attempts(
     job_id: int, workspace: CurrentWorkspace, repos: Repos
 ) -> list[JobAttemptOut]:
+    """尝试历史只含阶段、覆盖范围与原因，不返回原文或模型输出。"""
     return [
         JobAttemptOut.model_validate(attempt, from_attributes=True)
         for attempt in use_cases.list_job_attempts(repos, workspace.id, job_id)

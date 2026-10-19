@@ -1,4 +1,4 @@
-"""R007：任务与日程的来源详情规则。纯业务模型，不依赖数据库或 Web 框架。"""
+"""R007：任务与日程的来源详情规则；区分手动/提取来源并判断引用是否仍可验证。"""
 
 SOURCE_TYPE_EXTRACTED = "extracted"
 SOURCE_TYPE_MANUAL = "manual"

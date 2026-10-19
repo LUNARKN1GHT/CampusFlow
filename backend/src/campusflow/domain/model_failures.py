@@ -1,8 +1,7 @@
 """Q009：模型失败分类与用户可见文案。
 
-只定义契约，不触发业务逻辑：调用方（后续 Q011 问答接口）用
-``classify_model_failure`` 把异常转成固定的失败类别与文案，避免把异常原文、
-HTTP 细节或密钥直接展示给用户。
+只定义契约，不触发业务逻辑：问答入口用 ``classify_model_failure`` 把模型
+异常转成固定的失败类别与文案，避免把异常原文、HTTP 细节或密钥直接展示给用户。
 
 失败时不返回任何答案或引用——类别的存在只为说明「为什么没有结果」。
 """
@@ -39,6 +38,8 @@ class ModelFailureKind(StrEnum):
 
 @dataclass(frozen=True)
 class ModelFailure:
+    """一次模型失败的可见说明；retryable 决定 API 返回 503 还是 502。"""
+
     kind: ModelFailureKind
     retryable: bool
     message: str
@@ -57,6 +58,7 @@ def classify_model_failure(error: Exception) -> ModelFailure | None:
             retryable=True,
             message=SERVICE_UNAVAILABLE_MESSAGE,
         )
+    # ModelOutputError 是 PermanentError 的子类，必须先判断，否则会被归为请求被拒。
     if isinstance(error, ModelOutputError):
         return ModelFailure(
             kind=ModelFailureKind.INVALID_OUTPUT,

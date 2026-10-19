@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 外部日历页：选择已授权连接，从显式任务或已接受计划生成写入草案，再逐项确认并执行。
+ * 流程：预览（不调用供应商）→ 勾选条目确认（15 分钟确认指纹）→ 执行写入 → 逐项展示成功／失败／待核实。
+ * 约束：查询、预览和关闭页面都不创建外部事件；失败或未知不得显示为已同步，重试不会重复已成功项。
+ */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { tasksApi } from '../api/business'
@@ -37,6 +42,7 @@ const selectedItemIds = ref<number[]>([])
 const execution = ref<ExecutionResult | null>(null)
 const differences = ref<SyncDifferences | null>(null)
 const connectionWaiting = ref(false)
+// OAuth 弹窗无法回传结果，只能轮询连接列表；最多等待 180 秒，见到可用连接即停止。
 let connectionTimer: number | null = null
 
 const statusLabels: Record<string, string> = {
@@ -76,6 +82,7 @@ const acceptedPlans = computed(() =>
     .filter((plan) => plan.status === 'accepted')
     .sort((left, right) => right.range_start.localeCompare(left.range_start)),
 )
+// 已完成任务不写入外部日历；无截止日期的任务仍展示但不可勾选，因为外部事件需要日期。
 const filteredTasks = computed(() => {
   const keyword = taskSearch.value.trim().toLowerCase()
   const base = tasks.value.filter((task) => task.progress !== 'done')
@@ -91,6 +98,7 @@ const canCreateDraft = computed(() => {
 const selectedPlan = computed(
   () => acceptedPlans.value.find((plan) => plan.id === selectedPlanId.value) ?? null,
 )
+// 只有待确认或已过期的草案可再次确认；已执行状态必须重新生成草案。
 const draftCanConfirm = computed(
   () => draft.value?.status === 'draft' || draft.value?.status === 'expired',
 )
@@ -111,6 +119,7 @@ function resetPreview(): void {
   actionMessage.value = ''
 }
 
+// 连接、模式或来源变化都会使草案内容和确认指纹失效，必须重新生成并确认。
 watch([mode, selectedTaskIds, selectedPlanId, selectedConnectionId], resetPreview)
 watch(selectedConnectionId, () => {
   differences.value = null
@@ -230,6 +239,7 @@ function taskDueText(task: Task): string {
   return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（全天）`
 }
 
+// 授权到期与确认有效期等页面时间戳按浏览器本机时区显示，格式取可排序的 sv-SE。
 function formatLocal(value: string | null): string {
   if (!value) return '—'
   return new Intl.DateTimeFormat('sv-SE', {
@@ -242,6 +252,7 @@ function formatLocal(value: string | null): string {
   }).format(new Date(value))
 }
 
+// 草案条目必须按目标日历时区展示：仅日期条目若按 UTC 读可能落到前一天，不能直接用本机时区。
 function formatInZone(value: string, timeZone: string): string {
   try {
     return new Intl.DateTimeFormat('sv-SE', {
@@ -258,6 +269,7 @@ function formatInZone(value: string, timeZone: string): string {
   }
 }
 
+// 仅日期事件只显示目标时区下的日期并标“全天”，不展开仅用于表示全天的起止边界。
 function itemTime(item: DraftItem): string {
   if (item.date_only) return `${formatInZone(item.starts_at, item.timezone).slice(0, 10)} 全天`
   return `${formatInZone(item.starts_at, item.timezone)} → ${formatInZone(item.ends_at, item.timezone)} · ${item.timezone}`
@@ -267,6 +279,7 @@ function statusLabel(status: string): string {
   return statusLabels[status] ?? status
 }
 
+// 预览只读内部数据、不调用供应商；条目默认全选，但此时尚未确认，也未写入。
 async function createPreview(): Promise<void> {
   if (!activeConnection.value) return
   actionError.value = ''
@@ -288,6 +301,7 @@ async function createPreview(): Promise<void> {
   }
 }
 
+// 内容指纹来自预览，选中范围以本次提交为准；后端据此生成 15 分钟有效的确认指纹。
 async function confirmDraft(): Promise<void> {
   const current = draft.value
   if (!current) return
@@ -312,6 +326,7 @@ async function confirmDraft(): Promise<void> {
   }
 }
 
+// 只有点击执行才调用供应商；确认过期或内部来源变化会在任何外部调用前被拒绝。
 async function executeDraft(): Promise<void> {
   const current = draft.value
   if (!current?.confirmed_fingerprint) return
@@ -329,6 +344,7 @@ async function executeDraft(): Promise<void> {
   }
 }
 
+// 只重试失败／未知／未执行项，已成功项不会重复写入；确认指纹过期后仍需先重新确认。
 async function retryFailed(): Promise<void> {
   const current = draft.value
   if (!current?.confirmed_fingerprint) return
@@ -346,6 +362,7 @@ async function retryFailed(): Promise<void> {
   }
 }
 
+// 对账接口只返回单条操作；重新拉取草案与全部操作，以重建逐项状态和成功／失败／未知计数。
 async function rebuildExecution(draftId: number): Promise<void> {
   const [current, operations] = await Promise.all([
     calendarApi.getDraft(draftId),
@@ -363,6 +380,7 @@ async function rebuildExecution(draftId: number): Promise<void> {
   draft.value = current
 }
 
+// 待核实表示写入超时等未知结果；先向供应商按幂等键查询，仍未确定则保持待核实。
 async function reconcile(operation: CalendarOperation): Promise<void> {
   actionError.value = ''
   actionMessage.value = ''
@@ -378,6 +396,7 @@ async function reconcile(operation: CalendarOperation): Promise<void> {
   }
 }
 
+// 差异检查只读内部状态；据此生成的新草案仍要重新预览和确认，不能复用旧授权。
 async function loadDifferences(): Promise<void> {
   if (!activeConnection.value) return
   actionError.value = ''
@@ -583,6 +602,7 @@ onBeforeUnmount(stopWaiting)
           勾选项就是确认范围；未展示或未勾选的内容不会被写入。{{ draft.confirmed_at ? `本次确认在 ${formatLocal(draft.expires_at)} 前有效。` : '确认后 15 分钟内有效；当前尚未确认。' }}
         </p>
 
+        <!-- 未纳入与警告由后端随草案返回，必须原样展示，否则用户会误以为全部来源已覆盖。 -->
         <div v-if="draft.excluded.length" class="calendar-notice-list">
           <p v-for="item in draft.excluded" :key="`excluded-${item.source_type}-${item.source_id}`" class="inline-notice">
             未纳入：{{ item.title || item.source_id }} — {{ item.message }}

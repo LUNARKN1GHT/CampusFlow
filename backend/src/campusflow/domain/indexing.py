@@ -67,6 +67,8 @@ def validated_index_coverage(raw: object, source_count: int) -> tuple[bool, int]
 
 @dataclass(frozen=True)
 class BlockIndexProgress:
+    """单个索引块的进度；只有失败态可以标记可重试，失败码受白名单约束。"""
+
     block_id: str
     state: BlockIndexState
     retryable: bool = False
@@ -90,6 +92,8 @@ class BlockIndexProgress:
 
 @dataclass(frozen=True)
 class IndexProgressSummary:
+    """索引汇总；分母始终是完整块清单，fully_searchable 还需覆盖已知且无遗漏。"""
+
     status: JobStatus
     expected: int
     indexed: int
@@ -106,6 +110,7 @@ class IndexProgressSummary:
 def _progress_by_id(
     expected_block_ids: Sequence[str], records: Sequence[BlockIndexProgress]
 ) -> dict[str, BlockIndexProgress]:
+    """把进度记录对齐到完整清单；清单外或重复记录直接拒绝，避免旧清单混入计数。"""
     if isinstance(expected_block_ids, (str, bytes)):
         raise DomainError("索引块清单必须是编号序列")
     if any(not isinstance(key, str) or not key or len(key) > 128 for key in expected_block_ids):
@@ -156,6 +161,7 @@ def summarize_index_progress(
         and source_coverage_known
         and uncovered_source_count == 0
     )
+    # 状态取最“未完成”的一档：运行中优先，只有全部待处理才报 PENDING。
     if counts[BlockIndexState.RUNNING]:
         status = JobStatus.RUNNING
     elif counts[BlockIndexState.PENDING]:

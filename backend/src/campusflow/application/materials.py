@@ -1,7 +1,10 @@
-"""资料导入用例（D004 起）。
+"""资料导入、版本读取与删除用例（D004 起）。
 
 导入流程：校验 → 保存原文件到私有存储 → 建资料与版本记录 → 切分来源片段，
 全部在同一事务内提交；任何一步失败整体回滚，不产生半成品资料。
+
+原文版本与片段一经保存不再改写：修订元数据只动资料级字段，归档只切换标记。
+只有删除会清理原文件与派生内容（版本、片段、作业、候选、向量索引等）。
 """
 
 import hashlib
@@ -181,6 +184,7 @@ def list_materials(
 
 
 def get_material(repos: Repositories, workspace_id: int, material_id: int) -> MaterialData:
+    """读取当前空间内的资料；跨空间与不存在同样报“资料不存在”，不泄露他空间数据。"""
     material = repos.materials.get(material_id)
     if material is None:
         raise NotFoundError("资料不存在")
@@ -275,6 +279,7 @@ def import_uploaded_files(
                 )
                 continue
 
+        # 扩展名在校验阶段已确认合法；未单列的图片格式统一走视觉解析器。
         source_type = {
             "pdf": MaterialSourceType.PDF,
             "docx": MaterialSourceType.WORD,
@@ -351,6 +356,11 @@ class DeleteImpact:
 
 
 def preview_delete_impact(repos: Repositories, workspace_id: int, material_id: int) -> DeleteImpact:
+    """删除影响预览（D008/D009）：列出将一并失效的版本、片段、任务与派生事项。
+
+    返回的确认指纹覆盖全部影响项；预览之后任何一项变化都会让旧确认失效，
+    避免用户按旧的预览结果删除已经变了的资料。
+    """
     material = get_material(repos, workspace_id, material_id)
     versions = repos.materials.list_versions(material_id)
     chunk_count = sum(len(repos.materials.list_chunks(v.id)) for v in versions)
@@ -400,12 +410,13 @@ def delete_material(
     """确认后删除资料（D008/D009）。
 
     确认指纹必须匹配当前影响内容，变化后旧确认失效；
-    keep_tasks=True 时保留个人任务并标记"来源已失效"，False 时一并删除。
+    keep_tasks=True 时保留个人任务并标记“来源已失效”，False 时一并删除。
 
-    派生内容随资料一起消失：原文件由存储层清理，版本、片段、处理作业与
-    尝试历史由数据库外键级联（D001 的 CASCADE、J007 的作业级联）。
-    将来新增的派生表（例如 M3 的向量索引、R 系列的候选结果）必须同样
-    挂在 materials / material_versions 下并声明 CASCADE，才能被这里一起清掉。
+    派生内容随资料一起消失：原文件由存储层立即清理，版本、片段、处理作业、
+    候选、向量索引与索引清单由数据库外键级联（D001、J007、Q004）删除，不留墓碑。
+    若将来启用备份，已删资料只以备份副本形式存在，随备份保留期（默认 30 天）
+    到期清除，见 docs/data-retention.md；新增派生表仍须挂在 materials /
+    material_versions 下并声明 CASCADE，才能被这里一起清掉。
     """
     # 与 N010 创建关系共享资料锁；确认到删除之间不能插入新的关系绕过影响预览。
     if not repos.materials.lock_for_delete(workspace_id, material_id):
@@ -478,8 +489,10 @@ def list_version_chunks(
 def read_original_file(
     repos: Repositories, storage: FileStorage, workspace_id: int, material_id: int, version_no: int
 ) -> tuple[bytes, str]:
-    """授权读取原文（D018）：空间归属校验贯穿文件内容访问；
-    文件缺失时返回明确的"已不可用"状态，不伪造内容。"""
+    """授权读取原文（D018）：空间归属校验贯穿文件内容访问。
+
+    文件缺失或版本没有存储键时统一报“来源已不可用”，不返回空内容冒充原文。
+    """
     get_material(repos, workspace_id, material_id)
     version = next(
         (v for v in repos.materials.list_versions(material_id) if v.version_no == version_no),

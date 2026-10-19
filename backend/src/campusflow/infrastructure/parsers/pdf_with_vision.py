@@ -17,10 +17,13 @@ from campusflow.domain.jobs import is_retryable
 from campusflow.infrastructure.llm.errors import VisionRecognitionFailure
 from campusflow.infrastructure.parsers.pdf_render import render_pdf_page
 
+# 与 PdfDocumentParser 的失败原因保持子串匹配；空白页不会进入视觉回退。
 SCAN_PAGE_REASON = "扫描页"
 
 
 class PdfWithVisionFallbackParser:
+    """组合解析器：文本层优先，只对扫描页渲染后调用视觉识别，单页失败不影响其它页。"""
+
     def __init__(
         self,
         text_parser: DocumentParser,
@@ -33,6 +36,8 @@ class PdfWithVisionFallbackParser:
         self._render = render
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+        """先完整解析文本层，再逐页补做视觉识别；视觉结果绑定到实际页码。"""
+
         text_outcome = self._text_parser.parse(content, mime_type)
 
         fragments: list[ParsedFragment] = []
@@ -40,6 +45,7 @@ class PdfWithVisionFallbackParser:
         seq = 0
 
         for fragment in text_outcome.fragments:
+            # 重新连续编号，避免文本页与后续回退片段的 seq 冲突。
             fragments.append(
                 ParsedFragment(
                     seq=seq,
@@ -62,6 +68,7 @@ class PdfWithVisionFallbackParser:
                 image = self._render(content, page)
                 vision_outcome = self._vision_parser.parse(image, "image/png")
             except (VisionRecognitionFailure, ValueError) as exc:
+                # 渲染越界等 ValueError 也只算该页失败；retryable 只由领域错误类型决定。
                 failures.append(
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page),
@@ -77,7 +84,7 @@ class PdfWithVisionFallbackParser:
                         locator=ParserLocator(
                             kind=item.locator.kind,
                             page=page,  # 回退结果绑定到实际页码
-                            bbox=item.locator.bbox,
+                            bbox=item.locator.bbox,  # bbox 保持相对整页的 0-1 坐标
                         ),
                         text=item.text,
                         confidence=item.confidence,
@@ -85,6 +92,7 @@ class PdfWithVisionFallbackParser:
                 )
                 seq += 1
             for vision_failure in vision_outcome.failures:
+                # 模型自述不可读的区域只记录为失败，不据此生成任何确定的片段。
                 failures.append(
                     ParseFailure(
                         locator=ParserLocator(kind="page", page=page),

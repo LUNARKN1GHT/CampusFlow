@@ -1,4 +1,8 @@
-"""N013：列出通知变更可能影响的正式事项与计划时间块；只读、不执行调整。"""
+"""N013：列出通知变更可能影响的正式事项与计划时间块；只读、不执行调整。
+
+影响范围来自基准候选（旧版本）已经生成的正式事项；已完成任务与锁定时间块
+照常列出，提醒与外部日历明确标为未接入，不伪装已同步。
+"""
 
 from dataclasses import dataclass
 
@@ -56,6 +60,7 @@ class ChangeImpact:
 
 
 def _task_impact(repos: Repositories, workspace_id: int, task) -> ImpactedTask:
+    # 已完成任务和锁定时间块也要列出：变更影响不能被“已完成”或“已锁定”掩盖。
     drafts = repos.plans.list_drafts(workspace_id)
     blocks: list[ImpactedBlock] = []
     for draft in drafts:
@@ -91,6 +96,11 @@ def collect_impact(
     baseline_candidate_id: int,
     comparison_candidate_id: int,
 ) -> ChangeImpact:
+    """对比两个候选并列出基准侧已生成事项的影响；不修改计划或任务。
+
+    只查基准（旧）候选的来源关联：新版本尚未被接受，不能提前把它的
+    正式事项当成现有安排。
+    """
     diff = compare_candidates(repos, workspace_id, baseline_candidate_id, comparison_candidate_id)
     tasks = []
     task = repos.tasks.get_by_source_candidate(baseline_candidate_id)

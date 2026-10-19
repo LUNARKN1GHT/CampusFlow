@@ -1,3 +1,6 @@
+// 任务清单 CSV 与日历 ICS 导出：必须先预览，下载携带预览返回的范围指纹。
+// 只导出显式选择的任务或当前已接受计划，不做整空间回退；范围变化后指纹不一致由后端返回 409。
+
 import { apiRequest, apiRequestFile, type RequestedFile } from './client'
 
 export type ExportMode = 'tasks' | 'plan'
@@ -89,12 +92,14 @@ export type ExportPreview = {
   can_download: boolean
 }
 
+// 计划模式只提供 ICS；任务模式 CSV／ICS 均可，具体限制由后端按模式校验。
 export const exportsApi = {
   preview: (input: ExportRequest) =>
     apiRequest<ExportPreview>('/exports/preview', {
       method: 'POST',
       body: JSON.stringify(input),
     }),
+  // 下载时按同一份范围重算并比对 scope_fingerprint；缺失指纹返回 400，不一致返回 409。
   download: (input: ExportRequest): Promise<RequestedFile> =>
     apiRequestFile('/exports', {
       method: 'POST',
