@@ -16,6 +16,7 @@ from campusflow.application.scope import require_in_workspace
 from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
+from campusflow.domain.task_dependencies import cyclic_components, dependency_cycle
 
 
 def _apply_overdue(repos: Repositories, workspace_id: int, tasks: list[TaskData]) -> list[TaskData]:
@@ -235,10 +236,28 @@ def _existing_dependency(
     return None
 
 
+def _dependency_edges(repos: Repositories, workspace_id: int) -> dict[int, set[int]]:
+    edges: dict[int, set[int]] = {}
+    for link in repos.tasks.list_workspace_dependencies(workspace_id):
+        edges.setdefault(link.task_id, set()).add(link.depends_on_task_id)
+    return edges
+
+
+def _dependency_titles(repos: Repositories, task_ids: set[int]) -> dict[int, str]:
+    titles: dict[int, str] = {}
+    for task_id in task_ids:
+        task = repos.tasks.get(task_id)
+        titles[task_id] = task.title if task is not None else f"任务 {task_id}"
+    return titles
+
+
 def add_dependency(
     repos: Repositories, workspace_id: int, task_id: int, depends_on_task_id: int
 ) -> TaskDependencyData:
-    """添加"先完成前置任务"的必要依赖（A001）；重复添加保持幂等。"""
+    """添加"先完成前置任务"的必要依赖（A001）；成环时拒绝（A002）。
+
+    重复添加保持幂等；环内任务不能被当作可执行顺序，因此先校验再加边。
+    """
     _require_task_in_workspace(repos, workspace_id, task_id)
     _require_task_in_workspace(repos, workspace_id, depends_on_task_id)
     if task_id == depends_on_task_id:
@@ -246,9 +265,120 @@ def add_dependency(
     existing = _existing_dependency(repos, task_id, depends_on_task_id)
     if existing is not None:
         return existing
+
+    edges = _dependency_edges(repos, workspace_id)
+    edges.setdefault(task_id, set()).add(depends_on_task_id)
+    cycle = dependency_cycle(edges)
+    if cycle is not None:
+        titles = _dependency_titles(repos, set(cycle))
+        path = " → ".join(titles[item] for item in cycle)
+        raise DomainError(f"任务依赖成环：{path}；成环的依赖不能当作可执行顺序")
+
     link = repos.tasks.add_dependency(workspace_id, task_id, depends_on_task_id)
     repos.uow.commit()
     return link
+
+
+def dependency_check(
+    repos: Repositories, workspace_id: int, *, semester_id: int | None = None
+) -> dict:
+    """检查依赖成环、范围外/缺失前置与已取消前置（A002）。
+
+    成环基于整个工作空间；缺失与取消按本次选择的任务范围判断。
+    不修改任何任务或依赖。
+    """
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    scoped = repos.tasks.list(workspace_id, semester_id=semester_id)
+    scoped_ids = {task.id for task in scoped}
+    all_tasks = repos.tasks.list(workspace_id)
+    by_id = {task.id: task for task in all_tasks}
+    edges = _dependency_edges(repos, workspace_id)
+
+    cycles = []
+    cycle_task_ids: set[int] = set()
+    for component in cyclic_components(edges):
+        cycle_task_ids.update(component)
+        titles = [by_id[item].title if item in by_id else f"任务 {item}" for item in component]
+        cycles.append(
+            {
+                "task_ids": component,
+                "titles": titles,
+                "message": "依赖成环：" + " ↔ ".join(titles),
+            }
+        )
+
+    missing: list[dict] = []
+    cancelled: list[dict] = []
+    blocked: dict[int, dict] = {}
+
+    def block(task: TaskData, reason: dict) -> None:
+        entry = blocked.setdefault(
+            task.id,
+            {
+                "task_id": task.id,
+                "title": task.title,
+                "reasons": [],
+            },
+        )
+        entry["reasons"].append(reason)
+
+    for task in scoped:
+        if task.id in cycle_task_ids:
+            block(
+                task,
+                {
+                    "code": "dependency_cycle",
+                    "message": "任务位于依赖环中，不能确定可执行顺序",
+                },
+            )
+
+    for link in repos.tasks.list_workspace_dependencies(workspace_id):
+        if link.task_id not in scoped_ids:
+            continue
+        task = by_id[link.task_id]
+        prerequisite = by_id.get(link.depends_on_task_id)
+        if prerequisite is None:
+            reason = {
+                "code": "prerequisite_missing",
+                "depends_on_task_id": link.depends_on_task_id,
+                "message": f"前置任务 {link.depends_on_task_id} 已不存在，无法满足依赖",
+            }
+            missing.append({**reason, "task_id": task.id, "title": task.title})
+            block(task, reason)
+        elif prerequisite.id not in scoped_ids:
+            reason = {
+                "code": "prerequisite_out_of_scope",
+                "depends_on_task_id": prerequisite.id,
+                "depends_on_title": prerequisite.title,
+                "message": f"前置任务《{prerequisite.title}》不在当前学期范围，无法确认完成情况",
+            }
+            missing.append({**reason, "task_id": task.id, "title": task.title})
+            block(task, reason)
+        elif prerequisite.progress == TaskProgress.CANCELLED:
+            reason = {
+                "code": "prerequisite_cancelled",
+                "depends_on_task_id": prerequisite.id,
+                "depends_on_title": prerequisite.title,
+                "message": f"前置任务《{prerequisite.title}》已取消，依赖无法满足",
+            }
+            cancelled.append({**reason, "task_id": task.id, "title": task.title})
+            block(task, reason)
+
+    return {
+        "semester_id": semester_id,
+        "valid": not cycles and not missing and not cancelled,
+        "checked_tasks": len(scoped),
+        "checked_edges": sum(
+            1
+            for link in repos.tasks.list_workspace_dependencies(workspace_id)
+            if link.task_id in scoped_ids
+        ),
+        "cycles": cycles,
+        "missing_prerequisites": missing,
+        "cancelled_prerequisites": cancelled,
+        "blocked_tasks": sorted(blocked.values(), key=lambda item: item["task_id"]),
+    }
 
 
 def remove_dependency(

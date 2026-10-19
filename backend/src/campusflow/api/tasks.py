@@ -56,6 +56,15 @@ def list_tasks(
     ]
 
 
+@router.get("/tasks/dependencies/check", response_model=dict)
+def check_task_dependencies(
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    semester_id: Annotated[int | None, Query(ge=1)] = None,
+) -> dict:
+    return use_cases.dependency_check(repos, workspace.id, semester_id=semester_id)
+
+
 @router.post("/tasks", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, workspace: CurrentWorkspace, repos: Repos) -> TaskOut:
     task = use_cases.create_task(
