@@ -457,6 +457,52 @@ class CourseAlias(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class CourseStudyRecord(Base):
+    """C007：个人修读记录。
+
+    状态未知由“没有记录”表达，不落库成猜测值；成绩与已得学分只保存
+    用户显式填写的值，不按课程学分或其它记录推算。同一课程可在不同学期
+    重复修读，但同一课程、学期与状态只允许一条记录。
+    """
+
+    __tablename__ = "course_study_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_course_id",
+            "semester_id",
+            "status",
+            name="uq_course_study_record",
+            postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint(
+            "status IN ('completed', 'in_progress', 'planned')",
+            name="ck_course_study_record_status",
+        ),
+        CheckConstraint(
+            "credits_earned IS NULL OR credits_earned >= 0",
+            name="ck_course_study_record_credits",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    # 学期可未知；删除学期只清空引用，不删除修读记录。
+    semester_id: Mapped[int | None] = mapped_column(
+        ForeignKey("semesters.id", ondelete="SET NULL"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(20))
+    grade: Mapped[str | None] = mapped_column(String(100))
+    credits_earned: Mapped[float | None] = mapped_column(Float)
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Material(Base):
     """学习资料（D001）。
 
