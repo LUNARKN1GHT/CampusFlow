@@ -11,11 +11,28 @@ from campusflow.application.ports.repositories import (
     LearnerProfileData,
     Repositories,
 )
+from campusflow.domain.candidates import CandidateKind
+from campusflow.domain.course_graph import (
+    GraphCourse,
+    GraphProblem,
+    GraphRelation,
+    GraphResult,
+    NextCourse,
+    SemesterSuggestion,
+    TopoResult,
+    find_conflicts,
+    find_cycles,
+    next_courses,
+    suggest_terms,
+    topological_levels,
+)
 from campusflow.domain.course_paths import (
     UNKNOWN_STUDY_STATUS,
+    RelationType,
     aggregate_study_status,
     alias_scope_applies,
     normalize_course_name,
+    parse_relation_type_text,
     profile_missing_fields,
     validate_alias_text,
     validate_course_fields,
@@ -25,6 +42,7 @@ from campusflow.domain.course_paths import (
     validate_study_record_fields,
 )
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.states import ReviewStatus
 
 
 def list_plans(repos: Repositories, workspace_id: int) -> list[CurriculumPlanData]:
@@ -744,4 +762,251 @@ def preview_switch_plan(
         counts.get("courses", 0),
         counts.get("study_records", 0),
         note,
+    )
+
+
+@dataclass(frozen=True)
+class PlanGraph:
+    """E81：图、边证据与候选问题；只读，不修改任何关系。"""
+
+    plan: CurriculumPlanData
+    graph: GraphResult
+    edge_evidence: dict[int, tuple[dict, ...]]
+
+
+@dataclass(frozen=True)
+class PlanAnalysis:
+    plan: CurriculumPlanData
+    graph: PlanGraph
+    order: TopoResult
+    next_courses: tuple[NextCourse, ...]
+    semester: SemesterSuggestion
+    study_summary: StudyStatusSummary
+
+
+def _candidate_evidence(repos: Repositories, candidate) -> tuple[dict, ...]:
+    version = repos.materials.get_version(candidate.source_version_id)
+    material_id = None if version is None else version.material_id
+    items: list[dict] = []
+    seen: set[tuple[int, str]] = set()
+    for candidate_field in candidate.effective_draft().fields:
+        for evidence in candidate_field.evidence:
+            key = (evidence.chunk_id, evidence.quote)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(
+                {
+                    "chunk_id": evidence.chunk_id,
+                    "quote": evidence.quote,
+                    "field": candidate_field.name,
+                    "version_id": candidate.source_version_id,
+                    "material_id": material_id,
+                }
+            )
+    return tuple(items)
+
+
+def _relation_candidate_issues(
+    repos: Repositories,
+    workspace_id: int,
+    plan_id: int,
+    relations: tuple[GraphRelation, ...],
+) -> tuple[tuple[GraphProblem, ...], tuple[GraphProblem, ...]]:
+    """把未转换的关系候选列为缺项/待核对/冲突，不让它们静默改变图。"""
+    missing: list[GraphProblem] = []
+    pending: list[GraphProblem] = []
+    formal_by_pair: dict[tuple[int, int], set[RelationType]] = {}
+    for relation in relations:
+        formal_by_pair.setdefault(
+            (relation.from_course_id, relation.to_course_id), set()
+        ).add(relation.relation_type)
+    for candidate in repos.candidates.list_all(workspace_id, CandidateKind.COURSE_RELATION):
+        if candidate.draft.scope.curriculum_plan_id != plan_id:
+            continue
+        if candidate.review_status in (ReviewStatus.IGNORED, ReviewStatus.SUPERSEDED):
+            continue
+        fields = {field.name: field for field in candidate.effective_draft().fields}
+        relation_type = parse_relation_type_text(
+            fields.get("relation_type").value if fields.get("relation_type") else None
+        )
+        names = [
+            fields.get(name).value if fields.get(name) is not None else None
+            for name in ("from_course_name", "to_course_name")
+        ]
+        if relation_type is None or any(not isinstance(name, str) for name in names):
+            missing.append(
+                GraphProblem(
+                    "relation_candidate_incomplete",
+                    f"候选 #{candidate.id} 缺少可确定的关系类型或课程名称，不能进入依赖图",
+                    candidate_ids=(candidate.id,),
+                )
+            )
+            continue
+        resolved = [
+            resolve_course_name(
+                repos,
+                workspace_id,
+                plan_id,
+                name=name,
+                semester_id=candidate.draft.scope.semester_id,
+                class_name=candidate.draft.scope.class_name,
+            )
+            for name in names
+        ]
+        if any(item.status != "matched" for item in resolved):
+            missing.append(
+                GraphProblem(
+                    "relation_candidate_unmatched",
+                    f"候选 #{candidate.id}“{names[0]} → {names[1]}”中的课程无法在方案内唯一匹配",
+                    candidate_ids=(candidate.id,),
+                )
+            )
+            continue
+        source, target = (item.matches[0].id for item in resolved)
+        types = formal_by_pair.get((source, target), set())
+        if types and relation_type not in types:
+            pending.append(
+                GraphProblem(
+                    "relation_candidate_conflict",
+                    f"候选 #{candidate.id} 的关系类型与正式关系不同，核对前不能宣称图完整",
+                    (source, target),
+                    candidate_ids=(candidate.id,),
+                )
+            )
+        else:
+            pending.append(
+                GraphProblem(
+                    "relation_candidate_pending",
+                    f"候选 #{candidate.id} 仍是待核对或尚未转换的关系，暂不进入正式依赖图",
+                    (source, target),
+                    candidate_ids=(candidate.id,),
+                )
+            )
+    return tuple(missing), tuple(pending)
+
+
+def build_plan_graph(
+    repos: Repositories, workspace_id: int, plan_id: int
+) -> PlanGraph:
+    """只读取当前方案的有效课程、正式关系与待核对关系候选。"""
+    plan = get_plan(repos, workspace_id, plan_id)
+    course_rows = repos.paths.list_courses(plan_id)
+    status_summary = get_study_status(repos, workspace_id, plan_id)
+    status_by_course = {entry.course.id: entry for entry in status_summary.entries}
+    courses = tuple(
+        GraphCourse(
+            course.id,
+            course.name,
+            course.code,
+            course.credits,
+            tuple(course.offered_terms),
+            (
+                status_by_course[course.id].status
+                if course.id in status_by_course
+                else UNKNOWN_STUDY_STATUS
+            ),
+            len(status_by_course[course.id].records) if course.id in status_by_course else 0,
+        )
+        for course in course_rows
+    )
+    relations = tuple(
+        GraphRelation(
+            relation.id,
+            relation.from_course_id,
+            relation.to_course_id,
+            RelationType(relation.relation_type),
+            relation.condition_text,
+            relation.source_candidate_id,
+        )
+        for relation in repos.paths.list_relations(plan_id)
+    )
+    cycles = find_cycles(courses, relations)
+    conflicts = find_conflicts(relations)
+    missing, pending = _relation_candidate_issues(
+        repos, workspace_id, plan_id, relations
+    )
+    complete = not (cycles or conflicts or missing or pending)
+    limitations = [
+        "只使用当前方案内已确认的课程关系；不同方案的课程不会被连接。",
+        "并修只约束同一学期，建议先学只作提示；缺项或矛盾未核对前不宣称图完整。",
+    ]
+    if not complete:
+        limitations.append("图中存在环、缺项、矛盾或未转换候选，完整顺序与学期建议保持阻塞。")
+    return PlanGraph(
+        plan,
+        GraphResult(
+            courses,
+            relations,
+            cycles,
+            conflicts,
+            missing,
+            pending,
+            complete,
+            tuple(limitations),
+        ),
+        {
+            relation.id: _candidate_evidence(repos, candidate)
+            for relation in relations
+            if relation.source_candidate_id is not None
+            for candidate in [repos.candidates.get(workspace_id, relation.source_candidate_id)]
+            if candidate is not None
+        },
+    )
+
+
+def analyze_plan(
+    repos: Repositories,
+    workspace_id: int,
+    plan_id: int,
+    *,
+    credit_limit: int | None = None,
+    start_season: str = "fall",
+    max_terms: int | None = None,
+) -> PlanAnalysis:
+    """一次读取图、顺序、下一步与学期建议；问题只阻塞结论，不改写数据。"""
+    graph = build_plan_graph(repos, workspace_id, plan_id)
+    blocked = bool(
+        graph.graph.cycles
+        or graph.graph.conflicts
+        or graph.graph.missing
+        or graph.graph.pending
+    )
+    order = topological_levels(graph.graph.courses, graph.graph.relations)
+    if blocked:
+        order = TopoResult(
+            (),
+            False,
+            tuple(
+                graph.graph.cycles
+                + graph.graph.conflicts
+                + graph.graph.missing
+                + graph.graph.pending
+            ),
+        )
+    next_items = next_courses(graph.graph.courses, graph.graph.relations)
+    if blocked:
+        semester = SemesterSuggestion(
+            (),
+            (),
+            tuple(graph.graph.limitations)
+            + ("存在未核对问题，未生成学期方案。",),
+        )
+    else:
+        semester = suggest_terms(
+            graph.graph.courses,
+            graph.graph.relations,
+            credit_limit=credit_limit
+            if credit_limit is not None
+            else graph.plan.credit_limit_per_term,
+            start_season=start_season,
+            max_terms=max_terms,
+        )
+    return PlanAnalysis(
+        graph.plan,
+        graph,
+        order,
+        next_items,
+        semester,
+        get_study_status(repos, workspace_id, plan_id),
     )

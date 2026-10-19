@@ -202,6 +202,67 @@ class StudyStatusOut(BaseModel):
     note: str
 
 
+class GraphNodeOut(BaseModel):
+    id: int
+    name: str
+    code: str | None
+    credits: float | None
+    offered_terms: list[str]
+    study_status: str
+    record_count: int
+
+
+class GraphEvidenceOut(BaseModel):
+    chunk_id: int
+    quote: str
+    field: str
+    version_id: int
+    material_id: int | None
+
+
+class GraphEdgeOut(BaseModel):
+    id: int
+    from_course_id: int
+    to_course_id: int
+    relation_type: str
+    condition_text: str | None
+    source_candidate_id: int | None
+    evidence: list[GraphEvidenceOut]
+
+
+class GraphProblemOut(BaseModel):
+    code: str
+    message: str
+    course_ids: list[int]
+    relation_ids: list[int]
+    path: list[int]
+    candidate_ids: list[int]
+
+
+class CourseGraphOut(BaseModel):
+    plan_id: int
+    plan_version: str
+    nodes: list[GraphNodeOut]
+    edges: list[GraphEdgeOut]
+    cycles: list[GraphProblemOut]
+    conflicts: list[GraphProblemOut]
+    missing: list[GraphProblemOut]
+    pending: list[GraphProblemOut]
+    complete: bool
+    limitations: list[str]
+
+
+def _problem_out(problem) -> GraphProblemOut:
+    return GraphProblemOut(
+        code=problem.code,
+        message=problem.message,
+        course_ids=list(problem.course_ids),
+        relation_ids=list(problem.relation_ids),
+        path=list(problem.path),
+        candidate_ids=list(problem.candidate_ids),
+    )
+
+
 class LearnerProfileUpdate(BaseModel):
     major: str | None = Field(default=None, max_length=100)
     grade_year: int | None = None
@@ -475,6 +536,51 @@ def resolve_plan_alias(
         matches=[CurriculumCourseOut.model_validate(course) for course in resolved.matches],
         matched_by=resolved.matched_by,
         note=resolved.note,
+    )
+
+
+@router.get("/curriculum-plans/{plan_id}/graph", response_model=CourseGraphOut)
+def get_plan_graph(
+    plan_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> CourseGraphOut:
+    view = use_cases.build_plan_graph(repos, workspace.id, plan_id)
+    graph = view.graph
+    return CourseGraphOut(
+        plan_id=view.plan.id,
+        plan_version=view.plan.version_label,
+        nodes=[
+            GraphNodeOut(
+                id=course.id,
+                name=course.name,
+                code=course.code,
+                credits=course.credits,
+                offered_terms=list(course.offered_terms),
+                study_status=course.study_status,
+                record_count=course.record_count,
+            )
+            for course in graph.courses
+        ],
+        edges=[
+            GraphEdgeOut(
+                id=relation.id,
+                from_course_id=relation.from_course_id,
+                to_course_id=relation.to_course_id,
+                relation_type=relation.relation_type.value,
+                condition_text=relation.condition_text,
+                source_candidate_id=relation.source_candidate_id,
+                evidence=[
+                    GraphEvidenceOut(**item)
+                    for item in view.edge_evidence.get(relation.id, ())
+                ],
+            )
+            for relation in graph.relations
+        ],
+        cycles=[_problem_out(item) for item in graph.cycles],
+        conflicts=[_problem_out(item) for item in graph.conflicts],
+        missing=[_problem_out(item) for item in graph.missing],
+        pending=[_problem_out(item) for item in graph.pending],
+        complete=graph.complete,
+        limitations=list(graph.limitations),
     )
 
 
