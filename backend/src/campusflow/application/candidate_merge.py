@@ -91,6 +91,11 @@ def preview_merge(
         source = get_candidate(repos, workspace_id, source_id)
         if source.draft.kind is not target.draft.kind:
             raise DomainError("只能合并同一类型的候选事项")
+        for field in ("semester_id", "course_id", "class_name"):
+            left = getattr(target.draft.scope, field)
+            right = getattr(source.draft.scope, field)
+            if left and right and left != right:
+                raise DomainError("学期、课程或教学班不同，不能合并为同一事项")
         kind, formal_id, progress, block_count = _formal(repos, source)
         sources.append(
             MergeSourcePreview(
