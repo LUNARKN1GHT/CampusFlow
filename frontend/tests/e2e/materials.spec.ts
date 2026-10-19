@@ -127,3 +127,30 @@ test.describe('M2 资料库真实队列闭环', () => {
     await expect(page.locator('.task-row').filter({ hasText: task.title })).toContainText('引用不可用')
   })
 })
+
+test.describe('M6 网页不可访问时的替代输入', () => {
+  test('失败原因与未覆盖范围可见，并可改用粘贴原文', async ({ page }) => {
+    await page.goto('/login')
+    await page.getByLabel('用户名').fill('student')
+    await page.getByLabel('密码').fill('campusflow-dev')
+    await page.getByLabel('密码').press('Enter')
+    await page.getByRole('link', { name: '资料库' }).click()
+    await page.getByRole('button', { name: '导入资料', exact: true }).click()
+    await page.getByRole('button', { name: '公开网页' }).click()
+    await expect(page.getByText(/不会自动登录教务系统/)).toBeVisible()
+    await page.getByLabel('网页网址').fill('https://example.edu/notice')
+    await page.getByLabel('标题', { exact: true }).fill('登录页通知')
+    await page.route('**/api/v1/materials/web', (route) => route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: '网页需要登录或拒绝访问，请上传文件或粘贴原文' }),
+    }))
+    await page.getByRole('button', { name: '读取网页并处理' }).click()
+    await expect(page.getByRole('alert')).toContainText('网页需要登录或拒绝访问')
+    await expect(page.getByText(/网页正文未导入/)).toContainText('未覆盖内容不会被当作“没有要求”')
+    await page.getByRole('button', { name: '改为粘贴原文' }).click()
+    await expect(page.getByLabel('标题', { exact: true })).toHaveValue('登录页通知')
+    await expect(page.getByLabel('正文', { exact: true })).toBeVisible()
+    await expect(page.getByText(/网页正文未导入/)).toBeVisible()
+  })
+})
