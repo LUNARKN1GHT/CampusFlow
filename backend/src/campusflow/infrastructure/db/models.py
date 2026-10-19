@@ -779,3 +779,83 @@ class CandidateMerge(Base):
     reason: Mapped[str] = mapped_column(String(1000))
     operator: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReminderRule(Base):
+    """A010：提醒提前量、重复、暂停与关联任务。
+
+    规则和触发记录分表保存；task_id 为空表示工作空间默认规则。
+    时间一律按工作空间时区解释，规则本身不保存时区副本。
+    """
+
+    __tablename__ = "reminder_rules"
+    __table_args__ = (
+        CheckConstraint("advance_minutes >= 0", name="ck_reminder_rules_advance"),
+        CheckConstraint(
+            "repeat_minutes IS NULL OR repeat_minutes > 0", name="ck_reminder_rules_repeat"
+        ),
+        CheckConstraint("version >= 1", name="ck_reminder_rules_version"),
+        Index(
+            "uq_reminder_rules_task",
+            "workspace_id",
+            "task_id",
+            unique=True,
+            postgresql_where=text("task_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_reminder_rules_default",
+            "workspace_id",
+            unique=True,
+            postgresql_where=text("task_id IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    advance_minutes: Mapped[int] = mapped_column(Integer, default=1440, server_default="1440")
+    repeat_minutes: Mapped[int | None] = mapped_column(Integer)
+    paused: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ReminderTrigger(Base):
+    """A010/A012：一次实际提醒。dedupe_key 由事项、规则版本和触发窗口生成。"""
+
+    __tablename__ = "reminder_triggers"
+    __table_args__ = (
+        CheckConstraint("kind IN ('deadline', 'review')", name="ck_reminder_triggers_kind"),
+        CheckConstraint(
+            "status IN ('pending', 'sent', 'dismissed', 'cancelled')",
+            name="ck_reminder_triggers_status",
+        ),
+        UniqueConstraint("dedupe_key", name="uq_reminder_triggers_dedupe"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    rule_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reminder_rules.id", ondelete="CASCADE"), index=True
+    )
+    task_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    dedupe_key: Mapped[str] = mapped_column(String(200))
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    message: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default="pending", server_default="pending")
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
