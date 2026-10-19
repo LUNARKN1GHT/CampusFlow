@@ -4,6 +4,9 @@
     uv run alembic revision --autogenerate -m "说明"
     uv run alembic upgrade head
 并检查生成的迁移文件内容。
+
+派生数据（版本、片段、候选、索引与作业）随父对象外键 CASCADE 删除；任务、
+日程与规则不随来源消失，只解除关联并保留来源失效留痕。
 """
 
 from datetime import date, datetime, time
@@ -33,6 +36,8 @@ from campusflow.infrastructure.db.base import Base
 
 
 class EmbeddingProfileRecord(Base):
+    """不可变的向量配置目录（Q002）。id 即配置身份，登记后不得改写。"""
+
     __tablename__ = "embedding_profiles"
     __table_args__ = (CheckConstraint("dimensions > 0 AND dimensions <= 4096"),)
 
@@ -69,15 +74,18 @@ class IndexedBlock(Base):
             postgresql_with={"m": 16, "ef_construction": 64},
         ),
     )
+    # 配置参与主键：同一块在不同配置下各存一行，向量不跨配置比较
     profile_id: Mapped[str] = mapped_column(ForeignKey("embedding_profiles.id"), primary_key=True)
     block_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    # 随版本与片段级联删除，避免向量继续指向已不存在的原文
     version_id: Mapped[int] = mapped_column(
         ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
     )
     source_chunk_id: Mapped[int] = mapped_column(
         ForeignKey("source_chunks.id", ondelete="CASCADE"), index=True
     )
+    # 原文指纹与分块版本：文本或切分方式变化后不能复用旧向量
     source_fingerprint: Mapped[str] = mapped_column(String(64))
     start_offset: Mapped[int] = mapped_column(Integer)
     end_offset: Mapped[int] = mapped_column(Integer)
@@ -89,13 +97,17 @@ class IndexedBlock(Base):
     # 领取次数（含第一次）：达到上限后不再调用模型，避免崩溃或临时失败无限重试。
     attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     embedding: Mapped[list[float] | None] = mapped_column(VECTOR(1024))
+    # 领取凭证与租约：Worker 认领后才调用模型，租约过期允许他人重新领取
     claim_token: Mapped[str | None] = mapped_column(String(32))
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class IndexManifest(Base):
-    """完整来源/块清单快照；身份包含配置、来源、分块设置和解析覆盖。"""
+    """完整来源/块清单快照；身份包含配置、来源、分块设置和解析覆盖。
+
+    只有清单内全部块成功且解析覆盖完整，才允许该版本被完整检索。
+    """
 
     __tablename__ = "index_manifests"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -114,6 +126,7 @@ class Workspace(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
+    # 排期容量、休息与缓冲分钟数按工作空间时区解释；改设置不改写已生成计划
     daily_capacity_minutes: Mapped[int] = mapped_column(Integer, default=240)
     weekly_capacity_minutes: Mapped[int] = mapped_column(Integer, default=1680)
     break_minutes: Mapped[int] = mapped_column(Integer, default=15)
@@ -131,6 +144,7 @@ class Semester(Base):
     name: Mapped[str] = mapped_column(String(100))
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date] = mapped_column(Date)
+    # 归档只切换标记，不删除或改写课程、任务、计划与进度历史
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -176,6 +190,7 @@ class Task(Base):
     # 不得把只有日期的 DDL 补成 00:00 或 23:59 的确定时刻。
     due_date: Mapped[date | None] = mapped_column(Date)
     due_time: Mapped[time | None] = mapped_column(Time)
+    # 执行进度与候选核对状态是两条独立状态轴，互不写入
     progress: Mapped[str] = mapped_column(String(20), default=TaskProgress.NOT_STARTED)
     priority: Mapped[str] = mapped_column(String(20), default=TaskPriority.MEDIUM)
     estimated_minutes: Mapped[int | None] = mapped_column(Integer)
@@ -192,6 +207,8 @@ class Task(Base):
 
 
 class TaskProgressChange(Base):
+    """进度变更历史（只追加）：记录改变前后的进度与剩余耗时，供回溯。"""
+
     __tablename__ = "task_progress_changes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -236,6 +253,7 @@ class FixedEvent(Base):
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     location: Mapped[str | None] = mapped_column(String(200))
+    # 每周重复按工作空间时区的墙上时间展开；repeat_until 含当天
     recurrence: Mapped[str] = mapped_column(String(20), default=EventRecurrence.NONE)
     repeat_until: Mapped[date | None] = mapped_column(Date)
     # R005：核对转换而来时指向来源候选，唯一约束保证一个候选只建一个日程；
@@ -300,6 +318,7 @@ class CurriculumPlan(Base):
 
     __tablename__ = "curriculum_plans"
     __table_args__ = (
+        # 同一空间内专业、年级与版本号唯一，避免两套方案并行生效
         UniqueConstraint(
             "workspace_id", "major", "grade_year", "version_label", name="uq_curriculum_plan"
         ),
@@ -344,6 +363,7 @@ class LearnerProfile(Base):
     workspace_id: Mapped[int] = mapped_column(
         ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
     )
+    # 工作空间即主键：每个空间只有一份学习档案
     major: Mapped[str | None] = mapped_column(String(100))
     grade_year: Mapped[int | None] = mapped_column(Integer)
     curriculum_plan_id: Mapped[int | None] = mapped_column(
@@ -387,6 +407,7 @@ class CourseRelation(Base):
 
     __tablename__ = "course_relations"
     __table_args__ = (
+        # 同一方案内同一对课程与同类关系只存一条，重复导入不产生重复边
         UniqueConstraint(
             "curriculum_plan_id",
             "from_course_id",
@@ -430,6 +451,7 @@ class CourseAlias(Base):
 
     __tablename__ = "course_aliases"
     __table_args__ = (
+        # NULLS NOT DISTINCT：班级或学期为空时也参与唯一性，避免重复登记别名
         UniqueConstraint(
             "curriculum_course_id",
             "alias",
@@ -522,7 +544,9 @@ class Material(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_type: Mapped[str] = mapped_column(String(20))
     source_url: Mapped[str | None] = mapped_column(String(500))
+    # 处理状态（解析进度）；与核对状态、归档标记相互独立
     status: Mapped[str] = mapped_column(String(20), default="pending")
+    # 归档后默认列表与检索都排除，但不删除资料或派生数据
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     imported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -530,7 +554,10 @@ class Material(Base):
 
 
 class MaterialVersion(Base):
-    """资料版本（D001）。版本与资料通过 (material_id, version_no) 稳定关联。"""
+    """资料版本（D001）。版本与资料通过 (material_id, version_no) 稳定关联。
+
+    原文与文件按版本冻结，新内容另建版本；只有 source_metadata 可补充解析范围。
+    """
 
     __tablename__ = "material_versions"
     __table_args__ = (
@@ -556,6 +583,7 @@ class MaterialVersionRelation(Base):
 
     __tablename__ = "material_version_relations"
     __table_args__ = (
+        # 唯一约束兜底：并发创建同一关系时不会落库两条
         UniqueConstraint(
             "workspace_id",
             "source_version_id",
@@ -565,6 +593,7 @@ class MaterialVersionRelation(Base):
         ),
         CheckConstraint("source_version_id <> target_version_id"),
         CheckConstraint("kind IN ('same_source', 'replacement_claim')"),
+        # same_source 强制小 id 在前，同一关系不会双向各存一条
         CheckConstraint("kind <> 'same_source' OR source_version_id < target_version_id"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -578,6 +607,7 @@ class MaterialVersionRelation(Base):
     kind: Mapped[str] = mapped_column(String(30))
     statement: Mapped[str] = mapped_column(String(1000))
     actor: Mapped[str] = mapped_column(String(200))
+    # 两端发布信息与适用范围在关联时快照，原文件、片段与正式事项不改写
     source_snapshot: Mapped[dict] = mapped_column(JSONB)
     target_snapshot: Mapped[dict] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -595,6 +625,7 @@ class SourceChunk(Base):
     __table_args__ = (UniqueConstraint("version_id", "seq", name="uq_source_chunks_version_seq"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # 片段随版本级联删除；旧引用读取时重新核对片段是否仍可定位
     version_id: Mapped[int] = mapped_column(
         ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
     )
@@ -641,6 +672,7 @@ class ProcessingJob(Base):
         ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
     )
     stage: Mapped[str] = mapped_column(String(20))  # JobStage
+    # 当前尝试的阶段状态；每次终态尝试另写入 processing_job_attempts
     status: Mapped[str] = mapped_column(String(20), default="pending")  # JobStatus
     # 覆盖范围说明（如"第 1-3 页完成，第 4 页失败"），不含原文全文
     scope: Mapped[str | None] = mapped_column(String(500))
@@ -704,6 +736,7 @@ class ExtractedItem(Base):
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    # 绑定具体版本：版本删除时候选级联消失，正式事项由应用层留下来源失效痕迹
     source_version_id: Mapped[int] = mapped_column(
         ForeignKey("material_versions.id", ondelete="CASCADE"), index=True
     )
@@ -718,6 +751,7 @@ class ExtractedItem(Base):
     curriculum_plan_id: Mapped[int | None] = mapped_column(
         ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
     )
+    # 待核对原因代码列表（JSONB）；按代码过滤在应用层完成，新增原因无需改表
     review_reasons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -735,6 +769,7 @@ class ExtractedField(Base):
         ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(64))
+    # JSONB 且禁止 SQL NULL：JSON null 表示“字段为空”，与缺少该字段区分
     value: Mapped[object] = mapped_column(JSONB(none_as_null=False), nullable=False)
     origin: Mapped[str] = mapped_column(String(20))
     explanation: Mapped[str | None] = mapped_column(String(1000))
@@ -742,6 +777,8 @@ class ExtractedField(Base):
 
 
 class CandidateFieldEvidence(Base):
+    """逐字段证据摘录；片段随版本删除后证据一并消失，引用不再可验证。"""
+
     __tablename__ = "candidate_field_evidence"
     id: Mapped[int] = mapped_column(primary_key=True)
     field_id: Mapped[int] = mapped_column(
@@ -849,6 +886,7 @@ class PlanDraft(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     input_snapshot: Mapped[dict] = mapped_column(JSONB)
+    # 输入指纹用于判断当前输入是否仍与生成该草案时一致（变化建议 A006）
     input_fingerprint: Mapped[str] = mapped_column(String(64))
     assumptions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     gaps: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
@@ -887,6 +925,7 @@ class PlanBlock(Base):
     seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     locked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     reason: Mapped[str] = mapped_column(String(1000))
+    # 该时间块受哪些约束（可用时间、优先级、依赖、容量、休息等），用于解释安排
     constraint_source: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -921,6 +960,7 @@ class QaTurn(Base):
     insufficient: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     intent: Mapped[str] = mapped_column(String(20), default="query", server_default="query")
     scope: Mapped[dict] = mapped_column(JSONB)
+    # 引用、覆盖与对照以快照保存；读取旧轮次时逐条重新核对来源是否仍可验证
     citations: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     coverage: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
     comparisons: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
@@ -934,6 +974,7 @@ class VersionChangeAcceptance(Base):
 
     __tablename__ = "version_change_acceptances"
     __table_args__ = (
+        # 幂等键：同一对候选与同一组字段只能接受一次，避免并发留下两份记录
         UniqueConstraint(
             "workspace_id",
             "baseline_candidate_id",
@@ -951,6 +992,7 @@ class VersionChangeAcceptance(Base):
     comparison_candidate_id: Mapped[int] = mapped_column(
         ForeignKey("extracted_items.id", ondelete="CASCADE"), index=True
     )
+    # 记录差异比较时两端所在的版本，避免事后按当前版本反推
     baseline_version_id: Mapped[int] = mapped_column(
         ForeignKey("material_versions.id", ondelete="CASCADE")
     )
@@ -970,6 +1012,7 @@ class CandidateMerge(Base):
 
     __tablename__ = "candidate_merges"
     __table_args__ = (
+        # 同一对候选只保留一条合并记录，重试时先查既有记录再决定是否写入
         UniqueConstraint(
             "workspace_id",
             "target_candidate_id",
@@ -989,6 +1032,7 @@ class CandidateMerge(Base):
     target_formal_kind: Mapped[str | None] = mapped_column(String(20))
     target_formal_id: Mapped[int | None] = mapped_column(Integer)
     source_formal_id: Mapped[int | None] = mapped_column(Integer)
+    # 合并前的进度与来源快照，重试或事后审计都能还原合并依据
     preserved_progress: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     source_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     reason: Mapped[str] = mapped_column(String(1000))
@@ -1010,6 +1054,7 @@ class ReminderRule(Base):
             "repeat_minutes IS NULL OR repeat_minutes > 0", name="ck_reminder_rules_repeat"
         ),
         CheckConstraint("version >= 1", name="ck_reminder_rules_version"),
+        # 每个工作空间最多一条默认规则，每个任务最多一条专属规则（部分唯一索引）
         Index(
             "uq_reminder_rules_task",
             "workspace_id",
@@ -1051,6 +1096,7 @@ class ReminderTrigger(Base):
             "status IN ('pending', 'sent', 'dismissed', 'cancelled')",
             name="ck_reminder_triggers_status",
         ),
+        # 由事项、规则版本与触发窗口生成；唯一约束兜底，重复同步不会留下两条提醒
         UniqueConstraint("dedupe_key", name="uq_reminder_triggers_dedupe"),
     )
 
@@ -1096,6 +1142,7 @@ class CalendarConnection(Base):
     calendar_id: Mapped[str] = mapped_column(String(500))
     status: Mapped[str] = mapped_column(String(20), default="active", server_default="active")
     scopes: Mapped[str] = mapped_column(String(1000), default="", server_default="")
+    # 令牌只保存 Fernet 密文；撤销只改状态与时间，不解密回写或保留明文
     access_token_ciphertext: Mapped[str | None] = mapped_column(Text)
     refresh_token_ciphertext: Mapped[str | None] = mapped_column(Text)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -1115,6 +1162,7 @@ class CalendarOAuthState(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
     provider: Mapped[str] = mapped_column(String(50))
+    # 只存 state 哈希；consumed_at 非空表示已使用，回调重放会被拒绝
     state_hash: Mapped[str] = mapped_column(String(128))
     redirect_uri: Mapped[str] = mapped_column(String(1000))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -1142,10 +1190,13 @@ class CalendarDraft(Base):
     )
     status: Mapped[str] = mapped_column(String(20), default="draft", server_default="draft")
     version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # 内容指纹随条目变化；确认指纹另外绑定连接、目标日历与选中条目，
+    # 执行前两者都必须与当前状态一致，否则要求重新预览确认
     content_fingerprint: Mapped[str] = mapped_column(String(64))
     confirmed_fingerprint: Mapped[str | None] = mapped_column(String(64))
     confirmed_item_ids: Mapped[list[int]] = mapped_column(JSONB, default=list, server_default="[]")
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 确认有效期 15 分钟；过期后必须重新预览确认，不能复用旧确认
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     excluded: Mapped[list[dict]] = mapped_column(JSONB, default=list, server_default="[]")
     warnings: Mapped[list[dict]] = mapped_column(JSONB, default=list, server_default="[]")
@@ -1175,6 +1226,8 @@ class CalendarDraftItem(Base):
         ForeignKey("calendar_drafts.id", ondelete="CASCADE"), index=True
     )
     operation_type: Mapped[str] = mapped_column(String(20))
+    # source_type + source_id 是多态引用，故意不建外键：来源任务或计划块删除后
+    # 条目仍需保留以便对账，执行前会重新校验来源是否仍在且内容指纹未变
     source_type: Mapped[str] = mapped_column(String(20))
     source_id: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String(500))
@@ -1200,6 +1253,7 @@ class CalendarOperation(Base):
             "status IN ('pending', 'success', 'failed', 'unknown', 'skipped')",
             name="ck_calendar_operation_status",
         ),
+        # 幂等键唯一：超时重试先按键对账，已成功项不重复执行
         UniqueConstraint("idempotency_key", name="uq_calendar_operation_key"),
     )
 
@@ -1236,6 +1290,7 @@ class CalendarEventLink(Base):
         CheckConstraint(
             "state IN ('active', 'deleted', 'external_missing')", name="ck_calendar_link_state"
         ),
+        # 同一连接下每个来源只保留一条映射；状态区分主动删除与外部缺失
         UniqueConstraint(
             "connection_id",
             "source_type",

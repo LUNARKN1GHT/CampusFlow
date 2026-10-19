@@ -34,6 +34,7 @@ class SampleOutcome:
     predicted_facts: Mapping[str, str]
     expected_units: frozenset[str]
     system_units: frozenset[str]
+    # 结构性失败标记；本模块不据此剔除样本，计数仍按实际输出进行。
     failed: bool = False
 
 

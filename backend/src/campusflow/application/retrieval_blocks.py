@@ -20,6 +20,11 @@ def build_version_blocks(
     *,
     config: ChunkingConfig = DEFAULT_CHUNKING,
 ) -> list[RetrievalBlock]:
+    """授权读取指定版本的原文片段并切分为检索块；不写库、不调用模型。
+
+    切分沿用保存时的片段边界与定位信息，同一输入重复调用结果一致；
+    不合并段落或表格单元，避免引用无法回到原文。
+    """
     chunks = list_version_chunks(repos, workspace_id, material_id, version_no)
     return split_sources(
         [

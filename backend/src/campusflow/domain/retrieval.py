@@ -10,6 +10,11 @@ from campusflow.domain.indexing import IndexProgressSummary
 
 @dataclass(frozen=True)
 class RetrievalScope:
+    """检索范围；None 表示该维度不加限定，指定值时只匹配完全相等的资料。
+
+    未标清学期、课程或教学班的资料不会匹配到具体范围，也不能靠空值蒙混通过。
+    """
+
     semester_id: int | None = None
     course_id: int | None = None
     class_name: str | None = None
@@ -29,6 +34,8 @@ class RetrievalScope:
 
 @dataclass(frozen=True)
 class RetrievalCandidate:
+    """已通过空间与范围过滤的候选块；携带归属信息与向量，供排序和建立引用。"""
+
     material_id: int
     title: str
     semester_id: int | None
@@ -42,6 +49,12 @@ class RetrievalCandidate:
 
 @dataclass(frozen=True)
 class RetrievalVersion:
+    """本次范围内涉及的一个资料版本及其索引进度。
+
+    ``unavailable_reason`` 非空表示该版本已识别为不可用（如块校验失败），
+    只排除这个版本，并由覆盖提示说明原因。
+    """
+
     material_id: int
     version_id: int
     manifest_id: str
@@ -52,6 +65,8 @@ class RetrievalVersion:
 
 @dataclass(frozen=True)
 class ScopedCandidates:
+    """范围检索的完整输入；候选块与各版本进度分开，便于回答层说明覆盖情况。"""
+
     workspace_id: int
     scope: RetrievalScope
     profile_id: str

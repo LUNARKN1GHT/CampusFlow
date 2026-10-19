@@ -1,4 +1,8 @@
-"""N012：按发布信息、范围与替代声明判定生效候选；不写库、不自动接受。"""
+"""N012：按发布信息、范围与替代声明判定生效候选；不写库、不自动接受。
+
+导入顺序不决定生效：只有新版本明确声明替代旧版本、范围一致、发布时间
+完整且新不早于旧、来源未归档时才推荐新候选；其余返回待核对或冲突。
+"""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,6 +34,7 @@ class VersionApplicability:
 
 
 def _published_at(material, version) -> datetime | None:
+    # 优先资料级发布时间，缺失时读版本元数据；解析失败按缺失处理，绝不用导入时间代替。
     if material.published_at is not None:
         return material.published_at
     value = version.source_metadata.get("published_at")
@@ -60,6 +65,11 @@ def assess_applicability(
     baseline_candidate_id: int,
     comparison_candidate_id: int,
 ) -> VersionApplicability:
+    """只读判定新候选是否可以生效；applied 恒为 false，接受仍走 N014。
+
+    默认 requires_review，只有所有条件同时满足才改为 applicable 并推荐
+    新候选；任何一项缺失或相反都不推荐，也不按导入时间覆盖旧版本。
+    """
     diff = compare_candidates(repos, workspace_id, baseline_candidate_id, comparison_candidate_id)
     left, right = diff.left, diff.right
     left_material = repos.materials.get(left.material_id)
@@ -92,6 +102,7 @@ def assess_applicability(
         left.source_version_id,
         VersionRelationKind.REPLACEMENT_CLAIM,
     )
+    # 反向替代声明（旧声称替代新）方向相反，保留关系供展示，但不能推荐新版本。
     backward = store.find(
         workspace_id,
         left.source_version_id,
@@ -131,6 +142,7 @@ def assess_applicability(
 
     left_at = _published_at(left_material, left_version)
     right_at = _published_at(right_material, right_version)
+    # 发布时间必须双方都完整才可比较；缺失时不能用导入时间补位。
     if left_at is not None and right_at is not None:
         if right_at < left_at:
             reasons.append(
@@ -150,12 +162,14 @@ def assess_applicability(
         if status not in {"conflict"} and forward is not None:
             status = "requires_review"
 
+    # 归档资料不作为当前依据；恢复前只能待核对，不能继续推荐新版本。
     if left_material.archived or right_material.archived:
         reasons.append(
             ApplicabilityReason("source_archived", "来源资料已归档，需恢复后再作为当前依据。")
         )
         status = "requires_review"
 
+    # 只有替代声明、范围、发布时间与归档状态全部满足才推荐新候选。
     if (
         forward is not None
         and scope_comparison == "same"

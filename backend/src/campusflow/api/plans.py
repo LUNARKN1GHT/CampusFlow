@@ -1,4 +1,8 @@
-"""M5 计划草案 HTTP 路由（P013）。"""
+"""计划草案与当前已接受计划 HTTP 路由（M5/P013）。
+
+生成、重排与调整建议都只产生或展示待接受草案；只有显式接受才改变当前计划。
+移动时间块不改变任务截止，版本冲突统一返回 409。
+"""
 
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal
@@ -143,6 +147,7 @@ class PlanDraftOut(BaseModel):
 
 
 def _default_range(workspace: WorkspaceData, repos: Repositories, payload: PlanDraftCreate):
+    """解析预设区间；预设不接受自定义起止，custom 必须由调用方给出边界。"""
     settings = get_settings(repos, workspace.id)
     today = datetime.now(UTC).astimezone(ZoneInfo(settings.timezone)).date()
     kind = payload.range_type
@@ -161,6 +166,7 @@ def _default_range(workspace: WorkspaceData, repos: Repositories, payload: PlanD
 def create_plan_draft(
     payload: PlanDraftCreate, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """生成并保存待接受草案；接受前当前计划与任务截止都不变。"""
     start, end = _default_range(workspace, repos, payload)
     draft = use_cases.generate_draft(
         repos,
@@ -177,6 +183,10 @@ def create_plan_draft(
 def reschedule_plan(
     payload: PlanRescheduleIn, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """基于当前已接受计划局部重排；锁定块与范围外块保留，结果仍是草案。
+
+    没有已接受计划时返回 404，不会退化成从零生成。
+    """
     draft = use_cases.reschedule_plan(
         repos,
         workspace.id,
@@ -194,6 +204,7 @@ def get_plan_adjustments(
     repos: Repos,
     semester_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> dict:
+    """只读比较输入变化，auto_applied 恒为 false；不会改写当前计划。"""
     return use_cases.adjustment_suggestions(repos, workspace.id, semester_id=semester_id)
 
 
@@ -201,6 +212,7 @@ def get_plan_adjustments(
 def create_plan_adjustment_draft(
     payload: AdjustmentDraftIn, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """仅在用户显式请求后生成待接受草案；输入与已接受计划一致时返回 409。"""
     draft = use_cases.create_adjustment_draft(
         repos,
         workspace.id,
@@ -232,6 +244,10 @@ def get_plan_draft(draft_id: int, workspace: CurrentWorkspace, repos: Repos) -> 
 def accept_plan_draft(
     draft_id: int, payload: PlanAcceptIn, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """接受草案成为当前计划；输入变化、版本过期或已有更新计划都返回 409。
+
+    接受后重算提醒，但不会改写任何任务截止时间。
+    """
     draft = use_cases.accept_draft(
         repos,
         workspace.id,
@@ -247,6 +263,7 @@ def get_plan_overview(
     repos: Repos,
     semester_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> dict:
+    """今日总览只读；时间块只取当前已接受计划，没有计划时仍列出近期任务。"""
     return use_cases.overview(repos, workspace.id, semester_id=semester_id)
 
 
@@ -256,12 +273,14 @@ def get_current_plan(
     repos: Repos,
     semester_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> PlanDraftOut | None:
+    """没有已接受计划时返回 null，而不是最近一份草案。"""
     draft = use_cases.current_plan(repos, workspace.id, semester_id=semester_id)
     return PlanDraftOut.from_data(draft) if draft is not None else None
 
 
 @router.get("/plans/drafts/{draft_id}/conflicts", response_model=list[dict])
 def list_plan_conflicts(draft_id: int, workspace: CurrentWorkspace, repos: Repos) -> list[dict]:
+    """返回草案生成时保存的冲突与风险；检查限制在 coverage 中说明。"""
     return use_cases.draft_conflicts(repos, workspace.id, draft_id)
 
 
@@ -269,6 +288,10 @@ def list_plan_conflicts(draft_id: int, workspace: CurrentWorkspace, repos: Repos
 def move_plan_block(
     block_id: int, payload: PlanBlockMoveIn, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """只允许移动已接受计划中的块；不修改任务 DDL。
+
+    越出计划范围、与时间块或固定日程重叠返回 400；版本过期返回 409。
+    """
     draft = use_cases.move_block(
         repos,
         workspace.id,
@@ -284,6 +307,7 @@ def move_plan_block(
 def set_plan_block_lock(
     block_id: int, payload: PlanBlockLockIn, workspace: CurrentWorkspace, repos: Repos
 ) -> PlanDraftOut:
+    """锁定只表示后续重排原样保留该块，不改变时间块本身或任务截止。"""
     draft = use_cases.set_block_lock(
         repos,
         workspace.id,

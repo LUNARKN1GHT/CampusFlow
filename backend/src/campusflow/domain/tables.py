@@ -28,7 +28,10 @@ class TablePart:
 
 
 def find_table_parts(text: str) -> list[TablePart]:
-    """在片段文本中找出表格分部标记。page 由调用方补充。"""
+    """在片段文本中找出表格分部标记。page 由调用方补充。
+
+    返回顺序即原文出现顺序；page 先置 0，调用方必须写入真实页码后才能作为证据。
+    """
     return [
         TablePart(
             title=match.group("title").strip(),
@@ -41,12 +44,19 @@ def find_table_parts(text: str) -> list[TablePart]:
 
 
 def group_key(title: str) -> str:
-    """同一表格的分组键：去掉空白的标题。"""
+    """同一表格的分组键：去掉空白的标题。
+
+    只归一空白，不做大小写或标点折叠，避免把标题相近但不同的表格合并。
+    """
     return re.sub(r"\s+", "", title)
 
 
 def missing_parts(parts: list[TablePart]) -> list[tuple[str, int]]:
-    """返回（表格分组键, 缺失的分部号）列表：声明共 N 部分但只找到少于 N 个。"""
+    """返回（表格分组键, 缺失的分部号）列表：声明共 N 部分但只找到少于 N 个。
+
+    总部分数取该分组首个分部的声明；缺失按分部号集合判断，重复分部号
+    不会被当成补齐，也不会单独报错。
+    """
     by_group: dict[str, list[TablePart]] = {}
     for part in parts:
         by_group.setdefault(group_key(part.title), []).append(part)

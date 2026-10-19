@@ -14,6 +14,11 @@ class CourseOption:
 
 @dataclass(frozen=True)
 class CourseMatch:
+    """匹配结果；status 为 missing_name/unmatched/class_mismatch/ambiguous/unique_candidate。
+
+    只有 unique_candidate 带建议课程，且仍只是待核对建议，不直接改写候选范围。
+    """
+
     status: str
     suggested_course_id: int | None
     matches: tuple[CourseOption, ...]

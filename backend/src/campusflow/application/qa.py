@@ -60,6 +60,12 @@ INTENT_SYSTEM_PROMPT = (
 
 @dataclass(frozen=True)
 class PreparedQuestion:
+    """读取阶段的结果快照：候选、覆盖范围和未索引资料。
+
+    只在读取事务内填充；向量与生成调用必须在调用方结束读取事务后进行，
+    避免持锁等待外部模型。
+    """
+
     workspace_id: int
     scope: RetrievalScope
     question: str
@@ -68,6 +74,7 @@ class PreparedQuestion:
     unindexed_materials: tuple[MaterialData, ...]
 
     def coverage_notices(self) -> tuple[CoverageNotice, ...]:
+        """把索引进度与未索引资料转成覆盖提示；部分覆盖必须对用户可见。"""
         notices = []
         seen_materials = set()
         for version in self.candidates.versions:
@@ -129,10 +136,15 @@ def prepare_question(
     profile_id: str,
     question: str,
 ) -> PreparedQuestion:
-    """授权、范围校验与候选读取；调用方必须在返回后结束读取事务。"""
+    """授权、范围校验与候选读取；调用方必须在返回后结束读取事务。
+
+    workspace_id 来自已认证会话，不由问题文本决定；未建立索引的资料只用于
+    覆盖提示，不进入本次候选集。
+    """
     question = _require_question(question)
     candidates = collect_retrieval_candidates(repos, reader, workspace_id, scope, profile_id)
     indexed = {version.material_id for version in candidates.versions}
+    # 未索引资料不参与回答，但要作为覆盖率提示返回，避免把“没检索到”说成“没有”。
     materials = tuple(
         material
         for material in repos.materials.list(
@@ -154,6 +166,7 @@ def prepare_question(
 
 
 def _insufficient(prepared: PreparedQuestion) -> QaAnswer:
+    """无可用候选或模型判定资料不足时统一返回固定文案，不生成回答或引用。"""
     return QaAnswer(
         answer=INSUFFICIENT_MATERIALS_MESSAGE,
         citations=(),
@@ -177,6 +190,7 @@ def _source_payload(
     question: str,
     citations: tuple[Citation, ...],
 ) -> str:
+    """只把本次候选原文、范围与覆盖提示交给模型，不附带其他资料或历史轮次。"""
     return json.dumps(
         {
             "question": question,
@@ -212,7 +226,11 @@ def answer_prepared(
     mode: RankingMode = RankingMode.HYBRID,
     top_k: int = DEFAULT_TOP_K,
 ) -> QaAnswer:
-    """在读取事务结束后调用；本函数只发起显式向量/生成请求。"""
+    """在读取事务结束后调用；本函数只发起显式向量/生成请求。
+
+    候选为空、排序为空或关键词模式零命中时直接返回资料不足，不调用生成模型；
+    模型返回的引用编号必须全部属于本次候选集，否则按模型输出错误拒绝整条回答。
+    """
     if not prepared.candidates.candidates:
         return _insufficient(prepared)
     query_embedding = embedder.embed(prepared.question)
@@ -226,6 +244,7 @@ def answer_prepared(
     )
     if not ranked:
         return _insufficient(prepared)
+    # 关键词零命中说明现有候选没有支持依据；不能据此断言“没有作业”。
     if mode is RankingMode.KEYWORD and all(item.keyword_score == 0 for item in ranked):
         return _insufficient(prepared)
 
@@ -251,9 +270,11 @@ def answer_prepared(
     for note in incomplete_date_notes(cited):
         if note not in uncertainties:
             uncertainties.append(note)
+    # 引用编号合法只代表属于候选集；回答中的日期仍要与被引原文逐字核对。
     for warning in support_warnings(generated.answer, cited):
         if warning not in uncertainties:
             uncertainties.append(warning)
+    # 冲突以提示并列保留，不按导入时间挑一条，也不改写模型正文。
     for conflict in conflicts:
         if conflict.message not in uncertainties:
             uncertainties.append(conflict.message)
@@ -293,10 +314,12 @@ def detect_intent(generator: TextGenerator, question: str, scope: RetrievalScope
 
 
 def conflict_summary(conflicts: tuple[ConflictNotice, ...]) -> str | None:
+    """返回首条冲突提示供单值展示；多条冲突不在这里合并或择一。"""
     return conflicts[0].message if conflicts else None
 
 
 def capability_for(intent: QaIntent) -> dict:
+    """把意图与能力边界转为只读响应；不执行工具，executed 恒为 False。"""
     return {
         "intent": intent.kind.value,
         "available": intent.available,

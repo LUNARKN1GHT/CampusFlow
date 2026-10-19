@@ -83,7 +83,11 @@ def _append_reasons(draft: CandidateDraft, reasons: Sequence[ReviewReason]) -> C
 def with_coverage_reasons(
     drafts: Sequence[CandidateDraft], ranges: Sequence[UncoveredRange]
 ) -> list[CandidateDraft]:
-    """未覆盖范围非空时，本批每条候选都带上同一候选级核对原因。"""
+    """未覆盖范围非空时，本批每条候选都带上同一候选级核对原因。
+
+    原因只影响待核对提示，不改变字段取值与核对状态；截断来源的候选
+    仍以 pending 落库，由用户核对原文后决定。
+    """
     reasons = coverage_review_reasons(ranges)
     if not reasons:
         return list(drafts)
@@ -118,6 +122,7 @@ def refresh_conflict_reasons(
 
     先移除旧的冲突原因再按当前取值重新判定：来源被删除或被修正后，过期的冲突
     提示必须消失，否则用户会核对一个已经不存在的第二个取值。
+    不提交事务，由调用方与候选写入一起提交；其他核对原因原样保留。
     """
     updated = 0
     for scope in dict.fromkeys(scopes):
@@ -128,6 +133,7 @@ def refresh_conflict_reasons(
             for entry in conflict.entries:
                 desired.setdefault(entry.candidate_id, []).append(reason)
         for candidate in candidates:
+            # 只替换本期重算的冲突原因，保留覆盖不足等由其他流程写入的原因。
             kept = [r for r in candidate.draft.review_reasons if r.code != SOURCE_CONFLICT]
             wanted = (kept + desired.get(candidate.id, []))[:_MAX_REASONS]
             if wanted == list(candidate.draft.review_reasons):

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/*
+ * 资料的归档与删除面板：归档只切换标记，删除必须先预览影响并携带预览签发的确认令牌。
+ * 确认只覆盖预览展示过的范围；预览后内容变化会让令牌失效，需重新预览。
+ */
 import { ref } from 'vue'
 
 import { errorMessage } from '../api/client'
@@ -26,6 +30,7 @@ async function toggleArchive() {
   archiveError.value = ''
   archiveMessage.value = ''
   try {
+    // 归档与恢复都不删除片段或正式任务，只影响是否参与检索与问答。
     const updated = await materialsApi[props.material.archived ? 'restore' : 'archive'](props.material.id)
     archiveMessage.value = updated.archived
       ? '已归档：资料退出检索与问答，引用保留并标注为已归档，可随时恢复。'
@@ -39,6 +44,7 @@ async function toggleArchive() {
 }
 
 async function previewDelete() {
+  // 只读预览：拿到各关联项数量、备份说明与确认令牌，此时还没有执行删除。
   previewing.value = true
   previewError.value = ''
   deletingError.value = ''
@@ -58,14 +64,14 @@ async function confirmDelete() {
   deleting.value = true
   deletingError.value = ''
   try {
-    // 只提交预览时展示过的范围指纹；内容变化会被后端拒绝，必须重新预览。
+    // 只提交预览签发的确认令牌（绑定展示过的范围）；内容变化会被后端拒绝，必须重新预览。
     await materialsApi.remove(props.material.id, current.confirm_token, keepTasks.value)
     deleteResult.value = keepTasks.value
       ? '删除完成：原文件与派生内容已移除，个人任务按选择保留并标注来源已删除。'
       : '删除完成：原文件、派生内容与关联个人任务均已移除。'
     emit('deleted', props.material.id)
   } catch (caught) {
-    // 删除未完成时不显示成功；资料仍可访问，可重新预览后再删除。
+    // 删除未完成时不显示成功；清空预览强制重新获取令牌，避免拿旧范围重复提交。
     deletingError.value = errorMessage(caught)
     impact.value = null
   } finally {

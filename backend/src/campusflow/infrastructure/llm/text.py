@@ -15,12 +15,17 @@ MAX_RESPONSE_BYTES = 1024 * 1024
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """禁止 urllib 跟随跳转：带 Authorization 的请求不能转发到其它主机。"""
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
 
 class _OpenAiCompatibleTextGenerator:
-    """OpenAI 兼容的 JSON 文字生成基类；供应商只通过地址和密钥区分。"""
+    """OpenAI 兼容的 JSON 文字生成基类；供应商只通过地址和密钥区分。
+
+    固定使用非流式请求并要求 JSON 对象输出，不传工具定义，避免模型触发外部操作。
+    """
 
     api_url = ""
     key_label = "模型"
@@ -28,6 +33,8 @@ class _OpenAiCompatibleTextGenerator:
     def __init__(
         self, api_key: str, *, model: str, timeout_seconds: float = 60, max_tokens: int = 4096
     ):
+        """校验密钥、模型名、超时与生成长度上限；非法配置在联网前直接拒绝。"""
+
         if not api_key or not api_key.strip() or any(c.isspace() for c in api_key):
             raise ValueError(f"缺少有效的{self.key_label}密钥")
         if not model or len(model) > 100 or any(c.isspace() for c in model):
@@ -43,6 +50,8 @@ class _OpenAiCompatibleTextGenerator:
         self._opener = urllib.request.build_opener(_NoRedirect())
 
     def generate(self, request: GenerationRequest) -> str:
+        """返回单条完整正文；截断输出、工具调用或空正文一律视为模型输出无效。"""
+
         payload = {
             "model": self._model,
             "stream": False,
@@ -68,6 +77,7 @@ class _OpenAiCompatibleTextGenerator:
         except urllib.error.HTTPError as exc:
             status = exc.code
             exc.close()
+            # 408/429/5xx 是服务抖动，可重试；其余 4xx 是请求被拒绝。
             if status == 429 or status == 408 or 500 <= status <= 599:
                 raise TransientError(f"文字模型暂时不可用（HTTP {status}），可稍后重试") from None
             raise PermanentError(
@@ -78,6 +88,7 @@ class _OpenAiCompatibleTextGenerator:
         if len(data) > MAX_RESPONSE_BYTES:
             raise ModelOutputError("文字模型响应超过读取上限")
         try:
+            # 只接受单条 choice、finish_reason=stop、无工具调用且正文非空的响应。
             raw = json.loads(data.decode("utf-8"))
             choices = raw["choices"]
             if not isinstance(choices, list) or len(choices) != 1:
@@ -99,6 +110,8 @@ class _OpenAiCompatibleTextGenerator:
 
 
 class ZhipuTextGenerator(_OpenAiCompatibleTextGenerator):
+    """默认供应商：智谱 GLM 文字模型，使用智谱密钥与其固定接口地址。"""
+
     api_url = API_URL
     key_label = "智谱"
 

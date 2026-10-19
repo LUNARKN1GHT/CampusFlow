@@ -11,6 +11,7 @@ from campusflow.domain.errors import DomainError
 _DATE = r"(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}年[0-9]{1,2}月[0-9]{1,2}日)"
 _CLOCK = r"[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?"
 _WEEKDAY = "一二三四五六日天"
+# 只接受完整的单一表达；多出修饰词时 fullmatch 失败，保留原文而不是截取一部分换算。
 _EXPRESSION = re.compile(
     rf"(?:请|须|应)?(?:在|于)?\s*"
     rf"(?P<relative>今天|明天|后天|(?:本周|这周|下周|下下周)[{_WEEKDAY}]|"
@@ -23,6 +24,8 @@ _EXPRESSION = re.compile(
 
 @dataclass(frozen=True)
 class DateResolution:
+    """一次换算结果；day 与 range 二选一，缺少时刻或依据时由 reason 说明保留了什么。"""
+
     day: date | None = None
     clock: time | None = None
     range_start: date | None = None
@@ -35,6 +38,7 @@ class DateResolution:
 
 
 def source_zone(name: str | None) -> ZoneInfo:
+    """必须显式给出来源时区；不用本机时区或个人设置兜底，避免换机器后结果漂移。"""
     if not name:
         raise DomainError("缺少明确的来源时区，不能使用电脑或个人设置代替")
     try:
@@ -98,6 +102,7 @@ def _require_unique_local_time(value: datetime, zone: ZoneInfo) -> None:
 
 
 def _week_number(text: str) -> int:
+    """把阿拉伯数字或中文数字的周次转成整数；无法识别时返回 0，由调用方判为无效。"""
     if text.isascii() and text.isdigit():
         return int(text)
     digits = {c: i for i, c in enumerate("一二三四五六七八九", 1)}
@@ -151,6 +156,7 @@ def resolve_relative_date(
                     reason="只明确教学周，缺少星期几，不能确定某一天或截止时刻",
                     relation="before" if match["before"] else "on",
                 )
+            # 周内序号以周一为 0；“周日/周天”映射为第 6 天，不做其他解释。
             day = start + timedelta(days=min(_WEEKDAY.index(match["weekday"]), 6))
         else:
             if type(publication) is not date:
@@ -162,6 +168,7 @@ def resolve_relative_date(
                 day = publication + timedelta(days=offset)
                 rule = f"以来源时区的发布日期 {publication.isoformat()} 加 {offset} 天"
             else:
+                # 以发布日期所在周为本周、周一为周首；跨月跨年交给 date 运算，不手工修正。
                 weeks = {"本周": 0, "这周": 0, "下周": 1, "下下周": 2}[expression[:-1]]
                 weekday = min(_WEEKDAY.index(expression[-1]), 6)
                 day = publication + timedelta(days=7 * weeks + weekday - publication.weekday())

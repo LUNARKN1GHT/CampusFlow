@@ -1,6 +1,8 @@
 """M9 外部日历用例：连接授权、草案确认、逐项执行与同步差异。
 
-所有外部写入都由用户显式选择并确认；查询和预览不产生写入。外部失败不修改内部
+所有外部写入都由用户显式选择并确认；查询和预览不产生写入。确认指纹绑定连接、
+目标日历、内容与选中条目并有时效，执行前重新核对内部来源未变化；逐项操作以
+幂等键防重复，超时结果先对账再重试，成功/失败/未知逐项返回。外部失败不修改内部
 任务或计划，只有实际成功的结果才写入外部事件映射。
 """
 
@@ -51,11 +53,14 @@ from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.states import TaskProgress
 from campusflow.infrastructure.calendar.tokens import TokenCipher
 
+# 带时刻的截止只写 15 分钟显示窗口，不表示任务耗时，也不改变原始截止时间。
 DUE_DISPLAY_MINUTES = 15
 
 
 @dataclass(frozen=True)
 class DraftSource:
+    """草案来源：显式选择的任务集合，或一个已接受计划。"""
+
     kind: str
     task_ids: tuple[int, ...] = ()
     plan_id: int | None = None
@@ -63,6 +68,8 @@ class DraftSource:
 
 @dataclass(frozen=True)
 class DraftItemBuild:
+    """构建阶段的一条待写入项，尚未持久化；指纹用于绑定预览与确认。"""
+
     operation_type: OperationType
     source_type: CalendarSourceType
     source_id: int
@@ -76,6 +83,8 @@ class DraftItemBuild:
 
 @dataclass(frozen=True)
 class DraftBuildResult:
+    """草案构建结果：可写入项、排除项与警告，全部进入预览供用户查看。"""
+
     items: list[DraftItemBuild]
     excluded: list[dict]
     warnings: list[dict]
@@ -83,6 +92,8 @@ class DraftBuildResult:
 
 @dataclass(frozen=True)
 class SyncDifference:
+    """内部来源与外部映射的差异建议（更新或删除）；只是建议，仍需确认后执行。"""
+
     operation_type: OperationType
     source_type: CalendarSourceType
     source_id: int
@@ -113,6 +124,11 @@ def start_authorization(
     *,
     redirect_uri: str,
 ) -> tuple[str, datetime]:
+    """发起 OAuth 授权，返回（授权地址, state 过期时间）。
+
+    state 只以哈希落库、10 分钟内一次性使用，原始值仅出现在授权地址中；
+    授权地址生成失败时 state 记录保留到自然过期，不会被误用。
+    """
     state = secrets.token_urlsafe(32)
     now = utc_now()
     expires_at = now + OAUTH_STATE_TTL
@@ -141,11 +157,17 @@ def complete_authorization(
     code: str | None,
     error: str | None,
 ) -> CalendarConnectionData:
+    """处理授权回调并建立/更新连接；令牌只以密文保存。
+
+    先原子消费 state（过期或重放直接拒绝），后续任何失败也提交消费结果，
+    防止同一个 state 被重复回调；只接受含 calendar.app.created 的授权范围。
+    """
     if not state:
         raise DomainError("授权回调缺少 state，未建立日历连接。")
     stored = store.consume_oauth_state(workspace.id, _state_hash(state), now=utc_now())
     if stored is None:
         raise DomainError("授权状态已过期或已使用，请重新发起连接。")
+    # 从下面开始 state 已消费：所有失败分支都要 commit，否则回滚会放行重放。
     if error:
         store.commit()
         raise DomainError("授权未完成，未建立日历连接。")
@@ -157,6 +179,7 @@ def complete_authorization(
     except CalendarProviderError as exc:
         store.commit()
         raise DomainError(ERROR_MESSAGES[exc.category]) from exc
+    # 首版只管理应用自建日历，没有这个范围就不能保证不碰用户的其他日历。
     if "calendar.app.created" not in tokens.scopes:
         store.commit()
         raise DomainError("授权范围不足，未建立日历连接。")
@@ -165,6 +188,7 @@ def complete_authorization(
     refresh_ciphertext = cipher.encrypt(tokens.refresh_token) if tokens.refresh_token else None
     existing = store.find_connection(workspace.id, provider.name, account_email)
     if existing is None:
+        # 首次连接才创建应用专属日历；已有连接沿用原日历，避免把事件写到新日历。
         try:
             calendar_id = provider.ensure_calendar(
                 access_token=tokens.access_token, timezone=workspace.timezone
@@ -183,6 +207,8 @@ def complete_authorization(
             token_expires_at=tokens.expires_at,
         )
     else:
+        # 重新授权时供应商可能不再返回 refresh token，此时必须保留旧密文，
+        # 否则连接会在 access token 过期后失去自动续期能力。
         preserved_refresh = refresh_ciphertext or _existing_refresh(store, existing.id)
         connection = store.update_connection_tokens(
             existing.id,
@@ -204,6 +230,11 @@ def revoke_connection(
     workspace_id: int,
     connection_id: int,
 ) -> tuple[CalendarConnectionData, int]:
+    """撤销连接：返回（已撤销连接, 被取消的未完成草案数）。
+
+    外部撤销失败不阻止本地断开；本地连接标记为 revoked、令牌清空，所有未完成
+    草案转为 cancelled，因此之后的执行一律被拒绝。内部任务与计划保持不变。
+    """
     connection = _require_connection(store, workspace_id, connection_id)
     credentials = store.get_credentials(connection.id)
     if credentials is not None:
@@ -236,6 +267,11 @@ def create_draft(
     source: DraftSource,
     note: str | None = None,
 ) -> CalendarDraftData:
+    """生成待确认草案；只接受显式选择的任务或一个已接受计划。
+
+    不调用供应商、不写外部日历；已取消或无截止的任务、孤立时间块进入排除
+    清单，缓冲块不写入，内容未变化的已同步项跳过并给出警告。
+    """
     connection = _require_active_connection(store, workspace.id, connection_id)
     if source.kind == "tasks":
         built = _build_task_items(store, repos, workspace, connection, source.task_ids)
@@ -262,6 +298,11 @@ def confirm_draft(
     item_ids: list[int],
     note: str | None,
 ) -> CalendarDraftData:
+    """确认草案中显式选中的条目，写入 15 分钟有效的确认指纹。
+
+    内部任务/计划变化、草案内容指纹不符或选中项不属于草案都会拒绝确认；
+    重新确认（如部分失败后）会升版本，使旧确认指纹立即失效。
+    """
     draft = _require_draft(store, workspace.id, draft_id)
     if draft.status == DraftStatus.COMPLETED:
         raise ConflictError("该草案已完成，不能再次确认。")
@@ -273,6 +314,7 @@ def confirm_draft(
         raise ConflictError("草案内容已变化，请重新预览后再确认。")
     selected = _validate_item_selection(draft, item_ids)
     now = utc_now()
+    # 已确认/已执行过的草案再次确认视为新一轮授权，版本递增让旧指纹失效。
     version = draft.version if draft.status == DraftStatus.DRAFT else draft.version + 1
     confirmation = confirmation_fingerprint(
         content_fingerprint=current,
@@ -306,7 +348,13 @@ def execute_draft(
     *,
     confirmation_fingerprint_value: str,
 ) -> tuple[CalendarDraftData, list[CalendarDraftItemData]]:
+    """执行已确认草案：先锁行，再核对来源与确认指纹，最后逐项写入。
+
+    已完成的草案直接返回既有选中的条目，不重复写入；未确认、已过期、连接
+    已撤销或内部来源已变化的草案都会在任何外部调用之前拒绝。
+    """
     draft = _require_draft(store, workspace.id, draft_id)
+    # 行锁防止两个并发请求同时执行同一草案、各自向外部日历写入。
     locked = store.lock_draft(draft.id)
     if locked is None:
         raise NotFoundError("日历草案不存在")
@@ -333,6 +381,7 @@ def retry_draft(
     *,
     confirmation_fingerprint_value: str,
 ) -> tuple[CalendarDraftData, list[CalendarDraftItemData]]:
+    """只重试失败、未知或尚未执行的选中项；已成功项绝不重复调用供应商。"""
     draft = _require_draft(store, workspace.id, draft_id)
     locked = store.lock_draft(draft.id)
     if locked is None:
@@ -373,6 +422,11 @@ def _execute_items(
     connection: CalendarConnectionData,
     items: list[CalendarDraftItemData],
 ) -> tuple[CalendarDraftData, list[CalendarDraftItemData]]:
+    """逐项执行：成功/失败/未知分别落库，草案状态由选中项的结果汇总。
+
+    每项使用“草案 + 条目 + 条目指纹”的幂等键，已成功的操作跳过；认证失败后
+    剩余项直接记失败，不再逐个请求。外部调用成功才更新事件映射。
+    """
     if not items:
         raise ConflictError("没有选中的日历操作。")
     store.update_draft_status(draft.id, DraftStatus.EXECUTING)
@@ -389,6 +443,7 @@ def _execute_items(
         )
         operation = store.find_operation_by_key(key)
         if operation is not None and operation.status == OperationStatus.SUCCESS:
+            # 幂等：同一草案条目的成功记录只认一次，重试不会再次创建外部事件。
             continue
         if operation is None:
             operation = store.create_operation(
@@ -401,6 +456,7 @@ def _execute_items(
             )
         is_retry = operation.status != OperationStatus.PENDING
         if auth_failed:
+            # 已经确认授权失效：后续项不再请求，统一记为失败，交由用户重新连接后重试。
             store.update_operation_result(
                 operation.id,
                 status=OperationStatus.FAILED,
@@ -419,6 +475,7 @@ def _execute_items(
                 store, provider, access_token, connection, item, payload, operation.status
             )
         except CalendarUnknownResult as exc:
+            # 写入可能已生效：记 UNKNOWN 而不是失败，重试前必须先按幂等键对账。
             store.update_operation_result(
                 operation.id,
                 status=OperationStatus.UNKNOWN,
@@ -435,6 +492,7 @@ def _execute_items(
             if exc.category == CalendarErrorCategory.AUTH:
                 store.set_connection_status(connection.id, ConnectionStatus.EXPIRED)
                 auth_failed = True
+            # 删除的目标本就不存在，等价于已经删掉，按成功收尾而不是留一条失败。
             if item.operation_type == OperationType.DELETE and exc.category == (
                 CalendarErrorCategory.NOT_FOUND
             ):
@@ -442,6 +500,7 @@ def _execute_items(
                     store, connection, item, operation.id, increment_attempt=is_retry
                 )
                 continue
+            # 更新目标在外部被手工删除：标记映射失效，避免同步差异继续建议更新它。
             if item.operation_type == OperationType.UPDATE and exc.category == (
                 CalendarErrorCategory.NOT_FOUND
             ):
@@ -486,6 +545,11 @@ def _call_provider(
     payload: CalendarEventPayload,
     previous_status: OperationStatus,
 ) -> ProviderEventResult | None:
+    """调用供应商执行单项操作；UNKNOWN 重试前先按幂等键查找既有事件。
+
+    CREATE 先查后建，UPDATE/DELETE 在 UNKNOWN 后同样先对账，避免超时重试
+    产生重复事件或误删；DELETE 找不到视为已删除。
+    """
     if item.operation_type == OperationType.CREATE:
         existing = provider.find_event(
             access_token=access_token,
@@ -500,6 +564,7 @@ def _call_provider(
             event=payload,
         )
     if item.operation_type == OperationType.UPDATE:
+        # 上次结果未知且已找到同一事件：直接沿用外部结果，不重复提交更新。
         if previous_status == OperationStatus.UNKNOWN:
             existing = provider.find_event(
                 access_token=access_token,
@@ -518,6 +583,7 @@ def _call_provider(
             event=payload,
         )
     if previous_status == OperationStatus.UNKNOWN:
+        # 上次删除是否已生效未知：外部已不存在就直接按删除成功收尾。
         existing = provider.find_event(
             access_token=access_token,
             calendar_id=connection.calendar_id,
@@ -545,6 +611,7 @@ def _mark_operation_success(
     *,
     increment_attempt: bool = False,
 ) -> None:
+    """创建/更新成功：记录外部标识并刷新映射；删除交给专用收尾函数。"""
     if item.operation_type == OperationType.DELETE:
         _mark_delete_success(
             store, connection, item, operation_id, increment_attempt=increment_attempt
@@ -588,6 +655,7 @@ def _mark_delete_success(
     *,
     increment_attempt: bool = False,
 ) -> None:
+    """删除成功（含外部本就不存在）：记录结果并关闭事件映射。"""
     store.update_operation_result(
         operation_id,
         status=OperationStatus.SUCCESS,
@@ -609,6 +677,12 @@ def reconcile_operation(
     workspace_id: int,
     operation_id: int,
 ) -> CalendarOperationData:
+    """按幂等键向供应商对账一条超时操作，返回更新后的操作记录。
+
+    删除：外部已不存在记为成功，仍存在则保留可重试失败；
+    创建/更新：外部存在记为成功，不存在记为失败并允许安全重试。
+    对账本身失败时保持原状态，不猜测结果。
+    """
     operation = store.get_operation(operation_id)
     if operation is None or operation.workspace_id != workspace_id:
         raise NotFoundError("外部操作记录不存在")
@@ -627,12 +701,14 @@ def reconcile_operation(
             operation_key=operation.idempotency_key,
         )
     except (CalendarUnknownResult, CalendarProviderError):
+        # 对账请求本身失败：保留原状态，不收窄为成功或失败，等下次再对账。
         store.commit()
         return store.get_operation(operation.id) or operation
     if item.operation_type == OperationType.DELETE:
         if existing is None:
             _mark_delete_success(store, connection, item, operation.id)
         else:
+            # 外部事件还在：原来的删除没有生效，保留为可重试失败。
             store.update_operation_result(
                 operation.id,
                 status=OperationStatus.FAILED,
@@ -644,8 +720,10 @@ def reconcile_operation(
                 finished_at=utc_now(),
             )
     elif existing is not None:
+        # 创建/更新在外部已存在同一幂等键的事件：就是上次超时前写入的那条。
         _mark_operation_success(store, connection, item, operation.id, existing)
     else:
+        # 外部没有结果：创建/更新确实未生效，记为失败后可以安全重试。
         if item.operation_type == OperationType.UPDATE:
             store.mark_link_external_missing(connection.id, item.source_type, item.source_id)
         store.update_operation_result(
@@ -680,6 +758,11 @@ def list_differences(
     workspace: WorkspaceData,
     connection_id: int,
 ) -> tuple[CalendarConnectionData, list[SyncDifference]]:
+    """列出已同步来源与当前内部内容的差异建议；只读，不写外部日历。
+
+    只比较 active 映射；任务/时间块被删除、取消或计划被替代时建议删除，
+    内容变化时建议更新。是否执行仍由用户另建草案并确认。
+    """
     connection = _require_connection(store, workspace.id, connection_id)
     differences: list[SyncDifference] = []
     for link in store.list_links(connection.id):
@@ -700,6 +783,10 @@ def create_difference_draft(
     connection_id: int,
     note: str | None = None,
 ) -> CalendarDraftData:
+    """把当前同步差异打包成待确认草案；没有差异时报错，不生成空草案。
+
+    生成的仍是普通草案，必须重新预览、确认后才能执行。
+    """
     connection = _require_active_connection(store, workspace.id, connection_id)
     _, differences = list_differences(store, repos, workspace, connection.id)
     if not differences:
@@ -761,6 +848,11 @@ def _build_task_items(
     connection: CalendarConnectionData,
     task_ids: tuple[int, ...],
 ) -> DraftBuildResult:
+    """按显式任务集合构建写入项：去重、校验空间，并逐项给出排除原因。
+
+    只有日期的截止写成全天事件；带时刻的截止按 15 分钟显示窗口，
+    内容未变化的已同步任务跳过，不重复写入。
+    """
     if not task_ids:
         raise DomainError("请至少选择一个任务。")
     tasks: list[TaskData] = []
@@ -807,6 +899,7 @@ def _build_task_items(
             continue
         items.append(built)
     if timed:
+        # 外部日历需要结束时间，15 分钟只是展示窗口；任务截止时间本身不被改写。
         warnings.append(
             {
                 "code": "due_display_window",
@@ -823,6 +916,11 @@ def _build_plan_items(
     connection: CalendarConnectionData,
     plan_id: int,
 ) -> DraftBuildResult:
+    """把已接受计划的任务时间块构建为写入项；草案或已替代计划直接拒绝。
+
+    缓冲块直接跳过；孤立与已取消任务的时间块不写入，逐条进入排除清单；
+    内容未变化的已同步时间块跳过。
+    """
     plan = repos.plans.get_draft(plan_id)
     if plan is None or plan.workspace_id != workspace.id:
         raise NotFoundError("计划不存在")
@@ -886,11 +984,13 @@ def _item_for_source(
     *,
     category: str,
 ) -> DraftItemBuild | None:
+    """按来源内容与已同步映射决定新建/更新；内容未变化返回 None（跳过）。"""
     link = store.get_active_link(connection.id, source_type, source_id)
     signature = source_content_fingerprint(
         source_type=source_type, source_id=source_id, payload=payload
     )
     if link is not None and link.content_fingerprint == signature:
+        # 已同步且内容一致：不生成操作，避免每次预览都产生无意义的写入项。
         return None
     operation_type = OperationType.UPDATE if link is not None else OperationType.CREATE
     external_id = link.external_event_id if link is not None else None
@@ -921,6 +1021,10 @@ def _persist_draft(
     built: DraftBuildResult,
     note: str | None,
 ) -> CalendarDraftData:
+    """持久化草案版本 1（draft 状态）；空草案携带前三条排除原因直接拒绝。
+
+    内容指纹绑定连接、目标日历与全部条目指纹，之后任何一项变化都无法通过确认。
+    """
     if not built.items:
         reasons = "；".join(item["message"] for item in built.excluded[:3])
         raise DomainError(
@@ -970,6 +1074,10 @@ def _persist_draft(
 def _difference_for_link(
     repos: Repositories, workspace: WorkspaceData, link: CalendarEventLinkData
 ) -> SyncDifference | None:
+    """比较单条映射与内部来源：无变化返回 None，变化建议更新，失效建议删除。
+
+    删除建议沿用上次同步快照，因为源任务或时间块可能已经不在了。
+    """
     snapshot = link.source_snapshot or {}
     if link.source_type == CalendarSourceType.TASK:
         task = repos.tasks.get(link.source_id)
@@ -1045,6 +1153,7 @@ def _difference_for_link(
 def _delete_difference(
     link: CalendarEventLinkData, snapshot: dict, code: str, reason: str
 ) -> SyncDifference:
+    """构造删除建议：标题与时间取自同步快照，不依赖已消失的内部对象。"""
     return SyncDifference(
         operation_type=OperationType.DELETE,
         source_type=link.source_type,
@@ -1074,6 +1183,11 @@ def _validate_confirmation(
     *,
     persist_expiry: bool,
 ) -> None:
+    """执行前校验确认仍然有效：内容、目标日历、选中项、指纹与时效。
+
+    过期时按需把草案标记为 expired，避免界面继续显示可执行；
+    连接已撤销或过期时同样拒绝，待写入操作不能绕过连接状态。
+    """
     current = _current_content_fingerprint(draft)
     if draft.content_fingerprint != current:
         raise ConflictError("草案内容已变化，请重新预览并确认。")
@@ -1110,6 +1224,10 @@ def _access_token(
     cipher: TokenCipher,
     connection: CalendarConnectionData,
 ) -> str:
+    """取可用访问令牌：临近过期提前刷新，刷新失败把连接标记为 expired。
+
+    返回的令牌只在本次执行内使用，不写日志；新令牌仍以密文保存。
+    """
     credentials = store.get_credentials(connection.id)
     if credentials is None:
         raise ConflictError("日历连接不存在。")
@@ -1171,6 +1289,7 @@ def _require_draft(store: CalendarStore, workspace_id: int, draft_id: int) -> Ca
 
 
 def _current_content_fingerprint(draft: CalendarDraftData) -> str:
+    # 始终从当前条目重算，而不是相信草案上保存的旧指纹，才能发现条目被改动。
     return content_fingerprint(
         connection_id=draft.connection_id,
         provider=f"connection:{draft.connection_id}",
@@ -1187,6 +1306,7 @@ def _connection_provider(connection: CalendarConnectionData) -> str:
 def _validate_item_selection(
     draft: CalendarDraftData, item_ids: list[int]
 ) -> list[CalendarDraftItemData]:
+    """确认范围必须非空且完全属于该草案；不存在的条目编号直接拒绝。"""
     selected_ids = {item_id for item_id in item_ids}
     if not selected_ids:
         raise DomainError("请至少选择一条要写入外部日历的内容。")
@@ -1221,6 +1341,7 @@ def _validate_items_are_current(
 def _current_payload_for_item(
     repos: Repositories, workspace: WorkspaceData, item: CalendarDraftItemData
 ) -> CalendarEventPayload | None:
+    """读取草案条目对应的当前内容；来源已删除、取消或计划失效时返回 None。"""
     if item.source_type == CalendarSourceType.TASK:
         task = repos.tasks.get(item.source_id)
         if (
@@ -1251,6 +1372,7 @@ def _selected_items(draft: CalendarDraftData) -> list[CalendarDraftItemData]:
 def _payload_from_item(
     item: CalendarDraftItemData, *, operation_key_value: str
 ) -> CalendarEventPayload:
+    """把持久化的草案条目还原为写入载荷；operation_key 用于幂等查找。"""
     starts_at = item.starts_at
     ends_at = item.ends_at
     if item.date_only:
@@ -1271,12 +1393,15 @@ def _payload_from_item(
 
 
 def _task_payload(task: TaskData, timezone: str) -> CalendarEventPayload:
+    """任务截止 → 日历事件：只有日期写全天，带时刻写显示窗口；只读任务。"""
     zone = _zone(timezone)
     if task.due_time is not None:
+        # 有明确时刻：按工作空间时区解释截止，15 分钟仅作为日历展示的结束时间。
         starts_at = datetime.combine(task.due_date, task.due_time, tzinfo=zone)
         ends_at = starts_at + timedelta(minutes=DUE_DISPLAY_MINUTES)
         date_only = False
     else:
+        # 只有日期：保持全天事件 [当天 00:00, 次日 00:00)，不补造具体时刻。
         starts_at = datetime.combine(task.due_date, time(0, 0), tzinfo=zone)
         ends_at = starts_at + timedelta(days=1)
         date_only = True
@@ -1325,10 +1450,12 @@ def _excluded(kind: str, source_id: int, title: str, code: str, message: str) ->
 
 
 def _state_hash(state: str) -> str:
+    # 数据库只保存哈希：即使泄漏 state 表，也不能据此伪造一次有效回调。
     return sha256(state.encode("utf-8")).hexdigest()
 
 
 def _zone(timezone: str) -> ZoneInfo:
+    # 时区非法时退回 UTC 只用于生成本次载荷，不改写任务、计划或工作空间配置。
     try:
         return ZoneInfo(timezone)
     except ZoneInfoNotFoundError:

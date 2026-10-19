@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 课程页：以学期为范围维护课程与教学班，并管理学期归档与恢复。
+ * 归档只切换学期标记，不删除课程、任务、进度或日程；默认隐藏已归档学期，打开“显示历史学期”后可查看和恢复。
+ * 切换学期会重新加载课程；归档当前学期时自动退回第一个进行中的学期。
+ */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { coursesApi, semestersApi } from '../api/business'
@@ -22,11 +27,13 @@ const editingCourse = ref<Course | null>(null)
 const editorOpen = ref(false)
 const courseForm = reactive({ name: '', code: '', teacher: '', class_name: '' })
 
+// 默认只列出进行中学期；历史开关打开后才把已归档学期加入可选范围。
 const visibleSemesters = computed(() => showHistory.value
   ? semesters.value
   : semesters.value.filter((semester) => !semester.archived))
 const selectedSemester = computed(() => semesters.value.find((semester) => semester.id === selectedId.value) ?? null)
 
+// 始终请求包含归档的学期列表（供历史开关使用），但默认只选中第一个未归档学期。
 async function load() {
   loading.value = true
   error.value = ''
@@ -62,6 +69,7 @@ async function createSemester() {
   }
 }
 
+// 归档／恢复只改标记；归档当前学期后切到第一个未归档学期，避免继续在隐藏范围内编辑。
 async function toggleArchived(semester: Semester) {
   formError.value = ''
   try {
@@ -102,6 +110,7 @@ function editCourse(course?: Course) {
   courseError.value = ''
 }
 
+// 编辑只提交发生变化的字段；新建固定挂到当前所选学期，空的可选字段按 null 保存。
 async function saveCourse() {
   if (selectedId.value === null) return
   courseSaving.value = true
@@ -136,6 +145,7 @@ async function saveCourse() {
 }
 
 watch(selectedId, loadCourses)
+// 关闭历史视图时，如当前仍在已归档学期，自动退回进行中学期。
 watch(showHistory, (visible) => {
   if (!visible && selectedSemester.value?.archived) {
     selectedId.value = semesters.value.find((semester) => !semester.archived)?.id ?? null
@@ -220,6 +230,7 @@ onMounted(load)
     </section>
 
     <section v-if="selectedSemester && (editorOpen || !courses.length)" class="panel editor-panel">
+      <!-- 没有课程时直接展开新建表单，避免空白学期多一次点击。 -->
       <div class="section-heading">
         <div><p class="eyebrow">{{ editingCourse ? '编辑' : '新建' }}</p><h2>{{ editingCourse?.name || '添加课程' }}</h2></div>
         <button v-if="editorOpen" type="button" class="text-button" @click="editorOpen = false">取消</button>

@@ -29,10 +29,13 @@ def rq_index_job_key(job_id: int) -> str:
 
 
 class RQJobQueue:
+    """基于 RQ/Redis 的投递实现；消息只含 job_id，真实状态以数据库为准。"""
+
     def __init__(
         self, redis_url: str, *, connection: Any | None = None, connect_timeout: int = 3
     ) -> None:
         # 连接超时设短一些：Redis 不可用时投递要快速失败，而不是拖住请求或启动补偿
+        # 扫描。注入 connection 仅用于测试（fakeredis），生产路径按 redis_url 建连。
         self._connection = (
             connection
             if connection is not None
@@ -42,6 +45,8 @@ class RQJobQueue:
         self._index_queue = Queue(INDEX_QUEUE_NAME, connection=self._connection)
 
     def enqueue_parse(self, job_id: int) -> str:
+        """投递解析作业并返回队列侧标识；同一数据库作业始终使用同一队列标识。"""
+
         from campusflow.workers.jobs import parse_version_job
 
         # 稳定作业键：补偿扫描重投同一条待投递记录时复用同一队列标识。
@@ -50,6 +55,8 @@ class RQJobQueue:
         return job.id
 
     def enqueue_index(self, job_id: int) -> str:
+        """投递向量索引作业；与解析作业分属不同队列，避免互相阻塞。"""
+
         from campusflow.workers.jobs import index_version_job
 
         # 同样使用稳定作业键；重复投递由作业领取与逐块领取共同兜底。

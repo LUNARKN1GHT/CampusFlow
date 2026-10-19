@@ -1,4 +1,8 @@
-"""API 输入输出 schema。"""
+"""API 输入输出 schema。
+
+状态字段直接复用领域枚举，避免 API 与领域各定义一套；需要精确契约的
+请求模型设置 extra="forbid"，未知字段返回 422，防止拼写错误被静默忽略。
+"""
 
 from datetime import date, datetime, time
 from typing import Any
@@ -25,6 +29,8 @@ class SemesterOut(BaseModel):
 
 
 class SemesterArchive(BaseModel):
+    """只切换归档标记；不会删除或改写该学期的课程、任务与日程。"""
+
     archived: bool
 
 
@@ -45,6 +51,7 @@ class CourseUpdate(BaseModel):
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "CourseUpdate":
+        # PATCH 可省略字段，但已提交的学期与名称不能被显式 null 清空。
         for field in ("semester_id", "name"):
             if field in self.model_fields_set and getattr(self, field) is None:
                 raise ValueError(f"{field} 不能为 null")
@@ -78,6 +85,8 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
+    """未提交字段保持原值；title/priority/due_source 不允许显式 null。"""
+
     course_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
     description: str | None = None
@@ -99,6 +108,8 @@ class TaskUpdate(BaseModel):
 
 
 class TaskProgressPatch(BaseModel):
+    """只改执行进度并追加历史；reason 不改变截止时间，也不修改候选核对状态。"""
+
     progress: TaskProgress
     reason: str | None = Field(default=None, max_length=500)
 
@@ -124,6 +135,7 @@ class TaskOut(BaseModel):
     estimated_minutes: int | None
     remaining_minutes: int | None
     parent_task_id: int | None
+    # 逾期由截止时间与完成情况实时计算，不是持久化的执行状态。
     overdue: bool
     created_at: datetime
     updated_at: datetime
@@ -138,6 +150,8 @@ class TaskLinkOut(BaseModel):
 
 
 class TaskRollupOut(BaseModel):
+    """只汇总一层子任务；总耗时为 0 时 percent_complete 为 null，不按缺失值估算。"""
+
     subtask_count: int
     estimated_minutes: int
     remaining_minutes: int
@@ -167,6 +181,7 @@ class SubtaskDraftIn(BaseModel):
 
 class SubtaskBatchIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # 单次最多 20 项；父任务必须是顶层任务，不支持多层嵌套。
     items: list[SubtaskDraftIn] = Field(min_length=1, max_length=20)
 
 
@@ -182,6 +197,7 @@ class TaskParentIn(BaseModel):
 
 class TaskDependencyIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # 必要前置依赖，不是父子包含关系；全空间成环时整条边被拒绝。
     depends_on_task_id: int = Field(ge=1)
 
 
@@ -206,6 +222,8 @@ class TaskProgressChangeOut(BaseModel):
 
 
 class FixedEventCreate(BaseModel):
+    """无偏移时间按工作空间时区解释；每周重复必须给出 repeat_until（含当天）。"""
+
     course_id: int | None = None
     title: str = Field(min_length=1, max_length=300)
     starts_at: datetime
@@ -216,6 +234,8 @@ class FixedEventCreate(BaseModel):
 
 
 class FixedEventUpdate(BaseModel):
+    """未提交字段保持原值；title/starts_at/ends_at/recurrence 不允许显式 null。"""
+
     course_id: int | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
     starts_at: datetime | None = None
@@ -255,6 +275,7 @@ class FixedEventOccurrenceOut(BaseModel):
 
 
 class AvailabilitySlotCreate(BaseModel):
+    # day_of_week 以周一为 0、周日为 6；时段按工作空间时区解释且不跨午夜。
     day_of_week: int = Field(ge=0, le=6)
     start_time: time
     end_time: time
@@ -302,6 +323,8 @@ class SourceFieldOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     name: str
     value: Any
+    # document=原文规定、user=用户补充、inferred=系统推断、suggestion=规划建议；
+    # 用户填写的值不能声明为 document。
     origin: FieldOrigin
     note: str | None
     verifiable: bool

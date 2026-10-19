@@ -13,7 +13,7 @@ from campusflow.domain.errors import ModelOutputError, PermanentError, Transient
 
 
 class VisionRecognitionFailure(RuntimeError):
-    """视觉识别失败的统一基类，供 PDF 单页降级捕获。"""
+    """视觉识别失败的统一基类，供 PDF 单页降级捕获；具体子类仍按可重试性分类。"""
 
 
 class VisionRecognitionError(VisionRecognitionFailure, TransientError):

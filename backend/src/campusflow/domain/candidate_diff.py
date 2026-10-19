@@ -38,6 +38,7 @@ class ScopeComponent(StrEnum):
     CLASS_NAME = "class_name"
 
 
+# 字段名来自 X003–X005 的提取 spec；未列出的字段仍归 OTHER 参与比较，不因未知分类而丢弃。
 FIELD_CATEGORIES: dict[str, FieldCategory] = {
     "due_text": FieldCategory.DATE,
     "due_date": FieldCategory.DATE,

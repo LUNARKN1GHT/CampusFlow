@@ -55,11 +55,14 @@ INTENT_PARAMETERS = {
 
 @dataclass(frozen=True)
 class QaIntent:
+    """已校验的意图；只保留固定枚举与白名单参数，模型不能借正文指定工具或命令。"""
+
     kind: QaIntentKind
     parameters: dict
 
     @property
     def available(self) -> bool:
+        # 三类意图当前都已接通，因此恒为 True；调用方仍应读取该字段，不硬编码能力。
         return True
 
     @property
@@ -69,6 +72,8 @@ class QaIntent:
 
 @dataclass(frozen=True)
 class GeneratedAnswer:
+    """通过协议校验的模型输出；引用仍是编号，尚未绑定为候选集中的引用对象。"""
+
     insufficient: bool
     answer: str
     citation_ids: tuple[str, ...]
@@ -151,6 +156,8 @@ def parse_intent(raw: str) -> QaIntent:
 
 @dataclass(frozen=True)
 class CoverageNotice:
+    """覆盖提示：哪些资料或片段没有参与回答，必须随答案一并展示。"""
+
     kind: str
     material_id: int
     title: str
@@ -161,6 +168,8 @@ class CoverageNotice:
 
 @dataclass(frozen=True)
 class MaterialComparison:
+    """按资料归并的引用与摘录，用于多资料对照，不代替逐条引用。"""
+
     material_id: int
     title: str
     semester_id: int | None
@@ -172,6 +181,8 @@ class MaterialComparison:
 
 @dataclass(frozen=True)
 class ConflictNotice:
+    """引用之间的矛盾提示；requires_review 表示尚未判断哪一侧生效。"""
+
     code: str
     message: str
     citation_ids: tuple[str, ...]
@@ -180,6 +191,8 @@ class ConflictNotice:
 
 @dataclass(frozen=True)
 class QaAnswer:
+    """最终回答：正文、引用、覆盖、对照与冲突分开保存；引用只能来自本次候选集。"""
+
     answer: str
     citations: tuple[Citation, ...]
     insufficient: bool
@@ -193,6 +206,7 @@ class QaAnswer:
 def build_comparisons(
     citations: tuple[Citation, ...] | list[Citation],
 ) -> tuple[MaterialComparison, ...]:
+    """按资料分组引用；组内保持引用原顺序，组间按资料编号排序，保证输出稳定。"""
     groups: dict[int, list[Citation]] = {}
     for citation in citations:
         groups.setdefault(citation.material_id, []).append(citation)
@@ -219,6 +233,7 @@ def detect_date_conflicts(
 ) -> tuple[ConflictNotice, ...]:
     """同一类要求出现不同日期时并列提示，不按资料新旧自动选择。"""
     by_category: dict[str, dict[str, set[str]]] = {}
+    # 只比较“几月几日”，不判断年份：这是提示可能不一致，不是冲突裁决。
     for citation in citations:
         for category, pattern in _DATE_PATTERNS:
             for match in pattern.finditer(citation.excerpt):
@@ -246,6 +261,7 @@ def detect_date_conflicts(
 
 
 def incomplete_date_notes(citations: tuple[Citation, ...] | list[Citation]) -> tuple[str, ...]:
+    """引文只有月日、没有完整年份时提示核对；不按发布年份或当前年份换算。"""
     for citation in citations:
         if not _YEARLESS_DATE.search(citation.excerpt):
             continue

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 设置页：维护工作空间时区、每日／每周学习容量、休息与提交缓冲，以及每周可用时段。
+ * 偏好只影响后续生成或重排计划时的时间解释与容量，不改写已存日程、任务 DDL 或既有计划。
+ * 保存后服务端会按新的工作空间时区重算提醒窗口；界面主题保存在本机浏览器，不写入工作空间。
+ */
 import { onMounted, reactive, ref } from 'vue'
 
 import { scheduleApi } from '../api/business'
@@ -37,6 +42,8 @@ async function load() {
   }
 }
 
+// 保存的是后续排期的输入；每日与每周容量独立保存，不会自动调整已录入的可用时段。
+// 成功后才显示提示并用服务端返回值回填；失败只在表单内报错，已填内容保留。
 async function saveSettings() {
   saving.value = true
   error.value = ''
@@ -51,6 +58,7 @@ async function saveSettings() {
   }
 }
 
+// 仅校验先后顺序；重叠时段与跨日由服务端拒绝，成功后按星期和开始时间重排列表。
 async function addSlot() {
   slotError.value = ''
   if (slotForm.end_time <= slotForm.start_time) {
@@ -68,6 +76,7 @@ async function addSlot() {
   }
 }
 
+// 服务端删除成功后才从本地列表移除；失败保留原时段并显示错误。
 async function deleteSlot(slot: AvailabilitySlot) {
   slotError.value = ''
   try {

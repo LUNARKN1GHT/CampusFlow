@@ -1,4 +1,7 @@
-"""X004：固定日程候选提取。只返回待核对草稿，不创建正式日程。"""
+"""X004：固定日程候选提取。只返回待核对草稿，不创建正式日程。
+
+活动描述、起止时间与名称必须来自同一段原文；提交截止不能充当活动时间。
+"""
 
 from dataclasses import replace
 
@@ -50,6 +53,7 @@ EVENT_SPEC = ExtractionSpec(
 
 
 def _check_event(draft: CandidateDraft, sources: dict[int, str]) -> CandidateDraft:
+    """校验活动名称、描述与时间同源；缺失字段转为核对原因，不构造时间点。"""
     fields = {f.name: f for f in draft.fields}
     statement = fields["activity_text"].value
     generated = []
@@ -61,6 +65,7 @@ def _check_event(draft: CandidateDraft, sources: dict[int, str]) -> CandidateDra
         elif not any(field.value in e.quote for e in field.evidence):
             raise InvalidModelOutput("活动字段必须保留对应证据原文，不能补写或改写")
     try:
+        # 描述本身及其完整原句都不能混入提交、报名截止等非活动要求。
         require_event_statement(statement)
         require_event_context(
             statement,
@@ -74,6 +79,7 @@ def _check_event(draft: CandidateDraft, sources: dict[int, str]) -> CandidateDra
         raise InvalidModelOutput(str(error)) from None
     if fields["title"].value not in statement:
         raise InvalidModelOutput("活动名称必须出现在活动描述中，不能混用其他事项")
+    # 起止时间必须来自当前活动描述，不能借用其他活动或作业截止的时间。
     for name in ("start_text", "end_text"):
         value = fields[name].value
         if value is not None:
@@ -98,6 +104,7 @@ def extract_event_drafts(
     version_no: int,
     generator: TextGenerator,
 ) -> list[CandidateDraft]:
+    """先校验空间与版本再调用模型；只返回草稿，不写库或创建固定日程。"""
     drafts = generate_for_version(
         repos, workspace_id, material_id, version_no, generator, EVENT_SPEC
     )

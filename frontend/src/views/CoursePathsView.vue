@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/*
+ * 课程路径页：按培养方案版本维护课程、三类关系、别名与修读记录，并只读请求关系图、
+ * 拓扑层次、下一步与学期试排。图、顺序、可学判断与学期建议共用同一份已确认正式关系，
+ * 任何环、类型矛盾、缺项或未转换候选都会阻塞结论；页面只展示原因，不自行补出顺序。
+ * 切换查看版本不影响档案中的当前方案，旧方案数据保留且不会迁移到新版本。
+ */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { semestersApi } from '../api/business'
@@ -25,6 +31,7 @@ import type {
   SwitchPreview,
 } from '../api/types'
 
+// 三类关系互斥；只有强制先修进入拓扑分层，并修只约束同修，建议先学仅提示。
 const relationLabels: Record<string, string> = {
   prerequisite: '强制先修',
   corequisite: '并修',
@@ -37,6 +44,7 @@ const statusLabels: Record<string, string> = {
   planned: '待修',
   unknown: '未知',
 }
+// 后端问题代码的中文映射；未收录的代码原样显示，避免前端猜测含义。
 const problemCodeLabels: Record<string, string> = {
   prerequisite_cycle: '强制先修成环',
   relation_conflict: '关系类型矛盾',
@@ -162,6 +170,7 @@ const selectedGraphNode = computed<CourseGraphNode | null>(
 const selectedGraphEdge = computed<CourseGraphEdge | null>(
   () => graph.value?.edges.find((edge) => edge.id === selectedEdgeId.value) ?? null,
 )
+// 成环高亮只取后端返回的环路径上的边与课程，不在前端另行推断环。
 const cycleRelationIds = computed(
   () => new Set((graph.value?.cycles ?? []).flatMap((problem) => problem.relation_ids)),
 )
@@ -169,6 +178,9 @@ const cycleCourseIds = computed(
   () => new Set((graph.value?.cycles ?? []).flatMap((problem) => [...problem.path, ...problem.course_ids])),
 )
 
+// 固定四组与 /graph 的 cycles／conflicts／missing／pending 字段一一对应：
+// missing 含候选缺字段与课名无法唯一匹配，pending 含待核对与类型冲突的未转换候选；
+// 分组只影响展示，是否阻塞仍以后端 complete 为准。
 const graphProblemGroups = computed(() => {
   const current = graph.value
   if (!current) return []
@@ -180,6 +192,7 @@ const graphProblemGroups = computed(() => {
   ]
 })
 
+// 节点尺寸与间距固定，SVG 宽高、连线锚点和点击热区都由这些常量推导。
 const GRAPH_NODE_WIDTH = 172
 const GRAPH_NODE_HEIGHT = 54
 const GRAPH_COLUMN_GAP = 72
@@ -199,6 +212,8 @@ const graphLayout = computed<GraphLayout>(() => {
   if (!current || !current.nodes.length) {
     return { nodes: [], edges: [], width: 0, height: 0, columns: 0 }
   }
+  // 布局要画出全部课程，因此自行按强制先修做一次 Kahn 分层，不复用 /order：
+  // 后者在存在问题时返回空层次，直接使用会让有问题的图无节点可渲染。
   const ids = current.nodes.map((node) => node.id)
   const idSet = new Set(ids)
   const indegree = new Map(ids.map((id) => [id, 0]))
@@ -250,6 +265,8 @@ const graphLayout = computed<GraphLayout>(() => {
     maxRows * GRAPH_NODE_HEIGHT +
     Math.max(0, maxRows - 1) * GRAPH_ROW_GAP +
     GRAPH_PADDING * 2
+  // 列号来自强制先修链上的 Kahn 分层，行号按中文课名排序；
+  // 位置只由节点集合推导，重复渲染结果稳定。
   const positions = new Map<number, { x: number; y: number; column: number; row: number }>()
   const layoutNodes: GraphLayout['nodes'] = []
   columns.forEach((nodes, column) => {
@@ -272,6 +289,8 @@ const graphLayout = computed<GraphLayout>(() => {
     const sy = source.y + GRAPH_NODE_HEIGHT / 2
     const tx = target.x
     const ty = target.y + GRAPH_NODE_HEIGHT / 2
+    // 连线从源节点右侧中点连到目标节点左侧中点；同列或回边改用绕行曲率只为
+    // 避免穿过节点，箭头方向仍表示“来源课程 → 受限课程”。
     let path: string
     if (edge.from_course_id === edge.to_course_id) {
       // 自环必须可见：从节点右侧绕出再回到自身。
@@ -289,6 +308,8 @@ const graphLayout = computed<GraphLayout>(() => {
   return { nodes: layoutNodes, edges: layoutEdges, width, height, columns: columns.length }
 })
 
+// next 接口把已完成课程标为不可进入，两处列表都排除，避免出现在“待满足条件”里；
+// 没有修读记录时状态为 unknown，按未完成处理，不推断为已修或未修。
 const nextAvailable = computed(
   () =>
     nextCourses.value?.courses.filter(
@@ -302,6 +323,7 @@ const nextBlocked = computed(
     ) ?? [],
 )
 
+// 节点与连线详情互斥，仅保留一个选中项；再次点击同一项取消选中。
 function toggleGraphNode(nodeId: number) {
   selectedEdgeId.value = null
   selectedNodeId.value = selectedNodeId.value === nodeId ? null : nodeId
@@ -316,15 +338,19 @@ function problemCodeLabel(code: string): string {
   return problemCodeLabels[code] ?? code
 }
 
+// 环问题优先展示 path（含回到起点的完整路径），其余问题退回 course_ids。
 function problemCourseNames(problem: CourseGraphProblem): string {
   const ids = problem.path.length ? problem.path : problem.course_ids
   return ids.map(courseName).join(' → ')
 }
 
+// 节点宽度固定，超长课名截断；完整名称由模板里的 <title> 提供悬浮提示。
 function shortNodeName(name: string): string {
   return name.length > 12 ? `${name.slice(0, 12)}…` : name
 }
 
+// 默认查看档案中的当前方案；没有当前方案时只选中第一个版本供查看，
+// 真正写入档案仍需用户在切换预览中确认。
 async function load() {
   loading.value = true
   error.value = ''
@@ -355,6 +381,8 @@ async function load() {
   }
 }
 
+// 方案切换后所有列表与分析都重新拉取；没有选中方案时清空并重置，
+// 避免上一个方案的图或顺序残留在页面上。
 async function loadPlanData() {
   if (selectedPlanId.value === null) {
     courses.value = []
@@ -410,6 +438,8 @@ async function loadAnalysis() {
   graphLoading.value = true
   orderLoading.value = true
   nextLoading.value = true
+  // 三个只读分析并行且各自容错，任一失败只清空对应区块；
+  // 返回时若已切换方案则丢弃结果，防止旧响应覆盖新方案的数据。
   const [graphResult, orderResult, nextResult] = await Promise.allSettled([
     pathsApi.graph(planId),
     pathsApi.order(planId),
@@ -443,6 +473,8 @@ async function loadAnalysis() {
   }
 }
 
+// 留空表示交给后端：学分上限回落到方案设置，最多学期数自动；
+// 页面不把空字符串当作 0，也不在本地预判可排性。
 async function generateSemesterPlan() {
   if (selectedPlanId.value === null) return
   semesterLoading.value = true
@@ -461,6 +493,7 @@ async function generateSemesterPlan() {
   }
 }
 
+// 修读记录与汇总任一失败即整体标记不可用，避免把空数据展示成“未修”或“状态未知”。
 async function loadStudy() {
   if (selectedPlanId.value === null) return
   studyUnavailable.value = false
@@ -478,6 +511,8 @@ async function loadStudy() {
   }
 }
 
+// 查看版本与档案当前方案分离：仅当二者不同时读取切换影响预览，
+// 预览里的计数属于当前方案，切换不会删除旧方案数据。
 async function selectPlan(planId: number) {
   selectedPlanId.value = planId
   preview.value = null
@@ -503,6 +538,7 @@ async function selectPlan(planId: number) {
   }
 }
 
+// 写档案后按新方案重载；旧方案数据保留但不再进入当前路径，不做迁移。
 async function applyCurrentPlan() {
   if (selectedPlanId.value === null || profile.value === null) return
   actionError.value = ''
@@ -662,6 +698,8 @@ async function removeAlias(alias: CourseAlias) {
   }
 }
 
+// 名称解析只做严格匹配：空白归一、拉丁字母不区分大小写，正式课名优先，
+// 别名仅在学期／教学班范围满足时参与；多命中返回歧义，不自动绑定或合并课程。
 async function resolve() {
   if (selectedPlanId.value === null || !resolveName.value.trim()) return
   resolving.value = true
@@ -714,6 +752,7 @@ async function removeStudyRecord(record: CourseStudyRecord) {
   }
 }
 
+// 方案切换由 watch 全量重载；挂载时先等 load() 选出默认版本再加载，避免用空方案请求分析。
 watch(selectedPlanId, loadPlanData)
 onMounted(async () => {
   await load()
@@ -983,6 +1022,7 @@ onMounted(async () => {
           </form>
         </template>
 
+        <!-- 前三个页签都已显式判断，剩余分支即“修读状态”。 -->
         <template v-else>
           <div class="section-heading">
             <div><p class="eyebrow">个人修读</p><h2>已修、在修与待修</h2></div>
@@ -1202,6 +1242,7 @@ onMounted(async () => {
                   </dd>
                 </div>
               </dl>
+              <!-- 证据停留在字段／片段／版本／资料编号，不在本页跳转资料库；关系候选另给出核对入口。 -->
               <div class="evidence-list">
                 <p class="eyebrow">原文证据</p>
                 <p v-if="!selectedGraphEdge.evidence.length" class="compact-empty">该关系没有可展示的原文证据；不代表关系已被原文确认。</p>
@@ -1217,6 +1258,7 @@ onMounted(async () => {
               </div>
             </div>
           </template>
+          <!-- 标题标注“始终可见”：四组固定渲染，空组显示“无”，不让某类问题从页面消失。 -->
           <div class="problem-section">
             <div class="section-heading">
               <div><p class="eyebrow">问题清单</p><h3>环、矛盾、缺项与待核对</h3></div>
@@ -1276,6 +1318,7 @@ onMounted(async () => {
                 <p v-if="problem.relation_ids.length" class="form-help">相关关系：{{ problem.relation_ids.map((id) => `#${id}`).join('、') }}</p>
               </li>
             </ul>
+            <!-- 阻塞时后端 levels 为空；这里不渲染占位层次，避免把“未输出”误读为“无课”。 -->
             <div v-if="order.levels.length" class="level-grid">
               <div v-for="(level, index) in order.levels" :key="`level-${index}`" class="level-card">
                 <p class="eyebrow">第 {{ index + 1 }} 层</p>
@@ -1382,6 +1425,7 @@ onMounted(async () => {
               <p v-else>学分上限：{{ semesterPlan.credit_limit ?? '未知（未检查学分负荷上限）' }}。</p>
             </div>
           </div>
+          <!-- 有结果时始终展示审核边界；学分上限未知等降级说明由后端 limitations／assumptions 给出。 -->
           <p class="status-banner warn">
             <span><strong>不构成选课或毕业资格审核</strong><p>graduation_audit=false；请以学校正式培养方案和选课系统为准。</p></span>
           </p>

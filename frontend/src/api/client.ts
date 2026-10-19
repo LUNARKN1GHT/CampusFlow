@@ -1,9 +1,12 @@
+// 统一 HTTP 客户端：拼接 /api/v1、携带 Cookie 会话、默认 8 秒超时，并把失败归一为 ApiError。
+// 错误分为 http／validation／network／timeout／invalid-response，调用方据此决定提示与重试方式。
 const API_PREFIX = '/api/v1'
 const SESSION_EXPIRED_EVENT = 'campusflow:session-expired'
 
 type ValidationIssue = { loc?: Array<string | number>; msg?: string }
 type ErrorPayload = { detail?: string | ValidationIssue[] }
 
+/** 前端统一错误：status 为 null 表示没拿到响应（超时或网络不可达）。 */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -15,6 +18,7 @@ export class ApiError extends Error {
   }
 }
 
+/** 取 422 明细的首条，拼上字段路径（去掉 body 前缀），让用户知道改哪一项。 */
 function validationMessage(issues: ValidationIssue[]): string {
   const first = issues[0]
   if (!first) return '提交内容不符合要求，请检查后重试。'
@@ -22,6 +26,10 @@ function validationMessage(issues: ValidationIssue[]): string {
   return `${field ? `${field}：` : ''}${first.msg ?? '内容格式不正确'}`
 }
 
+/**
+ * 把非 2xx 响应转成 ApiError：优先使用后端 detail 文案，非 JSON 错误页不泄露原始正文。
+ * 401 只在 notifySessionExpiry 时广播会话失效事件；/auth/ 路径的 401 按登录失败提示。
+ */
 async function toApiError(response: Response, notifySessionExpiry: boolean): Promise<ApiError> {
   let payload: ErrorPayload | null = null
   try {
@@ -49,6 +57,10 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
   return new ApiError(`请求未完成（HTTP ${response.status}）。`, response.status, 'http')
 }
 
+/**
+ * 发出请求并统一处理超时：GET 强制 no-store，避免浏览器缓存旧数据。
+ * AbortError 归为超时，其余 fetch 异常归为网络不可达；两者都不会把请求伪装成成功。
+ */
 async function performRequest(
   path: string,
   init: RequestInit,
@@ -78,6 +90,7 @@ async function performRequest(
   }
 }
 
+/** 普通 JSON 接口：204 返回 undefined，响应不是 JSON 时报 invalid-response 而不是当作成功。 */
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
@@ -95,7 +108,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
 }
 
-/** 读取二进制原文（PDF、图片）。原文缺失时抛出 ApiError，供调用方区分"已失效"。 */
+/** 读取二进制原文（PDF、图片）。原文缺失时抛出 ApiError，供调用方区分"已失效"；默认 20 秒超时。 */
 export async function apiRequestBlob(path: string, timeoutMs = 20000): Promise<Blob> {
   const headers = new Headers({ Accept: '*/*' })
   const response = await performRequest(path, {}, headers, timeoutMs)
@@ -121,7 +134,10 @@ function filenameFromDisposition(value: string | null): string | null {
   return plain?.[1]?.trim() || null
 }
 
-/** POST 下载文件并读取响应头中的文件名；非 2xx 仍按 apiRequest 的规则抛出 ApiError。 */
+/**
+ * POST 下载文件并读取响应头中的文件名；非 2xx 仍按 apiRequest 的规则抛出 ApiError。
+ * 默认 30 秒超时，导出文件可能比普通接口慢。
+ */
 export async function apiRequestFile(
   path: string,
   init: RequestInit = {},
@@ -139,6 +155,7 @@ export async function apiRequestFile(
   }
 }
 
+/** 只对 ApiError 展示后端文案；未知异常统一兜底，避免把内部细节暴露给用户。 */
 export function errorMessage(error: unknown): string {
   return error instanceof ApiError ? error.message : '操作没有完成，请重试。'
 }

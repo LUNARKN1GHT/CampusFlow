@@ -14,6 +14,8 @@ _SEASON_ORDER = ("fall", "spring")
 
 @dataclass(frozen=True)
 class GraphCourse:
+    """课程节点；修读状态只影响下一步建议，不参与拓扑排序。"""
+
     id: int
     name: str
     code: str | None
@@ -25,6 +27,8 @@ class GraphCourse:
 
 @dataclass(frozen=True)
 class GraphRelation:
+    """一条已确认的正式关系；source_candidate_id 只用于回溯证据，不代表候选仍待核对。"""
+
     id: int
     from_course_id: int
     to_course_id: int
@@ -35,6 +39,8 @@ class GraphRelation:
 
 @dataclass(frozen=True)
 class GraphProblem:
+    """阻塞项或问题项；code 稳定供前端分类，其余字段指向具体的课程、关系或环路径。"""
+
     code: str
     message: str
     course_ids: tuple[int, ...] = ()
@@ -45,6 +51,8 @@ class GraphProblem:
 
 @dataclass(frozen=True)
 class GraphResult:
+    """图分析结果；complete 为 False 时 limitations 必须说明缺了什么，不能只给空列表。"""
+
     courses: tuple[GraphCourse, ...]
     relations: tuple[GraphRelation, ...]
     cycles: tuple[GraphProblem, ...]
@@ -57,6 +65,8 @@ class GraphResult:
 
 @dataclass(frozen=True)
 class TopoResult:
+    """只按强制先修得到的层次；存在环时 levels 为空，problems 说明原因。"""
+
     levels: tuple[tuple[int, ...], ...]
     alternatives: bool
     problems: tuple[GraphProblem, ...]
@@ -64,6 +74,8 @@ class TopoResult:
 
 @dataclass(frozen=True)
 class NextCourse:
+    """一门课的下一步判断；建议先学放在 recommended，不算硬阻塞。"""
+
     course_id: int
     name: str
     study_status: str
@@ -74,6 +86,8 @@ class NextCourse:
 
 @dataclass(frozen=True)
 class SuggestedTerm:
+    """一个学期的试排结果；学分未知单独计数，不按常识补值。"""
+
     index: int
     season: str
     course_ids: tuple[int, ...]
@@ -84,6 +98,8 @@ class SuggestedTerm:
 
 @dataclass(frozen=True)
 class SemesterSuggestion:
+    """学期建议；只是依赖层面的排列，不构成选课或毕业资格结论。"""
+
     terms: tuple[SuggestedTerm, ...]
     unplaced: tuple[dict, ...]
     limitations: tuple[str, ...]
@@ -111,10 +127,12 @@ def find_cycles(
     """返回强制先修环的具体路径，包含自环；按边集合去重。"""
     course_ids = {course.id for course in courses}
     adjacency = _prerequisite_adjacency(course_ids, relations)
+    # 颜色标记：0 未访问、1 在当前递归栈上、2 已完成；遇到栈上节点即为环。
     color = {course_id: 0 for course_id in course_ids}
     node_stack: list[int] = []
     edge_stack: list[GraphRelation] = []
     found: list[GraphProblem] = []
+    # 同一组节点与边只报一次，避免多个入口重复输出同一条环。
     seen: set[tuple[frozenset[int], frozenset[int]]] = set()
 
     def visit(node: int) -> None:
@@ -159,6 +177,7 @@ def find_conflicts(relations: tuple[GraphRelation, ...]) -> tuple[GraphProblem, 
     conflicts = []
     for (source, target), items in sorted(by_pair.items()):
         types = {item.relation_type for item in items}
+        # 三类关系两两互斥；同类型重复声明不算冲突，只保留证据。
         inconsistent = (
             RelationType.PREREQUISITE in types
             and RelationType.RECOMMENDED in types
@@ -269,6 +288,7 @@ def next_courses(
 
 
 def _term_season(index: int, start_season: str) -> str:
+    """学期季节按 fall→spring 交替；起始季节无法识别时按 fall 处理，不猜测。"""
     start = start_season if start_season in _SEASON_ORDER else "fall"
     return _SEASON_ORDER[(_SEASON_ORDER.index(start) + index) % len(_SEASON_ORDER)]
 
@@ -336,6 +356,7 @@ def suggest_terms(
 
     max_count = max_terms or max(4, len(topo.levels) + 2)
     position: dict[int, int] = {}
+    # 按层次与名称固定顺序试排，保证同样输入得到同样的学期建议。
     for course in sorted(active, key=lambda item: (level_by_id.get(item.id, 0), item.name)):
         earliest = level_by_id.get(course.id, 0)
         # 前置课程因开课季节被推后时，后续课程不能排到它前面。
@@ -375,6 +396,7 @@ def suggest_terms(
                 }
             )
     warnings_by_term: dict[int, list[str]] = defaultdict(list)
+    # 并修只尽量安排在同一学期；排不开时给出警告，不因此阻塞或伪造方案。
     for course_id, partners in corequisite_partners.items():
         if course_id not in position:
             continue

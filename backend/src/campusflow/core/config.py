@@ -1,3 +1,9 @@
+"""运行配置：默认值面向本机开发，生产必须用环境变量覆盖连接与凭据。
+
+密钥只从环境（或 backend/.env）读取，不写入数据库、日志或接口响应；
+文字、视觉与向量模型分别配置，互不继承，避免换模型时混用旧配置身份。
+"""
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -6,6 +12,8 @@ DB_CONNECT_TIMEOUT_SECONDS = 3
 
 
 class Settings(BaseSettings):
+    """多数变量加 CAMPUSFLOW_ 前缀；密钥与 OAuth 客户端使用各自环境变量名。"""
+
     model_config = SettingsConfigDict(
         env_prefix="CAMPUSFLOW_",
         env_file=".env",
@@ -37,7 +45,7 @@ class Settings(BaseSettings):
     embed_job_timeout_seconds: int = Field(default=300, ge=1)
     # Q004：索引作业自动重投上限；0 表示关闭自动重投
     embed_job_max_auto_retries: int = Field(default=3, ge=0)
-    # 智谱文字/视觉模型共用密钥（ZHIPU_API_KEY；未配置时不得调用真实模型）
+    # 智谱文字/视觉/向量模型共用密钥（ZHIPU_API_KEY；未配置时不得调用真实模型）
     zhipu_api_key: str | None = Field(default=None, validation_alias="ZHIPU_API_KEY")
     # Q019：文字生成供应方；deepseek 使用 DEEPSEEK_API_KEY 与 OpenAI 兼容接口
     deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
@@ -45,6 +53,7 @@ class Settings(BaseSettings):
     # X002：用户选择的文字模型，与视觉模型独立配置。
     text_model: str = "glm-4-flash-250414"
     text_timeout_seconds: float = Field(default=60, gt=0, le=120, allow_inf_nan=False)
+    # 输出上限同时约束费用；被截断的回答按无效响应拒绝，不当作成功。
     text_max_tokens: int = Field(default=4096, ge=1, le=8192)
     # Q002：与文字/视觉分别配置。revision 是本地索引代次，不是供应商版本证明。
     embedding_model: str = "embedding-3"
@@ -61,6 +70,7 @@ class Settings(BaseSettings):
     local_password: str = "campusflow-dev"
     # M9：外部日历。local 只用于自动化验收与显式本地演示，生产使用 google。
     calendar_provider: str = "google"
+    # Fernet 密钥，只用于加密 OAuth 令牌；未配置时拒绝连接/读取凭据，不落明文。
     calendar_token_key: str | None = None
     google_calendar_client_id: str | None = Field(
         default=None, validation_alias="GOOGLE_CALENDAR_CLIENT_ID"

@@ -57,6 +57,7 @@ def field_conflicts(entries: Sequence[ConflictEntry]) -> tuple[FieldConflict, ..
         groups.setdefault(key, []).append(entry)
     conflicts = []
     for (_, _, field_name), group in groups.items():
+        # 用规范化 JSON 比较：1 与 true、"1" 与 1 必须视为不同取值。
         values = [canonical_json(e.value) for e in group if e.value is not None]
         if len(values) >= 2 and len(set(values)) >= 2:
             conflicts.append(FieldConflict(str(field_name), tuple(group)))

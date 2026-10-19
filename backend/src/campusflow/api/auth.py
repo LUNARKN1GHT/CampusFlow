@@ -25,6 +25,7 @@ class SessionOut(BaseModel):
 
 
 def _valid_token(request: Request, token: str | None) -> bool:
+    # 令牌集合只存在进程内，不查库；服务重启后全部失效。
     return token is not None and token in request.app.state.auth_tokens
 
 
@@ -32,6 +33,10 @@ def require_session(
     request: Request,
     campusflow_session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> str:
+    """业务路由的统一登录守卫（main.py 以路由级依赖挂载）。
+
+    返回值是固定本地用户名，用作核对、接受等操作留痕的操作者。
+    """
     if not _valid_token(request, campusflow_session):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
     return request.app.state.settings.local_username
@@ -40,6 +45,7 @@ def require_session(
 @router.post("/login", response_model=SessionOut)
 def login(payload: LoginInput, request: Request, response: Response) -> SessionOut:
     settings = request.app.state.settings
+    # 常数时间比较，避免通过响应时间差异猜测用户名或口令。
     username_matches = secrets.compare_digest(
         payload.username.encode("utf-8"), settings.local_username.encode("utf-8")
     )
@@ -51,6 +57,7 @@ def login(payload: LoginInput, request: Request, response: Response) -> SessionO
 
     token = secrets.token_urlsafe(32)
     request.app.state.auth_tokens.add(token)
+    # HttpOnly + SameSite=Lax；本机 HTTP 开发因此 secure=False，部署 HTTPS 后应开启。
     response.set_cookie(
         SESSION_COOKIE,
         token,
@@ -74,6 +81,7 @@ def logout(
     response: Response,
     campusflow_session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
 ) -> None:
+    # 只作废当前浏览器带来的这个令牌，其他标签页或设备上的会话继续有效。
     if campusflow_session is not None:
         request.app.state.auth_tokens.discard(campusflow_session)
     response.delete_cookie(SESSION_COOKIE, path="/")

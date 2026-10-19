@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 版本对照页：选择基准（旧）与新候选后，并列展示适用范围、字段差异、受影响事项与重复建议。
+ * 流程：加载对照时并行取差异、适用性、影响与历史；用户勾选字段并填写原因后才接受；重复合并须先预览拿令牌。
+ * 约束：接受前不改变任务、日程和计划；冲突或证据不足需显式确认；取消合并预览不影响原候选。
+ */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -33,6 +38,7 @@ const mergeError = ref('')
 const merging = ref(false)
 const mergeResult = ref<MergeResult | null>(null)
 
+// missing 只表示新侧没有该字段；explicitly_removed 需新侧字段存在、值为空且至少一条证据仍可逐字定位。
 const statusLabels: Record<string, string> = {
   unchanged: '无变化', changed: '已修改', added: '新增', missing: '缺失', explicitly_removed: '原文明确删除',
 }
@@ -40,6 +46,7 @@ const applicabilityLabels: Record<string, string> = {
   applicable: '可作为新版本', conflict: '冲突，需核对', requires_review: '证据不足，待核对',
 }
 const comparable = computed(() => candidates.value.filter((item) => item.id !== baselineId.value))
+// 只有实际变化的字段可被接受；无变化字段后端会拒绝，因此这里不展示。
 const changedFields = computed(() => diff.value?.fields.filter((field) => field.status !== 'unchanged') ?? [])
 const scopeText = (scope: CandidateDiff['left']['scope']) => [
   scope.semester_name ?? '未指定学期',
@@ -48,11 +55,13 @@ const scopeText = (scope: CandidateDiff['left']['scope']) => [
 ].join(' · ')
 const valueText = (value: unknown) => value === null || value === undefined ? '—' : String(value)
 
+// 地址栏参数可能是数组或非法字符串，只接受正整数候选 ID。
 function queryNumber(value: unknown): number | null {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null
 }
 
+// 一并列出已失效候选以保留旧版本和接受历史；基准优先取地址栏参数，其次取列表首项。
 async function loadCandidates() {
   loading.value = true
   error.value = ''
@@ -67,6 +76,7 @@ async function loadCandidates() {
   }
 }
 
+// 重复建议只读；切换基准后清空来源选择与旧预览，避免预览令牌跨范围复用。
 async function loadDuplicates() {
   if (baselineId.value === null) return
   try {
@@ -78,6 +88,7 @@ async function loadDuplicates() {
   }
 }
 
+// 来源选择变化会使预览令牌失效，因此同时丢弃预览和已合并结果。
 function toggleSource(candidateId: number) {
   selectedSources.value = selectedSources.value.includes(candidateId)
     ? selectedSources.value.filter((item) => item !== candidateId)
@@ -86,6 +97,7 @@ function toggleSource(candidateId: number) {
   mergeResult.value = null
 }
 
+// 预览令牌绑定目标、来源候选、版本、进度与时间块数量；合并时原样回传，由后端重新校验。
 async function loadMergePreview() {
   if (baselineId.value === null || !selectedSources.value.length) {
     mergeError.value = '请先选择要合并的重复候选。'
@@ -106,6 +118,7 @@ function cancelMerge() {
   mergeError.value = ''
 }
 
+// 合并原因必填；若预览后范围或进度变化，后端返回冲突要求重新预览，不会按旧令牌执行。
 async function submitMerge() {
   if (baselineId.value === null || !mergePreview.value) return
   if (!mergeReason.value.trim()) {
@@ -130,6 +143,8 @@ async function submitMerge() {
   }
 }
 
+// 四个只读请求并行获取；默认勾选全部变化字段，但仍需用户填写原因并显式接受。
+// 两侧候选写入地址栏，刷新或分享后仍能恢复同一组对照。
 async function loadComparison() {
   if (baselineId.value === null || comparisonId.value === null) {
     error.value = '请选择基准候选和待比较候选。'
@@ -158,6 +173,8 @@ async function loadComparison() {
   }
 }
 
+// 字段与原因都要显式提交；判定为冲突或待核对时 acknowledge_conflict 为必需。
+// 接受成功后旧候选标记失效并重算提醒，页面随即刷新对照与历史。
 async function submitAcceptance() {
   if (baselineId.value === null || comparisonId.value === null) return
   if (!selectedFields.value.length) {
@@ -264,6 +281,7 @@ onMounted(loadCandidates)
             </article>
           </div>
           <p v-else class="compact-empty">旧版本尚未转换为正式任务。</p>
+          <!-- 后端声明的未覆盖能力必须原样展示，不能省略或让用户以为已同步。 -->
           <p v-for="item in impact.unsupported" :key="item.code" class="inline-notice">{{ item.message }}</p>
         </section>
 
@@ -308,6 +326,7 @@ onMounted(loadCandidates)
         <section class="panel">
           <div class="section-heading"><div><p class="eyebrow">确认</p><h2>接受所选字段</h2></div></div>
           <p class="form-help">接受后旧候选会标记为已失效；未点击接受前，任务、日程和计划不会改变。</p>
+          <!-- 适用性为冲突或证据不足时，必须勾选确认才能接受；后端会再次校验。 -->
           <label class="switch-field"><input v-model="acknowledgeConflict" type="checkbox" />我已核对冲突并确认接受</label>
           <label>接受原因<textarea v-model="reason" rows="3" placeholder="说明为什么接受这些字段"></textarea></label>
           <p v-if="acceptError" class="form-error" role="alert">{{ acceptError }}</p>

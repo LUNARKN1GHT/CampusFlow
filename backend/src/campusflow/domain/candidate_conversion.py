@@ -66,6 +66,7 @@ def due_source_for(origin: FieldOrigin) -> DueSourceType:
 
 
 def _estimated_minutes(field: CandidateField | None) -> int | None:
+    """耗时建议只接受正整数；其它取值不换算、不就近取整，留空由用户补充。"""
     if field is None:
         return None
     value = field.value
@@ -75,6 +76,7 @@ def _estimated_minutes(field: CandidateField | None) -> int | None:
 
 
 def _description(by_name: dict[str, CandidateField]) -> str | None:
+    """只把提交方式与产出物拼进描述，其余字段留给结构化列，避免同一信息重复写入。"""
     parts = []
     for name, label in DESCRIPTION_PARTS:
         field = by_name.get(name)
@@ -103,6 +105,7 @@ def build_task_conversion(
     if due_field is not None and due_field.value is not None:
         due_date, due_time = parse_due_text(due_field.value)
         due_source = due_source_for(due_field.origin)
+        # 解析不出的写法只留在备注里待核对，不猜测日期，也不清空原文提示。
         if due_date is None and isinstance(due_field.value, str):
             due_note = due_field.value.strip() or None
     return TaskConversion(

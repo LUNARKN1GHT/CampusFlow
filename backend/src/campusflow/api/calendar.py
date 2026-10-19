@@ -1,4 +1,8 @@
-"""M9 外部日历 HTTP 路由：连接、授权、草案、执行与同步差异。"""
+"""M9 外部日历 HTTP 路由：连接、授权、草案、执行与同步差异。
+
+流程固定为草案 → 用户逐项确认 → 执行 → 超时对账。预览与差异查询不写外部
+日历；连接撤销后未完成草案失效，内部任务与计划始终保持不变。
+"""
 
 from __future__ import annotations
 
@@ -176,6 +180,7 @@ class DifferenceDraftIn(BaseModel):
 
 @router.get("/calendar/connections", response_model=list[CalendarConnectionOut])
 def list_connections(workspace: CurrentWorkspace, store: Store) -> list[CalendarConnectionOut]:
+    """只列当前空间的连接；响应不含令牌或密文。"""
     return [_connection_out(item) for item in use_cases.list_connections(store, workspace.id)]
 
 
@@ -186,6 +191,10 @@ def start_oauth(
     provider: Provider,
     settings: SettingsDep,
 ) -> OAuthStartOut:
+    """发起授权：state 只以哈希落库，10 分钟内一次性使用。
+
+    生成授权地址不等于获得写入授权，写入仍需后续草案逐项确认。
+    """
     url, expires_at = use_cases.start_authorization(
         store,
         provider,
@@ -205,6 +214,7 @@ def oauth_callback(
     code: Annotated[str | None, Query()] = None,
     error: Annotated[str | None, Query()] = None,
 ) -> CalendarConnectionOut:
+    """回调必须带有效 state；过期、已使用或缺少授权码都拒绝建立连接。"""
     connection = use_cases.complete_authorization(
         store,
         provider,
@@ -225,6 +235,7 @@ def revoke_connection(
     provider: Provider,
     cipher: Cipher,
 ) -> CalendarConnectionOut:
+    """撤销连接并取消未完成草案；之后执行一律被拒绝，内部任务与计划保留。"""
     connection, _ = use_cases.revoke_connection(
         store, provider, cipher, workspace.id, connection_id
     )
@@ -238,6 +249,10 @@ def create_draft(
     store: Store,
     repos: Repos,
 ) -> DraftOut:
+    """只接受显式选择的任务或一个已接受计划；预览不调用供应商、不写外部日历。
+
+    草案计划不会被自动接受；被排除的条目与原因随草案返回。
+    """
     draft = use_cases.create_draft(
         store,
         repos,
@@ -266,6 +281,10 @@ def confirm_draft(
     store: Store,
     repos: Repos,
 ) -> DraftOut:
+    """确认选中条目：content_fingerprint 必须与当前草案一致。
+
+    确认 15 分钟内有效；草案内容或目标日历变化后旧确认失效，返回 409。
+    """
     draft = use_cases.confirm_draft(
         store,
         repos,
@@ -288,6 +307,10 @@ def execute_draft(
     provider: Provider,
     cipher: Cipher,
 ) -> ExecutionOut:
+    """执行前重新校验内部任务/计划、连接与目标日历；逐项返回成功、失败或未知。
+
+    未知结果不代表成功，必须先对账确认后才能重试；已成功项不会重复执行。
+    """
     draft, items = use_cases.execute_draft(
         store,
         repos,
@@ -310,6 +333,7 @@ def retry_draft(
     provider: Provider,
     cipher: Cipher,
 ) -> ExecutionOut:
+    """只重试失败或未知项，已成功项不会重复执行；没有可重试项返回 409。"""
     draft, items = use_cases.retry_draft(
         store,
         repos,
@@ -342,6 +366,7 @@ def reconcile_operation(
     provider: Provider,
     cipher: Cipher,
 ) -> OperationOut:
+    """按幂等键向供应商核对超时操作；对账失败保持原状态，不猜测成功。"""
     operation = use_cases.reconcile_operation(store, provider, cipher, workspace.id, operation_id)
     return _operation_out(operation)
 
@@ -353,6 +378,7 @@ def list_differences(
     store: Store,
     repos: Repos,
 ) -> DifferencesOut:
+    """只读比较已同步来源与内部现状；连接非 active 时只展示，不提供新草案。"""
     connection, differences = use_cases.list_differences(store, repos, workspace, connection_id)
     note = (
         "连接已撤销或过期：只展示内部变化，不会执行外部操作。"
@@ -374,6 +400,7 @@ def create_difference_draft(
     store: Store,
     repos: Repos,
 ) -> DraftOut:
+    """为同步差异生成新的更新/删除草案；仍需再次逐项确认后才会写入。"""
     draft = use_cases.create_difference_draft(
         store,
         repos,
@@ -464,6 +491,7 @@ def _execution_out(store: CalendarStore, workspace_id: int, draft, items) -> Exe
         )
         for item in items
     ]
+    # unknown 单独计数：写入结果未知既不能算成功，也不能直接重试。
     success = sum(1 for row in rows if row.operation and row.operation.status == "success")
     failed = sum(1 for row in rows if row.operation and row.operation.status == "failed")
     unknown = sum(1 for row in rows if row.operation and row.operation.status == "unknown")

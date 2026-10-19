@@ -2,6 +2,7 @@
 
 评估先按案例范围过滤文档（模拟 Q005 的读取边界），再排序；
 删除/归档、相似课程和不同学期样本如果出现在结果中，直接计为跨范围错误。
+只读评估，不访问数据库、不修改业务数据；假向量结果不能当作真实模型结论。
 """
 
 import hashlib
@@ -15,6 +16,8 @@ from campusflow.domain.retrieval import RetrievalCandidate
 
 @dataclass(frozen=True)
 class EvalDocument:
+    """评测文档；state 不是 active 的文档不得进入候选集。"""
+
     id: str
     text: str
     semester_id: int | None
@@ -29,6 +32,8 @@ class EvalDocument:
 
 @dataclass(frozen=True)
 class EvalCase:
+    """一个标注案例：提问、适用范围、支持文档标题与候选文档集合。"""
+
     id: str
     question: str
     semester_id: int | None
@@ -38,6 +43,7 @@ class EvalCase:
     documents: tuple[EvalDocument, ...]
 
     def matches(self, document: EvalDocument) -> bool:
+        """案例范围字段为 None 表示不限制；状态不合法或任一范围不符即排除。"""
         if not document.eligible:
             return False
         for expected, actual in (
@@ -52,6 +58,8 @@ class EvalCase:
 
 @dataclass
 class ModeResult:
+    """单种排序模式的汇总指标与逐案例明细。"""
+
     mode: str
     recall: float = 0.0
     citation_precision: float = 0.0
@@ -88,6 +96,7 @@ def _candidate(document: EvalDocument, embedder: Embedder) -> RetrievalCandidate
 def evaluate_mode(
     cases: tuple[EvalCase, ...], mode: RankingMode, embedder: Embedder, *, k: int = 5
 ) -> ModeResult:
+    """对一种排序模式计算召回、引用精确率与 MRR；只读且可复现。"""
     result = ModeResult(mode=mode.value)
     recall_total = 0.0
     precision_total = 0.0
@@ -105,6 +114,7 @@ def evaluate_mode(
         )
         ranked_titles = [item.candidate.title for item in ranked]
         support_hits = [title for title in ranked_titles if title in case.support]
+        # 召回分母是人工标注的支持文档数，不是返回条数；没有标注支持时按 1.0 计。
         recall_total += len(support_hits) / len(case.support) if case.support else 1.0
         precision_total += len(support_hits) / len(ranked_titles) if ranked_titles else 0.0
         first = next(
@@ -115,6 +125,7 @@ def evaluate_mode(
         if case.support and first is None:
             result.no_hit_cases.append(case.id)
         for title in ranked_titles:
+            # 候选已先按范围过滤，这里是防御性检查：正常为空，出现即计跨范围错误。
             if title not in {document.id for document in eligible}:
                 result.cross_scope_errors.append(f"{case.id}:{title}")
         result.case_rows.append(
@@ -126,6 +137,7 @@ def evaluate_mode(
             }
         )
     count = len(cases) or 1
+    # 空案例集用 1 作分母避免除零，此时所有指标保持 0。
     result.recall = round(recall_total / count, 4)
     result.citation_precision = round(precision_total / count, 4)
     result.mrr = round(reciprocal_total / count, 4)
@@ -135,6 +147,7 @@ def evaluate_mode(
 def evaluate_all(
     cases: tuple[EvalCase, ...], embedder: Embedder, *, k: int = 5
 ) -> dict[str, ModeResult]:
+    """对关键词、向量与混合三种模式跑同一批案例，共用 embedder 保证可比。"""
     return {
         mode.value: evaluate_mode(cases, mode, embedder, k=k)
         for mode in (RankingMode.KEYWORD, RankingMode.VECTOR, RankingMode.HYBRID)

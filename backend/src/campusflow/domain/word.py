@@ -50,6 +50,7 @@ def validate_docx(content: bytes) -> str | None:
             types = roots.get("[Content_Types].xml")
             relationships = roots.get("_rels/.rels")
             document = roots.get("word/document.xml")
+            # 三个部件缺一不可：只有 ZIP + XML 不代表是 Word 文档。
             if types is None or relationships is None or document is None:
                 return "文件不是有效的 .docx，缺少 Word 文档结构"
             main = [
@@ -63,6 +64,7 @@ def validate_docx(content: bytes) -> str | None:
                 for item in relationships
                 if item.attrib.get("Type", "").endswith("/officeDocument")
             ]
+            # 只接受唯一主文档、Internal 关系、w:document 根元素且带 w:body 的普通文档。
             if (
                 len(main) != 1
                 or len(targets) != 1

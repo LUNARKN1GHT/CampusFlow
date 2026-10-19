@@ -69,7 +69,7 @@ def abandon_write(repos: Repositories, job_id: int, reason: str) -> None:
 
 
 class ParserRegistry:
-    """按来源类型选择解析器。"""
+    """按来源类型选择解析器；未配置的类型视为永久失败，不进入重试。"""
 
     def __init__(
         self,
@@ -91,6 +91,7 @@ class ParserRegistry:
 
     def for_type(self, source_type: MaterialSourceType) -> DocumentParser:
         if source_type not in self._parsers:
+            # 缺解析器属于部署问题，重试不会自愈；标为永久失败交给运维处理。
             raise PermanentError("当前 Worker 尚未配置该资料类型的解析器")
         return self._parsers[source_type]
 
@@ -143,7 +144,10 @@ def coverage_metadata(outcome: ParseOutcome) -> dict[str, object]:
 def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> list[SourceChunkData]:
     """执行解析作业（Worker 入口调用）。
 
-    返回落库片段列表；失败时作业标记 failed 并抛出，由 Worker 层记录。
+    幂等领取 pending 作业；解析前后各核对一次目标，资料已删除或版本被取代时
+    丢弃结果、不复活旧内容。片段与覆盖范围同事务落库，作业状态按
+    “全部成功 / 部分成功 / 全部失败”映射，只要有临时失败范围就允许重试补齐；
+    成功产出片段时追加索引作业。失败时作业标记 failed 并抛出，由 Worker 层记录。
     """
     # 幂等领取（J004）：只有仍为 pending 的作业能被领取。重复消息、未提交或
     # 已结束的作业在这里直接返回，不重复解析、不重复生成片段（J003/J004 验收）
@@ -162,6 +166,7 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
         abandon_write(repos, job_id, blocked)
         return []
 
+    # 只读作业自己的目标版本：新版本存在也不能拿它的文件回填旧作业。
     versions = repos.materials.list_versions(job.material_id)
     version = next((v for v in versions if v.id == job.version_id), None)
     if version is None or version.storage_key is None:
@@ -203,6 +208,8 @@ def parse_version(repos: Repositories, storage: FileStorage, job_id: int) -> lis
             version.id, {COVERAGE_KEY: coverage_metadata(outcome)}
         )
 
+        # 只有零失败才算完成；部分成功必须保留“哪些范围没读出”的可见性，
+        # 全失败时也不得以空片段冒充“资料里没有内容”。
         if not outcome.failures:
             status = JobStatus.DONE
         elif outcome.fragments:

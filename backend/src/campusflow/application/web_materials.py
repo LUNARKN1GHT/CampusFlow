@@ -1,4 +1,8 @@
-"""N005：显式请求公开网页→不可变原文快照→待处理作业。"""
+"""N005 公开网页导入：显式请求 → 不可变原文快照 → 待处理解析作业。
+
+联网前先拒绝不存在的空间与跨空间关联；抓取时间与发布时间分开保存，
+不把抓取时间冒充发布信息。快照、版本与作业同事务落库，失败不留孤立文件。
+"""
 
 import hashlib
 from datetime import UTC, datetime
@@ -33,6 +37,11 @@ def import_requested_webpage(
     class_name: str | None = None,
     queue: JobQueue | None = None,
 ) -> tuple[MaterialData, MaterialVersionData, int]:
+    """抓取指定公开网页并建立版本 1 的不可变快照，返回（资料, 版本, 作业号）。
+
+    只有显式调用才联网；抓取失败不落库。原始响应作为受保护附件保存，
+    解析与正文提取交给后续作业，抓取时间不冒充发布时间。
+    """
     # 在联网之前拒绝不存在的空间及跨空间关联。
     if repos.workspaces.get(workspace_id) is None:
         raise NotFoundError("工作空间不存在")
@@ -42,6 +51,7 @@ def import_requested_webpage(
     except WebFetchError as exc:
         raise DomainError(str(exc)) from None
     fetched_at = datetime.now(UTC)
+    # 去掉响应头的 charset 等参数再判断类型；只有纯文本直接存 .txt，其余按 HTML 快照。
     content_type = page.content_type.split(";", 1)[0].strip().lower()
     extension = "txt" if content_type == "text/plain" else "html"
     storage_key = storage.save(page.body, extension)
@@ -53,6 +63,7 @@ def import_requested_webpage(
         "publisher": publisher,
         "published_at": published_at.isoformat() if published_at is not None else None,
         "published_text": published_text,
+        # 只有用户主动填写了发布方、发布时间或发布说明，才声明发布信息来自用户。
         "publication_basis": "user_provided"
         if publisher or published_at or published_text
         else None,
@@ -67,6 +78,7 @@ def import_requested_webpage(
             publisher=publisher,
             published_at=published_at,
             source_type=MaterialSourceType.WEB,
+            # 来源地址保留用户请求的 URL；跳转后的最终地址另存于版本元数据。
             source_url=requested_url,
         )
         version = repos.materials.create_version(
@@ -80,8 +92,10 @@ def import_requested_webpage(
         job = repos.jobs.create(workspace_id, material.id, version.id, "parse")
         repos.uow.commit()
     except Exception:
+        # 回滚数据库后删除已保存的快照，不留无法被版本引用的孤立文件。
         repos.uow.rollback()
         storage.delete(storage_key)
         raise
+    # 提交与投递分离（J003）：投递失败不抛异常，记录留待补偿扫描。
     dispatch_pending_jobs(repos, queue, job_ids=[job.id])
     return material, version, job.id

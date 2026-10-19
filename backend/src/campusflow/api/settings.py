@@ -1,4 +1,7 @@
-"""个人时区与学习偏好 HTTP 路由。"""
+"""个人时区与学习偏好 HTTP 路由。
+
+保存的是当前工作空间的排期参数，不是应用进程配置；时区必须是合法 IANA 名称。
+"""
 
 from typing import Annotated
 
@@ -19,6 +22,7 @@ class SettingsUpdate(BaseModel):
     daily_capacity_minutes: int = Field(ge=0, le=1440)
     break_minutes: int = Field(ge=0, le=240)
     buffer_minutes: int = Field(ge=0, le=1440)
+    # 省略表示保留原值，不是清空；输出始终给出最终生效的周容量。
     weekly_capacity_minutes: int | None = Field(default=None, ge=0, le=10080)
 
 
@@ -37,6 +41,7 @@ def get_settings(workspace: CurrentWorkspace, repos: Repos) -> SettingsOut:
 def update_settings(
     payload: SettingsUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> SettingsOut:
+    """整组提交学习偏好；无效时区或越界容量返回 400，未提交的周容量保持原值。"""
     return SettingsOut.model_validate(
         use_cases.update_settings(
             repos,

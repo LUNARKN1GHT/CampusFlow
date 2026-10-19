@@ -1,4 +1,9 @@
 <script setup lang="ts">
+/*
+ * 导出页：显式选择任务或已接受计划 → 预览条目／排除项／警告 → 携带范围指纹下载。
+ * 流程：范围、格式或选项任何变化都会清空旧预览；下载返回 409 表示范围已变化，必须重新预览。
+ * 约束：只导出用户显式选择的内容，不提供整空间导出；文件只落在本机，不写外部日历，也不含原文与备注。
+ */
 import { computed, onMounted, ref, watch } from 'vue'
 
 import { coursesApi, tasksApi } from '../api/business'
@@ -170,6 +175,7 @@ function resetPreview(): void {
   formError.value = ''
 }
 
+// 预览不带指纹；下载复用同一份范围并附带预览返回的指纹，由后端拒绝已经变化的范围。
 function requestBody(withFingerprint: boolean): ExportRequest {
   return {
     mode: mode.value,
@@ -256,6 +262,7 @@ async function download(): Promise<void> {
     downloadNotice.value = `已开始下载 ${filename}。文件只保存到本机，服务端不保留导出文件。`
   } catch (caught) {
     if (caught instanceof ApiError && caught.status === 409) {
+      // 409 说明预览后范围已变化：旧指纹作废，清空预览强制重新确认，不能沿用旧条目下载。
       preview.value = null
       fingerprint.value = ''
       actionError.value = '范围已变化，请重新预览。'
@@ -278,6 +285,7 @@ async function load(): Promise<void> {
     ])
     tasks.value = taskItems
     courses.value = courseItems
+    // 计划模式只列出已接受计划（草案不能导出），按区间起始倒序，便于优先选择最近计划。
     acceptedPlans.value = drafts
       .filter((draft) => draft.status === 'accepted')
       .sort((left, right) => right.range_start.localeCompare(left.range_start))
@@ -288,13 +296,16 @@ async function load(): Promise<void> {
   }
 }
 
+// 任何影响导出内容的输入变化都会让旧预览与指纹失效，并清除上一次的提示，避免误导。
 watch(
   [mode, format, selectedPlanId, includeSourceHints, includeFixedEvents, selectedTaskIds],
   resetPreview,
 )
+// 固定日程只在计划模式 ICS 下可用；切换格式后取消勾选，避免把未生效选项带进请求。
 watch(fixedEventsAvailable, (available) => {
   if (!available) includeFixedEvents.value = false
 })
+// 计划模式没有 CSV 导出，切到计划时自动改用 ICS，避免生成空文件。
 watch(mode, (value) => {
   if (value === 'plan' && format.value === 'csv') format.value = 'ics'
 })
@@ -487,6 +498,7 @@ onMounted(load)
           <div>
             <h3 class="subheading">预览条目</h3>
             <p class="form-help">标题按存储内容展示；下载内容以本次预览为准。来源失效的任务仍保留，但来源提示已省略。</p>
+            <!-- 被排除的条目仍留在预览中并给出原因，不隐藏；下载内容以本次预览为准。 -->
             <ul v-if="preview.items.length" class="export-item-list">
               <li v-for="item in preview.items" :key="item.task_id" class="export-item" :class="{ 'is-excluded': !item.included }">
                 <div class="task-title-line">

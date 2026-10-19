@@ -1,4 +1,7 @@
-"""X005：课程规则候选提取，完整原文与条件分列，保持待核对。"""
+"""X005：课程规则候选提取，完整原文与条件分列，保持待核对。
+
+模型输出先经 X002 结构契约校验，再逐条检查正文完整性与条件语句，只返回草稿。
+"""
 
 from dataclasses import replace
 
@@ -48,6 +51,7 @@ RULE_SPEC = ExtractionSpec(
 
 
 def _check_rule(draft: CandidateDraft, sources: dict[int, str]) -> CandidateDraft:
+    """校验单条规则：字段保留自身证据原文，正文为片段全文，限定信息为完整句。"""
     fields = {f.name: f for f in draft.fields}
     generated = [
         ReviewReason(
@@ -76,11 +80,14 @@ def _check_rule(draft: CandidateDraft, sources: dict[int, str]) -> CandidateDraf
             elif field.name != "title":
                 require_complete_sentence(field.value, texts)
                 if field.name == "effective_text":
+                    # 只引用发布时间不足以说明生效，必须有生效/失效等表述。
                     require_effective_basis(field.value)
         except DomainError as error:
             raise InvalidModelOutput(str(error)) from None
+    # 标题必须能在正文中逐字找到，避免模型另造一个概括性名称。
     if fields["title"].value not in fields["rule_text"].value:
         raise InvalidModelOutput("规则标题必须出现在完整规则原文中")
+    # 同 (code, field) 的本地原因覆盖模型原因，其余模型原因保留；随后整体校验。
     keys = {(r.code, r.field) for r in generated}
     reasons = generated + [r for r in draft.review_reasons if (r.code, r.field) not in keys]
     result = replace(draft, review_reasons=tuple(reasons))
@@ -98,7 +105,10 @@ def extract_rule_drafts(
     version_no: int,
     generator: TextGenerator,
 ) -> list[CandidateDraft]:
-    """先授权后生成，仅返回候选；正式规则保存/确认由后续用例处理。"""
+    """先授权后生成，仅返回候选；正式规则保存/确认由后续用例处理。
+
+    任一候选不合规都会中止本次提取，不会返回部分结果。
+    """
     drafts = generate_for_version(
         repos, workspace_id, material_id, version_no, generator, RULE_SPEC
     )

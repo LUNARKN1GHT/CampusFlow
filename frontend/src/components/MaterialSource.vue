@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/*
+ * 原文定位面板：按引用所属版本打开片段，并尽量在原文中高亮同一段文字／页／截图区域。
+ * 原文件不可读时明确标注"无法验证"，不渲染原文、也不声称引用仍可核对。
+ */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 import { errorMessage } from '../api/client'
@@ -24,6 +28,7 @@ const sourceError = ref('')
 const loadingSource = ref(false)
 const objectUrl = ref<string | null>(null)
 const originalText = ref('')
+// 按片段顺序在原文中向后查找，避免重复文字命中前面同名的段落；找不到时不高亮。
 const textSegments = computed(() => {
   const text = originalText.value
   let cursor = 0
@@ -86,11 +91,13 @@ async function loadSource(): Promise<void> {
   releaseObjectUrl()
   sourceError.value = ''
   originalText.value = ''
+  // 只有 pdf／image／text 能直接读取原文件；Word 与网页仅展示片段与定位信息。
   if (!['pdf', 'image', 'text'].includes(props.material.source_type)) return
   if (versionNo.value === null) return
   loadingSource.value = true
   try {
     const blob = await materialsApi.fileBlob(props.material.id, versionNo.value)
+    // 面板已关闭时不再创建 object URL，避免卸载后泄漏。
     if (disposed) return
     if (props.material.source_type === 'text') originalText.value = await blob.text()
     else objectUrl.value = URL.createObjectURL(blob)
@@ -132,6 +139,7 @@ async function loadAll(): Promise<void> {
 }
 
 // 面板切换到另一份资料时重新加载，避免沿用上一份的版本与片段。
+// 同一资料换版本／片段由父组件用 :key 重建组件，这里不再单独监听。
 watch(() => props.material.id, loadAll)
 
 onBeforeUnmount(() => { disposed = true; releaseObjectUrl() })

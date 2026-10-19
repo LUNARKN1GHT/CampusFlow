@@ -1,7 +1,8 @@
 """固定日程与可用时间用例。
 
-update_fixed_event 接收"合并后的最终值"（由 API 层把补丁与当前值合并后传入）。
-所有按 ID 的操作校验对象归属当前空间（W006）。
+无偏移输入按工作空间时区解释，带偏移输入保留时间点；DST 缺失或歧义时刻报错。
+每周重复按本地墙上时间展开，单次时长保持固定，供冲突检查与排期使用。
+update_fixed_event 接收"合并后的最终值"；所有按 ID 的操作校验空间归属（W006）。
 """
 
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ from campusflow.domain.timezones import in_workspace_timezone
 
 @dataclass
 class FixedEventOccurrence:
+    """展开后的日程实例；每周重复的多个实例共享同一 source_event_id。"""
+
     source_event_id: int
     course_id: int | None
     title: str
@@ -48,6 +51,11 @@ def list_fixed_event_occurrences(
     *,
     semester_id: int | None = None,
 ) -> list[FixedEventOccurrence]:
+    """把固定日程展开为查询闭区间内的实例，日期边界按工作空间时区解释。
+
+    每周重复沿用首次的本地墙上时间，未来 DST 缺失/歧义时报错而不静默挪动；
+    单次时长按 UTC 时间差保持不变，结果按 UTC 开始时间排序。
+    """
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
@@ -125,6 +133,10 @@ def create_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
+    """创建固定日程；时间先按工作空间时区解析，课程必须属于当前空间。
+
+    无偏移时间视为工作空间墙上时间，带偏移时间保留原时间点；每周重复必须给出截止日期。
+    """
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     starts_at = in_workspace_timezone(starts_at, timezone)
     ends_at = in_workspace_timezone(ends_at, timezone)
@@ -153,6 +165,7 @@ def update_fixed_event(
     recurrence: EventRecurrence,
     repeat_until: date | None,
 ) -> FixedEventData:
+    """写入固定日程的合并后最终值；时间解释与校验规则与创建一致。"""
     _require_event_in_workspace(repos, workspace_id, event_id)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     starts_at = in_workspace_timezone(starts_at, timezone)
@@ -177,6 +190,7 @@ def update_fixed_event(
 
 
 def delete_fixed_event(repos: Repositories, workspace_id: int, event_id: int) -> None:
+    """删除固定日程；已接受计划不随之改写，变化由调整建议提示。"""
     _require_event_in_workspace(repos, workspace_id, event_id)
     repos.schedule.delete_fixed_event(event_id)
     repos.uow.commit()
@@ -194,6 +208,7 @@ def create_availability_slot(
     start_time: time,
     end_time: time,
 ) -> AvailabilitySlotData:
+    """新增按星期重复的可用时段；同日重叠会被拒绝，跨午夜需拆成两天录入。"""
     error = validate_availability_slot(day_of_week, start_time, end_time)
     if error:
         raise DomainError(error)
@@ -208,6 +223,7 @@ def create_availability_slot(
 
 
 def delete_availability_slot(repos: Repositories, workspace_id: int, slot_id: int) -> None:
+    """删除当前空间的可用时段；已接受计划不随之改写，变化留给调整建议提示。"""
     slot = next(
         (s for s in repos.schedule.list_availability_slots(workspace_id) if s.id == slot_id), None
     )

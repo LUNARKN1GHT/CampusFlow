@@ -42,7 +42,10 @@ def index_version(
 ) -> IndexProgressSummary | None:
     """执行一个向量索引作业（Worker 入口调用）。
 
-    返回汇总；重复消息、阶段不符、来源已删除或旧版本被取代时返回 None。
+    幂等领取 pending 作业，按“当前版本 + 已登记配置”生成完整块清单后逐块索引；
+    重复消息、阶段不符、来源已删除或旧版本被取代时返回 None。终态只依据完整
+    清单汇总：全部块成功且解析覆盖已知完整才允许完整可检索（DONE），
+    否则如实给出 PARTIAL/FAILED，不按部分成功声称完整。
     """
     # 幂等领取（J004）：重复消息与已结束作业在这里直接返回，不产生模型调用。
     if not repos.jobs.claim(job_id):
@@ -53,6 +56,7 @@ def index_version(
     if job is None:
         return None
     if job.stage != JobStage.EMBED:
+        # 阶段不符属于上游投递错误；直接记永久失败，避免反复领取做无效工作。
         _record_failure(repos, job_id, _STAGE_MISMATCH_REASON, retryable=False)
         return None
 
@@ -62,6 +66,7 @@ def index_version(
         return None
 
     try:
+        # 先登记并核对配置身份：索引行按配置编号隔离，配置不一致时不得写入任何向量。
         profile = register_embedder_profile(profiles, embedder)
         repos.uow.commit()
     except DomainError:
@@ -70,6 +75,7 @@ def index_version(
         return None
 
     try:
+        # 清单绑定工作空间、版本、配置与当时的完整块集合；来源或覆盖变化后必须重建。
         manifest_id = manifests.prepare(job.workspace_id, job.version_id, profile.id)
         repos.jobs.set_manifest(job_id, manifest_id)
         repos.uow.commit()
@@ -95,6 +101,8 @@ def index_version(
         _abandon_or_fail(repos, job, retryable=True, reason=_SOURCE_CHANGED_REASON)
         return None
 
+    # 收尾必须重算完整快照：逐块循环里的保存校验只看单块来源，
+    # 只有这里能确认清单覆盖与解析覆盖仍与数据库一致。
     try:
         summary = manifests.summary(job.workspace_id, manifest_id, verify_snapshot=True)
     except (DomainError, NotFoundError):
@@ -130,8 +138,13 @@ def _index_blocks(
     lease_seconds: int,
     max_attempts: int,
 ) -> None:
-    """逐块处理：领取与保存各一个短事务，模型调用在事务之外。"""
+    """逐块处理：领取与保存各一个短事务，模型调用在事务之外。
+
+    每块凭独占领取凭证写回；凭证过期说明块已被他人重新领取，本次结果只能作废，
+    不能覆盖新结果。单块失败只记录安全失败码，仍受每块尝试次数上限约束。
+    """
     while True:
+        # 领取块时不重算全量快照（代价高且会长时间锁行），由每块保存时的来源校验兜底。
         claim = manifests.claim_next(
             workspace_id,
             manifest_id,
@@ -145,6 +158,7 @@ def _index_blocks(
         repos.jobs.heartbeat(job_id)
         repos.uow.commit()
 
+        # 到此事务已提交：模型调用期间不持有事务、锁或数据库连接。
         try:
             result = embedder.embed(claim.text)
             result.validate_for(embedder.profile)
@@ -166,7 +180,7 @@ def _index_blocks(
         )
         repos.uow.commit()
         if not saved:
-            # 凭证已被新的领取替换：本次结果作废，继续处理下一个块。
+            # 凭证已被新的领取替换（租约过期后他人接手）：本次结果作废，不覆盖新结果。
             continue
 
 

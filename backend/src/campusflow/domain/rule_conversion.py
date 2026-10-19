@@ -55,6 +55,7 @@ def build_rule_conversion(
     rule_text = _optional_text(by_name, RULE_TEXT_FIELD)
     if rule_text is None:
         raise DomainError("规则候选缺少规则正文，无法转换为课程规则")
+    # 限定信息缺失时保留 None：未知不等于无条件，也不补写生效日期。
     return RuleConversion(
         title=title,
         rule_text=rule_text,
