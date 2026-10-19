@@ -17,12 +17,14 @@ from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
     AssumptionOptions,
     AvailabilityRule,
+    BlockSuggestion,
     ExcludedTask,
     FixedEventOccurrence,
     PlanningDependency,
     PlanningInput,
     PlanningTask,
     PlanOutcome,
+    PreservedBlock,
     allocate_tasks,
     build_outcome,
     detect_overlaps,
@@ -74,6 +76,7 @@ def collect_inputs(
     range_end: date,
     now: datetime | None = None,
     segment_minutes: int = 90,
+    preserved_blocks: tuple[PreservedBlock, ...] = (),
 ) -> CollectedPlanInput:
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
@@ -84,6 +87,12 @@ def collect_inputs(
     raw_tasks: list[dict] = []
     tasks: list[PlanningTask] = []
     excluded: list[ExcludedTask] = []
+    preserved_minutes: dict[int, int] = {}
+    for block in preserved_blocks:
+        if block.task_id is not None:
+            preserved_minutes[block.task_id] = (
+                preserved_minutes.get(block.task_id, 0) + block.minutes
+            )
     scoped_tasks = repos.tasks.list(workspace_id, semester_id=semester_id)
     container_ids = {
         task.parent_task_id for task in scoped_tasks if task.parent_task_id is not None
@@ -119,6 +128,7 @@ def collect_inputs(
                 due_date_only=date_only,
                 target_date=task.target_date,
                 estimated=estimated,
+                locked_minutes=preserved_minutes.get(task.id, 0),
             )
         )
         raw_tasks.append(
@@ -202,6 +212,7 @@ def collect_inputs(
         buffer_minutes=settings.buffer_minutes,
         segment_minutes=segment_minutes,
         dependencies=tuple(dependencies),
+        preserved_blocks=preserved_blocks,
     )
     snapshot = input_snapshot(inputs, raw_tasks)
     return CollectedPlanInput(
@@ -287,8 +298,13 @@ def generate_draft(
     range_end: date,
     options: AssumptionOptions | None = None,
     now: datetime | None = None,
+    preserved_blocks: tuple[PreservedBlock, ...] = (),
+    change: str = "generated",
 ):
-    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。"""
+    """生成并保存两周草案（P002–P013）；未接受前不改变当前计划。
+
+    A005：preserved_blocks 原样带入新草案并占用可用时间，对应任务只排剩余分钟。
+    """
     if range_end < range_start:
         raise DomainError("规划结束日期不得早于开始日期")
     collected = collect_inputs(
@@ -299,12 +315,39 @@ def generate_draft(
         range_end=range_end,
         now=now,
         segment_minutes=(options.segment_minutes if options and options.segment_minutes else 90),
+        preserved_blocks=preserved_blocks,
     )
     resolved = resolve_assumptions(collected.inputs, options or AssumptionOptions())
     allocation = allocate_tasks(collected.inputs, resolved)
     outcome: PlanOutcome = build_outcome(collected.inputs, resolved, allocation)
-    conflicts = detect_overlaps(collected.inputs, outcome.blocks)
-    conflicts.extend(detect_risks(collected.inputs, resolved, outcome))
+    preserved_blocks_suggestions = tuple(
+        BlockSuggestion(
+            task_id=block.task_id,
+            title=block.title,
+            starts_at=block.start,
+            ends_at=block.end,
+            minutes=block.minutes,
+            seq=block.seq,
+            reason=("保留已锁定安排" if block.locked else "保留不在本次重排范围的安排"),
+            constraint_source=(
+                {
+                    "kind": "preserved",
+                    "value": block.block_id,
+                    "text": "重排时原样保留的时间块",
+                },
+            ),
+            locked=block.locked,
+        )
+        for block in preserved_blocks
+    )
+    all_blocks = tuple(
+        sorted(
+            (*preserved_blocks_suggestions, *outcome.blocks),
+            key=lambda block: (block.starts_at, block.seq),
+        )
+    )
+    conflicts = detect_overlaps(collected.inputs, all_blocks)
+    conflicts.extend(detect_risks(collected.inputs, resolved, outcome, all_blocks))
     unscheduled = [
         _disposition_dict(item) for item in outcome.dispositions if item.status != "scheduled"
     ] + [_excluded_dict(item) for item in outcome.excluded]
@@ -322,11 +365,11 @@ def generate_draft(
         conflicts=conflicts,
         coverage=outcome.coverage,
     )
-    blocks = repos.plans.create_blocks(draft.id, [_block_dict(block) for block in outcome.blocks])
+    blocks = repos.plans.create_blocks(draft.id, [_block_dict(block) for block in all_blocks])
     repos.plans.add_version(
         draft.id,
         version_no=draft.version,
-        change="generated",
+        change=change,
         snapshot=_draft_snapshot(draft, blocks),
     )
     repos.uow.commit()
@@ -343,6 +386,21 @@ def get_draft(repos: Repositories, workspace_id: int, draft_id: int):
     if draft is None or draft.workspace_id != workspace_id:
         raise NotFoundError("计划草案不存在")
     return draft
+
+
+def _preserved_blocks_from_snapshot(snapshot: dict) -> tuple[PreservedBlock, ...]:
+    return tuple(
+        PreservedBlock(
+            block_id=int(item["block_id"]),
+            task_id=item.get("task_id"),
+            title=str(item["title"]),
+            start=datetime.fromisoformat(item["starts_at"]),
+            end=datetime.fromisoformat(item["ends_at"]),
+            minutes=int(item["minutes"]),
+            locked=bool(item.get("locked", False)),
+        )
+        for item in snapshot.get("preserved_blocks", [])
+    )
 
 
 def accept_draft(
@@ -366,6 +424,7 @@ def accept_draft(
         range_end=draft.range_end,
         now=now or datetime.now(UTC),
         segment_minutes=segment_minutes,
+        preserved_blocks=_preserved_blocks_from_snapshot(draft.input_snapshot),
     )
     if collected.fingerprint != draft.input_fingerprint:
         raise ConflictError("排期输入已变化，请重新生成草案后再接受")
@@ -398,6 +457,68 @@ def accept_draft(
 
 def current_plan(repos: Repositories, workspace_id: int, *, semester_id: int | None = None):
     return repos.plans.get_current(workspace_id, semester_id=semester_id)
+
+
+def reschedule_plan(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    semester_id: int | None = None,
+    range_start: date | None = None,
+    range_end: date | None = None,
+    task_ids: list[int] | None = None,
+    now: datetime | None = None,
+):
+    """基于当前已接受计划做局部重排（A005）。
+
+    锁定时间块始终原样保留；指定 task_ids 时，范围外任务的现有时间块也保留。
+    其余任务在剩余可用时间内重新安排，结果仍是待接受草案。
+    """
+    if semester_id is not None:
+        require_semester_in_workspace(repos, workspace_id, semester_id)
+    else:
+        semester_id = None
+    current = current_plan(repos, workspace_id, semester_id=semester_id)
+    if current is None:
+        raise NotFoundError("当前没有已接受的计划，无法局部重排")
+    scope: set[int] | None = None
+    if task_ids is not None:
+        scope = set(task_ids)
+        if not scope:
+            raise DomainError("局部重排至少需要指定一个任务")
+        for task_id in scope:
+            task = repos.tasks.get(task_id)
+            if task is None or task.workspace_id != workspace_id:
+                raise NotFoundError("任务不存在")
+
+    preserved: list[PreservedBlock] = []
+    for block in current.blocks:
+        keep = block.locked or (
+            scope is not None and (block.task_id is None or block.task_id not in scope)
+        )
+        if keep:
+            preserved.append(
+                PreservedBlock(
+                    block_id=block.id,
+                    task_id=block.task_id,
+                    title=block.title,
+                    start=block.starts_at,
+                    end=block.ends_at,
+                    minutes=block.minutes,
+                    locked=block.locked,
+                )
+            )
+
+    return generate_draft(
+        repos,
+        workspace_id,
+        semester_id=semester_id,
+        range_start=range_start or current.range_start,
+        range_end=range_end or current.range_end,
+        now=now,
+        preserved_blocks=tuple(preserved),
+        change="rescheduled",
+    )
 
 
 def draft_conflicts(repos: Repositories, workspace_id: int, draft_id: int) -> list[dict]:

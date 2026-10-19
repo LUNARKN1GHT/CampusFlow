@@ -49,6 +49,8 @@ class PlanningTask:
     # 记录值来自用户明确选择的假设，而不是原文或已确认事实。
     due_assumed: bool = False
     duration_assumed: bool = False
+    # A005：已保留的时间块（锁定或局部重排范围外）占用的分钟数
+    locked_minutes: int = 0
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,23 @@ class FixedEventOccurrence:
 
 
 @dataclass(frozen=True)
+class PreservedBlock:
+    """A005：重排时必须原样保留的时间块（锁定或不在本次重排范围）。"""
+
+    block_id: int
+    task_id: int | None
+    title: str
+    start: datetime
+    end: datetime
+    minutes: int
+    locked: bool
+
+    @property
+    def seq(self) -> int:
+        return 0
+
+
+@dataclass(frozen=True)
 class PlanningInput:
     timezone: str
     range_start: date
@@ -98,6 +117,7 @@ class PlanningInput:
     buffer_minutes: int
     segment_minutes: int = 90
     dependencies: tuple[PlanningDependency, ...] = ()
+    preserved_blocks: tuple[PreservedBlock, ...] = ()
 
 
 def _iso(value: datetime | date | time | None) -> str | None:
@@ -168,6 +188,18 @@ def input_snapshot(
                 "state": link.state,
             }
             for link in inputs.dependencies
+        ],
+        "preserved_blocks": [
+            {
+                "block_id": block.block_id,
+                "task_id": block.task_id,
+                "title": block.title,
+                "starts_at": block.start.isoformat(),
+                "ends_at": block.end.isoformat(),
+                "minutes": block.minutes,
+                "locked": block.locked,
+            }
+            for block in inputs.preserved_blocks
         ],
     }
 
@@ -313,6 +345,7 @@ def resolve_assumptions(inputs: PlanningInput, options: AssumptionOptions) -> Re
                 estimated=task.estimated or duration_assumed,
                 due_assumed=due_assumed,
                 duration_assumed=duration_assumed,
+                locked_minutes=task.locked_minutes,
             )
         )
 
@@ -793,6 +826,13 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
 
     completed: dict[int, datetime] = {}
     satisfied: dict[int, bool] = {}
+    preserved_end: dict[int, datetime] = {}
+    for block in inputs.preserved_blocks:
+        if block.task_id is None:
+            continue
+        current_end = preserved_end.get(block.task_id)
+        if current_end is None or block.end > current_end:
+            preserved_end[block.task_id] = block.end
 
     def record_blocked(
         task: PlanningTask,
@@ -902,11 +942,28 @@ def allocate_tasks(inputs: PlanningInput, resolved: ResolvedInput) -> Allocation
             )
             continue
 
-        remaining = task.minutes
-        scheduled = 0
+        preserved_minutes = min(task.minutes, task.locked_minutes)
+        remaining = task.minutes - preserved_minutes
+        scheduled = preserved_minutes
         seq = 0
         deadline = task.due_at
-        last_end: datetime | None = None
+        last_end: datetime | None = preserved_end.get(task.task_id)
+        if remaining == 0:
+            satisfied[task.task_id] = True
+            completed[task.task_id] = last_end or inputs.now
+            dispositions.append(
+                TaskDisposition(
+                    task_id=task.task_id,
+                    title=task.title,
+                    status="scheduled",
+                    scheduled_minutes=preserved_minutes,
+                    remaining_minutes=0,
+                    reason_code=None,
+                    message="已由保留的时间块完整覆盖",
+                    options=(),
+                )
+            )
+            continue
         for window in windows:
             if earliest_start is not None:
                 if window[1] <= earliest_start:
@@ -1140,6 +1197,7 @@ def build_free_windows(inputs: PlanningInput) -> list[FreeWindow]:
         current_date += timedelta(days=1)
 
     busy = [Interval(event.start, event.end) for event in inputs.fixed_events]
+    busy.extend(Interval(block.start, block.end) for block in inputs.preserved_blocks)
     free = subtract_intervals(merge_intervals(availability), busy)
     floor = inputs.now
     clipped: list[Interval] = []

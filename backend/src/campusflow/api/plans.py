@@ -61,6 +61,15 @@ class PlanBlockMoveIn(BaseModel):
     expected_version: int = Field(ge=1)
 
 
+class PlanRescheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    semester_id: int | None = Field(default=None, ge=1)
+    start_date: date | None = None
+    end_date: date | None = None
+    task_ids: list[int] | None = Field(default=None, min_length=1, max_length=100)
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class PlanBlockLockIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     locked: bool
@@ -144,6 +153,21 @@ def create_plan_draft(
         range_start=start,
         range_end=end,
         options=payload.assumptions.to_options(),
+    )
+    return PlanDraftOut.from_data(draft)
+
+
+@router.post("/plans/reschedule", response_model=PlanDraftOut, status_code=201)
+def reschedule_plan(
+    payload: PlanRescheduleIn, workspace: CurrentWorkspace, repos: Repos
+) -> PlanDraftOut:
+    draft = use_cases.reschedule_plan(
+        repos,
+        workspace.id,
+        semester_id=payload.semester_id,
+        range_start=payload.start_date,
+        range_end=payload.end_date,
+        task_ids=payload.task_ids,
     )
     return PlanDraftOut.from_data(draft)
 
