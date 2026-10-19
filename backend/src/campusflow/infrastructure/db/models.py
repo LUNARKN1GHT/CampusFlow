@@ -353,6 +353,79 @@ class LearnerProfile(Base):
     )
 
 
+class CurriculumCourse(Base):
+    """培养方案内课程。学分或开课学期未知保持 NULL/空列表，不补造。"""
+
+    __tablename__ = "curriculum_courses"
+    __table_args__ = (
+        UniqueConstraint("curriculum_plan_id", "name", name="uq_curriculum_course_name"),
+        CheckConstraint(
+            "credits IS NULL OR credits >= 0", name="ck_curriculum_course_credits"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    code: Mapped[str | None] = mapped_column(String(50))
+    credits: Mapped[float | None] = mapped_column(Float)
+    # 已知开课季节，如 ["fall", "spring"]；空列表表示未知，不当作每学期都开。
+    offered_terms: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CourseRelation(Base):
+    """C004：三类课程关系分开保存。只有 prerequisite 参与拓扑排序。"""
+
+    __tablename__ = "course_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "curriculum_plan_id",
+            "from_course_id",
+            "to_course_id",
+            "relation_type",
+            name="uq_course_relation",
+        ),
+        CheckConstraint(
+            "relation_type IN ('prerequisite', 'corequisite', 'recommended')",
+            name="ck_course_relation_type",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    curriculum_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_plans.id", ondelete="CASCADE"), index=True
+    )
+    # from_course_id 为先修/并修/建议先学的来源课程，to_course_id 为受限课程。
+    # 允许自环，由 C010 在分析时显式报告，而不是在写入时静默丢弃。
+    from_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    to_course_id: Mapped[int] = mapped_column(
+        ForeignKey("curriculum_courses.id", ondelete="CASCADE"), index=True
+    )
+    relation_type: Mapped[str] = mapped_column(String(20))
+    condition_text: Mapped[str | None] = mapped_column(String(1000))
+    source_candidate_id: Mapped[int | None] = mapped_column(
+        ForeignKey("extracted_items.id", ondelete="SET NULL"), index=True, unique=True
+    )
+    created_by: Mapped[str] = mapped_column(String(100), default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class Material(Base):
     """学习资料（D001）。
 

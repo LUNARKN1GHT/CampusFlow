@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from campusflow.api.deps import get_current_workspace, get_repositories
@@ -38,6 +38,59 @@ class CurriculumPlanOut(BaseModel):
     credit_limit_per_term: int | None
     source_material_id: int | None
     source_version_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CurriculumCourseCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    code: str | None = Field(default=None, max_length=50)
+    credits: float | None = Field(default=None, ge=0, le=100)
+    offered_terms: list[str] = Field(default_factory=list)
+
+
+class CurriculumCourseUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    code: str | None = Field(default=None, max_length=50)
+    credits: float | None = Field(default=None, ge=0, le=100)
+    offered_terms: list[str] | None = None
+
+
+class CurriculumCourseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    curriculum_plan_id: int
+    name: str
+    code: str | None
+    credits: float | None
+    offered_terms: list[str]
+    source_candidate_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CourseRelationCreate(BaseModel):
+    from_course_id: int = Field(gt=0)
+    to_course_id: int = Field(gt=0)
+    relation_type: str
+    condition_text: str | None = Field(default=None, max_length=1000)
+
+
+class CourseRelationUpdate(BaseModel):
+    relation_type: str
+    condition_text: str | None = Field(default=None, max_length=1000)
+
+
+class CourseRelationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    curriculum_plan_id: int
+    from_course_id: int
+    to_course_id: int
+    relation_type: str
+    condition_text: str | None
+    source_candidate_id: int | None
+    created_by: str
     created_at: datetime
     updated_at: datetime
 
@@ -113,6 +166,130 @@ def update_plan(
 ) -> CurriculumPlanOut:
     plan = use_cases.update_plan(repos, workspace.id, plan_id, **payload.model_dump())
     return CurriculumPlanOut.model_validate(plan)
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/courses", response_model=list[CurriculumCourseOut]
+)
+def list_plan_courses(
+    plan_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> list[CurriculumCourseOut]:
+    return [
+        CurriculumCourseOut.model_validate(course)
+        for course in use_cases.list_courses(repos, workspace.id, plan_id)
+    ]
+
+
+@router.post(
+    "/curriculum-plans/{plan_id}/courses",
+    response_model=CurriculumCourseOut,
+    status_code=201,
+)
+def create_plan_course(
+    plan_id: int,
+    payload: CurriculumCourseCreate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CurriculumCourseOut:
+    course = use_cases.create_course(
+        repos, workspace.id, plan_id, **payload.model_dump()
+    )
+    return CurriculumCourseOut.model_validate(course)
+
+
+@router.patch(
+    "/curriculum-plans/{plan_id}/courses/{course_id}",
+    response_model=CurriculumCourseOut,
+)
+def update_plan_course(
+    plan_id: int,
+    course_id: int,
+    payload: CurriculumCourseUpdate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CurriculumCourseOut:
+    current = use_cases.get_course(repos, workspace.id, plan_id, course_id)
+    merged = {
+        "name": payload.name if payload.name is not None else current.name,
+        "code": payload.code if "code" in payload.model_fields_set else current.code,
+        "credits": (
+            payload.credits if "credits" in payload.model_fields_set else current.credits
+        ),
+        "offered_terms": (
+            payload.offered_terms
+            if payload.offered_terms is not None
+            else current.offered_terms
+        ),
+    }
+    course = use_cases.update_course(repos, workspace.id, plan_id, course_id, **merged)
+    return CurriculumCourseOut.model_validate(course)
+
+
+@router.delete("/curriculum-plans/{plan_id}/courses/{course_id}", status_code=204)
+def delete_plan_course(
+    plan_id: int, course_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> Response:
+    use_cases.delete_course(repos, workspace.id, plan_id, course_id)
+    return Response(status_code=204)
+
+
+@router.get(
+    "/curriculum-plans/{plan_id}/relations", response_model=list[CourseRelationOut]
+)
+def list_plan_relations(
+    plan_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    relation_type: Annotated[str | None, Query()] = None,
+) -> list[CourseRelationOut]:
+    return [
+        CourseRelationOut.model_validate(relation)
+        for relation in use_cases.list_relations(
+            repos, workspace.id, plan_id, relation_type=relation_type
+        )
+    ]
+
+
+@router.post(
+    "/curriculum-plans/{plan_id}/relations",
+    response_model=CourseRelationOut,
+    status_code=201,
+)
+def create_plan_relation(
+    plan_id: int,
+    payload: CourseRelationCreate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CourseRelationOut:
+    relation = use_cases.create_relation(
+        repos, workspace.id, plan_id, **payload.model_dump()
+    )
+    return CourseRelationOut.model_validate(relation)
+
+
+@router.patch(
+    "/curriculum-plans/{plan_id}/relations/{relation_id}",
+    response_model=CourseRelationOut,
+)
+def update_plan_relation(
+    plan_id: int,
+    relation_id: int,
+    payload: CourseRelationUpdate,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+) -> CourseRelationOut:
+    relation = use_cases.update_relation(
+        repos, workspace.id, plan_id, relation_id, **payload.model_dump()
+    )
+    return CourseRelationOut.model_validate(relation)
+
+
+@router.delete("/curriculum-plans/{plan_id}/relations/{relation_id}", status_code=204)
+def delete_plan_relation(
+    plan_id: int, relation_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> Response:
+    use_cases.delete_relation(repos, workspace.id, plan_id, relation_id)
+    return Response(status_code=204)
 
 
 @router.get("/learning-profile", response_model=LearnerProfileOut)
