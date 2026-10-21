@@ -71,6 +71,18 @@ installer: desktop\electron\release\CampusFlow-0.1.0-win-x64.exe (184.6 MB)
 把 `libpq.dll` 等运行时 DLL 一并删掉，导致 `postgres.exe --version` 无输出。
 修复为只删除多余 `*.exe`，并把版本检查改为同时输出退出码与 stderr。第二次运行通过。
 
+## Windows 外壳测试
+
+`desktop-ci.yml` 新增 `Electron tests (Windows)`：在 windows-2022 运行类型检查与
+`config`、`maintenance`、`supervisor` 三份规格（29 tests）。`electron.spec.ts`
+依赖 `/bin/sh` 伪造 sidecar，仍只在 Linux 运行。为适配 Windows：
+
+- 测试桩模拟 `taskkill /pid <pid> /T [/F]` 结束对应子进程，使停止顺序断言有效；
+- `pg_ctl` 路径断言按平台补 `.exe`。
+
+同时修复了首启迁移中的 Windows 偶发失败：临时目录改名为数据目录时若子进程句柄
+尚未释放（`WinError 5`），现在有限重试后再报错。
+
 ## 未验证
 
 - **安装与运行**：未在 Windows 11 上执行安装包，未验证首次启动、initdb、pgvector 扩展创建、
