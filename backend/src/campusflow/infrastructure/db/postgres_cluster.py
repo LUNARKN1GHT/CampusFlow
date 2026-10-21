@@ -162,12 +162,11 @@ class LocalPostgresCluster:
     def initdb(self, superuser: str, password: str) -> None:
         """初始化集群并写入连接配置；口令文件用后立即删除。"""
         self.data_dir.parent.mkdir(parents=True, exist_ok=True)
-        handle, password_name = tempfile.mkstemp(dir=self.data_dir.parent, prefix=".pgpass-")
-        password_file = Path(password_name)
+        password_file = self.data_dir.parent / f".campusflow-pw-{os.urandom(8).hex()}"
         try:
+            # 先写后关；Windows 上 initdb 读取时若文件仍被持有会报 Permission denied。
+            password_file.write_text(password, encoding="utf-8")
             os.chmod(password_file, 0o600)
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                stream.write(password)
             result = _run(
                 [
                     str(self.binaries.tool("initdb")),
