@@ -1,5 +1,7 @@
 """M9/E91：外部日历执行可靠性、重试、对账与同步差异。"""
 
+from datetime import date, timedelta
+
 import pytest
 from calendar_helpers import (
     _confirm,
@@ -191,15 +193,18 @@ def test_revoke_blocks_pending_operations_and_keeps_internal_tasks(
 
 def test_plan_mode_writes_accepted_plan_blocks(client: TestClient) -> None:
     connection = _connect(client)
-    _task(client, "计划块任务", due_date="2026-10-20", due_time="20:00:00")
+    today = date.today()
+    monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+    tuesday = monday + timedelta(days=1)
+    _task(client, "计划块任务", due_date=tuesday.isoformat(), due_time="20:00:00")
     slot = client.post(
         "/api/v1/availability-slots",
-        json={"day_of_week": 1, "start_time": "18:00:00", "end_time": "22:00:00"},
+        json={"day_of_week": 0, "start_time": "18:00:00", "end_time": "22:00:00"},
     )
     assert slot.status_code == 201, slot.text
     generated = client.post(
         "/api/v1/plans/drafts",
-        json={"start_date": "2026-10-19", "end_date": "2026-10-20", "assumptions": {}},
+        json={"start_date": monday.isoformat(), "end_date": tuesday.isoformat(), "assumptions": {}},
     )
     assert generated.status_code == 201, generated.text
     plan = generated.json()
