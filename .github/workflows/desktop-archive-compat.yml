@@ -232,14 +232,14 @@ jobs:
           psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
 
           "$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 \
-            --set=ws=reverse-transfer-check \
-            --set=sem=2026 Fall \
-            --set=course=Reverse OS Course \
-            --set=code=CF102 \
-            --set=material_title=Reverse OS Material \
-            --set=chunk_text=Reverse OS chunk: submit by 2027-01-10. \
-            --set=task_title=Reverse OS Task \
-            --set=candidate_title=Reverse OS Task Requirement \
+            '--set=ws=reverse-transfer-check' \
+            '--set=sem=2026 Fall' \
+            '--set=course=Reverse OS Course' \
+            '--set=code=CF102' \
+            '--set=material_title=Reverse OS Material' \
+            '--set=chunk_text=Reverse OS chunk: submit by 2027-01-10.' \
+            '--set=task_title=Reverse OS Task' \
+            '--set=candidate_title=Reverse OS Task Requirement' \
             -f desktop/postgres/seed_archive.sql
 
           exported=$("$sidecar" export --output "$archive")
