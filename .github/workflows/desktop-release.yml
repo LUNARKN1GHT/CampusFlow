@@ -150,8 +150,14 @@ jobs:
 
   release:
     name: Publish desktop release
-    if: startsWith(github.ref, 'refs/tags/desktop-v')
-    needs: [macos]
+    # Windows 未启用时该 job 跳过，Release 仍按 macOS 产物发布；
+    # 一旦启用，Windows 失败或未完成就不发布，避免半套安装包。
+    if: |
+      always() &&
+      startsWith(github.ref, 'refs/tags/desktop-v') &&
+      needs.macos.result == 'success' &&
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped')
+    needs: [macos, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
