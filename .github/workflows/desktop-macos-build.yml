@@ -78,9 +78,19 @@ jobs:
       - name: Verify DMG contents
         env:
           EXPECTED_MACHO: ${{ matrix.macho }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          dmg=$(ls desktop/electron/release/*.dmg | head -n 1)
+          dmgs=(desktop/electron/release/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ] || [ ! -f "${dmgs[0]}" ]; then
+            printf 'expected exactly one DMG, got: %s\n' "${dmgs[*]}" >&2
+            exit 1
+          fi
+          dmg="${dmgs[0]}"
+          case "$dmg" in
+            *"mac-$ARCH.dmg") ;;
+            *) echo "unexpected DMG for arch $ARCH: $dmg" >&2; exit 1 ;;
+          esac
           echo "dmg: $dmg ($(du -h "$dmg" | cut -f1))"
           mount=$(mktemp -d)
           hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg" >/dev/null
