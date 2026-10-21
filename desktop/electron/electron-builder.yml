@@ -1,5 +1,5 @@
 # P009：桌面安装包配置。构建前需先产出 sidecar（P002）与内置 PostgreSQL（P003），
-# 并把它们放到 desktop/dist/sidecar 与 desktop/vendor/postgres。
+# 并把它们放到 desktop/dist/campusflow-sidecar 与 desktop/vendor/pgsql。
 appId: com.campusflow.desktop
 productName: CampusFlow
 copyright: Copyright © 2026 CampusFlow contributors
@@ -13,8 +13,8 @@ files:
 extraResources:
   - from: ../../desktop/dist/campusflow-sidecar
     to: sidecar
-  - from: ../../desktop/vendor/postgres
-    to: postgres
+  - from: ../../desktop/vendor/pgsql
+    to: pgsql
   - from: ../../frontend/dist
     to: static
   - from: ../../THIRD-PARTY-NOTICES.md
