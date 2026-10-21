@@ -33,6 +33,10 @@ dev = [
 requires = ["hatchling>=1.27,<2.0"]
 build-backend = "hatchling.build"
 
+# 桌面 sidecar 单一命令入口：serve／worker／migrate／backup／restore／doctor
+[project.scripts]
+campusflow-sidecar = "campusflow.sidecar.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/campusflow"]
 
