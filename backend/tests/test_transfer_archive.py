@@ -85,8 +85,9 @@ def _admin_candidates() -> Iterator[str]:
     for user in users:
         if user:
             yield (
-                base.set(username=user, password=None, database="postgres")
-                .render_as_string(hide_password=False)
+                base.set(username=user, password=None, database="postgres").render_as_string(
+                    hide_password=False
+                )
             )
 
 
@@ -150,7 +151,7 @@ def transfer_role(admin_url: str) -> Iterator[tuple[str, str]]:
     """独立角色 + 口令：口令与角色名不同，才能验证"口令没有进入归档"。"""
     role = f"p010_role_{secrets.token_hex(4)}"
     password = f"P010-Pass-{secrets.token_hex(8)}"
-    _execute_admin(admin_url, f'CREATE ROLE "{role}" LOGIN PASSWORD \'{password}\'')
+    _execute_admin(admin_url, f"CREATE ROLE \"{role}\" LOGIN PASSWORD '{password}'")
     try:
         yield role, password
     finally:
@@ -194,9 +195,7 @@ class Site:
     @property
     def target_url(self) -> str:
         base = make_url(self.database_url)
-        return (
-            base.set(database=self.target_name).render_as_string(hide_password=False)
-        )
+        return base.set(database=self.target_name).render_as_string(hide_password=False)
 
     def settings(self) -> Settings:
         return Settings(
@@ -222,8 +221,10 @@ class Site:
 
     @property
     def template_url(self) -> str:
-        return make_url(self.database_url).set(database=self.template).render_as_string(
-            hide_password=False
+        return (
+            make_url(self.database_url)
+            .set(database=self.template)
+            .render_as_string(hide_password=False)
         )
 
 
@@ -247,9 +248,7 @@ def _create_database(
     source = f'"{template}"' if template else "template0"
     _execute_admin(admin_url, f'CREATE DATABASE "{name}" OWNER "{role}" TEMPLATE {source}')
     if with_vector:
-        extension_url = (
-            make_url(admin_url).set(database=name).render_as_string(hide_password=False)
-        )
+        extension_url = make_url(admin_url).set(database=name).render_as_string(hide_password=False)
         _execute_admin(extension_url, "CREATE EXTENSION IF NOT EXISTS vector")
 
 
@@ -481,9 +480,7 @@ def _counts(url: str) -> dict[str, int]:
     try:
         with engine.connect() as connection:
             for key, table in COUNT_TABLES.items():
-                counts[key] = connection.execute(
-                    text(f"SELECT count(*) FROM {table}")
-                ).scalar_one()
+                counts[key] = connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one()
     finally:
         engine.dispose()
     return counts
@@ -602,9 +599,10 @@ def test_export_import_roundtrip_preserves_rows_files_and_checksums(site: Site) 
         assert manifest["counts"] == result.counts
         expected_head = AlembicMigrator(str(BACKEND_DIR / "migrations")).head_revision()
         assert manifest["schema_head"] == expected_head
-        assert manifest["database"]["sha256"] == hashlib.sha256(
-            handle.read("database.dump")
-        ).hexdigest()
+        assert (
+            manifest["database"]["sha256"]
+            == hashlib.sha256(handle.read("database.dump")).hexdigest()
+        )
         assert manifest["database"]["size"] > 0
         excluded = {item["name"] for item in manifest["excluded_credentials"]}
         assert {"calendar_connections", "calendar_oauth_states"} <= excluded
@@ -638,9 +636,9 @@ def test_export_import_roundtrip_preserves_rows_files_and_checksums(site: Site) 
     for relative, content in MATERIALS.items():
         restored = site.target_storage / relative
         assert restored.read_bytes() == content
-        assert hashlib.sha256(restored.read_bytes()).hexdigest() == hashlib.sha256(
-            content
-        ).hexdigest()
+        assert (
+            hashlib.sha256(restored.read_bytes()).hexdigest() == hashlib.sha256(content).hexdigest()
+        )
 
     engine = create_engine(site.target_url)
     try:
@@ -654,22 +652,15 @@ def test_export_import_roundtrip_preserves_rows_files_and_checksums(site: Site) 
                 connection.execute(text("SELECT text FROM source_chunks")).scalar_one()
                 == "作业 10 月 30 日 23:59 前提交"
             )
-            assert (
-                connection.execute(text("SELECT title FROM tasks")).scalar_one() == "第一次作业"
-            )
-            assert (
-                connection.execute(text("SELECT minutes FROM plan_blocks")).scalar_one() == 120
-            )
+            assert connection.execute(text("SELECT title FROM tasks")).scalar_one() == "第一次作业"
+            assert connection.execute(text("SELECT minutes FROM plan_blocks")).scalar_one() == 120
             assert (
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
                 == info.schema_head
             )
-            assert (
-                connection.execute(
-                    text("SELECT value::text FROM extracted_fields WHERE name = 'title'")
-                ).scalar_one()
-                == json.dumps("第一次作业", ensure_ascii=False)
-            )
+            assert connection.execute(
+                text("SELECT value::text FROM extracted_fields WHERE name = 'title'")
+            ).scalar_one() == json.dumps("第一次作业", ensure_ascii=False)
     finally:
         engine.dispose()
 
@@ -945,9 +936,7 @@ def test_interrupted_import_leaves_original_data_intact(
         monkeypatch.setattr(service.migrator, "upgrade_to_head", explode)
 
     with pytest.raises(RuntimeError, match="模拟"):
-        service.import_archive(
-            result.archive_path, replace=True, confirm_token=info.confirm_token
-        )
+        service.import_archive(result.archive_path, replace=True, confirm_token=info.confirm_token)
 
     # 目标库与资料目录保持原样，临时库与工作目录都被清理
     assert _counts(site.target_url) == original_counts
@@ -956,10 +945,7 @@ def test_interrupted_import_leaves_original_data_intact(
     try:
         with engine.connect() as connection:
             leftovers = connection.execute(
-                text(
-                    "SELECT datname FROM pg_database "
-                    "WHERE datname LIKE 'campusflow_import_%'"
-                )
+                text("SELECT datname FROM pg_database WHERE datname LIKE 'campusflow_import_%'")
             ).scalars()
             assert list(leftovers) == []
     finally:

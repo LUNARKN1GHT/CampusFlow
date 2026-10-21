@@ -488,9 +488,7 @@ def test_secret_wrapper_and_file_store_roundtrip(tmp_path: Path) -> None:
         assert mode == 0o600
 
 
-@pytest.mark.skipif(
-    not KeychainSecretStore.is_available(), reason="本机没有可用的 macOS 钥匙串"
-)
+@pytest.mark.skipif(not KeychainSecretStore.is_available(), reason="本机没有可用的 macOS 钥匙串")
 def test_macos_keychain_roundtrip() -> None:
     if os.environ.get("CAMPUSFLOW_TEST_KEYCHAIN") != "1":
         pytest.skip("钥匙串往返会写入登录钥匙串，设置 CAMPUSFLOW_TEST_KEYCHAIN=1 才执行")

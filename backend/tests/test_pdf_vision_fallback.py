@@ -67,9 +67,7 @@ def _add_image_page(writer: PdfWriter) -> None:
         {NameObject("/XObject"): DictionaryObject({NameObject("/Im0"): writer._add_object(image)})}
     )
     content = DecodedStreamObject()
-    content.set_data(
-        f"q {PAGE_WIDTH} 0 0 {PAGE_HEIGHT} 0 0 cm /Im0 Do Q".encode("ascii")
-    )
+    content.set_data(f"q {PAGE_WIDTH} 0 0 {PAGE_HEIGHT} 0 0 cm /Im0 Do Q".encode("ascii"))
     page[NameObject("/Contents")] = writer._add_object(content)
 
 

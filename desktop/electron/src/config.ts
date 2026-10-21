@@ -40,8 +40,19 @@ function parseStage(value: string | undefined): StageName | null {
   return STAGES.includes(value as StageName) ? (value as StageName) : null
 }
 
+
+/** 打包后 electron-builder 把 sidecar／pgsql／static 放在 Resources 下；源码运行没有该目录。 */
+function bundledPath(...parts: string[]): string | null {
+  const resources = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath
+  if (!resources) return null
+  const candidate = path.join(resources, ...parts)
+  return existsSync(candidate) ? candidate : null
+}
+
 function resolveStaticDir(env: NodeJS.ProcessEnv): string | null {
   if (env.CAMPUSFLOW_STATIC_DIR) return path.resolve(env.CAMPUSFLOW_STATIC_DIR)
+  const bundled = bundledPath('static')
+  if (bundled) return bundled
   const repositoryBuild = path.resolve(__dirname, '..', '..', '..', 'frontend', 'dist')
   return existsSync(repositoryBuild) ? repositoryBuild : null
 }
@@ -53,7 +64,9 @@ function resolveStaticDir(env: NodeJS.ProcessEnv): string | null {
 export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): RuntimeConfig {
   const base = path.resolve(userDataDir)
   const dataDir = absoluteFrom(base, env.CAMPUSFLOW_DATA_DIR, path.join(base, 'data'))
-  const pgBin = env.CAMPUSFLOW_PG_BIN ? path.resolve(env.CAMPUSFLOW_PG_BIN) : null
+  const pgBin = env.CAMPUSFLOW_PG_BIN
+    ? path.resolve(env.CAMPUSFLOW_PG_BIN)
+    : bundledPath('pgsql', 'bin')
   const requestedMode = env.CAMPUSFLOW_PG_MODE
   const pgMode =
     requestedMode === 'managed' || requestedMode === 'external' || requestedMode === 'skip'
@@ -94,7 +107,12 @@ export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): Runtime
     pgPort,
     pgUser: env.CAMPUSFLOW_PG_USER?.trim() || 'campusflow',
     pgDatabase: env.CAMPUSFLOW_PG_DATABASE?.trim() || 'campusflow',
-    sidecarBin: env.CAMPUSFLOW_SIDECAR_BIN ? path.resolve(env.CAMPUSFLOW_SIDECAR_BIN) : null,
+    sidecarBin: env.CAMPUSFLOW_SIDECAR_BIN
+      ? path.resolve(env.CAMPUSFLOW_SIDECAR_BIN)
+      : bundledPath(
+          'sidecar',
+          process.platform === 'win32' ? 'campusflow-sidecar.exe' : 'campusflow-sidecar',
+        ),
     sidecarModule: env.CAMPUSFLOW_SIDECAR_MODULE?.trim() || 'campusflow.sidecar',
     pythonCommand: env.CAMPUSFLOW_PYTHON?.trim() || 'python',
     stub: env.CAMPUSFLOW_ELECTRON_STUB === '1',

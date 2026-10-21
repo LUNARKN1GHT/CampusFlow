@@ -75,9 +75,7 @@ def describe_target(settings: Settings, *, admin_url: str | None = None) -> Targ
     )
 
 
-def build_transfer_service(
-    settings: Settings, *, admin_url: str | None = None
-) -> TransferService:
+def build_transfer_service(settings: Settings, *, admin_url: str | None = None) -> TransferService:
     """装配完整服务；测试可用 `admin_url` 指向具备建库权限的维护账户。"""
     target = describe_target(settings, admin_url=admin_url)
     return TransferService(
@@ -100,9 +98,7 @@ def export_workspace(
     return build_transfer_service(settings).export(output_path, workspace_id=workspace_id)
 
 
-def inspect_archive(
-    archive_path: Path | str, *, settings: Settings | None = None
-) -> ArchiveInfo:
+def inspect_archive(archive_path: Path | str, *, settings: Settings | None = None) -> ArchiveInfo:
     """只读检查归档，不需要连接业务数据库；返回的 `confirm_token` 供导入确认。"""
     migrations_dir = settings.migrations_dir if settings is not None else None
     return _inspect_archive(

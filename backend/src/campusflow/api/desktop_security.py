@@ -49,9 +49,7 @@ ORIGIN_REJECTED_MESSAGE: Final = "桌面模式拒绝跨站请求：请求来源�
 
 def _header_values(scope: Scope, name: bytes) -> list[str]:
     return [
-        value.decode("latin-1")
-        for key, value in scope.get("headers", [])
-        if key.lower() == name
+        value.decode("latin-1") for key, value in scope.get("headers", []) if key.lower() == name
     ]
 
 
@@ -121,9 +119,7 @@ def is_allowed_origin(origin: str) -> bool:
 
 
 def _csp_applies(path: str) -> bool:
-    return not any(
-        path == exempt or path.startswith(exempt + "/") for exempt in _CSP_EXEMPT_PATHS
-    )
+    return not any(path == exempt or path.startswith(exempt + "/") for exempt in _CSP_EXEMPT_PATHS)
 
 
 async def _reject(send: Send, status_code: int, detail: str) -> None:

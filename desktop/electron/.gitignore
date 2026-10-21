@@ -5,3 +5,6 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 *.log
+
+# electron-builder 产物（P009）
+release/
