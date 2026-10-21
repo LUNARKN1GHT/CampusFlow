@@ -10,6 +10,7 @@
   var api = window.campusflow
 
   var stageLabels = {
+    bootstrap: '首启初始化',
     postgres: 'PostgreSQL',
     migrate: '数据库迁移',
     api: 'API 服务',

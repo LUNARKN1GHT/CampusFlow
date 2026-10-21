@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -50,6 +50,20 @@ interface Harness {
   kills: string[]
   children: FakeChild[]
   statuses: SupervisorStatus[]
+  runCalls: RunCall[]
+  spawnCalls: SpawnCall[]
+}
+
+interface RunCall {
+  command: string
+  args: string[]
+  env: NodeJS.ProcessEnv
+}
+
+interface SpawnCall {
+  command: string
+  args: string[]
+  env: NodeJS.ProcessEnv
 }
 
 const temporaryDirs: string[] = []
@@ -88,25 +102,29 @@ function createHarness(
   const kills: string[] = []
   const children: FakeChild[] = []
   const statuses: SupervisorStatus[] = []
+  const runCalls: RunCall[] = []
+  const spawnCalls: SpawnCall[] = []
   let nextPid = 900_000
 
   const deps: Partial<SupervisorDeps> = {
-    spawn: (command: string, args: string[], _options: SpawnOptions) => {
+    spawn: (command: string, args: string[], spawnOptions: SpawnOptions) => {
       const role = args[0] === 'worker' ? 'worker' : 'api'
       calls.push(`spawn:${args[0]}`)
+      spawnCalls.push({ command, args: [...args], env: { ...spawnOptions.env } })
       const child = new FakeChild((nextPid += 1))
       child.on('exit', () => kills.push(role))
       children.push(child)
       queueMicrotask(() => child.emit('spawn'))
       return child as unknown as ChildLike
     },
-    run: async (command: string, args: string[]) => {
+    run: async (
+      command: string,
+      args: string[],
+      runOptions: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number },
+    ) => {
+      runCalls.push({ command, args: [...args], env: { ...runOptions.env } })
       if (options.run) {
-        return options.run(command, args, {
-          cwd: config.dataDir,
-          env: {},
-          timeoutMs: 1_000,
-        })
+        return options.run(command, args, runOptions)
       }
       calls.push(`run:${args[0]}`)
       return { code: 0, stdout: '', stderr: '' }
@@ -120,7 +138,7 @@ function createHarness(
 
   const supervisor = new Supervisor({ config, logger, deps })
   supervisor.on('status', (status) => statuses.push(status))
-  return { supervisor, config, logger, calls, kills, children, statuses }
+  return { supervisor, config, logger, calls, kills, children, statuses, runCalls, spawnCalls }
 }
 
 async function eventually(
@@ -156,6 +174,167 @@ test('按 PostgreSQL → migrate → API → Worker 顺序启动，并按 Worker
   await harness.supervisor.stop()
   expect(harness.kills).toEqual(['worker', 'api'])
   expect(harness.supervisor.getStatus().phase).toBe('stopped')
+  cleanupHarness()
+})
+
+test('bootstrap 成功时跳过 initdb／migrate，按 bootstrap → API → Worker 启动', async () => {
+  const databaseUrl =
+    'postgresql+psycopg://campusflow:db-secret@127.0.0.1:59945/campusflow'
+  const harness = createHarness({
+    config: { bootstrap: true, pgMode: 'managed', pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            ready: true,
+            status: 'initialized',
+            initialized: true,
+            data_dir: '/tmp/fake-data',
+            database_url: databaseUrl,
+            local_username: 'campusflow',
+            local_password: 'local-login-token',
+            schema_head: 'k001_external_calendar',
+            secret_backend: 'file',
+            warnings: ['凭据回退到 0600 文件'],
+            messages: ['数据库已就绪'],
+            started_postgres: true,
+            postgres_running: true,
+          }),
+          stderr: '',
+        }
+      }
+      return { code: 0, stdout: '', stderr: '' }
+    },
+  })
+
+  await harness.supervisor.start()
+
+  const reportedStages = harness.statuses
+    .map((status) => status.stage)
+    .filter((stage, index, all) => all.indexOf(stage) === index)
+  expect(reportedStages).toEqual(['bootstrap', 'api', 'worker', 'ready'])
+  expect(harness.supervisor.getStatus().phase).toBe('ready')
+  expect(harness.supervisor.getBootstrapLogin()).toEqual({
+    username: 'campusflow',
+    password: 'local-login-token',
+  })
+
+  // 只执行 bootstrap：不再调用 initdb、pg_ctl start、createdb 或 migrate。
+  expect(harness.runCalls.map((call) => call.args[0])).toEqual(['bootstrap'])
+  expect(harness.spawnCalls).toHaveLength(2)
+  // bootstrap 需要空数据目录：不能提前在数据目录下创建 materials。
+  expect(existsSync(harness.config.dataDir)).toBe(true)
+  expect(existsSync(harness.config.storageDir)).toBe(false)
+
+  for (const call of harness.spawnCalls) {
+    expect(call.env.CAMPUSFLOW_DATABASE_URL).toBe(databaseUrl)
+    expect(call.env.CAMPUSFLOW_LOCAL_USERNAME).toBe('campusflow')
+    expect(call.env.CAMPUSFLOW_LOCAL_PASSWORD).toBe('local-login-token')
+    expect(call.env.CAMPUSFLOW_DEPLOYMENT_MODE).toBe('desktop')
+    expect(call.env.CAMPUSFLOW_DATA_DIR).toBe(harness.config.dataDir)
+  }
+  const bootstrapEnv = harness.runCalls[0]!.env
+  expect(bootstrapEnv.CAMPUSFLOW_LOG_DIR).toBe(harness.config.logDir)
+  expect(bootstrapEnv.CAMPUSFLOW_PG_BIN).toBe('/fake/pg')
+  expect(bootstrapEnv.CAMPUSFLOW_PG_PORT).toBe(String(harness.config.pgPort))
+  expect(bootstrapEnv.CAMPUSFLOW_API_PORT).toBe('43210')
+  expect(bootstrapEnv.CAMPUSFLOW_LOCAL_PASSWORD).toBeUndefined()
+
+  await harness.supervisor.stop()
+  expect(harness.kills).toEqual(['worker', 'api'])
+  const stopCall = harness.runCalls.find((call) => call.args.includes('stop'))
+  expect(stopCall?.command).toBe(path.join('/fake/pg', 'pg_ctl'))
+  expect(stopCall?.args).toEqual([
+    '-D',
+    harness.config.pgDataDir,
+    '-m',
+    'fast',
+    '-w',
+    'stop',
+  ])
+  expect(harness.supervisor.getStatus().phase).toBe('stopped')
+  // 退出后不再保留凭据。
+  expect(harness.supervisor.getBootstrapLogin()).toBeNull()
+  cleanupHarness()
+})
+
+test('bootstrap 退出码非零时停在 bootstrap 阶段，不启动 API 且错误信息包含诊断目录', async () => {
+  const harness = createHarness({
+    config: { bootstrap: true, pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        return {
+          code: 1,
+          stdout: '',
+          stderr: '初始化失败：无法创建数据库（诊断日志目录：/tmp/fake-data.failed-20261021/logs）',
+        }
+      }
+      return { code: 0, stdout: '', stderr: '' }
+    },
+  })
+
+  await expect(harness.supervisor.start()).rejects.toThrow('首启初始化阶段失败')
+  const status = harness.supervisor.getStatus()
+  expect(status.phase).toBe('failed')
+  expect(status.failure?.stage).toBe('bootstrap')
+  expect(status.failure?.message).toContain('退出码 1')
+  expect(status.failure?.message).toContain('初始化失败')
+  expect(status.failure?.message).toContain(path.join(harness.config.dataDir, 'logs'))
+  expect(status.failure?.logTail.some((line) => line.includes('阶段开始：bootstrap'))).toBe(true)
+  expect(harness.spawnCalls).toHaveLength(0)
+  expect(harness.calls).toEqual([])
+  expect(harness.supervisor.getBootstrapLogin()).toBeNull()
+  cleanupHarness()
+})
+
+test('bootstrap 返回 ready=false 时同样失败，且不把口令写入日志', async () => {
+  const harness = createHarness({
+    config: { bootstrap: true, pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            ready: false,
+            status: 'partially_initialized',
+            initialized: true,
+            data_dir: '/tmp/fake-data',
+            database_url: null,
+            local_username: null,
+            local_password: 'should-never-be-logged',
+            schema_head: 'k001_external_calendar',
+            secret_backend: 'file',
+            warnings: [],
+            messages: ['数据库口令缺失，不会使用默认口令'],
+            started_postgres: false,
+            postgres_running: false,
+          }),
+          stderr: '',
+        }
+      }
+      return { code: 0, stdout: '', stderr: '' }
+    },
+  })
+
+  await expect(harness.supervisor.start()).rejects.toThrow('首启初始化阶段失败')
+  const status = harness.supervisor.getStatus()
+  expect(status.failure?.stage).toBe('bootstrap')
+  expect(status.failure?.message).toContain('partially_initialized')
+  expect(status.failure?.message).toContain('不会使用默认口令')
+  expect(harness.spawnCalls).toHaveLength(0)
+  const log = readFileSync(harness.logger.logPath, 'utf8')
+  expect(log).not.toContain('should-never-be-logged')
+  cleanupHarness()
+})
+
+test('测试桩模式下即使显式要求也跳过 bootstrap', async () => {
+  const config = baseConfig({ stub: true, bootstrap: true })
+  const harness = createHarness({ config })
+  await harness.supervisor.start()
+  expect(harness.runCalls.filter((call) => call.args[0] === 'bootstrap')).toHaveLength(0)
+  expect(harness.supervisor.getBootstrapLogin()).toBeNull()
+  await harness.supervisor.stop()
   cleanupHarness()
 })
 

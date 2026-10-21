@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -119,10 +119,58 @@ test('测试桩模式：启动页 → 主窗口，日志按阶段推进，退出
   for (const offset of stageOffsets) expect(offset).toBeGreaterThan(-1)
   expect(stageOffsets).toEqual([...stageOffsets].sort((left, right) => left - right))
   expect(log).toContain('启动完成：所有阶段就绪')
+  // 测试桩模式跳过首启初始化：既不调用 sidecar bootstrap，也不出现 bootstrap 阶段。
+  expect(log).not.toContain('阶段开始：bootstrap')
 
   await quitGracefully(app)
   await expect.poll(() => isAlive(apiPid), { timeout: 5_000 }).toBe(false)
   await expect.poll(() => isAlive(workerPid), { timeout: 5_000 }).toBe(false)
+})
+
+test('bootstrap 失败时显示错误页，且不启动 API', async () => {
+  test.skip(process.platform === 'win32', '假 sidecar 使用 POSIX shell 脚本')
+  const userData = mkdtempSync(path.join(os.tmpdir(), 'campusflow-p008-bootstrap-'))
+  const binDir = mkdtempSync(path.join(os.tmpdir(), 'campusflow-p008-sidecar-'))
+  tempDirs.push(userData, binDir)
+  const fakeSidecar = path.join(binDir, 'fake-sidecar')
+  writeFileSync(
+    fakeSidecar,
+    [
+      '#!/bin/sh',
+      'echo "初始化失败：无法写入数据目录（诊断日志目录：/tmp/cf-bootstrap-failed/logs）" >&2',
+      'exit 1',
+      '',
+    ].join('\n'),
+  )
+  chmodSync(fakeSidecar, 0o755)
+
+  const app = await electron.launch({
+    args: [APP_MAIN],
+    env: {
+      ...process.env,
+      CAMPUSFLOW_ELECTRON_USER_DATA: userData,
+      CAMPUSFLOW_BOOTSTRAP: '1',
+      CAMPUSFLOW_AUTO_LOGIN: '0',
+      CAMPUSFLOW_SIDECAR_BIN: fakeSidecar,
+    },
+  })
+  openApps.push(app)
+
+  const shell = await app.firstWindow()
+  await expect(shell.locator('[data-testid="error"]')).toBeVisible()
+  await expect(shell.locator('[data-testid="error-stage"]')).toContainText('首启初始化')
+  await expect(shell.locator('[data-testid="error-message"]')).toContainText('退出码 1')
+  await expect(shell.locator('[data-testid="error-message"]')).toContainText('诊断日志目录')
+  await expect(shell.locator('[data-testid="error-log-tail"]')).toContainText('阶段开始：bootstrap')
+
+  const log = readFileSync(path.join(userData, 'logs', 'main.log'), 'utf8')
+  expect(log).toContain('启动顺序：bootstrap → API → Worker')
+  expect(log).toContain('阶段开始：bootstrap')
+  expect(log).not.toContain('阶段开始：api')
+  expect(log).not.toContain('阶段开始：postgres')
+  expect(existsSync(path.join(userData, 'run', 'stub-api.pid'))).toBe(false)
+
+  await quitGracefully(app)
 })
 
 test('模拟迁移失败时显示错误页，点击重试后进入主窗口', async () => {
