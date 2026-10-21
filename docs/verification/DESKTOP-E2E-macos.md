@@ -210,6 +210,29 @@ codesign -dv                                    Signature=adhoc, Info.plist=not 
 - `codesign --verify --deep --strict` 失败（`code has no resources but signature indicates they must be present`），
   确认产物未签名，不能作为正式发布包。
 
+## CI 打包（arm64 与 x64）
+
+`.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与 `macos-15-intel`
+（x64）上构建前端、内置 PostgreSQL、sidecar 与 DMG，并挂载 DMG 断言资源齐全、架构匹配、
+随包 sidecar 可运行。运行 [39663810965](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39663810965)
+两个任务均通过：
+
+```text
+arm64: dmg: CampusFlow-0.1.0-mac-arm64.dmg (176M)
+       campusflow-sidecar 0.1.0
+       DMG contents verified for arm64
+x64:   dmg: CampusFlow-0.1.0-mac-x64.dmg (176M)
+       campusflow-sidecar 0.1.0
+       DMG contents verified for x86_64
+```
+
+- `macos-13` 已不再提供 runner（x64 任务排队 12 分钟未分配），发布工作流同步改用
+  `macos-15-intel`。
+- `electron-builder` 原先未加入 devDependencies，`npx` 每次下载最新版；现固定为
+  `26.15.3`，由 `npm ci` 安装。
+- `electron-builder.yml` 的 `mac.target.arch` 列表会覆盖命令行 `--arm64/--x64`，
+  导致每个任务构建两种架构；已删除该列表，架构由工作流指定。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。

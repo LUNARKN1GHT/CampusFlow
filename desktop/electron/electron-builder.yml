@@ -29,9 +29,7 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   target:
     - target: dmg
-      arch:
-        - arm64
-        - x64
+  # 架构由工作流的 --arm64／--x64 指定；不要在配置里列 arch，否则会覆盖命令行参数。
 dmg:
   writeUpdateInfo: false
 win:

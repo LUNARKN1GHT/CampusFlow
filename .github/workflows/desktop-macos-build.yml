@@ -1,0 +1,123 @@
+name: Desktop macOS build
+
+# 验证 macOS arm64／x64 的 PostgreSQL、sidecar、DMG 打包与包内资源。
+# 正式发布仍由 desktop-release.yml 在 desktop-v* 标签上执行；这里只产出 artifact。
+on:
+  pull_request:
+    paths:
+      - "desktop/build_macos.sh"
+      - "desktop/postgres/**"
+      - "desktop/campusflow-sidecar.spec"
+      - "desktop/electron/**"
+      - "frontend/**"
+      - ".github/workflows/desktop-macos-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+            macho: arm64
+          - runner: macos-15-intel
+            arch: x64
+            macho: x86_64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/electron/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        run: bash desktop/postgres/build_macos.sh
+
+      - name: Build PyInstaller sidecar
+        run: bash desktop/build_macos.sh
+
+      - name: Install Electron dependencies and compile
+        working-directory: desktop/electron
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package DMG
+        working-directory: desktop/electron
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+
+      - name: Verify DMG contents
+        env:
+          EXPECTED_MACHO: ${{ matrix.macho }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          dmgs=(desktop/electron/release/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ] || [ ! -f "${dmgs[0]}" ]; then
+            printf 'expected exactly one DMG, got: %s\n' "${dmgs[*]}" >&2
+            exit 1
+          fi
+          dmg="${dmgs[0]}"
+          case "$dmg" in
+            *"mac-$ARCH.dmg") ;;
+            *) echo "unexpected DMG for arch $ARCH: $dmg" >&2; exit 1 ;;
+          esac
+          echo "dmg: $dmg ($(du -h "$dmg" | cut -f1))"
+          mount=$(mktemp -d)
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg" >/dev/null
+          trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT
+
+          app="$mount/CampusFlow.app"
+          for relative in \
+            Contents/Resources/sidecar/campusflow-sidecar \
+            Contents/Resources/pgsql/bin/postgres \
+            Contents/Resources/pgsql/share/extension/vector.control \
+            Contents/Resources/pgsql/lib/vector.dylib \
+            Contents/Resources/static/index.html \
+            Contents/Resources/THIRD-PARTY-NOTICES.md; do
+            if [ ! -e "$app/$relative" ]; then
+              echo "missing from DMG: $relative" >&2
+              exit 1
+            fi
+          done
+
+          "$app/Contents/Resources/sidecar/campusflow-sidecar" --version
+          file "$app/Contents/MacOS/CampusFlow" | grep -q "$EXPECTED_MACHO"
+          file "$app/Contents/Resources/pgsql/bin/postgres" | grep -q "$EXPECTED_MACHO"
+          echo "DMG contents verified for $EXPECTED_MACHO"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-${{ matrix.arch }}-ci
+          path: desktop/electron/release/*.dmg
+          if-no-files-found: error
