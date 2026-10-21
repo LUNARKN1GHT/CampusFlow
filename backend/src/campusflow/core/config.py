@@ -44,8 +44,12 @@ class Settings(BaseSettings):
     # 上传限制（D003）：可通过环境变量覆盖
     upload_max_bytes: int = 20 * 1024 * 1024
     upload_max_files: int = 5
-    # 未来备份的保留期限（天），删除界面据此说明备份残留（D010）
+    # 删除界面据此说明备份残留（D010）；不代表升级备份会保留这么久。
     backup_retention_days: int = 30
+    # P011：升级前备份按份数保留，避免每次升级后无限累积；只在升级成功后清理。
+    backup_retention_count: int = Field(default=5, ge=1)
+    # P011：pg_dump／pg_restore 所在目录；未配置时从 PATH 查找。
+    pg_bin: str | None = None
     # 启动时扫描并重投待投递作业（J004 补偿）；关闭时只保留手动重投入口
     dispatch_on_startup: bool = True
     # 作业超时（秒，J005）：领取后超过这个时长仍是"处理中"就回收为可重试失败

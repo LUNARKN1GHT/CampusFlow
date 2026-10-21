@@ -138,6 +138,31 @@ uv run --locked alembic revision --autogenerate -m "说明"   # 按模型变更�
 uv run --locked alembic downgrade -1                       # 回退一步
 ```
 
+### 桌面升级迁移（P011）
+
+桌面启动器在启动 API 前按顺序调用（签名与错误类型见 `application/upgrade.py` 模块文档）：
+
+```python
+from campusflow.application.upgrade import check_schema_or_raise, upgrade_if_needed
+
+upgrade_if_needed(settings)    # 需要升级时先备份，再迁移到安装包内置 head
+check_schema_or_raise(settings)  # 数据库新于应用、仍落后或未初始化时拒绝启动
+```
+
+- 数据库结构比安装包新时拒绝启动，不执行降级；需要安装更新的应用。
+- 需要升级时先写 `<data_dir>/backups/pre-upgrade-<UTC>/`：`database.dump`（pg_dump 自定义归档）、`materials/` 与记录 revision、时间、文件大小和 SHA-256 的 `manifest.json`。迁移或升级后校验失败会自动恢复该备份，备份目录保留供手动导出。
+- `CAMPUSFLOW_PG_BIN` 指定 `pg_dump`／`pg_restore` 目录，未设置时从 `PATH` 查找；口令只通过环境变量传递，不进入命令行、manifest 或日志。
+- `CAMPUSFLOW_BACKUP_RETENTION_COUNT`（默认 5）按份数保留升级备份，仅在升级成功后清理；`CAMPUSFLOW_BACKUP_RETENTION_DAYS` 仍只用于删除界面说明备份残留。
+- 专项测试默认使用后端测试库；设置 `CAMPUSFLOW_P011_TEST_DATABASE_URL` 可改用外部创建的专用 scratch 库：
+
+```bash
+cd backend
+CAMPUSFLOW_P011_TEST_DATABASE_URL=postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_scratch \
+  uv run --locked pytest tests/test_upgrade.py -q
+```
+
+测试会临时降到旧 revision 并在结束后恢复 head，不要指向有实际数据的数据库。完整证据与未验证项见 [P011 说明](verification/DESKTOP-P011-upgrade.md)。
+
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
 当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 已接入：纯领域测试不触发数据库，测试库名必须以 `_test` 结尾。
