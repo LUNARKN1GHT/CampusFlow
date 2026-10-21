@@ -191,14 +191,33 @@ env -i HOME=/tmp/cf-clean/home TMPDIR=/tmp PATH=/usr/bin:/bin:/usr/sbin:/sbin \
 - 升级后 `/api/v1/health` → 200；SIGTERM 正常回收，无残留进程。
 - 覆盖的是“同一应用启动时发现旧结构”；旧版本应用 → 新 DMG 安装的替换流程仍未验证。
 
+## DMG 内容与签名检查（本机）
+
+对 `desktop/electron/release/CampusFlow-0.1.0-mac-arm64.dmg`（166 MB）挂载后逐项检查：
+
+```text
+CampusFlow.app/Contents/MacOS/CampusFlow        Mach-O 64-bit executable arm64
+Resources/sidecar/campusflow-sidecar --version  campusflow-sidecar 0.1.0
+Resources/pgsql/bin/{initdb,pg_ctl,postgres,…}  存在
+Resources/pgsql/share/extension/vector.control  存在
+Resources/pgsql/lib/vector.dylib                存在
+Resources/static/{index.html,assets}            存在
+Resources/THIRD-PARTY-NOTICES.md                存在
+codesign -dv                                    Signature=adhoc, Info.plist=not bound
+```
+
+- 随包的 sidecar 能直接从只读 DMG 运行。
+- `codesign --verify --deep --strict` 失败（`code has no resources but signature indicates they must be present`），
+  确认产物未签名，不能作为正式发布包。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
 - **首启凭据**：默认流程已改为 P007 bootstrap（随机口令、凭据后端、自动登录），不再使用 `student/campusflow-dev`；`CAMPUSFLOW_BOOTSTRAP=0` 仍保留旧 trust 流程，只用于测试和排障。
 - **macOS 钥匙串**：本轮自动化显式使用 `CAMPUSFLOW_SECRET_BACKEND=file`；打包应用默认 `auto` 走钥匙串的路径沿用 P007 源码验证，未在打包应用中复跑。
 - **自动登录失败提示**：真实运行中未制造失败，只由单元测试覆盖；页面内提示条的实际样式未截图。
-- **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；打包应用内通过原生对话框实际执行的流程未自动化，真实跨机器迁移仍未验证。
-- **Windows**：未构建、未运行。
+- **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；打包应用内通过原生对话框实际执行的流程未自动化。跨机器迁移已由 `desktop-archive-compat.yml` 覆盖 Windows↔macOS 双向（见 DESKTOP-P010-transfer.md），安装后的应用之间迁移未验证。
+- **Windows**：已由 `desktop-windows-build.yml` 在 windows-2022 构建并校验安装包内容、运行首启测试；未在 Windows 11 实机安装运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。
 - **DMG 安装流程**：未执行拖入 Applications 后的首次启动；本轮直接运行 `.app` 内可执行文件。
