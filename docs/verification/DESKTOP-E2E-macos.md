@@ -123,12 +123,29 @@ secrets.json: 0600，含 db-password 与 local-password
 
 ### 测试
 
-`cd desktop/electron && npm run typecheck && npm test`：23 passed。新增覆盖：
+`cd desktop/electron && npm run typecheck && npm test`：40 passed。新增覆盖：
 
-- supervisor：`bootstrap → API → Worker → ready` 顺序、不再调用 `initdb`／`createdb`／`migrate`、API／Worker 环境含连接串与本机凭据、退出调用 `pg_ctl stop`、bootstrap 失败与 `ready=false` 停在 bootstrap 阶段。
+- supervisor：`bootstrap → migrate（升级闸门）→ API → Worker → ready` 顺序、不再调用 `initdb`／`createdb`／`migrate`、API／Worker 环境含连接串与本机凭据、退出调用 `pg_ctl stop`、bootstrap 失败与 `ready=false` 停在 bootstrap 阶段、数据库比安装包新时拒绝启动、维护暂停/恢复。
+- 数据维护：导出取消与成功摘要、导入检查/确认/令牌/失败恢复/非法输出、升级已最新/拒绝降级/备份升级/失败恢复。
 - 配置：打包／`CAMPUSFLOW_BOOTSTRAP`／`CAMPUSFLOW_MANAGED_POSTGRES`／测试桩的启用规则，`CAMPUSFLOW_AUTO_LOGIN=0`。
 - 自动登录：登录页填充与提交、未跳转时 1 秒后重试一次、失败只提示用户名且异常信息不含口令、失败提示条脚本不含口令。
-- Electron：测试桩模式不出现 bootstrap 阶段；假 sidecar 退出 1 时显示错误页且不启动 API。
+- Electron：测试桩模式不出现 bootstrap 阶段；假 sidecar 退出 1 时显示错误页且不启动 API；应用菜单包含「数据」导出／导入／升级入口。
+
+### 数据维护与升级闸门（2026-10-21 复跑）
+
+同一打包应用重新构建后，用全新数据目录复跑：
+
+```text
+阶段开始：bootstrap → 阶段完成：bootstrap   （迁移头 k001_external_calendar，凭据后端 macos-keychain）
+阶段开始：migrate   → 数据库结构已是最新，无需升级（约 0.3 s） → 阶段完成：migrate
+阶段开始：api       → 阶段完成：api
+阶段开始：worker    → 阶段完成：worker
+状态：phase=ready stage=ready …  自动登录成功：campusflow
+```
+
+- 本次 bootstrap 默认使用 macOS 钥匙串（未设置 `CAMPUSFLOW_SECRET_BACKEND=file`）。
+- `GET /api/v1/health` → 200；`GET /` → 200；SIGTERM 后按 Worker → API → PostgreSQL 逆序停止，无残留进程。
+- 未通过菜单实际执行导出／导入对话框（会阻塞在原生保存/确认窗口）；菜单存在与流程分支由 Playwright 用例覆盖，归档本身的真实读写见 `DESKTOP-P010-transfer.md` 的 CLI round-trip。
 
 ## 未验证 / 已知缺口
 
@@ -136,7 +153,7 @@ secrets.json: 0600，含 db-password 与 local-password
 - **首启凭据**：默认流程已改为 P007 bootstrap（随机口令、凭据后端、自动登录），不再使用 `student/campusflow-dev`；`CAMPUSFLOW_BOOTSTRAP=0` 仍保留旧 trust 流程，只用于测试和排障。
 - **macOS 钥匙串**：本轮自动化显式使用 `CAMPUSFLOW_SECRET_BACKEND=file`；打包应用默认 `auto` 走钥匙串的路径沿用 P007 源码验证，未在打包应用中复跑。
 - **自动登录失败提示**：真实运行中未制造失败，只由单元测试覆盖；页面内提示条的实际样式未截图。
-- **`.campusflow` 与升级命令**：CLI 已提供 export/import/upgrade，但 Electron 菜单/界面入口尚未接入。
+- **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；打包应用内通过原生对话框实际执行的流程未自动化，真实跨机器迁移仍未验证。
 - **Windows**：未构建、未运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。

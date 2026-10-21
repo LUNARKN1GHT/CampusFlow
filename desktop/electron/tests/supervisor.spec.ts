@@ -177,7 +177,7 @@ test('按 PostgreSQL → migrate → API → Worker 顺序启动，并按 Worker
   cleanupHarness()
 })
 
-test('bootstrap 成功时跳过 initdb／migrate，按 bootstrap → API → Worker 启动', async () => {
+test('bootstrap 成功时跳过 initdb，先过升级闸门再按 bootstrap → migrate → API → Worker 启动', async () => {
   const databaseUrl =
     'postgresql+psycopg://campusflow:db-secret@127.0.0.1:59945/campusflow'
   const harness = createHarness({
@@ -204,6 +204,18 @@ test('bootstrap 成功时跳过 initdb／migrate，按 bootstrap → API → Wor
           stderr: '',
         }
       }
+      if (args[0] === 'upgrade') {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            state: 'up_to_date',
+            database_revision: 'k001_external_calendar',
+            bundled_head: 'k001_external_calendar',
+            action: null,
+          }),
+          stderr: '',
+        }
+      }
       return { code: 0, stdout: '', stderr: '' }
     },
   })
@@ -213,15 +225,18 @@ test('bootstrap 成功时跳过 initdb／migrate，按 bootstrap → API → Wor
   const reportedStages = harness.statuses
     .map((status) => status.stage)
     .filter((stage, index, all) => all.indexOf(stage) === index)
-  expect(reportedStages).toEqual(['bootstrap', 'api', 'worker', 'ready'])
+  expect(reportedStages).toEqual(['bootstrap', 'migrate', 'api', 'worker', 'ready'])
   expect(harness.supervisor.getStatus().phase).toBe('ready')
   expect(harness.supervisor.getBootstrapLogin()).toEqual({
     username: 'campusflow',
     password: 'local-login-token',
   })
 
-  // 只执行 bootstrap：不再调用 initdb、pg_ctl start、createdb 或 migrate。
-  expect(harness.runCalls.map((call) => call.args[0])).toEqual(['bootstrap'])
+  // 只执行 bootstrap 与升级检查：不再调用 initdb、pg_ctl start、createdb 或 migrate。
+  expect(harness.runCalls.map((call) => call.args[0])).toEqual(['bootstrap', 'upgrade'])
+  expect(harness.runCalls[1]!.args).toEqual(['upgrade', '--check', '--apply', '--json'])
+  expect(harness.runCalls[1]!.env.CAMPUSFLOW_DATABASE_URL).toBe(databaseUrl)
+  expect(harness.runCalls[1]!.env.CAMPUSFLOW_LOCAL_PASSWORD).toBeUndefined()
   expect(harness.spawnCalls).toHaveLength(2)
   // bootstrap 需要空数据目录：不能提前在数据目录下创建 materials。
   expect(existsSync(harness.config.dataDir)).toBe(true)
@@ -256,6 +271,110 @@ test('bootstrap 成功时跳过 initdb／migrate，按 bootstrap → API → Wor
   expect(harness.supervisor.getStatus().phase).toBe('stopped')
   // 退出后不再保留凭据。
   expect(harness.supervisor.getBootstrapLogin()).toBeNull()
+  cleanupHarness()
+})
+
+test('维护操作暂停 API 与 Worker、保留 PostgreSQL，并可恢复服务', async () => {
+  const databaseUrl = 'postgresql+psycopg://campusflow:db-secret@127.0.0.1:59945/campusflow'
+  const harness = createHarness({
+    config: { bootstrap: true, pgMode: 'managed', pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            ready: true,
+            status: 'initialized',
+            initialized: true,
+            database_url: databaseUrl,
+            local_username: 'campusflow',
+            local_password: 'local-login-token',
+            schema_head: 'p011_upgrade',
+            secret_backend: 'file',
+            warnings: [],
+            messages: [],
+            started_postgres: true,
+            postgres_running: true,
+          }),
+          stderr: '',
+        }
+      }
+      return { code: 0, stdout: '{"ok":true}', stderr: '' }
+    },
+  })
+  await harness.supervisor.start()
+  expect(harness.supervisor.getStatus().phase).toBe('ready')
+
+  await harness.supervisor.suspendServices()
+  expect(harness.kills).toEqual(['worker', 'api'])
+  expect(harness.supervisor.getStatus().phase).toBe('stopping')
+  // 暂停只回收 API 与 Worker，PostgreSQL 保持运行。
+  expect(harness.runCalls.some((call) => call.args.includes('stop'))).toBe(false)
+
+  const result = await harness.supervisor.runMaintenance(
+    'export',
+    ['--output', '/tmp/archive.campusflow'],
+    1_000,
+  )
+  expect(result.code).toBe(0)
+  const exportCall = harness.runCalls.at(-1)!
+  expect(exportCall.args).toEqual(['export', '--output', '/tmp/archive.campusflow'])
+  expect(exportCall.env.CAMPUSFLOW_DATABASE_URL).toBe(databaseUrl)
+  // 维护命令不需要本机登录凭据或 API 端口。
+  expect(exportCall.env.CAMPUSFLOW_LOCAL_USERNAME).toBeUndefined()
+  expect(exportCall.env.CAMPUSFLOW_LOCAL_PASSWORD).toBeUndefined()
+  expect(exportCall.env.CAMPUSFLOW_API_PORT).toBeUndefined()
+
+  await harness.supervisor.resumeServices()
+  expect(harness.supervisor.getStatus().phase).toBe('ready')
+  expect(harness.spawnCalls.at(-1)!.args[0]).toBe('worker')
+
+  await harness.supervisor.stop()
+  expect(harness.supervisor.getStatus().phase).toBe('stopped')
+  cleanupHarness()
+})
+
+test('启动时数据库比安装包新则拒绝启动且不降级', async () => {
+  const harness = createHarness({
+    config: { bootstrap: true, pgMode: 'managed', pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        return {
+          code: 0,
+          stdout: JSON.stringify({
+            ready: true,
+            status: 'initialized',
+            initialized: false,
+            database_url: 'postgresql+psycopg://campusflow:db@127.0.0.1:59945/campusflow',
+            local_username: 'campusflow',
+            local_password: 'local-login-token',
+            schema_head: 'future',
+            secret_backend: 'file',
+            warnings: [],
+            messages: [],
+            started_postgres: true,
+            postgres_running: true,
+          }),
+          stderr: '',
+        }
+      }
+      return {
+        code: 1,
+        stdout: JSON.stringify({
+          state: 'database_ahead',
+          database_revision: 'future',
+          bundled_head: 'p011_upgrade',
+        }),
+        stderr: '',
+      }
+    },
+  })
+
+  await expect(harness.supervisor.start()).rejects.toThrow(/不会降级/)
+  expect(harness.supervisor.getStatus().phase).toBe('failed')
+  expect(harness.supervisor.getStatus().stage).toBe('migrate')
+  expect(harness.spawnCalls).toHaveLength(0)
+  expect(harness.supervisor.getStatus().failure?.message).toContain('future')
   cleanupHarness()
 })
 

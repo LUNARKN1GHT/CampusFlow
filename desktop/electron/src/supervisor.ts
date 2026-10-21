@@ -145,6 +145,8 @@ export class Supervisor extends EventEmitter {
   private startPromise: Promise<void> | null = null
   private stopPromise: Promise<void> | null = null
   private stopping = false
+  /** 维护操作（导入／升级）暂停 API 与 Worker，此时子进程退出属预期。 */
+  private maintenance = false
   private failing = false
   private stubFailureConsumed = false
   private pgManaged = false
@@ -201,8 +203,66 @@ export class Supervisor extends EventEmitter {
     return this.start()
   }
 
+  /**
+   * 导出／导入／升级前暂停 API 与 Worker，PostgreSQL 保持运行。
+   * 暂停期间子进程退出不进重启计数；操作失败由 `resumeServices` 恢复。
+   */
+  async suspendServices(): Promise<void> {
+    if (this.maintenance) return
+    this.maintenance = true
+    this.logger.info('维护模式：暂停 API 与 Worker')
+    this.setStatus({
+      phase: 'stopping',
+      stage: 'idle',
+      message: '正在暂停服务以执行数据维护…',
+      port: this.port,
+    })
+    await this.stopService('worker')
+    await this.stopService('api')
+  }
+
+  /** 维护操作失败后原地恢复服务；成功路径由调用方重启应用。 */
+  async resumeServices(): Promise<void> {
+    if (!this.maintenance) return
+    this.maintenance = false
+    this.logger.info('维护操作未完成：恢复 API 与 Worker')
+    try {
+      await this.startApi()
+      await this.startWorker()
+      this.setStatus({
+        phase: 'ready',
+        stage: 'ready',
+        message: READY_MESSAGE,
+        port: this.port,
+      })
+    } catch (error) {
+      const message = describeError(error)
+      await this.stopChildren()
+      const failure = this.buildFailure(this.currentStage, message)
+      this.setStatus({
+        phase: 'failed',
+        stage: this.currentStage,
+        message: `${STAGE_LABELS[this.currentStage]}恢复失败：${message}`,
+        failure,
+        port: this.port,
+      })
+      this.logger.error(`恢复服务失败：${message}`)
+    }
+  }
+
+  /** 维护命令（export／import／upgrade）复用 sidecar 与 bootstrap 的连接信息。 */
+  runMaintenance(subcommand: string, extra: string[], timeoutMs: number): Promise<RunResult> {
+    const command = this.sidecarCommand(subcommand, extra)
+    return this.deps.run(command.command, command.args, {
+      cwd: command.cwd,
+      env: this.maintenanceEnv(),
+      timeoutMs,
+    })
+  }
+
   async stop(): Promise<void> {
     if (this.stopPromise) return this.stopPromise
+    this.maintenance = false
     this.stopping = true
     this.setStatus({ phase: 'stopping', message: '正在停止服务，请稍候…' })
     this.stopPromise = (async () => {
@@ -237,6 +297,8 @@ export class Supervisor extends EventEmitter {
       if (this.config.bootstrap) {
         // P007：sidecar 负责建库、迁移与凭据，Electron 不再自行 initdb／migrate。
         await this.stage('bootstrap', () => this.runBootstrapStage())
+        // P011：新版本安装包可能带有更靠后的迁移头，启动前先备份并升级，绝不降级。
+        await this.stage('migrate', () => this.runUpgradeStage())
       } else {
         await this.stage('postgres', () => this.startPostgres())
         await this.stage('migrate', () => this.runMigrate())
@@ -348,14 +410,32 @@ export class Supervisor extends EventEmitter {
     env.CAMPUSFLOW_DEPLOYMENT_MODE = 'desktop'
     env.CAMPUSFLOW_LOG_DIR = this.config.logDir
     if (this.config.pgBin) env.CAMPUSFLOW_PG_BIN = this.config.pgBin
-    if (!env.CAMPUSFLOW_MIGRATIONS_DIR) {
-      // 打包 sidecar 会自行从解包目录发现迁移；源码运行回退到仓库 backend/migrations。
-      const repositoryMigrations = path.join(this.config.backendDir, 'migrations')
-      if (existsSync(repositoryMigrations)) {
-        env.CAMPUSFLOW_MIGRATIONS_DIR = repositoryMigrations
-      }
-    }
+    this.applyMigrationsDir(env)
     return env
+  }
+
+  /**
+   * 维护命令只需要数据库连接（bootstrap 生成的超级用户连接串）与 pg 工具，
+   * 不传本机登录凭据，也不传 API 端口。
+   */
+  private maintenanceEnv(): NodeJS.ProcessEnv {
+    const env = this.childEnv()
+    delete env.CAMPUSFLOW_API_PORT
+    delete env.CAMPUSFLOW_LOCAL_USERNAME
+    delete env.CAMPUSFLOW_LOCAL_PASSWORD
+    if (this.bootstrapDatabaseUrl) env.CAMPUSFLOW_DATABASE_URL = this.bootstrapDatabaseUrl
+    if (this.config.pgBin) env.CAMPUSFLOW_PG_BIN = this.config.pgBin
+    this.applyMigrationsDir(env)
+    return env
+  }
+
+  /** 打包 sidecar 会自行从解包目录发现迁移；源码运行回退到仓库 backend/migrations。 */
+  private applyMigrationsDir(env: NodeJS.ProcessEnv): void {
+    if (env.CAMPUSFLOW_MIGRATIONS_DIR) return
+    const repositoryMigrations = path.join(this.config.backendDir, 'migrations')
+    if (existsSync(repositoryMigrations)) {
+      env.CAMPUSFLOW_MIGRATIONS_DIR = repositoryMigrations
+    }
   }
 
   /** API／Worker 的环境：bootstrap 生成的连接串与本机凭据只进入这两个子进程。 */
@@ -645,8 +725,45 @@ export class Supervisor extends EventEmitter {
     return database?.ok === true ? 'ready' : 'pending'
   }
 
-  private async runMigrate(): Promise<void> {
+  /**
+   * P011 启动闸门：新安装包可能携带比本机数据库更新的迁移头。
+   * 需要升级时先备份再迁移；数据库比安装包新时拒绝启动，不降级。
+   */
+  private async runUpgradeStage(): Promise<void> {
     if (this.config.stub) {
+      this.logger.info('测试桩：跳过数据库升级检查')
+      return
+    }
+    const result = await this.runMaintenance(
+      'upgrade',
+      ['--check', '--apply', '--json'],
+      600_000,
+    )
+    const payload = parseJsonObject(result.stdout)
+    const state = typeof payload?.state === 'string' ? payload.state : ''
+    const current = typeof payload?.database_revision === 'string' ? payload.database_revision : ''
+    const head = typeof payload?.bundled_head === 'string' ? payload.bundled_head : ''
+    if (state === 'database_ahead') {
+      throw new Error(
+        `本机数据库由更新版本的 CampusFlow 创建（结构 ${current || '未知'}，` +
+          `内置 ${head || '未知'}）；本版本不会降级数据库，请安装新版本`,
+      )
+    }
+    if (result.code !== 0 || !payload) {
+      const hint = this.missingSidecarHint(result)
+      throw new Error(
+        `数据库升级失败（退出码 ${result.code}）${hint ? `；${hint}` : ''}`,
+      )
+    }
+    if (payload.action === 'upgraded' || payload.action === 'created_schema') {
+      const backup = typeof payload.backup === 'string' ? `，升级前备份 ${payload.backup}` : ''
+      this.logger.info(`数据库结构已升级：${current || '空'} -> ${head}${backup}`)
+      return
+    }
+    this.logger.info('数据库结构已是最新，无需升级')
+  }
+
+  private async runMigrate(): Promise<void> {    if (this.config.stub) {
       this.logger.info('测试桩：跳过真实数据库迁移')
       return
     }
@@ -786,7 +903,13 @@ export class Supervisor extends EventEmitter {
       if (current?.child !== child) return
       this.managed.delete(name)
       const detail = code !== null ? `退出码 ${code}` : `信号 ${signal ?? '未知'}`
-      if (this.stopping || this.failing || this.status.phase === 'stopping' || this.status.phase === 'failed') {
+      if (
+        this.stopping ||
+        this.maintenance ||
+        this.failing ||
+        this.status.phase === 'stopping' ||
+        this.status.phase === 'failed'
+      ) {
         this.logger.info(`${name} 已退出（${detail}）`)
         return
       }

@@ -5,6 +5,14 @@ import { loadConfig } from './config'
 import { attemptAutoLogin, autoLoginNoticeMessage, buildAutoLoginNoticeScript } from './auto-login'
 import { writeDiagnostics } from './diagnostics'
 import { Logger } from './logger'
+import {
+  checkAndApplyUpgrade,
+  exportArchive,
+  importArchive,
+  resolveDefaultArchivePath,
+  type DialogPort,
+  type MaintenanceContext,
+} from './maintenance'
 import { installSecurity, isAllowedExternalUrl } from './security'
 import { Supervisor } from './supervisor'
 import type { RuntimeConfig, SupervisorStatus } from './types'
@@ -28,6 +36,7 @@ let quitting = false
 let shutdownPromise: Promise<void> | null = null
 let autoLoginSettled = false
 let autoLoginRunning = false
+let maintenanceRunning = false
 
 function getAppOrigin(): string | null {
   const port = supervisor?.getPort() ?? config?.apiPort ?? 0
@@ -368,6 +377,75 @@ async function saveDiagnostics(): Promise<void> {
   }
 }
 
+function relaunchApp(): void {
+  logger?.info('维护操作完成：重启应用')
+  app.relaunch()
+  void shutdown().finally(() => app.exit(0))
+}
+
+function maintenanceContext(): MaintenanceContext | null {
+  if (!config || !logger || !supervisor) return null
+  const parent = (): BrowserWindow | undefined =>
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined
+  const dialogs: DialogPort = {
+    showSaveDialog: (options) => {
+      const target = parent()
+      return target ? dialog.showSaveDialog(target, options) : dialog.showSaveDialog(options)
+    },
+    showOpenDialog: (options) => {
+      const target = parent()
+      return target ? dialog.showOpenDialog(target, options) : dialog.showOpenDialog(options)
+    },
+    showMessageBox: (options) => {
+      const target = parent()
+      return target ? dialog.showMessageBox(target, options) : dialog.showMessageBox(options)
+    },
+  }
+  const active = supervisor
+  return {
+    dialogs,
+    logger,
+    run: (subcommand, extra, timeoutMs) => active.runMaintenance(subcommand, extra, timeoutMs),
+    suspendServices: () => active.suspendServices(),
+    resumeServices: () => active.resumeServices(),
+    relaunch: relaunchApp,
+    defaultArchivePath: () => resolveDefaultArchivePath(app.getPath('documents')),
+  }
+}
+
+/** 数据维护只在服务就绪时开放，且同一时间只允许一个操作。 */
+async function runMaintenance(
+  action: (context: MaintenanceContext) => Promise<unknown>,
+): Promise<void> {
+  if (maintenanceRunning) return
+  if (!supervisor || supervisor.getStatus().phase !== 'ready') {
+    await dialog.showMessageBox({
+      type: 'info',
+      message: '服务尚未就绪',
+      detail: '请等待启动完成后再执行导出、导入或升级。',
+      buttons: ['知道了'],
+    })
+    return
+  }
+  const context = maintenanceContext()
+  if (!context) return
+  maintenanceRunning = true
+  try {
+    await action(context)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logger?.error(`维护操作异常：${message}`)
+    await dialog.showMessageBox({
+      type: 'error',
+      message: '维护操作未完成',
+      detail: message,
+      buttons: ['知道了'],
+    })
+  } finally {
+    maintenanceRunning = false
+  }
+}
+
 function buildMenu(): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
@@ -378,6 +456,24 @@ function buildMenu(): void {
         { label: '保存诊断信息', click: () => void saveDiagnostics() },
         { type: 'separator' },
         { label: '退出', role: 'quit' },
+      ],
+    },
+    {
+      label: '数据',
+      submenu: [
+        {
+          label: '导出数据归档…',
+          click: () => void runMaintenance((context) => exportArchive(context)),
+        },
+        {
+          label: '从归档导入…',
+          click: () => void runMaintenance((context) => importArchive(context)),
+        },
+        { type: 'separator' },
+        {
+          label: '检查数据库升级…',
+          click: () => void runMaintenance((context) => checkAndApplyUpgrade(context)),
+        },
       ],
     },
     {
