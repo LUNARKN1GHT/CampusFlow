@@ -76,6 +76,22 @@ sidecar 启动顺序：先 `upgrade_if_needed(settings)`，再 `check_schema_or_
 验证：`cd desktop/electron && npm test` 40 passed，其中覆盖启动即拒绝降级、需要升级时
 暂停/恢复与重启路径。真实安装器跨版本升级（旧版本导出 → 新版本安装包启动）仍未验证。
 
+打包应用实跑（2026-10-21）：先用打包应用的数据库启动到 head，再用 backend 虚拟环境
+`alembic downgrade -1` 把 `alembic_version` 回退到 `c007_merge_c003`（并删除 K 系列表），
+随后用同一打包应用重启。日志显示：
+
+```text
+阶段开始：migrate
+数据库结构已升级：c007_merge_c003 -> k001_external_calendar，
+  升级前备份 /private/tmp/cf-clean/data/backups/pre-upgrade-20261021T125428Z
+阶段完成：migrate → api → worker → ready；自动登录成功
+```
+
+备份目录含 `database.dump`（181307 字节，SHA-256 `4b02d095…b5717d`）与 `manifest.json`
+（`kind=pre-upgrade`、`database_revision=c007_merge_c003`、`app_schema_head=k001_external_calendar`、
+连接串口令显示为 `***`）；升级后健康检查 200，SIGTERM 后无残留进程。仍未验证的是
+**安装包替换**（旧版本应用 → 新版本 DMG 安装）而非同一份应用重复启动。
+
 ## 保留策略
 
 升级前备份目录名以 `pre-upgrade-` 开头且含 `manifest.json` 才算候选；按目录名（UTC 时间戳）倒序保留最新 `CAMPUSFLOW_BACKUP_RETENTION_COUNT` 份，并强制保留本次用于恢复的备份。清理只在迁移与校验全部成功后执行；失败路径不删除任何旧备份，恢复所用备份也不会被删除。
