@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
@@ -346,6 +347,7 @@ def test_desktop_modules_do_not_import_redis_or_rq(tmp_path) -> None:
     environment = os.environ.copy()
     environment["CAMPUSFLOW_DEPLOYMENT_MODE"] = "desktop"
     environment["CAMPUSFLOW_DATABASE_URL"] = TEST_DATABASE_URL
+    environment["CAMPUSFLOW_DATA_DIR"] = str(tmp_path / "data")
     environment["CAMPUSFLOW_STORAGE_DIR"] = str(tmp_path / "materials")
 
     result = subprocess.run(
@@ -386,10 +388,9 @@ def test_server_mode_still_selects_rq_queue(client: TestClient, monkeypatch) -> 
 
 
 def test_unknown_deployment_mode_is_rejected(client: TestClient) -> None:
-    settings = Settings(
-        _env_file=None,
-        database_url=TEST_DATABASE_URL,
-        deployment_mode="unknown",
-    )
-    with pytest.raises(ValueError, match="server 或 desktop"):
-        build_job_queue(settings)
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            database_url=TEST_DATABASE_URL,
+            deployment_mode="unknown",
+        )
