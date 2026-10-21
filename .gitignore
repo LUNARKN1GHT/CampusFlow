@@ -27,3 +27,8 @@ data/
 *.log
 .DS_Store
 .idea/
+
+# Desktop bundled runtime, build cache and smoke scratch output
+desktop/vendor/
+desktop/.scratch/
+desktop/postgres/.scratch/
