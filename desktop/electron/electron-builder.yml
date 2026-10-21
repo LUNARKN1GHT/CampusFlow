@@ -11,7 +11,7 @@ files:
   - dist/**/*
   - package.json
 extraResources:
-  - from: ../../desktop/dist/sidecar
+  - from: ../../desktop/dist/campusflow-sidecar
     to: sidecar
   - from: ../../desktop/vendor/postgres
     to: postgres

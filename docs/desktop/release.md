@@ -14,7 +14,7 @@
 
 | 产物 | 生产者 | 预期位置 |
 | --- | --- | --- |
-| PyInstaller one-folder sidecar | P002a（macOS）／P002b（Windows） | `desktop/dist/sidecar/` |
+| PyInstaller one-folder sidecar | P002a（macOS）／P002b（Windows） | `desktop/dist/campusflow-sidecar/` |
 | 内置 PostgreSQL 17 + pgvector | P003a（macOS）／P003b（Windows） | `desktop/vendor/postgres/` |
 | 前端构建产物 | `frontend/npm run build` | `frontend/dist/` |
 | Electron 外壳 | P008 | `desktop/electron/dist/` |
