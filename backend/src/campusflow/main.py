@@ -29,6 +29,7 @@ from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api import version_relations as version_relations_api
 from campusflow.api.health import router as health_router
+from campusflow.api.static_spa import install_static_spa
 from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.jobs import (
     RecoveryResult,
@@ -193,6 +194,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             prefix="/api/v1",
             dependencies=[Depends(auth_api.require_session)],
         )
+
+    # 桌面模式最后挂载 SPA 回退路由，保证先匹配真实 API 与文档路由。
+    install_static_spa(app, settings)
 
     # 领域异常统一映射：不存在 404、状态冲突 409、其余业务拒绝 400，
     # 只回传领域层写好的中文说明，不暴露异常类型、SQL 或外部响应细节。
