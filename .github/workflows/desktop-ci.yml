@@ -57,3 +57,34 @@ jobs:
 
       - name: Test
         run: xvfb-run -a npm test
+
+  electron-windows:
+    name: Electron tests (Windows)
+    # electron.spec.ts 使用 /bin/sh 伪造 sidecar，只能在 POSIX 运行；
+    # 这里覆盖与平台无关的进程监管、维护流程与配置解析。
+    runs-on: windows-2022
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: desktop/electron
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/electron/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build and run platform-neutral specs
+        run: |
+          npm run build
+          npx playwright test tests/config.spec.ts tests/maintenance.spec.ts tests/supervisor.spec.ts
