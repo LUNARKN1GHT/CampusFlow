@@ -661,7 +661,7 @@ export class Supervisor extends EventEmitter {
     }
     if (retryDetail) {
       await this.handleServiceExit(name, `重启失败：${retryDetail}`)
-    } else if (restarted) {
+    } else if (restarted && !this.stopping) {
       this.setStatus({ phase: 'ready', stage: 'ready', message: READY_MESSAGE })
       this.scheduleRestartReset(name)
     }
