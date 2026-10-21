@@ -93,7 +93,7 @@ jobs:
             Contents/Resources/pgsql/share/extension/vector.control \
             Contents/Resources/pgsql/lib/vector.dylib \
             Contents/Resources/static/index.html \
-            Contents/THIRD-PARTY-NOTICES.md; do
+            Contents/Resources/THIRD-PARTY-NOTICES.md; do
             if [ ! -e "$app/$relative" ]; then
               echo "missing from DMG: $relative" >&2
               exit 1
