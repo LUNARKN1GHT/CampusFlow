@@ -27,6 +27,7 @@ import os
 import secrets
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -455,7 +456,7 @@ def initialize(settings: Settings, *, secret_store: SecretStore | None = None) -
         raise BootstrapError(f"初始化失败：{message}{hint}", log_dir=log_dir) from exc
 
     try:
-        work.rename(root)
+        _rename_directory(work, root)
     except OSError as exc:
         log_dir = _preserve_failure(work, root, cluster, socket_path if socket_outside else None)
         _discard_secrets(installed_store)
@@ -665,6 +666,18 @@ def _create_work_directory(parent: Path, prefix: str) -> Path:
             os.chmod(candidate, 0o700)
         return candidate
     raise BootstrapError("无法创建临时工作目录，请检查数据目录是否可写")
+
+
+def _rename_directory(source: Path, target: Path, *, attempts: int = 10) -> None:
+    """Windows 上子进程句柄释放略滞后，目录重命名被短暂拒绝时重试。"""
+    for attempt in range(attempts):
+        try:
+            source.rename(target)
+            return
+        except PermissionError:
+            if attempt + 1 == attempts:
+                raise
+            time.sleep(0.1 * (attempt + 1))
 
 
 def _create_layout(paths: DataPaths) -> None:
