@@ -234,6 +234,24 @@ ditto /tmp/cf-dmg2/CampusFlow.app /tmp/cf-install/CampusFlow.app   # 模拟拖�
 执行同一用例：首次导入步骤等待 120 s 超时，随后两次重跑均通过（14.0 s、15.5 s），未见
 可复现的功能错误；x64 首启的 Rosetta 冷启动耗时仍可能接近超时阈值，未定位根因。
 
+## 安装到 ~/Applications 并经 LaunchServices 启动（arm64）
+
+2026-10-21 用同一 arm64 DMG 把 `.app` 安装到用户级 `~/Applications`（安装前不存在同名应用），
+经 `open -n --env …` 由 LaunchServices 启动，数据目录与日志目录指向临时路径：
+
+```text
+启动顺序：bootstrap → API → Worker（首启初始化由 sidecar 负责）
+首启初始化完成：迁移头 k001_external_calendar，凭据后端 macos-keychain
+状态：phase=ready stage=ready 全部服务已就绪 → 自动登录成功：campusflow
+GET /api/v1/health → 200
+```
+
+- 打包应用默认使用 macOS 钥匙串（未设置 `CAMPUSFLOW_SECRET_BACKEND`），与 P007 的源码验证一致。
+- `osascript -e 'tell application "CampusFlow" to quit'` 后按 Worker → API → PostgreSQL 回收，
+  日志显示“子进程已回收，应用退出”，复查无残留进程。
+- 验证后删除 `~/Applications/CampusFlow.app` 与临时数据目录；未在系统 `/Applications` 安装，
+  也未模拟 Gatekeeper 隔离属性。
+
 ## CI 打包（arm64 与 x64）
 
 `.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与 `macos-15-intel`
@@ -267,5 +285,6 @@ x64:   dmg: CampusFlow-0.1.0-mac-x64.dmg (176M)
 - **Windows**：已由 `desktop-windows-build.yml` 在 windows-2022 构建并校验安装包内容、运行首启测试；未在 Windows 11 实机安装运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。
-- **DMG 安装流程**：已在挂载的 CI DMG 上把 `.app` 复制到临时目录后启动并通过维护流程；
-  未执行拖入 `/Applications`、由 Finder/LaunchServices 首次打开及 Gatekeeper 拦截场景。
+- **DMG 安装流程**：已从挂载的 CI DMG 复制 `.app` 到临时目录执行维护流程，并安装到
+  `~/Applications` 经 LaunchServices 启动；未安装到系统 `/Applications`，未模拟 Gatekeeper
+  隔离属性（quarantine）下的首次打开。
