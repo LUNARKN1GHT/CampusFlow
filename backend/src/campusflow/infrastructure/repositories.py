@@ -1388,6 +1388,25 @@ class SqlAlchemyJobRepository:
         rows = self._session.scalars(query.order_by(ProcessingJob.id).limit(limit))
         return [_job_to_data(row) for row in rows]
 
+    def list_claimable_ids(self, *, limit: int = 100) -> list[int]:
+        """桌面轮询 Worker 的候选作业（P005）：解析/索引且仍未处理的作业。
+
+        处理中（running）由其它 Worker 持有，永久失败也不会自动重试，
+        因此都不在候选内；实际领取仍由 claim 原子完成。
+        """
+        from campusflow.domain.states import JobStage, JobStatus
+
+        rows = self._session.scalars(
+            select(ProcessingJob.id)
+            .where(
+                ProcessingJob.stage.in_([JobStage.PARSE, JobStage.EMBED]),
+                ProcessingJob.status == JobStatus.PENDING,
+            )
+            .order_by(ProcessingJob.id)
+            .limit(limit)
+        )
+        return list(rows)
+
     def set_manifest(self, job_id: int, manifest_id: str) -> ProcessingJobData | None:
         if _row_missing(self._session, ProcessingJob, job_id):
             return None

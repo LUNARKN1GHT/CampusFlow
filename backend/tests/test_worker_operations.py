@@ -42,10 +42,10 @@ def test_real_worker_requires_key(monkeypatch):
 
 def test_real_worker_passes_vision_limits(monkeypatch):
     """Q009：环境变量里的视觉超时/重试配置必须真正传到适配器。"""
-    from campusflow.workers import main as worker_main
+    from campusflow.workers import assembly
 
     parser_class = Mock(return_value=Mock())
-    monkeypatch.setattr(worker_main, "ZhipuVisionParser", parser_class)
+    monkeypatch.setattr(assembly, "ZhipuVisionParser", parser_class)
     settings = Settings(
         _env_file=None,
         database_url=TEST_DATABASE_URL,
