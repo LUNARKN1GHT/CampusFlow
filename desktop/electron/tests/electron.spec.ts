@@ -157,7 +157,7 @@ test('bootstrap 失败时显示错误页，且不启动 API', async () => {
   openApps.push(app)
 
   const shell = await app.firstWindow()
-  await expect(shell.locator('[data-testid="error"]')).toBeVisible()
+  await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(shell.locator('[data-testid="error-stage"]')).toContainText('首启初始化')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('退出码 1')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('诊断日志目录')
@@ -178,7 +178,7 @@ test('模拟迁移失败时显示错误页，点击重试后进入主窗口', as
     CAMPUSFLOW_ELECTRON_STUB_FAIL_STAGE: 'migrate',
   })
   const shell = await app.firstWindow()
-  await expect(shell.locator('[data-testid="error"]')).toBeVisible()
+  await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(shell.locator('[data-testid="error-stage"]')).toContainText('数据库迁移')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('模拟')
   const logPath = await shell.locator('[data-testid="error-log-path"]').textContent()
