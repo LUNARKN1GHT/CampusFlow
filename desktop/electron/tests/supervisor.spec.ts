@@ -265,7 +265,8 @@ test('bootstrap 成功时跳过 initdb，先过升级闸门再按 bootstrap → 
   await harness.supervisor.stop()
   expect(harness.kills).toEqual(['worker', 'api'])
   const stopCall = harness.runCalls.find((call) => call.args.includes('stop'))
-  expect(stopCall?.command).toBe(path.join('/fake/pg', 'pg_ctl'))
+  const pgCtlName = process.platform === 'win32' ? 'pg_ctl.exe' : 'pg_ctl'
+  expect(stopCall?.command).toBe(path.join('/fake/pg', pgCtlName))
   expect(stopCall?.args).toEqual([
     '-D',
     harness.config.pgDataDir,
