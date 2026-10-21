@@ -104,6 +104,7 @@ Run first launch and maintenance flow            1 passed (33.7 s)
   PostgreSQL 都指向安装目录内的 `resources`，不依赖仓库构建目录。
 - 应用退出后等待主进程结束，再检查 `CampusFlow`、`campusflow-sidecar` 与
   `postgres` 进程，均无残留（`Verify no leftover processes after exit` 通过）。
+- 未显式指定凭据后端时，用例断言首启日志为 `凭据后端 windows-dpapi`，防止静默回退到文件存储。
 - 同一运行的 Python bootstrap 测试 13 passed、3 skipped；PostgreSQL/pgvector/sidecar
   冒烟全部通过。
 
