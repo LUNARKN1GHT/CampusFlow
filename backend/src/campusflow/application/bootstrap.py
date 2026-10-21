@@ -380,7 +380,7 @@ def initialize(settings: Settings, *, secret_store: SecretStore | None = None) -
         except OSError as exc:
             raise BootstrapError("数据目录已存在且非空，拒绝覆盖") from exc
 
-    work = Path(tempfile.mkdtemp(prefix=f"{root.name}.init-", dir=root.parent))
+    work = _create_work_directory(root.parent, f"{root.name}.init-")
     work_paths = DataPaths.under(work)
     _create_layout(work_paths)
 
@@ -651,6 +651,20 @@ def _cluster_running(settings: Settings, current: BootstrapState) -> bool:
         log_file=current.paths.postgres_log,
     )
     return cluster.is_running()
+
+
+def _create_work_directory(parent: Path, prefix: str) -> Path:
+    """不使用 mkdtemp：Windows 上它按 0o700 生成受限 ACL，initdb 子进程无法进入。"""
+    for _ in range(100):
+        candidate = parent / f"{prefix}{secrets.token_hex(6)}"
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        if os.name != "nt":
+            os.chmod(candidate, 0o700)
+        return candidate
+    raise BootstrapError("无法创建临时工作目录，请检查数据目录是否可写")
 
 
 def _create_layout(paths: DataPaths) -> None:
