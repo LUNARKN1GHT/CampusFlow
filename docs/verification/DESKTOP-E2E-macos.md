@@ -19,6 +19,7 @@ Resources/sidecar/campusflow-sidecar        98 MB
 Resources/pgsql/                            22 MB（PostgreSQL 17.11 + vector.dylib）
 Resources/static/                          436 KB（SPA）
 Resources/THIRD-PARTY-NOTICES.md
+Resources/icon.icns                        2.3 MB（应用图标，2026-10-21 加入）
 ```
 
 ## 启动配置与阶段

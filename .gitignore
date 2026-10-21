@@ -27,6 +27,9 @@ desktop/.build-venv/
 desktop/build/
 desktop/dist/
 
+# electron-builder buildResources（图标、签名 entitlements）属于源码，必须提交
+!desktop/electron/build/
+
 # Runtime data and local tools
 data/
 *.log

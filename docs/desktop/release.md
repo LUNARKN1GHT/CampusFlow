@@ -39,11 +39,14 @@ npx electron-builder --mac --arm64 --publish never   # 或 --x64
 
 ## 签名与公证
 
+安装包资源位于 `desktop/electron/build/`：`icon.png`（1024×1024，macOS 圆角网格，
+electron-builder 会为 DMG 与 NSIS 生成对应图标）与 `entitlements.mac.plist`。
+
 macOS：
 
 - `MACOS_CSC_LINK`（Developer ID Application 证书的 base64 p12）与 `MACOS_CSC_KEY_PASSWORD`。
 - `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID` 用于 notarization 与 staple。
-- hardened runtime 由 `desktop/electron/build/entitlements.mac.plist` 启用；授予 JIT、可执行内存与库验证豁免，因为随包 sidecar／PostgreSQL 不是同一签名主体。
+- hardened runtime 由 `desktop/electron/build/entitlements.mac.plist` 启用；授予 JIT、可执行内存与库验证豁免，因为随包 sidecar／PostgreSQL 不是同一签名主体。该文件随仓库保存，启用签名前应先用 `plutil -lint` 校验。
 
 Windows：
 
