@@ -159,6 +159,7 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
         // 已经退出的应用再次关闭会抛错，忽略即可。
       }
     }
-    rmSync(root, { recursive: true, force: true })
+    // Windows 上 PostgreSQL 句柄释放略滞后，清理时重试避免 EBUSY 掩盖真实结果。
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
   }
 })
