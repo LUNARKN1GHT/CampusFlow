@@ -35,6 +35,11 @@ installer: desktop\electron\release\CampusFlow-0.1.0-win-x64.exe (184.6 MB)
 ```
 
 - 校验步骤断言 `sidecar.exe`、`vendor\pgsql\bin\postgres.exe` 与 `release\*.exe` 均存在。
+- 安装包内容：用 7-Zip 解开 NSIS 与内层 `app-64.7z`，断言 `resources` 下含
+  `sidecar\campusflow-sidecar.exe`、`pgsql\bin\postgres.exe`、
+  `pgsql\share\extension\vector.control`、`static\index.html` 与
+  `THIRD-PARTY-NOTICES.md`，运行 [39652545642](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39652545642)
+  输出 `installer contents verified: 5 resources`。
 - 产物：artifact `desktop-windows-x64-ci`（签名未配置，184.6 MB 未签名 NSIS）。
 
 ### 运行时冒烟（`desktop/postgres/smoke_windows.ps1`）
