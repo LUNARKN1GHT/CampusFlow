@@ -18,7 +18,22 @@ from campusflow.workers.assembly import build_parser_registry, configure_worker
 from campusflow.workers.safe_worker import SafeWorker
 
 # 保留旧导入路径（测试与外部脚本从 workers.main 取注册表构造函数）。
-__all__ = ["build_parser_registry", "main"]
+__all__ = ["build_parser_registry", "main", "run_server_worker"]
+
+
+def run_server_worker(settings: Settings, *, burst: bool = False, demo: bool = False) -> None:
+    """服务端 RQ 消费循环；由 `python -m` 入口与 sidecar 共用。"""
+    # 启动顺序：先注入模型与解析器装配，再连通 Redis，最后开始消费；
+    # 解析器或连接配置不成立时直接退出，不进入消费循环。
+    configure_worker(settings, demo=demo)
+    connection = redis.Redis.from_url(
+        settings.redis_url, socket_connect_timeout=3, socket_timeout=5
+    )
+    connection.ping()
+    # 同时消费解析与索引队列，按列表顺序取任务；burst 模式清空当前队列后退出。
+    SafeWorker(
+        [QUEUE_NAME, INDEX_QUEUE_NAME], connection=connection, log_job_description=False
+    ).work(burst=burst)
 
 
 def main() -> None:
@@ -35,18 +50,7 @@ def main() -> None:
             "此 Worker 需要 Linux；Windows 请按 docs/MATERIAL_PROCESSING.md 使用 Docker"
         )
     try:
-        settings = Settings()
-        # 启动顺序：先注入模型与解析器装配，再连通 Redis，最后开始消费；
-        # 解析器或连接配置不成立时直接退出，不进入消费循环。
-        configure_worker(settings, demo=args.demo)
-        connection = redis.Redis.from_url(
-            settings.redis_url, socket_connect_timeout=3, socket_timeout=5
-        )
-        connection.ping()
-        # 同时消费解析与索引队列，按列表顺序取任务；burst 模式清空当前队列后退出。
-        SafeWorker(
-            [QUEUE_NAME, INDEX_QUEUE_NAME], connection=connection, log_job_description=False
-        ).work(burst=args.burst)
+        run_server_worker(Settings(), burst=args.burst, demo=args.demo)
     except ValueError:
         # 仅上面的受控配置校验信息；不输出连接对象或 Settings。
         raise SystemExit("Worker 配置无效，请运行诊断命令检查模型、测试库与连接设置") from None

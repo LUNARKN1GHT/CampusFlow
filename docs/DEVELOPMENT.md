@@ -142,6 +142,56 @@ uv run --locked alembic downgrade -1                       # 回退一步
 
 当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 已接入：纯领域测试不触发数据库，测试库名必须以 `_test` 结尾。
 
+## 桌面 sidecar 命令（P006）
+
+桌面版与手工运维共用同一个入口 `campusflow-sidecar`（`backend/pyproject.toml` 的
+`[project.scripts]`，实现在 `campusflow/sidecar/`）。它只做进程装配、本地文件操作与
+诊断，不承载业务规则；`uv sync --locked` 后即可使用：
+
+```bash
+cd backend
+uv run --locked campusflow-sidecar doctor --json          # 只读诊断
+uv run --locked campusflow-sidecar migrate                # 升级到 head（可重复执行）
+uv run --locked campusflow-sidecar serve --port 8000      # 默认只绑定 127.0.0.1
+uv run --locked campusflow-sidecar worker --burst         # 按部署模式选择 Worker
+uv run --locked campusflow-sidecar backup --output ~/campusflow-backup.tar
+uv run --locked campusflow-sidecar restore ~/campusflow-backup.tar --replace
+```
+
+- 退出码：`0` 成功，`1` 运行失败（数据库不可达、归档损坏、缺 `pg_dump` 等），`2` 参数使用错误。
+- 日志：每个事件一行 JSON 写 stderr，含 `timestamp`／`level`／`command`／`event`；`--log-file` 可同时追加到文件。连接串口令、`?password=` 参数和密钥类字段在写出前一律替换为 `***`，诊断输出只报告"模型密钥是否已配置"。
+- `worker --mode auto` 跟随 `CAMPUSFLOW_DEPLOYMENT_MODE`：`desktop` 用数据库轮询（不需要 Redis），`server` 用 RQ（Windows 不支持）；两种模式复用 `workers.assembly` 的解析器与向量装配，命令层不重复作业逻辑。
+- `serve` 收到 SIGINT／SIGTERM 后完成在途请求再退出，并以 `0` 结束；端口与主机只做校验，不做自动切换。
+
+### 备份归档与恢复语义
+
+`backup` 生成一个未压缩 tar（pg_dump 自定义格式自带压缩），成员固定为
+`manifest.json`、`database.dump`（`pg_dump -Fc --no-owner --no-privileges`）和
+`storage/…`（私有存储目录原样副本）。manifest 字段：`archive_format_version`（当前 1）、
+`created_at`、`database_url`（口令为 `***`）、`database`、`alembic_head`、
+`alembic_current`、`storage_file_count`、`pg_dump_version`。找不到 `pg_dump`／`pg_restore`
+时先报告缺失并用 `CAMPUSFLOW_PG_BIN` 指定 bin 目录，不会静默跳过数据库。
+
+`restore` 的行为是确定的，按顺序执行：
+
+1. 先读 manifest 校验格式版本与 `database.dump` 是否存在，不支持的版本直接拒绝。
+2. 目标库已有任何 `public` 表即为"非空"；非空且未加 `--replace` 时退出码 1，且不改动任何数据。
+3. 加 `--replace` 时先写一份安全备份（默认 `campusflow-safety-<时间>.tar` 放在归档同目录，可用 `--safety-backup` 指定），备份失败则不再继续。
+4. 数据库恢复：`--strategy auto`（默认）在非空库上先建临时库 `*_restore_<时间戳>` 恢复，成功后再把旧库改名、临时库改成目标名，失败时原库保持可用；角色没有建库权限、或目标库仍有连接时退回 `--strategy direct`，即直接 `pg_restore --clean --if-exists`。**直接模式不是事务性的**：中途失败可能留下只恢复了一部分的库，此时以第 3 步的安全备份为准重建。
+5. 已存在的扩展（如 `vector`）会从恢复清单中跳过并保留目标库中的原扩展：扩展的创建与删除需要超级用户，普通业务角色无法执行。空库首次迁移同样需要先用超级用户执行 `CREATE EXTENSION vector`，否则 `migrate` 会给出对应提示。
+6. 资料存储：`--replace` 时把现有目录改名为 `<目录>.pre-restore-<时间>` 留档后再换入归档内容；不加 `--replace`（即空库恢复）时只写入归档内文件，不删除现有文件。
+
+命令前请停止 API 与 Worker，避免备份到写入中的状态或在恢复时占用目标库连接。
+
+`doctor` 的检查项为 `database`（连通）、`vector_extension`（版本）、`migrations`（current 与 head 是否一致）、`storage_dir`／`data_dir`（存在且可写，实际写探针）、`pg_tools`（`pg_dump`、`pg_restore`）、`model_key`（只报告布尔值）与 `log_dir`。关键项失败时退出码 1；`model_key` 和 `log_dir` 只作为提示，不阻止启动。`doctor --json` 的 `checks`、`failed`、`critical_failed`、`warnings` 可直接供 Electron 展示。
+
+专项测试（使用临时数据库，名称以 `_test` 结尾；本机需要可执行 `CREATE DATABASE` 的管理员连接，否则相关用例跳过）：
+
+```bash
+cd backend
+uv run --locked pytest tests/test_sidecar_cli.py -q
+```
+
 ## 验证
 
 后端，在 `backend/` 下执行：
