@@ -102,6 +102,10 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
     } catch (error) {
       throw new Error(`${(error as Error).message}\n--- app stderr ---\n${stderr.join('').slice(-4000)}`)
     }
+    // 未显式指定后端时，Windows 必须使用 DPAPI；回退到文件说明凭据保护失效。
+    if (process.platform === 'win32' && !process.env.CAMPUSFLOW_SECRET_BACKEND) {
+      expect(readFileSync(mainLog, 'utf8')).toContain('凭据后端 windows-dpapi')
+    }
 
     // 原生对话框在自动化里不可操作：替换为脚本结果，其余流程与真实菜单一致。
     await app.evaluate(({ dialog, app: electronApp }, config) => {
