@@ -70,6 +70,13 @@ uv run --locked python -m campusflow.workers.main
 Windows 原生 Python 不支持当前 RQ Worker 的 Linux 进程方式，应使用上述 Docker 命令。
 `--burst` 表示处理完当时的队列就退出；日常常驻运行不要加这个参数。
 
+桌面部署不安装 Redis：设置 `CAMPUSFLOW_DEPLOYMENT_MODE=desktop` 后，从 `backend/`
+执行 `uv run --locked python -m campusflow.workers.desktop`。Worker 直接轮询
+PostgreSQL 中待处理的解析与索引作业，Windows 原生可运行；空闲时每
+`--poll-interval` 秒（默认 2）检查一次，`--burst` 处理完当前作业后退出。
+启动时会执行一次与 API 相同的恢复扫描，崩溃遗留的处理中作业按超时回收后重跑。
+服务端部署仍使用上面的 RQ Worker，行为不变。
+
 Worker 同时监听 `campusflow-parse` 与 `campusflow-index`。解析成功后只在数据库里
 生成一个待处理索引作业，**不会直接写 Redis**（outbox 语义）；由 API 的恢复扫描在
 最长一个扫描周期内投递。相关开关在 `backend/.env` 中配置：
