@@ -22,6 +22,11 @@ build/
 playwright-report/
 test-results/
 
+# Desktop sidecar build (P002a): 构建 venv、PyInstaller 中间产物与产物不提交
+desktop/.build-venv/
+desktop/build/
+desktop/dist/
+
 # Runtime data and local tools
 data/
 *.log
