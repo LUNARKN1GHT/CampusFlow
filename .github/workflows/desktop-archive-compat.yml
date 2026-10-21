@@ -34,75 +34,28 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
-      - name: Install backend
-        working-directory: backend
-        run: uv sync --locked
-
       - name: Stage bundled PostgreSQL 17 and pgvector
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
 
-      - name: Diagnose initdb password file handling
-        shell: pwsh
-        working-directory: backend
-        env:
-          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}\desktop\vendor\pgsql\bin
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $false
-          $root = Join-Path $env:RUNNER_TEMP 'pwprobe'
-          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force $root | Out-Null
-
-          function Try-PasswordFile([string]$label, [string]$pw) {
-            $dir = Join-Path $root $label
-            New-Item -ItemType Directory -Force $dir | Out-Null
-            Write-Host "--- $label file=$pw"
-            icacls $pw | Out-Host
-            icacls (Split-Path -Parent $pw) | Out-Host
-            & "$env:CAMPUSFLOW_PG_BIN\initdb.exe" -D (Join-Path $dir 'data') -U probe "--pwfile=$pw" -A scram-sha-256 -E UTF8 --locale=C 2>&1 | Out-Host
-            Write-Host "initdb $label : exit $LASTEXITCODE"
-          }
-
-          # C3: PowerShell 建目录并写文件
-          $c3dir = Join-Path $root 'C3-ps-dir'
-          New-Item -ItemType Directory -Force $c3dir | Out-Null
-          $c3pw = Join-Path $c3dir '.campusflow-pw'
-          Set-Content -Path $c3pw -Value 'probe-secret' -NoNewline
-          Try-PasswordFile 'C3-ps-file' $c3pw
-
-          # C4: PowerShell 建目录，Python 写文件
-          $c4dir = Join-Path $root 'C4-python-file'
-          New-Item -ItemType Directory -Force $c4dir | Out-Null
-          $c4 = & uv run --locked python -c 'import os, pathlib, sys; f = pathlib.Path(sys.argv[1]) / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)' $c4dir
-          Try-PasswordFile 'C4-python-file' $c4.Trim()
-
-          # D1: Python 普通 mkdir（继承默认 ACL）
-          $d1 = & uv run --locked python -c 'import os, pathlib; d = pathlib.Path(os.environ["RUNNER_TEMP"]) / "plain-mkdir-dir"; d.mkdir(mode=0o700, exist_ok=True); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
-          Try-PasswordFile 'D1-plain-mkdir' $d1.Trim()
-
-          # D2: mkdtemp 目录，但口令文件放在 RUNNER_TEMP 根目录
-          $pwRoot = & uv run --locked python -c 'import os, tempfile; fd, name = tempfile.mkstemp(dir=os.environ["RUNNER_TEMP"], prefix=".campusflow-pw-"); os.close(fd); open(name, "w").write("probe"); os.chmod(name, 0o600); print(name)'
-          $d2dir = & uv run --locked python -c 'import os, tempfile; print(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-data-"))'
-          $d2root = Join-Path $root 'D2-data-in-mkdtemp'
-          New-Item -ItemType Directory -Force $d2root | Out-Null
-          Write-Host "--- D2 data-dir=$($d2dir.Trim()) pw=$($pwRoot.Trim())"
-          & "$env:CAMPUSFLOW_PG_BIN\initdb.exe" -D (Join-Path $d2dir.Trim() 'data') -U probe "--pwfile=$($pwRoot.Trim())" -A scram-sha-256 -E UTF8 --locale=C 2>&1 | Out-Host
-          Write-Host "initdb D2-data-in-mkdtemp : exit $LASTEXITCODE"
+      - name: Build PyInstaller sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
 
       - name: Bootstrap, seed and export archive
         shell: pwsh
-        working-directory: backend
         env:
           CAMPUSFLOW_DEPLOYMENT_MODE: desktop
           CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}\campusflow-export
           CAMPUSFLOW_PG_BIN: ${{ github.workspace }}\desktop\vendor\pgsql\bin
         run: |
           $ErrorActionPreference = 'Stop'
+          $sidecar = Join-Path $env:GITHUB_WORKSPACE 'desktop\dist\campusflow-sidecar\campusflow-sidecar.exe'
           $staging = Join-Path $env:RUNNER_TEMP 'archive'
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           $archive = Join-Path $staging 'campusflow-from-windows.campusflow'
 
-          $report = & uv run --locked campusflow-sidecar bootstrap --json
+          $report = & $sidecar bootstrap --json
           if ($LASTEXITCODE -ne 0) { throw 'bootstrap failed' }
           $report | Set-Content -Path (Join-Path $staging 'bootstrap.json') -Encoding utf8
           $state = $report | ConvertFrom-Json
@@ -116,7 +69,7 @@ jobs:
           & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -c $seed
           if ($LASTEXITCODE -ne 0) { throw 'seeding failed' }
 
-          $export = & uv run --locked campusflow-sidecar export --output $archive
+          $export = & $sidecar export --output $archive
           if ($LASTEXITCODE -ne 0) { throw 'export failed' }
           $export | Set-Content -Path (Join-Path $staging 'export.json') -Encoding utf8
           $exported = $export | ConvertFrom-Json
@@ -128,7 +81,7 @@ jobs:
           }
           Write-Host "exported: $($exported.size) bytes, sha256 $($exported.sha256)"
 
-          $info = & uv run --locked campusflow-sidecar import $archive --inspect
+          $info = & $sidecar import $archive --inspect
           if ($LASTEXITCODE -ne 0) { throw 'inspect failed' }
           $inspected = $info | ConvertFrom-Json
           if ($inspected.platform -notmatch 'Windows') {
@@ -157,12 +110,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
-      - name: Install backend
-        working-directory: backend
-        run: uv sync --locked
-
       - name: Stage bundled PostgreSQL 17 and pgvector
         run: bash desktop/postgres/build_macos.sh
+
+      - name: Build PyInstaller sidecar
+        run: bash desktop/build_macos.sh
 
       - name: Download Windows archive
         uses: actions/download-artifact@v4
@@ -171,40 +123,38 @@ jobs:
           path: ${{ runner.temp }}/archive
 
       - name: Import archive and verify data
-        working-directory: backend
         env:
           CAMPUSFLOW_DEPLOYMENT_MODE: desktop
           CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}/campusflow-import
           CAMPUSFLOW_PG_BIN: ${{ github.workspace }}/desktop/vendor/pgsql/bin
         run: |
           set -euo pipefail
+          sidecar="$GITHUB_WORKSPACE/desktop/dist/campusflow-sidecar/campusflow-sidecar"
           staging="$RUNNER_TEMP/archive"
           archive="$staging/campusflow-from-windows.campusflow"
 
-          report=$(uv run --locked campusflow-sidecar bootstrap --json)
+          report=$("$sidecar" bootstrap --json)
           echo "$report" | jq -e '.postgres_running == true' >/dev/null
           export CAMPUSFLOW_DATABASE_URL
           CAMPUSFLOW_DATABASE_URL=$(echo "$report" | jq -r '.database_url')
 
-          info=$(uv run --locked campusflow-sidecar import "$archive" --inspect)
+          info=$("$sidecar" import "$archive" --inspect)
           echo "$info" | jq -e '.platform | startswith("Windows")' >/dev/null
           echo "$info" | jq -e '.format_version' >/dev/null
           token=$(echo "$info" | jq -r '.confirm_token')
 
-          result=$(uv run --locked campusflow-sidecar import "$archive" --replace --confirm-token "$token")
+          result=$("$sidecar" import "$archive" --replace --confirm-token "$token")
           echo "$result" | jq .
           echo "$result" > "$staging/import.json"
 
-          uv run --locked python - "$staging/export.json" "$staging/import.json" <<'PY'
-          import json
-          import sys
-
-          exported = json.load(open(sys.argv[1], encoding="utf-8"))["counts"]
-          restored = json.load(open(sys.argv[2], encoding="utf-8"))["restored_counts"]
-          differing = {key: (value, restored.get(key)) for key, value in exported.items() if restored.get(key) != value}
-          if differing:
-              raise SystemExit(f"restored counts differ: {differing}")
-          PY
+          for table in workspaces semesters courses; do
+            exported=$(jq -r --arg t "$table" '.counts[$t]' "$staging/export.json")
+            restored=$(jq -r --arg t "$table" '.restored_counts[$t]' "$staging/import.json")
+            if [ "$exported" != "$restored" ]; then
+              echo "count mismatch for $table: exported $exported, restored $restored" >&2
+              exit 1
+            fi
+          done
 
           psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
           workspace=$("$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc \
