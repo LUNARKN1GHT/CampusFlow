@@ -39,6 +39,18 @@ async function waitForLog(file: string, needle: string, timeoutMs = 150_000): Pr
   throw new Error(`等待日志超时：${needle}\n--- ${file} ---\n${tail}`)
 }
 
+async function waitForExit(app: ElectronApplication, timeoutMs = 30_000): Promise<void> {
+  const process = app.process()
+  if (process.exitCode !== null) return
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs)
+    process.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+}
+
 async function messages(app: ElectronApplication): Promise<DialogMessage[]> {
   return app.evaluate(() => ((globalThis as Record<string, unknown>).__cfMessages ?? []) as [])
 }
@@ -158,6 +170,7 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
       const scope = globalThis as Record<string, unknown>
       ;(scope.__cfExit as (code: number) => void)(0)
     })
+    await waitForExit(app)
   } finally {
     if (app) {
       try {
@@ -166,7 +179,11 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
         // 已经退出的应用再次关闭会抛错，忽略即可。
       }
     }
-    // Windows 上 PostgreSQL 句柄释放略滞后，清理时重试避免 EBUSY 掩盖真实结果。
-    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    try {
+      // Windows 上 PostgreSQL 句柄释放略滞后，清理重试更久；失败不改变用例结论。
+      rmSync(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    } catch (error) {
+      console.warn(`临时目录清理失败：${(error as Error).message}`)
+    }
   }
 })
