@@ -179,6 +179,17 @@ test('bootstrap 失败时显示错误页，且不启动 API', async () => {
     const logPath = path.join(userData, 'logs', 'main.log')
     console.log('electron stderr:', Buffer.concat(stderr).toString())
     console.log('main.log:', existsSync(logPath) ? readFileSync(logPath, 'utf8') : '(missing)')
+    try {
+      const windows = await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map((window) => ({
+          url: window.webContents.getURL(),
+          destroyed: window.isDestroyed(),
+        })),
+      )
+      console.log('browser windows:', JSON.stringify(windows))
+    } catch (probeError) {
+      console.log('browser windows probe failed:', String(probeError))
+    }
     throw error
   }
   await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
