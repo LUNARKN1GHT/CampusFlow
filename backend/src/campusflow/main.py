@@ -28,6 +28,7 @@ from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api import version_relations as version_relations_api
+from campusflow.api.desktop_security import install_desktop_security
 from campusflow.api.health import router as health_router
 from campusflow.api.static_spa import install_static_spa
 from campusflow.application.dispatch import dispatch_pending_jobs
@@ -194,6 +195,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             prefix="/api/v1",
             dependencies=[Depends(auth_api.require_session)],
         )
+
+    # 桌面模式先安装本机防护中间件：Host／Origin 校验与安全响应头在路由之前生效，
+    # 静态 SPA 回退的响应也会经过它；服务端模式不安装，行为保持不变。
+    install_desktop_security(app, settings)
 
     # 桌面模式最后挂载 SPA 回退路由，保证先匹配真实 API 与文档路由。
     install_static_spa(app, settings)

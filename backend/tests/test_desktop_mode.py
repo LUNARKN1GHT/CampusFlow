@@ -63,7 +63,10 @@ def test_server_mode_keeps_existing_defaults(tmp_path: Path) -> None:
 def test_desktop_spa_serves_index_and_history_routes(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
     _write_dist(dist)
-    client = TestClient(create_app(_desktop_settings(tmp_path, static_dir=str(dist))))
+    client = TestClient(
+        create_app(_desktop_settings(tmp_path, static_dir=str(dist))),
+        base_url="http://127.0.0.1",
+    )
 
     for path in ("/", "/login?expired=1", "/review/changes"):
         response = client.get(path)
@@ -80,7 +83,10 @@ def test_desktop_spa_serves_index_and_history_routes(tmp_path: Path) -> None:
 def test_desktop_spa_serves_hashed_assets_and_missing_asset_is_404(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
     _write_dist(dist)
-    client = TestClient(create_app(_desktop_settings(tmp_path, static_dir=str(dist))))
+    client = TestClient(
+        create_app(_desktop_settings(tmp_path, static_dir=str(dist))),
+        base_url="http://127.0.0.1",
+    )
 
     asset = client.get("/assets/index-abc123.js")
     assert asset.status_code == 200
@@ -106,7 +112,10 @@ def test_desktop_spa_serves_hashed_assets_and_missing_asset_is_404(tmp_path: Pat
 def test_desktop_spa_never_swallows_api_paths(tmp_path: Path) -> None:
     dist = tmp_path / "dist"
     _write_dist(dist)
-    client = TestClient(create_app(_desktop_settings(tmp_path, static_dir=str(dist))))
+    client = TestClient(
+        create_app(_desktop_settings(tmp_path, static_dir=str(dist))),
+        base_url="http://127.0.0.1",
+    )
 
     unknown = client.get("/api/v1/no-such-route")
     assert unknown.status_code == 404
@@ -142,7 +151,7 @@ def test_server_mode_does_not_mount_spa_even_with_static_dir(tmp_path: Path) -> 
 
 
 def test_desktop_mode_without_static_dir_serves_api_only(tmp_path: Path) -> None:
-    client = TestClient(create_app(_desktop_settings(tmp_path)))
+    client = TestClient(create_app(_desktop_settings(tmp_path)), base_url="http://127.0.0.1")
     assert client.get("/").status_code == 404
     assert client.get("/api/v1/health").status_code == 200
 
