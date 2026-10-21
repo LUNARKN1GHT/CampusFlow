@@ -9,7 +9,6 @@ import os
 import uuid
 from pathlib import Path
 
-import pymupdf
 import redis
 from campusflow.application.ports.parsers import (
     ParseFailure,
@@ -29,6 +28,7 @@ from campusflow.infrastructure.parsers.table_aware import TableAwareParser
 from campusflow.infrastructure.parsers.text import TextDocumentParser
 from campusflow.infrastructure.queue.rq_queue import QUEUE_NAME
 from campusflow.workers.safe_worker import SafeWorker
+from pdf_fixtures import make_png, make_text_pdf
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
@@ -67,15 +67,11 @@ def main():
         if args.directory is None:
             parser.error("fixtures 需要 --directory")
         args.directory.mkdir(parents=True, exist_ok=True)
-        with pymupdf.open() as image:
-            page = image.new_page(width=300, height=200)
-            page.insert_text((25, 40), "M2 synthetic image " + uuid.uuid4().hex[:8])
-            png = page.get_pixmap().tobytes("png")
-            (args.directory / "m2-image.png").write_bytes(png)
-        with pymupdf.open() as pdf:
-            pdf.new_page().insert_text((72, 72), "M2 text page one")
-            pdf.new_page().insert_text((72, 72), "M2 text page two")
-            (args.directory / "m2-text.pdf").write_bytes(pdf.tobytes())
+        png = make_png("M2 synthetic image " + uuid.uuid4().hex[:8], 300, 200)
+        (args.directory / "m2-image.png").write_bytes(png)
+        (args.directory / "m2-text.pdf").write_bytes(
+            make_text_pdf(["M2 text page one", "M2 text page two"])
+        )
         return
     if not os.environ.get("CAMPUSFLOW_DATABASE_URL") or not os.environ.get(
         "CAMPUSFLOW_REDIS_URL"

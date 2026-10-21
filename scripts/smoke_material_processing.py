@@ -11,11 +11,11 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import pymupdf
 import redis
 from campusflow.core.config import Settings
 from campusflow.main import create_app
 from fastapi.testclient import TestClient
+from pdf_fixtures import make_mixed_pdf, make_png
 from rq import Queue
 from sqlalchemy.engine import make_url
 
@@ -63,14 +63,8 @@ def main() -> None:
             assert response.status_code == 201
             assert len(response.json()["chunks"]) == 2
 
-            with pymupdf.open() as image_document:
-                image_page = image_document.new_page(width=200, height=100)
-                image_page.insert_text((15, 40), "synthetic image " + label[:8])
-                png = image_page.get_pixmap().tobytes("png")
-            with pymupdf.open() as pdf:
-                pdf.new_page().insert_text((72, 72), "synthetic PDF " + label)
-                pdf.new_page().insert_image(pymupdf.Rect(20, 20, 220, 120), stream=png)
-                pdf_bytes = pdf.tobytes()
+            png = make_png("synthetic image " + label[:8], 200, 100)
+            pdf_bytes = make_mixed_pdf("synthetic PDF " + label)
 
             uploads = []
             for filename, content in (("sample.pdf", pdf_bytes), ("sample.png", png)):
