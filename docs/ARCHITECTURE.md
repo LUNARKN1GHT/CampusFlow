@@ -264,3 +264,9 @@ Q003 的 `domain/chunking.py` 只做可复现的原文切片，`application/retr
 ## Q009 模型超时、重试与失败降级
 
 模型调用分两层控制：适配器负责单次请求的等待上限与有限内部重试，作业层只根据异常是否可重试决定是否重投。`TransientError` 表示服务抖动（408／429／5xx／网络／超时），`PermanentError` 表示请求被拒绝或来源不可用；新增的 `ModelOutputError` 进一步标记「模型有响应但内容不可用」。`domain/model_failures.py` 把异常转换为「服务不可用／请求被拒绝／输出无效」三类固定用户文案，未预期异常也按服务不可用处理，确保失败时不会返回可能被误认为答案的内容。视觉识别的超时、重试次数和退避由 `CAMPUSFLOW_VISION_*` 配置，永久错误不重试；扫描 PDF 的单页失败只标记该页。问答接口与页面展示、资料不足判定分别留 Q011、Q012，见 [Q009 说明](verification/Q009-model-resilience.md)。
+
+## 桌面分发（DESKTOP）
+
+同一套后端支持 `server` 与 `desktop` 两种部署模式，`/api/v1` 契约与业务逻辑不变。桌面模式使用绝对数据目录（`CAMPUSFLOW_DATA_DIR`），由 FastAPI 同源托管构建后的 SPA（`CAMPUSFLOW_STATIC_DIR`）：history 路由回退 `index.html`，缺失静态资源保持 404，`/api` 不参与回退。队列装配为数据库轮询（`DBJobQueue` + `workers/desktop.py`），不安装 Redis／RQ，领取仍复用数据库幂等 `claim`。迁移目录按显式配置、PyInstaller `_MEIPASS`、安装包数据、仓库目录的顺序解析。
+
+打包路线为 PyInstaller one-folder sidecar、内置 PostgreSQL 17 + pgvector、Electron 外壳与 `.campusflow` 全量迁移包；PyMuPDF 已由 pypdfium2 替换以避开 AGPL。服务端 Docker／RQ 运行方式保持不变。当前 P001（许可与 PDF 渲染）、P004（部署模式）、P005（数据库 Worker）已接入，打包、安装器与跨平台验收仍在推进。证据见 [P001a](verification/DESKTOP-P001a-license-audit.md)、[P001b](verification/DESKTOP-P001b-pdf-render.md)、[P004](verification/DESKTOP-P004-desktop-mode.md) 与 [P005](verification/DESKTOP-P005-db-worker.md)。
