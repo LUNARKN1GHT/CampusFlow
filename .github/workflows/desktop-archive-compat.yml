@@ -76,9 +76,18 @@ jobs:
           $c4 = & uv run --locked python -c 'import os, pathlib, sys; f = pathlib.Path(sys.argv[1]) / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)' $c4dir
           Try-PasswordFile 'C4-python-file' $c4.Trim()
 
-          # C5: Python mkdtemp 目录，展示目录 ACL
-          $c5 = & uv run --locked python -c 'import os, pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
-          Try-PasswordFile 'C5-mkdtemp' $c5.Trim()
+          # D1: Python 普通 mkdir（继承默认 ACL）
+          $d1 = & uv run --locked python -c 'import os, pathlib; d = pathlib.Path(os.environ["RUNNER_TEMP"]) / "plain-mkdir-dir"; d.mkdir(mode=0o700, exist_ok=True); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
+          Try-PasswordFile 'D1-plain-mkdir' $d1.Trim()
+
+          # D2: mkdtemp 目录，但口令文件放在 RUNNER_TEMP 根目录
+          $pwRoot = & uv run --locked python -c 'import os, tempfile; fd, name = tempfile.mkstemp(dir=os.environ["RUNNER_TEMP"], prefix=".campusflow-pw-"); os.close(fd); open(name, "w").write("probe"); os.chmod(name, 0o600); print(name)'
+          $d2dir = & uv run --locked python -c 'import os, tempfile; print(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-data-"))'
+          $d2root = Join-Path $root 'D2-data-in-mkdtemp'
+          New-Item -ItemType Directory -Force $d2root | Out-Null
+          Write-Host "--- D2 data-dir=$($d2dir.Trim()) pw=$($pwRoot.Trim())"
+          & "$env:CAMPUSFLOW_PG_BIN\initdb.exe" -D (Join-Path $d2dir.Trim() 'data') -U probe "--pwfile=$($pwRoot.Trim())" -A scram-sha-256 -E UTF8 --locale=C 2>&1 | Out-Host
+          Write-Host "initdb D2-data-in-mkdtemp : exit $LASTEXITCODE"
 
       - name: Bootstrap, seed and export archive
         shell: pwsh
