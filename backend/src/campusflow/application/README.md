@@ -7,6 +7,7 @@
 - `courses.py`：学期与课程的增改查、归档
 - `tasks.py`：任务增改查与执行进度流转
 - `schedule.py`：固定日程与可用时间的增改查删
+- `transfer/`：`.campusflow` 全量迁移包的导出、检查与导入（P010），数据库与归档细节经端口注入，装配入口在 `infrastructure/transfer`
 
 `ports/repositories.py` 定义仓储协议、数据传输对象（DTO）与事务控制接口，具体实现位于 `infrastructure/repositories.py`，由 API 依赖注入装配。
 
