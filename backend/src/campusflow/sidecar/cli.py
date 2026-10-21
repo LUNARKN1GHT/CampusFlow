@@ -1,8 +1,11 @@
-"""`campusflow-sidecar` 命令入口：serve／worker／migrate／backup／restore／doctor。
+"""`campusflow-sidecar` 命令入口：serve／worker／migrate／backup／restore／doctor／
+bootstrap／export／import／upgrade。
 
 约定：0 成功，1 运行失败，2 参数使用错误。每个事件都写成一行 JSON 送到 stderr
 （可选同时写 `--log-file`），stdout 只放命令结果，便于 Electron 直接读取与展示。
-所有输出在写出前统一脱敏，不打印口令、密钥或连接串原文。
+所有输出在写出前统一脱敏，不打印口令、密钥或连接串原文；唯一例外是
+`bootstrap --json`：Electron 自动登录需要本地口令与连接串，只出现在这一次的
+stdout 上，不进入 stderr、日志文件或 state.json。
 """
 
 from __future__ import annotations
@@ -11,16 +14,20 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from campusflow.core.config import Settings
 from campusflow.sidecar.backup import run_backup, run_restore
+from campusflow.sidecar.bootstrap import run_bootstrap
 from campusflow.sidecar.doctor import run_doctor
 from campusflow.sidecar.errors import SidecarError, UsageError
 from campusflow.sidecar.logs import EventLogger, build_log_file, scrub_text
 from campusflow.sidecar.migrate import run_migrate
 from campusflow.sidecar.serve import DEFAULT_HOST, DEFAULT_PORT, run_serve
+from campusflow.sidecar.transfer import inspect_archive_payload, run_export, run_import
+from campusflow.sidecar.upgrade import apply_upgrade, check_upgrade, describe
 from campusflow.sidecar.worker import (
     DEFAULT_BATCH_SIZE,
     DEFAULT_POLL_INTERVAL_SECONDS,
@@ -109,6 +116,50 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = subcommands.add_parser("doctor", parents=[common], help="只读诊断运行环境")
     doctor.add_argument("--json", action="store_true", help="以 JSON 输出诊断结果")
+
+    bootstrap = subcommands.add_parser(
+        "bootstrap", parents=[common], help="桌面模式首启初始化与就绪（仅 desktop）"
+    )
+    bootstrap.add_argument("--json", action="store_true", help="输出含连接信息的 JSON")
+    bootstrap.add_argument(
+        "--check",
+        action="store_true",
+        help="只读检查数据目录状态：不初始化、不迁移、不启动 PostgreSQL",
+    )
+
+    export = subcommands.add_parser(
+        "export", parents=[common], help="导出整库与资料为 .campusflow 归档"
+    )
+    export.add_argument("--output", required=True, help="归档输出路径（.campusflow）")
+    export.add_argument(
+        "--workspace-id",
+        type=int,
+        help="首版只支持整库导出；传入该参数会被明确拒绝",
+    )
+
+    imports = subcommands.add_parser(
+        "import", parents=[common], help="从 .campusflow 归档导入（需确认令牌）"
+    )
+    imports.add_argument("archive", help="inspect 或导出的归档路径")
+    imports.add_argument("--inspect", action="store_true", help="只读检查归档，不修改数据")
+    imports.add_argument(
+        "--replace", action="store_true", help="目标库已有数据时整体替换（须同时给令牌）"
+    )
+    imports.add_argument(
+        "--confirm-token",
+        help="import --inspect 返回的 confirm_token；只接受命令行参数，不读环境变量",
+    )
+
+    upgrade = subcommands.add_parser(
+        "upgrade", parents=[common], help="按 P011 备份后升级数据库结构（不降级）"
+    )
+    upgrade.add_argument("--check", action="store_true", help="只读检查升级状态，不写库")
+    upgrade.add_argument(
+        "--apply",
+        action="store_true",
+        help="配合 --check：需要升级时执行正式升级（先备份再迁移）",
+    )
+    upgrade.add_argument("--json", action="store_true", help="以 JSON 输出结果")
     return parser
 
 
@@ -131,6 +182,20 @@ def _secrets(settings: Settings) -> list[str | None]:
 def _emit(text: str, settings: Settings) -> None:
     """stdout 统一出口：写之前再脱敏一次，避免任何调用路径意外带出密钥。"""
     print(scrub_text(text, _secrets(settings)))
+
+
+def _emit_payload(payload: dict[str, Any], settings: Settings) -> None:
+    """JSON 输出：只替换模型密钥原文，不做 URL 级脱敏。
+
+    `bootstrap --json` 必须把本地口令与含口令的连接串交给 Electron 自动登录，
+    因此这里保留连接信息；这是它唯一允许出现口令的出口（只写 stdout）。
+    其它命令的 payload 本来就不含口令，兜底替换模型密钥仍然生效。
+    """
+    text = json.dumps(payload, ensure_ascii=False, default=str)
+    for secret in _secrets(settings):
+        if secret and len(secret) >= 4:
+            text = text.replace(secret, "***")
+    print(text)
 
 
 def _format_revisions(revisions: list[str]) -> str:
@@ -227,6 +292,76 @@ def _handle_doctor(args: argparse.Namespace, settings: Settings, logger: EventLo
     return EXIT_OK if report["ok"] else EXIT_FAILURE
 
 
+def _bootstrap_summary(payload: dict[str, Any], *, check: bool) -> str:
+    """非 JSON 输出：短中文状态，绝不打印本地口令或连接串。"""
+    data_dir = payload["data_dir"]
+    head = payload["schema_head"] or "未迁移"
+    if check:
+        if payload["initialized"]:
+            phrase = "PostgreSQL 正在运行" if payload["postgres_running"] else "PostgreSQL 未运行"
+            running = f"，{phrase}"
+            lines = [f"数据目录已初始化：{data_dir}（迁移头 {head}{running}）"]
+        else:
+            lines = [
+                f"数据目录未就绪：{payload['status']}（{data_dir}）；"
+                "运行 bootstrap 完成初始化并启动数据库"
+            ]
+    else:
+        started = "，本次已启动 PostgreSQL" if payload["started_postgres"] else ""
+        lines = [f"桌面数据目录已就绪：{data_dir}（迁移头 {head}{started}）"]
+    if payload["warnings"]:
+        lines.append("提示：" + "；".join(payload["warnings"]))
+    return "\n".join(lines)
+
+
+def _handle_bootstrap(args: argparse.Namespace, settings: Settings, logger: EventLogger) -> int:
+    payload = run_bootstrap(settings, logger, check=args.check)
+    if args.json:
+        _emit_payload(payload, settings)
+    else:
+        _emit(_bootstrap_summary(payload, check=args.check), settings)
+    if args.check:
+        # `--check` 只证明数据目录可用（initialized）；是否真的能连库由随后的运行确认。
+        return EXIT_OK if payload["initialized"] else EXIT_FAILURE
+    return EXIT_OK
+
+
+def _handle_export(args: argparse.Namespace, settings: Settings, logger: EventLogger) -> int:
+    payload = run_export(settings, logger, args.output, workspace_id=args.workspace_id)
+    _emit_payload(payload, settings)
+    return EXIT_OK
+
+
+def _handle_import(args: argparse.Namespace, settings: Settings, logger: EventLogger) -> int:
+    if args.inspect:
+        if args.confirm_token or args.replace:
+            raise UsageError("--inspect 只读检查归档，不能与 --replace 或 --confirm-token 同时使用")
+        payload = inspect_archive_payload(settings, args.archive)
+    else:
+        payload = run_import(
+            settings,
+            logger,
+            args.archive,
+            replace=args.replace,
+            confirm_token=args.confirm_token,
+        )
+    _emit_payload(payload, settings)
+    return EXIT_OK
+
+
+def _handle_upgrade(args: argparse.Namespace, settings: Settings, logger: EventLogger) -> int:
+    if args.check:
+        payload, exit_code = check_upgrade(settings, logger, apply=args.apply)
+    else:
+        payload = apply_upgrade(settings, logger)
+        exit_code = EXIT_OK
+    if args.json:
+        _emit_payload(payload, settings)
+    else:
+        _emit(describe(payload), settings)
+    return exit_code
+
+
 _HANDLERS = {
     "serve": _handle_serve,
     "worker": _handle_worker,
@@ -234,6 +369,10 @@ _HANDLERS = {
     "backup": _handle_backup,
     "restore": _handle_restore,
     "doctor": _handle_doctor,
+    "bootstrap": _handle_bootstrap,
+    "export": _handle_export,
+    "import": _handle_import,
+    "upgrade": _handle_upgrade,
 }
 
 

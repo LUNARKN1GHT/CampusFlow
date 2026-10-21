@@ -15,6 +15,7 @@ from sqlalchemy import text
 
 from campusflow.core.config import Settings
 from campusflow.sidecar.backup import find_pg_tool
+from campusflow.sidecar.bootstrap import state_summary
 from campusflow.sidecar.dbtools import (
     connect,
     database_name,
@@ -127,6 +128,10 @@ def collect_report(settings: Settings, *, log_dir: str | Path | None = None) -> 
         checks["data_dir"] = {"ok": True, "critical": False, "status": "not_configured"}
     else:
         checks["data_dir"] = _check_directory(data_dir, critical=True)
+
+    # 桌面模式补充首启状态（P007）：只读检查，不初始化、不启动数据库。
+    if settings.deployment_mode == "desktop" and data_dir is not None:
+        checks["bootstrap"] = state_summary(settings)
 
     if log_dir is not None:
         checks["log_dir"] = _check_directory(Path(log_dir).expanduser(), critical=False)
