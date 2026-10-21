@@ -28,6 +28,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_test"
     )
     redis_url: str = "redis://127.0.0.1:6379/0"
+    # P005：部署模式。desktop 使用数据库轮询 Worker，不装配 Redis/RQ。
+    deployment_mode: str = "server"
     # 原文件私有存储根目录（相对后端工作目录；不进 Git，不对外公开）
     storage_dir: str = "data/materials"
     # 上传限制（D003）：可通过环境变量覆盖
