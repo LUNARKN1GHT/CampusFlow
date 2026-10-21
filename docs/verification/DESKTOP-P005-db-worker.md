@@ -14,7 +14,7 @@
 ## 验证证据
 
 - 后端全量（合并后，独立测试库）：`1583 passed, 6 skipped`。
-- `backend/tests/test_desktop_worker.py`：8 passed，覆盖无 Redis 上传→解析→索引闭环、重复投递／双 Worker 只执行一次、解析与索引重启恢复、可领取查询语义、桌面模块导入隔离（`redis`/`rq` 不在 `sys.modules`）、服务端仍选择 RQ、未知模式被拒绝。
+- `backend/tests/test_desktop_worker.py`：10 passed，覆盖无 Redis 上传→解析→索引闭环（图片、PDF、DOCX）、重复投递／双 Worker 只执行一次、解析与索引重启恢复、可领取查询语义、桌面模块导入隔离（`redis`/`rq` 不在 `sys.modules`）、服务端仍选择 RQ、未知模式被拒绝。
 - `uv run ruff check .`：`All checks passed!`。
 - 手工 `--burst`（隔离测试库，预置 1 个 pending 索引作业）：
 
