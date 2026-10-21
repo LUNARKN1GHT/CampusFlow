@@ -308,6 +308,8 @@ def desktop_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("CAMPUSFLOW_DATA_DIR", str(root))
     monkeypatch.setenv("CAMPUSFLOW_SECRET_BACKEND", "file")
     monkeypatch.setenv("CAMPUSFLOW_PG_BIN", str(binaries.bindir))
+    # 用户名显式固定，避免受开发者 .env 的 CAMPUSFLOW_LOCAL_USERNAME 影响。
+    monkeypatch.setenv("CAMPUSFLOW_LOCAL_USERNAME", "campusflow")
     for name in (
         "CAMPUSFLOW_DATABASE_URL",
         "CAMPUSFLOW_STORAGE_DIR",
