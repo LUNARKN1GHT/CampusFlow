@@ -63,10 +63,17 @@ jobs:
 
           $env:CAMPUSFLOW_DATABASE_URL = $state.database_url
           $psqlUrl = $state.database_url -replace 'postgresql\+psycopg://', 'postgresql://'
-          $seed = 'INSERT INTO workspaces (name, timezone) VALUES (''desktop-transfer-check'', ''Asia/Shanghai'');' +
-                  'INSERT INTO semesters (workspace_id, name, start_date, end_date, archived) SELECT id, ''2026 Fall'', DATE ''2026-09-01'', DATE ''2027-01-15'', false FROM workspaces WHERE name = ''desktop-transfer-check'';' +
-                  'INSERT INTO courses (workspace_id, semester_id, name, code) SELECT w.id, s.id, ''Cross-OS Course'', ''CF101'' FROM workspaces w JOIN semesters s ON s.workspace_id = w.id WHERE w.name = ''desktop-transfer-check'' AND s.name = ''2026 Fall'';'
-          & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -c $seed
+          $env:PGCLIENTENCODING = 'UTF8'
+          & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 `
+            '--set=ws=desktop-transfer-check' `
+            '--set=sem=2026 Fall' `
+            '--set=course=Cross-OS Course' `
+            '--set=code=CF101' `
+            '--set=material_title=Cross-OS Material' `
+            '--set=chunk_text=提交截止日期为2026年12月20日。' `
+            '--set=task_title=Cross-OS Task' `
+            '--set=candidate_title=Cross-OS Task Requirement' `
+            -f desktop/postgres/seed_archive.sql
           if ($LASTEXITCODE -ne 0) { throw 'seeding failed' }
 
           $export = & $sidecar export --output $archive
@@ -74,7 +81,7 @@ jobs:
           $export | Set-Content -Path (Join-Path $staging 'export.json') -Encoding utf8
           $exported = $export | ConvertFrom-Json
           if (-not (Test-Path $archive)) { throw "archive missing: $archive" }
-          foreach ($table in @('workspaces', 'semesters', 'courses')) {
+          foreach ($table in @('workspaces', 'semesters', 'courses', 'materials', 'material_versions', 'candidates', 'tasks', 'plans', 'time_blocks')) {
             if ($exported.counts.$table -ne 1) {
               throw "expected one $table row in export, got $($exported.counts.$table)"
             }
@@ -147,7 +154,7 @@ jobs:
           echo "$result" | jq .
           echo "$result" > "$staging/import.json"
 
-          for table in workspaces semesters courses; do
+          for table in workspaces semesters courses materials material_versions candidates tasks plans time_blocks; do
             exported=$(jq -r --arg t "$table" '.counts[$t]' "$staging/export.json")
             restored=$(jq -r --arg t "$table" '.restored_counts[$t]' "$staging/import.json")
             if [ "$exported" != "$restored" ]; then
@@ -157,19 +164,35 @@ jobs:
           done
 
           psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
-          workspace=$("$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc \
-            "SELECT name FROM workspaces WHERE name = 'desktop-transfer-check'")
-          course=$("$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc \
-            "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'")
-          if [ "$workspace" != "desktop-transfer-check" ]; then
-            echo "workspace missing after import: '$workspace'" >&2
-            exit 1
-          fi
-          if [ "$course" != "Cross-OS Course" ]; then
-            echo "course missing after import: '$course'" >&2
-            exit 1
-          fi
-          echo "cross-platform archive verified: $workspace / $course"
+          q() {
+            "$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc "$1"
+          }
+          workspace=$(q "SELECT name FROM workspaces WHERE name = 'desktop-transfer-check'")
+          course=$(q "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'")
+          material=$(q "SELECT title FROM materials WHERE title = 'Cross-OS Material'")
+          chunk=$(q "SELECT text FROM source_chunks WHERE text = '提交截止日期为2026年12月20日。'")
+          task=$(q "SELECT title || '|' || progress FROM tasks WHERE title = 'Cross-OS Task'")
+          candidate=$(q "SELECT f.value #>> '{}' FROM extracted_fields f JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'desktop-transfer-check' AND f.name = 'title'")
+          evidence=$(q "SELECT e.quote FROM candidate_field_evidence e JOIN extracted_fields f ON f.id = e.field_id JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'desktop-transfer-check'")
+          block=$(q "SELECT b.title || '|' || b.minutes || '|' || b.locked FROM plan_blocks b JOIN plan_drafts d ON d.id = b.draft_id JOIN workspaces w ON w.id = d.workspace_id WHERE w.name = 'desktop-transfer-check'")
+          citation=$(q "SELECT t.citations->0->>'quote' FROM qa_turns t JOIN qa_conversations q ON q.id = t.conversation_id JOIN workspaces w ON w.id = q.workspace_id WHERE w.name = 'desktop-transfer-check'")
+
+          check() {
+            if [ "$2" != "$3" ]; then
+              echo "$1 mismatch: expected '$3', got '$2'" >&2
+              exit 1
+            fi
+          }
+          check workspace "$workspace" "desktop-transfer-check"
+          check course "$course" "Cross-OS Course"
+          check material "$material" "Cross-OS Material"
+          check chunk "$chunk" "提交截止日期为2026年12月20日。"
+          check task "$task" "Cross-OS Task|in_progress"
+          check candidate "$candidate" "Cross-OS Task Requirement"
+          check evidence "$evidence" "提交截止日期为2026年12月20日。"
+          check plan-block "$block" "Cross-OS Task|90|true"
+          check citation "$citation" "提交截止日期为2026年12月20日。"
+          echo "cross-platform archive verified: $workspace / $course / $task / $block"
 
   macos-export:
     name: macOS export
@@ -209,13 +232,19 @@ jobs:
           psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
 
           "$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 \
-            -c "INSERT INTO workspaces (name, timezone) VALUES ('reverse-transfer-check', 'Asia/Shanghai')" \
-            -c "INSERT INTO semesters (workspace_id, name, start_date, end_date, archived) SELECT id, '2026 Fall', DATE '2026-09-01', DATE '2027-01-15', false FROM workspaces WHERE name = 'reverse-transfer-check'" \
-            -c "INSERT INTO courses (workspace_id, semester_id, name, code) SELECT w.id, s.id, 'Reverse OS Course', 'CF102' FROM workspaces w JOIN semesters s ON s.workspace_id = w.id WHERE w.name = 'reverse-transfer-check'"
+            --set=ws=reverse-transfer-check \
+            --set=sem=2026 Fall \
+            --set=course=Reverse OS Course \
+            --set=code=CF102 \
+            --set=material_title=Reverse OS Material \
+            --set=chunk_text=反向验收：资料中的作业截止为2027年1月10日。 \
+            --set=task_title=Reverse OS Task \
+            --set=candidate_title=Reverse OS Task Requirement \
+            -f desktop/postgres/seed_archive.sql
 
           exported=$("$sidecar" export --output "$archive")
           echo "$exported" > "$staging/export.json"
-          echo "$exported" | jq -e '.counts.workspaces == 1 and .counts.semesters == 1 and .counts.courses == 1' >/dev/null
+          echo "$exported" | jq -e '.counts.workspaces == 1 and .counts.semesters == 1 and .counts.courses == 1 and .counts.materials == 1 and .counts.material_versions == 1 and .counts.candidates == 1 and .counts.tasks == 1 and .counts.plans == 1 and .counts.time_blocks == 1' >/dev/null
           echo "$exported" | jq -e '.size > 0' >/dev/null
 
           info=$("$sidecar" import "$archive" --inspect)
@@ -287,24 +316,42 @@ jobs:
           $result | Set-Content -Path (Join-Path $staging 'import.json') -Encoding utf8
           $restored = $result | ConvertFrom-Json
           $exported = Get-Content (Join-Path $staging 'export.json') -Raw | ConvertFrom-Json
-          foreach ($table in @('workspaces', 'semesters', 'courses')) {
+          foreach ($table in @('workspaces', 'semesters', 'courses', 'materials', 'material_versions', 'candidates', 'tasks', 'plans', 'time_blocks')) {
             if ($exported.counts.$table -ne $restored.restored_counts.$table) {
               throw "count mismatch for ${table}: exported $($exported.counts.$table), restored $($restored.restored_counts.$table)"
             }
           }
 
           $psqlUrl = $state.database_url -replace 'postgresql\+psycopg://', 'postgresql://'
-          $workspace = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc `
-            "SELECT name FROM workspaces WHERE name = 'reverse-transfer-check'"
-          if ($LASTEXITCODE -ne 0) { throw 'workspace query failed' }
-          $course = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc `
-            "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'"
-          if ($LASTEXITCODE -ne 0) { throw 'course query failed' }
-          if ($workspace.Trim() -ne 'reverse-transfer-check') {
-            throw "workspace missing after import: '$workspace'"
+          $env:PGCLIENTENCODING = 'UTF8'
+          function Invoke-Query([string]$sql) {
+            $value = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc $sql
+            if ($LASTEXITCODE -ne 0) { throw "query failed: $sql" }
+            return $value.Trim()
           }
-          if ($course.Trim() -ne 'Reverse OS Course') {
-            throw "course missing after import: '$course'"
+          function Assert-Value([string]$name, [string]$actual, [string]$expected) {
+            if ($actual -ne $expected) {
+              throw "${name} mismatch: expected '$expected', got '$actual'"
+            }
           }
-          Write-Host "reverse cross-platform archive verified: $($workspace.Trim()) / $($course.Trim())"
+          $workspace = Invoke-Query "SELECT name FROM workspaces WHERE name = 'reverse-transfer-check'"
+          $course = Invoke-Query "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'"
+          $material = Invoke-Query "SELECT title FROM materials WHERE title = 'Reverse OS Material'"
+          $chunk = Invoke-Query "SELECT text FROM source_chunks WHERE text = '反向验收：资料中的作业截止为2027年1月10日。'"
+          $task = Invoke-Query "SELECT title || '|' || progress FROM tasks WHERE title = 'Reverse OS Task'"
+          $candidate = Invoke-Query "SELECT f.value #>> '{}' FROM extracted_fields f JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check' AND f.name = 'title'"
+          $evidence = Invoke-Query "SELECT e.quote FROM candidate_field_evidence e JOIN extracted_fields f ON f.id = e.field_id JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check'"
+          $block = Invoke-Query "SELECT b.title || '|' || b.minutes || '|' || b.locked FROM plan_blocks b JOIN plan_drafts d ON d.id = b.draft_id JOIN workspaces w ON w.id = d.workspace_id WHERE w.name = 'reverse-transfer-check'"
+          $citation = Invoke-Query "SELECT t.citations->0->>'quote' FROM qa_turns t JOIN qa_conversations q ON q.id = t.conversation_id JOIN workspaces w ON w.id = q.workspace_id WHERE w.name = 'reverse-transfer-check'"
+
+          Assert-Value workspace $workspace 'reverse-transfer-check'
+          Assert-Value course $course 'Reverse OS Course'
+          Assert-Value material $material 'Reverse OS Material'
+          Assert-Value chunk $chunk '反向验收：资料中的作业截止为2027年1月10日。'
+          Assert-Value task $task 'Reverse OS Task|in_progress'
+          Assert-Value candidate $candidate 'Reverse OS Task Requirement'
+          Assert-Value evidence $evidence '反向验收：资料中的作业截止为2027年1月10日。'
+          Assert-Value plan-block $block 'Reverse OS Task|90|true'
+          Assert-Value citation $citation '反向验收：资料中的作业截止为2027年1月10日。'
+          Write-Host "reverse cross-platform archive verified: $workspace / $course / $task / $block"
 
