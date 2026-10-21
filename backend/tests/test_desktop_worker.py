@@ -4,6 +4,7 @@
 桌面模块不导入 redis/rq、服务端仍选择 RQ 队列。
 """
 
+import io
 import os
 import subprocess
 import sys
@@ -17,6 +18,8 @@ import pytest
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
@@ -28,6 +31,7 @@ from campusflow.infrastructure.db.models import IndexedBlock
 from campusflow.infrastructure.llm.vision import FakeVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.text import TextDocumentParser
+from campusflow.infrastructure.parsers.word import WordDocumentParser
 from campusflow.infrastructure.queue.db_queue import DBJobQueue
 from campusflow.infrastructure.queue.factory import build_job_queue
 from campusflow.infrastructure.repositories import build_repositories
@@ -120,6 +124,7 @@ def worker_assembly():
             text_parser=TextDocumentParser(),
             pdf_parser=PdfDocumentParser(),
             vision_parser=FakeVisionParser(),
+            word_parser=WordDocumentParser(),
         )
     )
     set_embedder_factory(build_demo_embedder)
@@ -134,6 +139,35 @@ def _upload_image(client: TestClient, name: str = "桌面截图.png") -> dict:
     )
     assert response.status_code == 201, response.text
     return response.json()["results"][0]
+
+
+def _text_pdf_bytes(text: str) -> bytes:
+    """生成最小文本 PDF，用于桌面 Worker 的多格式闭环验证。"""
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
+    )
+    content = DecodedStreamObject()
+    escaped = text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+    content.set_data(f"BT /F1 12 Tf 72 720 Td ({escaped}) Tj ET".encode("latin-1"))
+    page[NameObject("/Contents")] = writer._add_object(content)
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
+
+
+DOCX_BYTES = (
+    Path(__file__).parents[2] / "samples/synthetic/n001/word-notice-table.docx"
+).read_bytes()
+PDF_BYTES = _text_pdf_bytes("Homework due 2026-11-01")
 
 
 # ------------------------------------------------------------ 无 Redis 闭环
@@ -176,6 +210,36 @@ def test_upload_parse_and_index_without_redis(
 
     # 没有新作业时 burst 直接退出，不报错
     assert run_desktop_worker(client.app.state.settings, burst=True, poll_interval=0) == 0
+
+
+@pytest.mark.parametrize(
+    ("name", "payload"),
+    [("桌面资料.pdf", PDF_BYTES), ("桌面通知.docx", DOCX_BYTES)],
+)
+def test_pdf_and_docx_parse_without_redis(
+    client: TestClient,
+    desktop_queue: DBJobQueue,
+    shared_storage,
+    name: str,
+    payload: bytes,
+) -> None:
+    """P005 验收：PDF 与 DOCX 在桌面模式下同样由数据库 Worker 完成解析与索引。"""
+    response = client.post("/api/v1/materials/upload", files=[("files", (name, payload))])
+    assert response.status_code == 201, response.text
+    material_id = response.json()["results"][0]["material"]["id"]
+
+    assert run_desktop_worker(client.app.state.settings, burst=True, poll_interval=0) >= 2
+    assert _material_status(material_id) == MaterialStatus.DONE
+
+    with _session() as session:
+        jobs = build_repositories(session).jobs.list_by_material(material_id)
+        embed_jobs = [item for item in jobs if item.stage == JobStage.EMBED]
+        assert len(embed_jobs) == 1
+        version_id = embed_jobs[0].version_id
+    with _session() as session:
+        rows = list(session.query(IndexedBlock).filter(IndexedBlock.version_id == version_id))
+        assert rows
+        assert all(row.state == "done" for row in rows)
 
 
 def test_duplicate_delivery_and_two_workers_run_job_once(client: TestClient) -> None:

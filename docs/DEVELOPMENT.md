@@ -138,6 +138,31 @@ uv run --locked alembic revision --autogenerate -m "说明"   # 按模型变更�
 uv run --locked alembic downgrade -1                       # 回退一步
 ```
 
+### 桌面升级迁移（P011）
+
+桌面启动器在启动 API 前按顺序调用（签名与错误类型见 `application/upgrade.py` 模块文档）：
+
+```python
+from campusflow.application.upgrade import check_schema_or_raise, upgrade_if_needed
+
+upgrade_if_needed(settings)    # 需要升级时先备份，再迁移到安装包内置 head
+check_schema_or_raise(settings)  # 数据库新于应用、仍落后或未初始化时拒绝启动
+```
+
+- 数据库结构比安装包新时拒绝启动，不执行降级；需要安装更新的应用。
+- 需要升级时先写 `<data_dir>/backups/pre-upgrade-<UTC>/`：`database.dump`（pg_dump 自定义归档）、`materials/` 与记录 revision、时间、文件大小和 SHA-256 的 `manifest.json`。迁移或升级后校验失败会自动恢复该备份，备份目录保留供手动导出。
+- `CAMPUSFLOW_PG_BIN` 指定 `pg_dump`／`pg_restore` 目录，未设置时从 `PATH` 查找；口令只通过环境变量传递，不进入命令行、manifest 或日志。
+- `CAMPUSFLOW_BACKUP_RETENTION_COUNT`（默认 5）按份数保留升级备份，仅在升级成功后清理；`CAMPUSFLOW_BACKUP_RETENTION_DAYS` 仍只用于删除界面说明备份残留。
+- 专项测试默认使用后端测试库；设置 `CAMPUSFLOW_P011_TEST_DATABASE_URL` 可改用外部创建的专用 scratch 库：
+
+```bash
+cd backend
+CAMPUSFLOW_P011_TEST_DATABASE_URL=postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow_scratch \
+  uv run --locked pytest tests/test_upgrade.py -q
+```
+
+测试会临时降到旧 revision 并在结束后恢复 head，不要指向有实际数据的数据库。完整证据与未验证项见 [P011 说明](verification/DESKTOP-P011-upgrade.md)。
+
 测试库（`campusflow_test`）的迁移由 pytest 的 `tests/conftest.py` 自动执行，无需手动处理。
 
 当前测试夹具在每个用例前清空相关业务表；只能使用专用测试库，不把 `CAMPUSFLOW_TEST_DATABASE_URL` 指向有实际数据的数据库。T004、T005 已接入：纯领域测试不触发数据库，测试库名必须以 `_test` 结尾。
@@ -299,3 +324,50 @@ Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖
 - 开发服务仅绑定本机地址，当前不用于公网部署。后续共享部署需要认证、访问范围控制与反向代理配置。
 - Swagger UI 使用外部静态资源；离线时 UI 可能无法加载，可直接访问 `/openapi.json` 查看接口描述。
 - 项目代码和项目自有文档采用 [Apache License 2.0](../LICENSE)；第三方材料仍需分别核对并遵循其自身授权条件。
+
+## 桌面模式本地验证
+
+桌面模式不依赖 Redis，使用绝对数据目录、同源静态站点与数据库轮询 Worker。先构建前端，再启动后端：
+
+```bash
+cd frontend && npm run build
+cd ../backend
+CAMPUSFLOW_DEPLOYMENT_MODE=desktop \
+CAMPUSFLOW_DATA_DIR="$HOME/.campusflow-dev" \
+CAMPUSFLOW_STATIC_DIR="../frontend/dist" \
+uv run --locked uvicorn campusflow.main:app --host 127.0.0.1 --port 8000
+```
+
+访问 `http://127.0.0.1:8000/` 加载 SPA；`/login?expired=1` 等 history 路由回退 `index.html`；`/api/v1/...` 始终返回 JSON。数据目录必须是绝对路径，未显式设置 `CAMPUSFLOW_STORAGE_DIR` 时存储落在 `<data_dir>/materials`。
+
+作业由数据库轮询 Worker 处理（`--demo` 只允许名称以 `_test` 结尾的测试库并使用假识别／假向量）：
+
+```bash
+cd backend
+CAMPUSFLOW_DEPLOYMENT_MODE=desktop CAMPUSFLOW_DATA_DIR="$HOME/.campusflow-dev" \
+  uv run --locked python -m campusflow.workers.desktop --poll-interval 2
+```
+
+`--burst` 处理完当前可领取作业后退出。服务端仍使用 RQ Worker；两种模式的验收记录见 [P004](verification/DESKTOP-P004-desktop-mode.md) 与 [P005](verification/DESKTOP-P005-db-worker.md)。
+
+### 桌面首启初始化（P007）
+
+桌面模式的数据目录由 `campusflow.application.bootstrap` 初始化：在临时同级目录运行 `initdb`、建库、启用 pgvector、执行迁移，成功后原子改名为 `CAMPUSFLOW_DATA_DIR`。数据库口令与本地登录口令只写入系统凭据存储，不进入 `state.json`、日志或仓库。
+
+```bash
+cd backend
+CAMPUSFLOW_DEPLOYMENT_MODE=desktop CAMPUSFLOW_DATA_DIR="$HOME/.campusflow" \
+CAMPUSFLOW_PG_BIN=/opt/homebrew/opt/postgresql@17/bin \
+uv run --locked python - <<'PY'
+from campusflow.application import bootstrap
+from campusflow.core.config import Settings
+
+settings = Settings()
+bootstrap.initialize(settings)                    # 首次；已初始化时直接返回现状
+report = bootstrap.ensure_ready(settings)         # 启动集群、校验凭据
+env = bootstrap.connection_env(report)            # CAMPUSFLOW_DATABASE_URL / LOCAL_PASSWORD
+print(report.status, report.ready, report.connection.port)
+PY
+```
+
+`initialize` 结束时集群是停止的（原子改名要求先停止服务器），随后由 `ensure_ready` 启动。凭据位置由 `CAMPUSFLOW_SECRET_BACKEND` 决定：`auto`（默认）在 macOS 使用钥匙串、Windows 使用 DPAPI，其它平台或密钥链不可用时退回 `<data_dir>/secrets.json`（0600）并在报告中给出警告。凭据丢失时 `ensure_ready` 返回 `partially_initialized` 并明确提示，不会回退到 `student/campusflow-dev`。Sidecar 命令入口见 P006，Electron 自动登录见 P008；验收记录见 [P007](verification/DESKTOP-P007-bootstrap.md)。
