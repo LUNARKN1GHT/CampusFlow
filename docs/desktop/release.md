@@ -50,8 +50,12 @@ cd desktop/electron; npm ci; npm run build; npx electron-builder --win --publish
 - 需要 Visual Studio 2022 的 MSVC x64 工具链；缺少 VC 运行库时从 VS Redist 复制到 `bin`。
 - 产物：`release/CampusFlow-<version>-win-x64.exe`。
 - 两条脚本已由 `.github/workflows/desktop-windows-build.yml` 在 `windows-2022` 跑通，
-  产出约 184.6 MB 的未签名 NSIS 安装包；安装与运行仍未在 Windows 实机验证。
+  产出约 184.6 MB 的未签名 NSIS 安装包并校验包内 sidecar、PostgreSQL、静态前端与许可清单；安装与运行仍未在 Windows 实机验证。
   桌面发布工作流默认跳过 Windows，只有在仓库变量 `DESKTOP_WINDOWS_ENABLED=true` 时才会构建。
+
+macOS 两个架构由 `.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与
+`macos-15-intel`（x64）构建并校验 DMG 内容；`electron-builder` 固定为 `26.15.3`，
+架构由 `--arm64`／`--x64` 指定（`electron-builder.yml` 不再写 `arch` 列表）。
 
 ## 签名与公证
 

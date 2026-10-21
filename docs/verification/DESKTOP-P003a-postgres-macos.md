@@ -187,7 +187,10 @@ All checks passed!
 
 ## 8. 未验证事项
 
-- Windows 版本（P003b）、macOS x86_64 构建、其它 macOS 版本。
+- macOS x86_64 构建：已由 `desktop-macos-build.yml` 在 `macos-15-intel` 上构建
+  PostgreSQL 17.11 + pgvector 并打包 DMG，包内 `pgsql/bin/postgres` 为 x86_64，
+  冒烟与 DMG 内容校验通过（见 DESKTOP-E2E-macos.md）；Host 架构（arm64）上未做交叉编译。
+- Windows 版本（P003b）。
 - 真正没有安装 Xcode/Homebrew 的干净机器：本机具备 Xcode CLT；产物本身不链接 Homebrew，但未在无编译工具的机器上验证。
 - 签名、公证、Gatekeeper 首次启动与安装器内的最终路径（P009）；当前只有 ad-hoc 签名。
 - Electron 主进程的生命周期监管、退出清理、崩溃恢复、端口冲突重试与应用包内复制步骤。
