@@ -53,28 +53,20 @@ jobs:
           Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $root | Out-Null
 
-          function Try-PasswordFile([string]$label, [string]$pw, [int]$delayMs = 0) {
+          function Try-PasswordFile([string]$label, [string]$pw) {
             $dir = Join-Path $root $label
             New-Item -ItemType Directory -Force $dir | Out-Null
-            if ($delayMs -gt 0) { Start-Sleep -Milliseconds $delayMs }
+            Write-Host "--- $label file=$pw"
             icacls $pw | Out-Host
-            Get-Content $pw -ErrorAction SilentlyContinue | Out-Null
-            Write-Host "powershell-read $label : exit $LASTEXITCODE"
+            icacls (Split-Path -Parent $pw) | Out-Host
             & "$env:CAMPUSFLOW_PG_BIN\initdb.exe" -D (Join-Path $dir 'data') -U probe "--pwfile=$pw" -A scram-sha-256 -E UTF8 --locale=C 2>&1 | Out-Host
             Write-Host "initdb $label : exit $LASTEXITCODE"
           }
 
-          # C1: 当前实现，立即调用
-          $c1 = & uv run --locked python -c 'import os, pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
-          Try-PasswordFile 'C1-immediate' $c1.Trim()
-
-          # C2: 当前实现，写入后等待 1 秒
-          $c2 = & uv run --locked python -c 'import os, pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
-          Try-PasswordFile 'C2-delay-1s' $c2.Trim() 1000
-
-          # C3: Python 建目录，PowerShell 写文件
-          $c3 = & uv run --locked python -c 'import pathlib, tempfile; print(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-"))'
-          $c3pw = Join-Path $c3.Trim() '.campusflow-pw'
+          # C3: PowerShell 建目录并写文件
+          $c3dir = Join-Path $root 'C3-ps-dir'
+          New-Item -ItemType Directory -Force $c3dir | Out-Null
+          $c3pw = Join-Path $c3dir '.campusflow-pw'
           Set-Content -Path $c3pw -Value 'probe-secret' -NoNewline
           Try-PasswordFile 'C3-ps-file' $c3pw
 
@@ -83,6 +75,10 @@ jobs:
           New-Item -ItemType Directory -Force $c4dir | Out-Null
           $c4 = & uv run --locked python -c 'import os, pathlib, sys; f = pathlib.Path(sys.argv[1]) / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)' $c4dir
           Try-PasswordFile 'C4-python-file' $c4.Trim()
+
+          # C5: Python mkdtemp 目录，展示目录 ACL
+          $c5 = & uv run --locked python -c 'import os, pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
+          Try-PasswordFile 'C5-mkdtemp' $c5.Trim()
 
       - name: Bootstrap, seed and export archive
         shell: pwsh
