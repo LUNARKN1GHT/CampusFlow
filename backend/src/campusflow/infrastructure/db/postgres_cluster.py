@@ -58,6 +58,26 @@ def _run(
         raise PostgresError(f"无法执行 {Path(command[0]).name}") from exc
 
 
+def _run_detached(
+    command: list[str],
+    *,
+    env: dict[str, str] | None = None,
+    timeout: int = _COMMAND_TIMEOUT_SECONDS,
+) -> int:
+    """启动服务器时不能用管道：postgres 会继承句柄，Windows 上父进程会一直等 EOF。"""
+    try:
+        return subprocess.run(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
+            env=env,
+        ).returncode
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise PostgresError(f"无法执行 {Path(command[0]).name}") from exc
+
+
 def server_env() -> dict[str, str]:
     """服务器与 pg_ctl 的环境：固定 C locale，不传递任何 PGPASSWORD。"""
     env = {key: value for key, value in os.environ.items() if key != "PGPASSWORD"}
@@ -83,12 +103,11 @@ class PgBinaries:
                     "未找到 initdb：请安装 PostgreSQL，或用 CAMPUSFLOW_PG_BIN 指定二进制目录"
                 )
             bindir = Path(found).parent
-        missing = [
-            name for name in ("initdb", "pg_ctl", "pg_isready") if not (bindir / name).is_file()
-        ]
+        resolved = {name: _binary(bindir, name) for name in ("initdb", "pg_ctl", "pg_isready")}
+        missing = [name for name, path in resolved.items() if not path.is_file()]
         if missing:
             raise PostgresError(f"PostgreSQL 二进制目录 {bindir} 缺少：{', '.join(missing)}")
-        result = _run([str(bindir / "initdb"), "--version"])
+        result = _run([str(resolved["initdb"]), "--version"])
         if result.returncode != 0:
             raise PostgresError(f"无法读取 initdb 版本：{_tail(result.stderr)}")
         output = (result.stdout or result.stderr).strip()
@@ -106,7 +125,16 @@ class PgBinaries:
         return True
 
     def tool(self, name: str) -> Path:
-        return self.bindir / name
+        return _binary(self.bindir, name)
+
+
+def _binary(bindir: Path, name: str) -> Path:
+    """Windows 官方安装包只提供 `*.exe`，按实际存在的文件名解析。"""
+    candidate = bindir / name
+    if candidate.is_file():
+        return candidate
+    suffixed = bindir / f"{name}.exe"
+    return suffixed if suffixed.is_file() else candidate
 
 
 def find_free_port(host: str = "127.0.0.1") -> int:
@@ -154,12 +182,11 @@ class LocalPostgresCluster:
     def initdb(self, superuser: str, password: str) -> None:
         """初始化集群并写入连接配置；口令文件用后立即删除。"""
         self.data_dir.parent.mkdir(parents=True, exist_ok=True)
-        handle, password_name = tempfile.mkstemp(dir=self.data_dir.parent, prefix=".pgpass-")
-        password_file = Path(password_name)
+        password_file = self.data_dir.parent / f".campusflow-pw-{os.urandom(8).hex()}"
         try:
+            # 先写后关；Windows 上 initdb 读取时若文件仍被持有会报 Permission denied。
+            password_file.write_text(password, encoding="utf-8")
             os.chmod(password_file, 0o600)
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                stream.write(password)
             result = _run(
                 [
                     str(self.binaries.tool("initdb")),
@@ -189,11 +216,16 @@ class LocalPostgresCluster:
             "# CampusFlow 桌面模式配置（P007，每次启动前重写）",
             "listen_addresses = '127.0.0.1'",
             f"port = {self.port}",
-            f"unix_socket_directories = '{_quote_conf_value(str(self.socket_dir))}'",
-            "unix_socket_permissions = 0700",
-            "password_encryption = scram-sha-256",
-            "",
         ]
+        if os.name != "nt":
+            # Windows 没有 Unix 套接字，且配置值里的反斜杠会被当成转义符。
+            lines.extend(
+                [
+                    f"unix_socket_directories = '{_quote_conf_value(str(self.socket_dir))}'",
+                    "unix_socket_permissions = 0700",
+                ]
+            )
+        lines.extend(["password_encryption = scram-sha-256", ""])
         runtime_config = self.data_dir / _RUNTIME_CONFIG_NAME
         runtime_config.write_text("\n".join(lines), encoding="utf-8")
         main_config = self.data_dir / "postgresql.conf"
@@ -209,7 +241,7 @@ class LocalPostgresCluster:
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise PostgresError("无法写入 PostgreSQL 运行配置，数据目录可能不可写") from exc
-        result = _run(
+        returncode = _run_detached(
             [
                 str(self.binaries.tool("pg_ctl")),
                 "-D",
@@ -223,7 +255,7 @@ class LocalPostgresCluster:
             ],
             env=server_env(),
         )
-        if result.returncode != 0:
+        if returncode != 0:
             raise PostgresError(f"PostgreSQL 启动失败：{self.log_tail()}")
 
     def stop(self) -> bool:

@@ -376,8 +376,21 @@ _HANDLERS = {
 }
 
 
+def _configure_streams() -> None:
+    """Windows 控制台默认不是 UTF-8，中文 JSON 与错误提示会触发 UnicodeEncodeError。"""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8")
+        except (ValueError, OSError):
+            continue
+
+
 def main(argv: list[str] | None = None) -> int:
     """命令分发；返回退出码而不是直接退出，便于测试与 Electron 复用。"""
+    _configure_streams()
     arguments = list(sys.argv[1:]) if argv is None else list(argv)
     parser = build_parser()
     try:
