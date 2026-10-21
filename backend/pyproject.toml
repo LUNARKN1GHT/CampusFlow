@@ -35,6 +35,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/campusflow"]
 
+# 桌面 sidecar 不依赖仓库目录；迁移脚本与 Alembic 配置随 wheel 一起安装。
+[tool.hatch.build.targets.wheel.force-include]
+"alembic.ini" = "campusflow/alembic.ini"
+"migrations" = "campusflow/migrations"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

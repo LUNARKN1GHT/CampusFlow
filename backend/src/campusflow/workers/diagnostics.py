@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 
 import redis
-from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from rq import Queue
@@ -15,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from campusflow.core.config import Settings
 from campusflow.infrastructure.db.engine import create_db_engine
+from campusflow.infrastructure.db.migrations import build_alembic_config
 from campusflow.infrastructure.queue.rq_queue import QUEUE_NAME
 from campusflow.infrastructure.repositories import build_repositories
 
@@ -31,9 +31,7 @@ def collect_diagnostics(settings: Settings, *, job_id: int | None = None) -> dic
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
             current = set(MigrationContext.configure(connection).get_current_heads())
-            backend = Path(__file__).resolve().parents[3]
-            config = Config(str(backend / "alembic.ini"))
-            config.set_main_option("script_location", str(backend / "migrations"))
+            config = build_alembic_config(settings.migrations_dir)
             expected = set(ScriptDirectory.from_config(config).get_heads())
             # 只有数据库迁移头与代码期望完全一致才算就绪，落后或领先都不冒充可用。
             report["database"] = {
