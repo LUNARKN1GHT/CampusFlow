@@ -147,6 +147,26 @@ secrets.json: 0600，含 db-password 与 local-password
 - `GET /api/v1/health` → 200；`GET /` → 200；SIGTERM 后按 Worker → API → PostgreSQL 逆序停止，无残留进程。
 - 未通过人工点击原生保存/确认窗口执行导出／导入；改为 `tests/packaged-maintenance.spec.ts` 脚本替换对话框返回值，经真实菜单与 sidecar 完成导出 → 升级检查 → 导入（1 passed，9.0 s），档案本身的 CLI round-trip 见 `DESKTOP-P010-transfer.md`。
 
+### 受限环境启动（PATH 仅系统目录）
+
+用 `env -i` 清空环境，只保留 `HOME`／`TMPDIR`／系统 `PATH`，且**不设置**
+`CAMPUSFLOW_SIDECAR_BIN`／`CAMPUSFLOW_PG_BIN`／`CAMPUSFLOW_STATIC_DIR`：
+
+```text
+env -i HOME=/tmp/cf-clean/home TMPDIR=/tmp PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  CAMPUSFLOW_DATA_DIR=... CAMPUSFLOW_API_PORT=8143 CAMPUSFLOW_PG_PORT=55445 \
+  CampusFlow.app/Contents/MacOS/CampusFlow
+```
+
+- 资源全部按 `process.resourcesPath` 自动发现，进程路径均为包内
+  `Resources/sidecar/campusflow-sidecar` 与 `Resources/pgsql/bin/postgres`，未调用系统
+  Python、Node、psql 或 Homebrew PostgreSQL。
+- `bootstrap` 约 21 s（本次回退 `secret_backend=file`，state.json 与日志均记录；未追求钥匙串路径），
+  随后 `migrate`（已是最新）→ `api` → `worker` → ready；健康检查 200。
+- SIGTERM 后按 Worker → API → PostgreSQL 回收，无残留进程。
+- 这不是干净机器验收：仍使用同一台已安装 Homebrew／Node 的 macOS，只证明运行时 PATH 中
+  不需要它们；全新 macOS 与 DMG 安装仍未验证。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
