@@ -376,3 +376,12 @@ GitHub 是发布后的任务状态与认领信息来源；本文件和 backlog.j
 | [F004 · 评估其他校内系统连接需求](https://github.com/LUNARKN1GHT/CampusFlow/issues/224) | 待认领 | S | 无 |
 | [既有 #2：优化查询方式](https://github.com/LUNARKN1GHT/CampusFlow/issues/2) | 待范围决策 | 待评估 | 不纳入前三阶段 |
 
+### [[EF1] 后续探索：桌面分发与技术栈演进](https://github.com/LUNARKN1GHT/CampusFlow/issues/380)
+
+| 任务 | 初始状态 | 规模 | 前置任务 |
+| --- | --- | --- | --- |
+| [F005 · 评估 Windows 与 macOS 桌面分发与打包方案](https://github.com/LUNARKN1GHT/CampusFlow/issues/381) | 已完成 | M | 无 |
+| [F006 · 评估后端技术栈长期演进与重构成本](https://github.com/LUNARKN1GHT/CampusFlow/issues/382) | 已完成 | M | 无 |
+
+两项均不立项、不纳入现有三阶段；Docker 一键本机包由 [#400](https://github.com/LUNARKN1GHT/CampusFlow/issues/400) 暂缓跟踪，后端保持 Python 并先建立测量基线。结论见 [docs/research/ef1-scope-decision.md](../research/ef1-scope-decision.md)。
+
