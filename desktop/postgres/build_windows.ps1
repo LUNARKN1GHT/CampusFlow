@@ -116,7 +116,8 @@ function Prune-Stage {
         $target = Join-Path $stageDir $license
         if (Test-Path $target) { Remove-Item -Force $target }
     }
-    foreach ($exe in Get-ChildItem -Path (Join-Path $stageDir 'bin') -File) {
+    # 只裁剪可执行文件；bin 下的 DLL 是运行时依赖，必须保留。
+    foreach ($exe in Get-ChildItem -Path (Join-Path $stageDir 'bin') -File -Filter *.exe) {
         $name = [System.IO.Path]::GetFileNameWithoutExtension($exe.Name)
         if ($keptBinaries -notcontains $name) { Remove-Item -Force $exe.FullName }
     }
@@ -181,9 +182,10 @@ Prune-Stage
 Ensure-VcRuntime (Join-Path $stageDir 'bin') $vc.VsPath
 
 Write-Host 'verifying staged binaries'
-$versionOutput = & (Join-Path $stageDir 'bin\postgres.exe') --version
-if ($LASTEXITCODE -ne 0 -or $versionOutput -notlike "*$pgVersion*") {
-    throw "unexpected postgres version: $versionOutput"
+$versionOutput = & (Join-Path $stageDir 'bin\postgres.exe') --version 2>&1
+$versionExit = $LASTEXITCODE
+if ($versionExit -ne 0 -or "$versionOutput" -notlike "*$pgVersion*") {
+    throw "unexpected postgres version (exit $versionExit): $versionOutput"
 }
 & (Join-Path $stageDir 'bin\pg_isready.exe') --version
 if ($LASTEXITCODE -ne 0) { throw 'pg_isready is not runnable' }
