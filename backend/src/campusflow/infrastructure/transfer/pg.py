@@ -176,6 +176,9 @@ class PgToolchain:
         command = [
             self._binary("pg_dump"),
             "--format=custom",
+            # 归档外层已用 ZIP deflate 压缩；内层不压缩，才能被没有 zlib 的
+            # macOS 内置 PostgreSQL 恢复（跨平台迁移要求两端互通）。
+            "--compress=0",
             "--no-owner",
             "--no-privileges",
             *_connect_flags(parsed),
