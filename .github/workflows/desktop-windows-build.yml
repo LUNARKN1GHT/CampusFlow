@@ -58,6 +58,46 @@ jobs:
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
 
+      - name: Smoke test bundled PostgreSQL, pgvector and sidecar
+        shell: pwsh
+        run: |
+          $pg = 'desktop/vendor/pgsql'
+          $scratch = Join-Path $env:RUNNER_TEMP 'pg-smoke'
+          Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $scratch | Out-Null
+          $port = 55440
+
+          $alphabet = [char[]]((48..57) + (65..90) + (97..122))
+          $password = -join (1..24 | ForEach-Object { Get-Random -InputObject $alphabet })
+          $pwFile = Join-Path $scratch 'pw.txt'
+          Set-Content -Path $pwFile -Value $password -NoNewline
+
+          & "$pg\bin\initdb.exe" -D "$scratch\data" -U campusflow "--pwfile=$pwFile" -A scram-sha-256 -E UTF8 --locale=C
+          if ($LASTEXITCODE -ne 0) { throw 'initdb failed' }
+          & "$pg\bin\pg_ctl.exe" -D "$scratch\data" -l "$scratch\pg.log" -o "-p $port -h 127.0.0.1" -w start
+          if ($LASTEXITCODE -ne 0) { Get-Content "$scratch\pg.log"; throw 'pg_ctl start failed' }
+          try {
+            $env:PGPASSWORD = $password
+            & "$pg\bin\psql.exe" -h 127.0.0.1 -p $port -U campusflow -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE smoke'
+            if ($LASTEXITCODE -ne 0) { throw 'CREATE DATABASE failed' }
+            & "$pg\bin\psql.exe" -h 127.0.0.1 -p $port -U campusflow -d smoke -v ON_ERROR_STOP=1 `
+              -c 'CREATE EXTENSION vector' `
+              -c 'CREATE TABLE items (id bigserial, embedding vector(3))' `
+              -c 'CREATE INDEX ON items USING hnsw (embedding vector_l2_ops)' `
+              -c "INSERT INTO items (embedding) VALUES ('[1,2,3]'), ('[4,5,6]')" `
+              -c "SELECT id FROM items ORDER BY embedding <-> '[3,1,2]' LIMIT 1"
+            if ($LASTEXITCODE -ne 0) { throw 'pgvector smoke failed' }
+          }
+          finally {
+            Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+            & "$pg\bin\pg_ctl.exe" -D "$scratch\data" -m fast -w stop
+          }
+          Remove-Item -Recurse -Force $scratch -ErrorAction SilentlyContinue
+
+          $sidecar = 'desktop/dist/campusflow-sidecar/campusflow-sidecar.exe'
+          & $sidecar --version
+          if ($LASTEXITCODE -ne 0) { throw 'sidecar --version failed' }
+
       - name: Install Electron dependencies and compile
         shell: pwsh
         working-directory: desktop/electron
