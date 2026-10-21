@@ -349,3 +349,25 @@ CAMPUSFLOW_DEPLOYMENT_MODE=desktop CAMPUSFLOW_DATA_DIR="$HOME/.campusflow-dev" \
 ```
 
 `--burst` 处理完当前可领取作业后退出。服务端仍使用 RQ Worker；两种模式的验收记录见 [P004](verification/DESKTOP-P004-desktop-mode.md) 与 [P005](verification/DESKTOP-P005-db-worker.md)。
+
+### 桌面首启初始化（P007）
+
+桌面模式的数据目录由 `campusflow.application.bootstrap` 初始化：在临时同级目录运行 `initdb`、建库、启用 pgvector、执行迁移，成功后原子改名为 `CAMPUSFLOW_DATA_DIR`。数据库口令与本地登录口令只写入系统凭据存储，不进入 `state.json`、日志或仓库。
+
+```bash
+cd backend
+CAMPUSFLOW_DEPLOYMENT_MODE=desktop CAMPUSFLOW_DATA_DIR="$HOME/.campusflow" \
+CAMPUSFLOW_PG_BIN=/opt/homebrew/opt/postgresql@17/bin \
+uv run --locked python - <<'PY'
+from campusflow.application import bootstrap
+from campusflow.core.config import Settings
+
+settings = Settings()
+bootstrap.initialize(settings)                    # 首次；已初始化时直接返回现状
+report = bootstrap.ensure_ready(settings)         # 启动集群、校验凭据
+env = bootstrap.connection_env(report)            # CAMPUSFLOW_DATABASE_URL / LOCAL_PASSWORD
+print(report.status, report.ready, report.connection.port)
+PY
+```
+
+`initialize` 结束时集群是停止的（原子改名要求先停止服务器），随后由 `ensure_ready` 启动。凭据位置由 `CAMPUSFLOW_SECRET_BACKEND` 决定：`auto`（默认）在 macOS 使用钥匙串、Windows 使用 DPAPI，其它平台或密钥链不可用时退回 `<data_dir>/secrets.json`（0600）并在报告中给出警告。凭据丢失时 `ensure_ready` 返回 `partially_initialized` 并明确提示，不会回退到 `student/campusflow-dev`。Sidecar 命令入口见 P006，Electron 自动登录见 P008；验收记录见 [P007](verification/DESKTOP-P007-bootstrap.md)。

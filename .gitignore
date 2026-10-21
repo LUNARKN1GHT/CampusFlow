@@ -37,3 +37,7 @@ data/
 desktop/vendor/
 desktop/.scratch/
 desktop/postgres/.scratch/
+
+# P007：桌面凭据兜底文件绝不入库
+secrets.json
+secrets.dpapi

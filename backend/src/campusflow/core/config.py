@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     static_dir: str | None = None
     # 打包后迁移脚本不在仓库相对位置时显式指定；未配置时按打包资源解析。
     migrations_dir: str | None = None
+    # P007：内置 PostgreSQL 的二进制目录（initdb／pg_ctl／pg_isready）；不填用 PATH。
+    pg_bin: str | None = None
+    # P007：本机口令存放位置。auto 依次尝试 macOS 钥匙串、Windows DPAPI、0600 文件。
+    secret_backend: Literal["auto", "keychain", "dpapi", "file"] = "auto"
     # 默认值与本机 Docker Compose 一致，未配置 .env 也能直接启动
     database_url: str = "postgresql+psycopg://campusflow:campusflow@127.0.0.1:5432/campusflow"
     test_database_url: str = (
