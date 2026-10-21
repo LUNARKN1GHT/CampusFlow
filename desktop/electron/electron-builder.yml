@@ -1,0 +1,48 @@
+# P009：桌面安装包配置。构建前需先产出 sidecar（P002）与内置 PostgreSQL（P003），
+# 并把它们放到 desktop/dist/sidecar 与 desktop/vendor/postgres。
+appId: com.campusflow.desktop
+productName: CampusFlow
+copyright: Copyright © 2026 CampusFlow contributors
+asar: true
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+extraResources:
+  - from: ../../desktop/dist/sidecar
+    to: sidecar
+  - from: ../../desktop/vendor/postgres
+    to: postgres
+  - from: ../../frontend/dist
+    to: static
+  - from: ../../THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+artifactName: ${productName}-${version}-${os}-${arch}.${ext}
+publish: null
+mac:
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+dmg:
+  writeUpdateInfo: false
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  shortcutName: CampusFlow
