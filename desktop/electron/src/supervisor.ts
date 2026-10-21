@@ -14,6 +14,7 @@ import type {
 } from './types'
 
 const STAGE_LABELS: Record<StageName, string> = {
+  bootstrap: '首启初始化',
   postgres: 'PostgreSQL',
   migrate: '数据库迁移',
   api: 'API 服务',
@@ -21,6 +22,7 @@ const STAGE_LABELS: Record<StageName, string> = {
 }
 
 const STAGE_MESSAGES: Record<StageName, string> = {
+  bootstrap: '正在初始化本地数据库与凭据…',
   postgres: '正在启动 PostgreSQL…',
   migrate: '正在执行数据库迁移…',
   api: '正在启动 API 服务…',
@@ -28,6 +30,28 @@ const STAGE_MESSAGES: Record<StageName, string> = {
 }
 
 const READY_MESSAGE = '全部服务已就绪，正在加载界面…'
+
+/** `campusflow-sidecar bootstrap --json` 的字段；口令只用于本机自动登录。 */
+interface BootstrapPayload {
+  ready: boolean
+  status: string
+  initialized: boolean
+  database_url: string | null
+  local_username: string | null
+  local_password: string | null
+  schema_head: string | null
+  secret_backend: string | null
+  warnings: string[]
+  messages: string[]
+  started_postgres: boolean
+  postgres_running: boolean
+}
+
+/** 供主进程自动登录使用；不经过 preload／IPC，也不写入磁盘。 */
+export interface BootstrapLogin {
+  username: string
+  password: string
+}
 
 interface ManagedChild {
   name: 'api' | 'worker'
@@ -66,8 +90,46 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
   }
 }
 
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+/** 严格解析 bootstrap 的 stdout：只接受完整 JSON 对象，不从混杂输出里猜字段。 */
+export function parseBootstrapPayload(stdout: string): BootstrapPayload | null {
+  const text = stdout.trim()
+  if (!text) return null
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  if (typeof record.ready !== 'boolean' || typeof record.status !== 'string') return null
+  return {
+    ready: record.ready,
+    status: record.status,
+    initialized: record.initialized === true,
+    database_url: optionalString(record.database_url),
+    local_username: optionalString(record.local_username),
+    local_password: optionalString(record.local_password),
+    schema_head: optionalString(record.schema_head),
+    secret_backend: optionalString(record.secret_backend),
+    warnings: stringList(record.warnings),
+    messages: stringList(record.messages),
+    started_postgres: record.started_postgres === true,
+    postgres_running: record.postgres_running === true,
+  }
+}
+
 /**
- * 进程监管器：严格按 PostgreSQL → migrate → API → Worker 启动，
+ * 进程监管器：默认严格按 PostgreSQL → migrate → API → Worker 启动；启用首启初始化
+ * （P007 bootstrap）时改为 bootstrap → API → Worker，由 sidecar 建库、迁移并存取凭据。
  * 就绪后发出 ready；API／Worker 异常退出按指数退避重启，PostgreSQL
  * 退出直接停止整套服务。所有子进程都记录 PID，退出时逆序回收。
  */
@@ -86,6 +148,10 @@ export class Supervisor extends EventEmitter {
   private failing = false
   private stubFailureConsumed = false
   private pgManaged = false
+  /** bootstrap 模式：PostgreSQL 由 sidecar 启动，Electron 只负责在退出时停止。 */
+  private pgExternallyManaged = false
+  private bootstrapLogin: BootstrapLogin | null = null
+  private bootstrapDatabaseUrl: string | null = null
   private pgMonitor: NodeJS.Timeout | null = null
   private pgPid: number | null = null
   private port: number | undefined
@@ -115,6 +181,11 @@ export class Supervisor extends EventEmitter {
     return this.port
   }
 
+  /** 自动登录凭据只留在主进程内存；没有 bootstrap 或未就绪时返回 null。 */
+  getBootstrapLogin(): BootstrapLogin | null {
+    return this.bootstrapLogin ? { ...this.bootstrapLogin } : null
+  }
+
   start(): Promise<void> {
     if (this.startPromise) return this.startPromise
     this.startPromise = this.runStartup().finally(() => {
@@ -136,6 +207,9 @@ export class Supervisor extends EventEmitter {
     this.setStatus({ phase: 'stopping', message: '正在停止服务，请稍候…' })
     this.stopPromise = (async () => {
       await this.stopChildren()
+      // 退出后不保留本机凭据与连接串。
+      this.bootstrapLogin = null
+      this.bootstrapDatabaseUrl = null
       this.setStatus({ phase: 'stopped', stage: 'idle', message: '服务已停止' })
     })()
     return this.stopPromise
@@ -146,19 +220,27 @@ export class Supervisor extends EventEmitter {
     this.stopping = false
     this.failing = false
     this.pgManaged = false
+    this.pgExternallyManaged = false
+    this.bootstrapLogin = null
+    this.bootstrapDatabaseUrl = null
     this.stopPromise = null
     this.port = this.config.apiPort > 0 ? this.config.apiPort : await this.deps.findFreePort()
-    this.currentStage = 'postgres'
+    this.currentStage = this.config.bootstrap ? 'bootstrap' : 'postgres'
     this.setStatus({
       phase: 'starting',
-      stage: 'postgres',
+      stage: this.currentStage,
       message: '正在准备桌面运行环境…',
       port: this.port,
     })
 
     try {
-      await this.stage('postgres', () => this.startPostgres())
-      await this.stage('migrate', () => this.runMigrate())
+      if (this.config.bootstrap) {
+        // P007：sidecar 负责建库、迁移与凭据，Electron 不再自行 initdb／migrate。
+        await this.stage('bootstrap', () => this.runBootstrapStage())
+      } else {
+        await this.stage('postgres', () => this.startPostgres())
+        await this.stage('migrate', () => this.runMigrate())
+      }
       await this.stage('api', () => this.startApi())
       await this.stage('worker', () => this.startWorker())
       this.setStatus({ phase: 'ready', stage: 'ready', message: READY_MESSAGE, port: this.port })
@@ -220,13 +302,16 @@ export class Supervisor extends EventEmitter {
   }
 
   private ensureDirectories(): void {
-    for (const dir of [
+    const dirs = [
       this.config.dataDir,
-      this.config.storageDir,
+      // bootstrap 要求数据目录为空；materials 由 sidecar 在原子初始化时创建，
+      // 这里提前创建会让“数据目录非空”检查误判为已有数据。
+      ...(this.config.bootstrap ? [] : [this.config.storageDir]),
       this.config.backupDir,
       this.config.logDir,
       this.config.runDir,
-    ]) {
+    ]
+    for (const dir of dirs) {
       mkdirSync(dir, { recursive: true })
     }
   }
@@ -252,6 +337,36 @@ export class Supervisor extends EventEmitter {
           }
         : {}),
     }
+  }
+
+  /** 首启初始化的环境：数据／日志目录、内置 PostgreSQL 与迁移脚本位置，以及请求端口。 */
+  private bootstrapEnv(): NodeJS.ProcessEnv {
+    const env = this.childEnv()
+    delete env.CAMPUSFLOW_DATABASE_URL
+    delete env.CAMPUSFLOW_LOCAL_USERNAME
+    delete env.CAMPUSFLOW_LOCAL_PASSWORD
+    env.CAMPUSFLOW_DEPLOYMENT_MODE = 'desktop'
+    env.CAMPUSFLOW_LOG_DIR = this.config.logDir
+    if (this.config.pgBin) env.CAMPUSFLOW_PG_BIN = this.config.pgBin
+    if (!env.CAMPUSFLOW_MIGRATIONS_DIR) {
+      // 打包 sidecar 会自行从解包目录发现迁移；源码运行回退到仓库 backend/migrations。
+      const repositoryMigrations = path.join(this.config.backendDir, 'migrations')
+      if (existsSync(repositoryMigrations)) {
+        env.CAMPUSFLOW_MIGRATIONS_DIR = repositoryMigrations
+      }
+    }
+    return env
+  }
+
+  /** API／Worker 的环境：bootstrap 生成的连接串与本机凭据只进入这两个子进程。 */
+  private serviceEnv(): NodeJS.ProcessEnv {
+    const env = this.childEnv()
+    if (this.bootstrapDatabaseUrl) env.CAMPUSFLOW_DATABASE_URL = this.bootstrapDatabaseUrl
+    if (this.bootstrapLogin) {
+      env.CAMPUSFLOW_LOCAL_USERNAME = this.bootstrapLogin.username
+      env.CAMPUSFLOW_LOCAL_PASSWORD = this.bootstrapLogin.password
+    }
+    return env
   }
 
   private sidecarCommand(
@@ -311,6 +426,64 @@ export class Supervisor extends EventEmitter {
       return '未找到 sidecar（P006）：请设置 CAMPUSFLOW_SIDECAR_BIN，或配置 CAMPUSFLOW_PYTHON 与 CAMPUSFLOW_BACKEND_DIR 使用开发回退命令。'
     }
     return brief(result.stderr) ? `输出：${brief(result.stderr)}` : ''
+  }
+
+  private bootstrapDiagnosticsDir(): string {
+    return path.join(this.config.dataDir, 'logs')
+  }
+
+  /**
+   * 调用 `campusflow-sidecar bootstrap --json`：建库、启用 pgvector、迁移并生成随机凭据。
+   * stdout 是唯一携带本机口令的位置，只解析进内存；日志、错误页与诊断都不落口令。
+   */
+  private async runBootstrapStage(): Promise<void> {
+    if (this.config.stub) {
+      this.logger.info('测试桩：跳过首启初始化')
+      return
+    }
+    const command = this.sidecarCommand('bootstrap', ['--json'])
+    const result = await this.deps.run(command.command, command.args, {
+      cwd: command.cwd,
+      env: this.bootstrapEnv(),
+      timeoutMs: 300_000,
+    })
+    const diagnostics = this.bootstrapDiagnosticsDir()
+    if (result.errorCode === 'ENOENT') {
+      throw new Error(`首启初始化无法启动：${this.missingSidecarHint(result)}`)
+    }
+    if (result.code !== 0) {
+      const detail = brief(result.stderr) || '没有可用的错误输出'
+      throw new Error(
+        `bootstrap 退出码 ${result.code}：${detail}；诊断日志目录：${diagnostics}`,
+      )
+    }
+    const payload = parseBootstrapPayload(result.stdout)
+    if (!payload) {
+      throw new Error(`bootstrap 输出不是有效的 JSON；诊断日志目录：${diagnostics}`)
+    }
+    if (
+      payload.ready !== true ||
+      !payload.database_url ||
+      !payload.local_username ||
+      !payload.local_password
+    ) {
+      const reasons = [...payload.messages, ...payload.warnings].join('；') || '缺少连接或凭据'
+      throw new Error(
+        `bootstrap 未就绪（status=${payload.status}）：${reasons}；诊断日志目录：${diagnostics}`,
+      )
+    }
+    this.bootstrapLogin = {
+      username: payload.local_username,
+      password: payload.local_password,
+    }
+    this.bootstrapDatabaseUrl = payload.database_url
+    this.pgExternallyManaged = true
+    this.logger.info(
+      `首启初始化完成：迁移头 ${payload.schema_head ?? '未知'}，凭据后端 ${
+        payload.secret_backend ?? '未知'
+      }，PostgreSQL 由 bootstrap 管理`,
+    )
+    for (const warning of payload.warnings) this.logger.warn(`首启提示：${brief(warning, 400)}`)
   }
 
   private async startPostgres(): Promise<void> {
@@ -520,7 +693,7 @@ export class Supervisor extends EventEmitter {
   ): Promise<void> {
     const child = this.deps.spawn(command, args, {
       cwd,
-      env: this.childEnv(),
+      env: this.serviceEnv(),
       detached: process.platform !== 'win32',
       windowsHide: true,
     })
@@ -846,6 +1019,11 @@ export class Supervisor extends EventEmitter {
   }
 
   private async stopPostgres(): Promise<void> {
+    if (this.pgExternallyManaged) {
+      this.pgExternallyManaged = false
+      await this.stopBootstrapPostgres()
+      return
+    }
     if (!this.pgManaged) return
     this.pgManaged = false
     if (this.config.pgBin) {
@@ -881,6 +1059,38 @@ export class Supervisor extends EventEmitter {
     this.logger.info('PostgreSQL 已停止')
   }
 
+  /**
+   * bootstrap 模式退出：只调用 pg_ctl 停止 sidecar 启动的集群，不按 PID 兜底结束，
+   * 避免误杀其它实例；`not running` 视为已经停止。
+   */
+  private async stopBootstrapPostgres(): Promise<void> {
+    if (!this.config.pgBin) {
+      this.logger.warn('未配置 CAMPUSFLOW_PG_BIN，无法停止 bootstrap 启动的 PostgreSQL')
+      return
+    }
+    // bootstrap 固定使用 <data_dir>/pgdata，不读取 CAMPUSFLOW_PG_DATA_DIR。
+    const pgDataDir = path.join(this.config.dataDir, 'pgdata')
+    const result = await this.deps.run(
+      toolPath(this.config.pgBin, 'pg_ctl'),
+      ['-D', pgDataDir, '-m', 'fast', '-w', 'stop'],
+      {
+        cwd: this.config.dataDir,
+        env: this.childEnv(),
+        timeoutMs: this.config.stopTimeoutMs + 5_000,
+      },
+    )
+    if (result.code === 0) {
+      this.logger.info('bootstrap 启动的 PostgreSQL 已停止')
+      return
+    }
+    const detail = `${result.stdout} ${result.stderr}`
+    if (/not\s+running|no\s+server\s+running|is\s+not\s+running/i.test(detail)) {
+      this.logger.info('bootstrap 启动的 PostgreSQL 已停止（pg_ctl 报告未在运行）')
+      return
+    }
+    this.logger.warn(`停止 bootstrap PostgreSQL 失败（退出码 ${result.code}）：${brief(detail)}`)
+  }
+
   private async killPid(pid: number, signal: NodeJS.Signals): Promise<void> {
     if (process.platform === 'win32') {
       const args = ['/pid', String(pid), '/T']
@@ -905,7 +1115,7 @@ export class Supervisor extends EventEmitter {
 
   private buildFailure(stage: StageName, message: string) {
     const tail = this.logger.recentLines(80)
-    if (stage === 'postgres') tail.push(...this.readPostgresTail())
+    if (stage === 'postgres' || stage === 'bootstrap') tail.push(...this.readPostgresTail())
     return {
       stage,
       message,
@@ -914,17 +1124,28 @@ export class Supervisor extends EventEmitter {
     }
   }
 
+  /** PostgreSQL 服务日志：bootstrap 写在数据目录，旧 managed 模式写在 Electron 日志目录。 */
   private readPostgresTail(): string[] {
-    try {
-      const content = readFileSync(path.join(this.config.logDir, 'postgres.log'), 'utf8')
-      return content
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .slice(-30)
-        .map((line) => `[postgres.log] ${brief(line, 400)}`)
-    } catch {
-      return []
+    const files = [
+      path.join(this.config.dataDir, 'logs', 'postgres.log'),
+      path.join(this.config.logDir, 'postgres.log'),
+    ]
+    const lines: string[] = []
+    for (const file of new Set(files)) {
+      try {
+        const content = readFileSync(file, 'utf8')
+        lines.push(
+          ...content
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .slice(-30)
+            .map((line) => `[postgres.log] ${brief(line, 400)}`),
+        )
+      } catch {
+        // 文件不存在时跳过：诊断信息不能因为缺少日志而丢失。
+      }
     }
+    return lines
   }
 
   private delay(ms: number): Promise<void> {

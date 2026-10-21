@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import type { RuntimeConfig, StageName } from './types'
 
-const STAGES: readonly StageName[] = ['postgres', 'migrate', 'api', 'worker']
+const STAGES: readonly StageName[] = ['bootstrap', 'postgres', 'migrate', 'api', 'worker']
 
 function positiveInt(value: string | undefined, fallback: number, min = 1): number {
   if (value === undefined || value.trim() === '') return fallback
@@ -58,10 +58,28 @@ function resolveStaticDir(env: NodeJS.ProcessEnv): string | null {
 }
 
 /**
+ * 首启初始化开关：显式 `CAMPUSFLOW_BOOTSTRAP=1` 打开、`=0` 关闭（保留旧 trust 流程与测试）；
+ * 未显式设置时，只有打包应用且未指定外置 PostgreSQL 才默认启用。
+ * 测试桩模式永远跳过 bootstrap，避免冒烟测试依赖真实 PostgreSQL。
+ */
+function resolveBootstrap(env: NodeJS.ProcessEnv, packaged: boolean, stub: boolean): boolean {
+  if (stub) return false
+  const flag = env.CAMPUSFLOW_BOOTSTRAP?.trim()
+  if (flag === '1') return true
+  if (flag === '0') return false
+  if (!packaged) return false
+  return env.CAMPUSFLOW_MANAGED_POSTGRES?.trim() !== 'external'
+}
+
+/**
  * 从环境变量解析桌面运行配置。所有路径都转换为绝对路径；
  * 端口、超时与重试次数均可覆盖，便于本机联调与自动化测试。
  */
-export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): RuntimeConfig {
+export function loadConfig(
+  env: NodeJS.ProcessEnv,
+  userDataDir: string,
+  packaged = false,
+): RuntimeConfig {
   const base = path.resolve(userDataDir)
   const dataDir = absoluteFrom(base, env.CAMPUSFLOW_DATA_DIR, path.join(base, 'data'))
   const pgBin = env.CAMPUSFLOW_PG_BIN
@@ -76,6 +94,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): Runtime
         : 'external'
   const pgPort = positiveInt(env.CAMPUSFLOW_PG_PORT, pgMode === 'managed' ? 55432 : 5432)
   const apiPort = positiveInt(env.CAMPUSFLOW_API_PORT, 0, 1)
+  const stub = env.CAMPUSFLOW_ELECTRON_STUB === '1'
 
   return {
     userDataDir: base,
@@ -107,6 +126,8 @@ export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): Runtime
     pgPort,
     pgUser: env.CAMPUSFLOW_PG_USER?.trim() || 'campusflow',
     pgDatabase: env.CAMPUSFLOW_PG_DATABASE?.trim() || 'campusflow',
+    bootstrap: resolveBootstrap(env, packaged, stub),
+    autoLogin: env.CAMPUSFLOW_AUTO_LOGIN?.trim() !== '0',
     sidecarBin: env.CAMPUSFLOW_SIDECAR_BIN
       ? path.resolve(env.CAMPUSFLOW_SIDECAR_BIN)
       : bundledPath(
@@ -115,7 +136,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, userDataDir: string): Runtime
         ),
     sidecarModule: env.CAMPUSFLOW_SIDECAR_MODULE?.trim() || 'campusflow.sidecar',
     pythonCommand: env.CAMPUSFLOW_PYTHON?.trim() || 'python',
-    stub: env.CAMPUSFLOW_ELECTRON_STUB === '1',
+    stub,
     stubDelayMs: positiveInt(env.CAMPUSFLOW_ELECTRON_STUB_DELAY_MS, 120, 0),
     stubFailStage: parseStage(env.CAMPUSFLOW_ELECTRON_STUB_FAIL_STAGE),
     stubFailAlways: env.CAMPUSFLOW_ELECTRON_STUB_FAIL_ALWAYS === '1',

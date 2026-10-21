@@ -36,6 +36,8 @@ export function buildDiagnostics(input: DiagnosticsInput): Record<string, unknow
       pgMode: input.config.pgMode,
       pgPort: input.config.pgPort,
       pgBin: input.config.pgBin,
+      bootstrap: input.config.bootstrap,
+      autoLogin: input.config.autoLogin,
       sidecarBin: input.config.sidecarBin,
       sidecarModule: input.config.sidecarBin ? null : input.config.sidecarModule,
       staticDir: input.config.staticDir,

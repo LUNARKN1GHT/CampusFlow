@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'elect
 import path from 'node:path'
 
 import { loadConfig } from './config'
+import { attemptAutoLogin, autoLoginNoticeMessage, buildAutoLoginNoticeScript } from './auto-login'
 import { writeDiagnostics } from './diagnostics'
 import { Logger } from './logger'
 import { installSecurity, isAllowedExternalUrl } from './security'
@@ -25,6 +26,8 @@ let currentStatus: SupervisorStatus | null = null
 let ipcInstalled = false
 let quitting = false
 let shutdownPromise: Promise<void> | null = null
+let autoLoginSettled = false
+let autoLoginRunning = false
 
 function getAppOrigin(): string | null {
   const port = supervisor?.getPort() ?? config?.apiPort ?? 0
@@ -141,6 +144,53 @@ async function showError(status: SupervisorStatus): Promise<void> {
   broadcastStatus()
 }
 
+/** 自动登录失败提示：只给用户名，不含口令；页面仍可手动登录。 */
+function showAutoLoginNotice(username: string): void {
+  const message = autoLoginNoticeMessage(username)
+  logger?.warn(message)
+  if (currentStatus && shellWindow && !shellWindow.isDestroyed()) {
+    shellWindow.webContents.send('campusflow:status', { ...currentStatus, message })
+  }
+  const target = mainWindow
+  if (!target || target.isDestroyed()) return
+  void target.webContents
+    .executeJavaScript(buildAutoLoginNoticeScript(username))
+    .catch((error: unknown) => {
+      logger?.warn(`自动登录提示注入失败：${error instanceof Error ? error.message : String(error)}`)
+    })
+}
+
+/**
+ * 主窗口加载完成或前端路由切到 /login 时尝试自动登录。
+ * 凭据只来自 supervisor 的内存，不暴露给 preload／IPC，也不写入 localStorage。
+ */
+function runAutoLogin(window: BrowserWindow): void {
+  if (!config || config.stub || !config.autoLogin) return
+  const credentials = supervisor?.getBootstrapLogin()
+  if (!credentials) return
+  if (autoLoginSettled || autoLoginRunning) return
+  autoLoginRunning = true
+  void attemptAutoLogin(window.webContents, credentials, { logger: logger ?? undefined })
+    .then((outcome) => {
+      if (outcome === 'success') {
+        autoLoginSettled = true
+        return
+      }
+      if (outcome === 'failed') {
+        autoLoginSettled = true
+        showAutoLoginNotice(credentials.username)
+      }
+    })
+    .catch((error: unknown) => {
+      autoLoginSettled = true
+      logger?.error(`自动登录异常：${error instanceof Error ? error.message : String(error)}`)
+      showAutoLoginNotice(credentials.username)
+    })
+    .finally(() => {
+      autoLoginRunning = false
+    })
+}
+
 async function openMainWindow(): Promise<void> {
   if (mainWindow && !mainWindow.isDestroyed()) return
   const origin = getAppOrigin()
@@ -169,6 +219,9 @@ async function openMainWindow(): Promise<void> {
     event.preventDefault()
     created.setTitle('CampusFlow')
   })
+  // 首次加载完成后尝试自动登录；前端路由异步切到 /login 时再触发一次。
+  created.webContents.on('did-finish-load', () => runAutoLogin(created))
+  created.webContents.on('did-navigate-in-page', () => runAutoLogin(created))
   created.once('ready-to-show', () => {
     created.show()
     if (shellWindow && !shellWindow.isDestroyed()) {
@@ -413,7 +466,7 @@ function bootstrap(): void {
   })
 
   void app.whenReady().then(() => {
-    config = loadConfig(process.env, app.getPath('userData'))
+    config = loadConfig(process.env, app.getPath('userData'), app.isPackaged)
     logger = new Logger(config.logDir)
     const stubSuffix = config.stub ? '（测试桩模式）' : ''
     logger.info(
@@ -422,7 +475,14 @@ function bootstrap(): void {
     logger.info(`用户目录：${config.userDataDir}`)
     logger.info(`数据目录：${config.dataDir}`)
     logger.info(`日志目录：${config.logDir}`)
-    logger.info(`启动顺序：PostgreSQL → migrate → API → Worker`)
+    logger.info(
+      config.bootstrap
+        ? '启动顺序：bootstrap → API → Worker（首启初始化由 sidecar 负责）'
+        : '启动顺序：PostgreSQL → migrate → API → Worker',
+    )
+    if (config.bootstrap) {
+      logger.info(`自动登录：${config.autoLogin ? '启用' : '已关闭（CAMPUSFLOW_AUTO_LOGIN=0）'}`)
+    }
 
     installIpc()
     buildMenu()

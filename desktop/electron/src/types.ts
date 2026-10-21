@@ -1,5 +1,9 @@
-/** 启动阶段严格按 PostgreSQL → migrate → API → Worker 推进。 */
-export type StageName = 'postgres' | 'migrate' | 'api' | 'worker'
+/**
+ * 启动阶段：默认按 PostgreSQL → migrate → API → Worker 推进；
+ * 启用首启初始化（P007 bootstrap）时改为 bootstrap → API → Worker，
+ * 由 sidecar 负责建库、迁移与凭据，Electron 不再自行 initdb／migrate。
+ */
+export type StageName = 'bootstrap' | 'postgres' | 'migrate' | 'api' | 'worker'
 
 export type SupervisorPhase = 'idle' | 'starting' | 'ready' | 'failed' | 'stopping' | 'stopped'
 
@@ -94,6 +98,10 @@ export interface RuntimeConfig {
   pgPort: number
   pgUser: string
   pgDatabase: string
+  /** 首启初始化：由 sidecar bootstrap 建库、迁移并生成凭据，跳过自带 initdb／migrate。 */
+  bootstrap: boolean
+  /** 主窗口加载后使用 bootstrap 生成的本机凭据自动登录；CAMPUSFLOW_AUTO_LOGIN=0 可关闭。 */
+  autoLogin: boolean
   sidecarBin: string | null
   sidecarModule: string
   pythonCommand: string
