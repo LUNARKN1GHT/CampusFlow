@@ -83,12 +83,11 @@ class PgBinaries:
                     "未找到 initdb：请安装 PostgreSQL，或用 CAMPUSFLOW_PG_BIN 指定二进制目录"
                 )
             bindir = Path(found).parent
-        missing = [
-            name for name in ("initdb", "pg_ctl", "pg_isready") if not (bindir / name).is_file()
-        ]
+        resolved = {name: _binary(bindir, name) for name in ("initdb", "pg_ctl", "pg_isready")}
+        missing = [name for name, path in resolved.items() if not path.is_file()]
         if missing:
             raise PostgresError(f"PostgreSQL 二进制目录 {bindir} 缺少：{', '.join(missing)}")
-        result = _run([str(bindir / "initdb"), "--version"])
+        result = _run([str(resolved["initdb"]), "--version"])
         if result.returncode != 0:
             raise PostgresError(f"无法读取 initdb 版本：{_tail(result.stderr)}")
         output = (result.stdout or result.stderr).strip()
@@ -106,7 +105,16 @@ class PgBinaries:
         return True
 
     def tool(self, name: str) -> Path:
-        return self.bindir / name
+        return _binary(self.bindir, name)
+
+
+def _binary(bindir: Path, name: str) -> Path:
+    """Windows 官方安装包只提供 `*.exe`，按实际存在的文件名解析。"""
+    candidate = bindir / name
+    if candidate.is_file():
+        return candidate
+    suffixed = bindir / f"{name}.exe"
+    return suffixed if suffixed.is_file() else candidate
 
 
 def find_free_port(host: str = "127.0.0.1") -> int:

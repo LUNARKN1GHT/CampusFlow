@@ -324,6 +324,22 @@ def test_broken_pg_binaries_are_reported(work_root: Path, tmp_path: Path) -> Non
     assert not work_root.exists()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="用 POSIX 脚本模拟 Windows 的 *.exe")
+def test_pg_binaries_resolve_windows_exe_suffix(tmp_path: Path) -> None:
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for name in ("initdb", "pg_ctl", "pg_isready"):
+        script = bindir / f"{name}.exe"
+        body = "echo 'initdb (PostgreSQL) 17.11'\n" if name == "initdb" else "exit 0\n"
+        script.write_text(f"#!/bin/sh\n{body}", encoding="utf-8")
+        script.chmod(0o755)
+
+    binaries = PgBinaries.discover(str(bindir))
+
+    assert binaries.version == "17.11"
+    assert binaries.tool("pg_ctl").name == "pg_ctl.exe"
+
+
 def test_initialize_refuses_partially_initialized_dir(tmp_path: Path) -> None:
     root = tmp_path / "data"
     (root / "pgdata").mkdir(parents=True)
