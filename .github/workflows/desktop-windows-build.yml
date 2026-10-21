@@ -43,6 +43,13 @@ jobs:
             frontend/package-lock.json
             desktop/electron/package-lock.json
 
+      - name: Run bootstrap tests on Windows
+        shell: pwsh
+        working-directory: backend
+        run: |
+          uv sync --locked
+          uv run --locked pytest tests/test_bootstrap.py -q
+
       - name: Build frontend
         shell: pwsh
         working-directory: frontend
