@@ -66,7 +66,7 @@ macOS：
 
 - `MACOS_CSC_LINK`（Developer ID Application 证书的 base64 p12）与 `MACOS_CSC_KEY_PASSWORD`。
 - `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID` 用于 notarization 与 staple。
-- hardened runtime 由 `desktop/electron/build/entitlements.mac.plist` 启用；授予 JIT、可执行内存与库验证豁免，因为随包 sidecar／PostgreSQL 不是同一签名主体。该文件随仓库保存，启用签名前应先用 `plutil -lint` 校验。
+- hardened runtime 由 `desktop/electron/build/entitlements.mac.plist` 启用；授予 JIT、可执行内存与库验证豁免，因为随包 sidecar／PostgreSQL 不是同一签名主体。该文件随仓库保存；`plutil -lint` 校验通过，图标为 1024×1024。签名与公证本身尚未执行。
 
 Windows：
 
