@@ -196,11 +196,16 @@ class LocalPostgresCluster:
             "# CampusFlow 桌面模式配置（P007，每次启动前重写）",
             "listen_addresses = '127.0.0.1'",
             f"port = {self.port}",
-            f"unix_socket_directories = '{_quote_conf_value(str(self.socket_dir))}'",
-            "unix_socket_permissions = 0700",
-            "password_encryption = scram-sha-256",
-            "",
         ]
+        if os.name != "nt":
+            # Windows 没有 Unix 套接字，且配置值里的反斜杠会被当成转义符。
+            lines.extend(
+                [
+                    f"unix_socket_directories = '{_quote_conf_value(str(self.socket_dir))}'",
+                    "unix_socket_permissions = 0700",
+                ]
+            )
+        lines.extend(["password_encryption = scram-sha-256", ""])
         runtime_config = self.data_dir / _RUNTIME_CONFIG_NAME
         runtime_config.write_text("\n".join(lines), encoding="utf-8")
         main_config = self.data_dir / "postgresql.conf"
