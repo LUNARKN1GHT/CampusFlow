@@ -123,10 +123,10 @@ jobs:
           npm run build
 
       - name: Stage bundled PostgreSQL 17 and pgvector
-        run: powershell -File desktop/postgres/build_windows.ps1
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
 
       - name: Build PyInstaller sidecar
-        run: powershell -File desktop/build_windows.ps1
+        run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
 
       - name: Install Electron dependencies and compile
         working-directory: desktop/electron

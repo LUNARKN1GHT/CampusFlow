@@ -1,0 +1,93 @@
+name: Desktop Windows build
+
+# 验证 P002b/P003b 的 Windows 构建脚本并产出未签名 NSIS 安装包（仅 artifact）。
+# 正式发布仍由 desktop-release.yml 在 desktop-v* 标签上执行。
+on:
+  pull_request:
+    paths:
+      - "desktop/build_windows.ps1"
+      - "desktop/postgres/**"
+      - "desktop/campusflow-sidecar.spec"
+      - "desktop/electron/**"
+      - "frontend/**"
+      - ".github/workflows/desktop-windows-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/electron/package-lock.json
+
+      - name: Build frontend
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
+
+      - name: Build PyInstaller sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
+
+      - name: Install Electron dependencies and compile
+        shell: pwsh
+        working-directory: desktop/electron
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package NSIS installer
+        shell: pwsh
+        working-directory: desktop/electron
+        run: npx electron-builder --win --publish never
+
+      - name: Verify artifacts
+        shell: pwsh
+        run: |
+          $sidecar = 'desktop/dist/campusflow-sidecar/campusflow-sidecar.exe'
+          if (-not (Test-Path $sidecar)) { throw "missing sidecar: $sidecar" }
+          $pg = 'desktop/vendor/pgsql/bin/postgres.exe'
+          if (-not (Test-Path $pg)) { throw "missing postgres: $pg" }
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          $size = [math]::Round($installer.Length / 1MB, 1)
+          Write-Host "installer: $($installer.FullName) ($size MB)"
+          Write-Host "sidecar: $sidecar"
+          Write-Host "postgres: $pg"
+
+      - name: Upload unsigned installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64-ci
+          path: desktop/electron/release/*.exe
+          if-no-files-found: error
