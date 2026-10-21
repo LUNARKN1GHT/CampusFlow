@@ -163,6 +163,17 @@ jobs:
           $env:CAMPUSFLOW_PG_BIN = Join-Path $root 'resources\pgsql\bin'
           npx playwright test tests/packaged-maintenance.spec.ts --reporter=line
 
+      - name: Verify no leftover processes after exit
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 3
+          $left = Get-Process -Name CampusFlow, campusflow-sidecar, postgres -ErrorAction SilentlyContinue
+          if ($left) {
+            $left | Format-Table -AutoSize | Out-String | Write-Host
+            throw 'processes still running after application exit'
+          }
+          Write-Host 'no leftover CampusFlow, sidecar or postgres processes'
+
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4
         with:
