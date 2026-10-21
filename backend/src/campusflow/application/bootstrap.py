@@ -568,9 +568,7 @@ def ensure_ready(settings: Settings, *, secret_store: SecretStore | None = None)
                 cluster.stop()
             except PostgresError:
                 logger.warning("启动失败后停止 PostgreSQL 未成功，请检查残留进程")
-        raise BootstrapError(
-            f"{exc}；日志位于 {paths.postgres_log}", log_dir=paths.logs
-        ) from exc
+        raise BootstrapError(f"{exc}；日志位于 {paths.postgres_log}", log_dir=paths.logs) from exc
 
     connection = PgConnection(
         host=DB_HOST,

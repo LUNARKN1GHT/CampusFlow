@@ -208,9 +208,7 @@ class ArchiveInfo:
 
     @property
     def requires_reauthorization(self) -> tuple[str, ...]:
-        return tuple(
-            item.name for item in self.excluded_credentials if item.requires_reentry
-        )
+        return tuple(item.name for item in self.excluded_credentials if item.requires_reentry)
 
 
 def confirm_token_for_digest(digest: str) -> str:

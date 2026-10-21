@@ -64,9 +64,7 @@ def server_client(tmp_path: Path) -> TestClient:
 
 
 def _login(client: TestClient, *, username: str, password: str):
-    return client.post(
-        "/api/v1/auth/login", json={"username": username, "password": password}
-    )
+    return client.post("/api/v1/auth/login", json={"username": username, "password": password})
 
 
 # ------------------------------------------------------------------ 主机与来源解析
@@ -285,9 +283,7 @@ def test_desktop_x_forwarded_host_cannot_bypass(
     "origin",
     ("http://evil.example", "https://127.0.0.1", "null", "http://localhost.evil.com"),
 )
-def test_desktop_rejects_cross_origin_writes(
-    desktop_api_client: TestClient, origin: str
-) -> None:
+def test_desktop_rejects_cross_origin_writes(desktop_api_client: TestClient, origin: str) -> None:
     response = desktop_api_client.post(
         "/api/v1/auth/login",
         json={"username": "student", "password": "campusflow-dev"},
@@ -320,9 +316,7 @@ def test_desktop_rejects_cross_origin_for_all_write_methods(
     "origin",
     ("http://127.0.0.1:5173", "http://localhost", "http://[::1]:8000"),
 )
-def test_desktop_allows_loopback_origin_writes(
-    desktop_api_client: TestClient, origin: str
-) -> None:
+def test_desktop_allows_loopback_origin_writes(desktop_api_client: TestClient, origin: str) -> None:
     response = _login_with_origin(desktop_api_client, origin, password="campusflow-dev")
     assert response.status_code == 200, origin
     assert response.json() == {"username": "student"}
@@ -339,9 +333,7 @@ def test_desktop_allows_write_without_origin(desktop_api_client: TestClient) -> 
 
 def test_desktop_does_not_apply_origin_check_to_reads(desktop_api_client: TestClient) -> None:
     # 规范只拦截写入方法；GET 带外部 Origin 不改变响应，仍由会话与业务校验负责。
-    response = desktop_api_client.get(
-        "/api/v1/health", headers={"origin": "http://evil.example"}
-    )
+    response = desktop_api_client.get("/api/v1/health", headers={"origin": "http://evil.example"})
     assert response.status_code == 200
 
 
@@ -425,9 +417,7 @@ def test_history_fallback_and_login_flow_work_under_security(
     assert INDEX_MARKER in fallback.text
     assert fallback.headers["content-security-policy"] == CONTENT_SECURITY_POLICY
 
-    login = _login_with_origin(
-        desktop_client, "http://127.0.0.1:5173", password="campusflow-dev"
-    )
+    login = _login_with_origin(desktop_client, "http://127.0.0.1:5173", password="campusflow-dev")
     assert login.status_code == 200
     session = desktop_client.get("/api/v1/auth/session")
     assert session.status_code == 200

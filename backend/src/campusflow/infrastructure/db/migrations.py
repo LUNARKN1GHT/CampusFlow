@@ -48,4 +48,3 @@ def upgrade_to_head(database_url: str, migrations_dir: str | None = None) -> str
     if head is None:
         raise RuntimeError("迁移脚本没有 head，无法确认数据库结构")
     return head
-

@@ -53,14 +53,13 @@ class KeychainSecretStore:
             raise KeychainError("调用 security 命令失败") from exc
 
     def get(self, account: str) -> str | None:
-        result = self._run(
-            ["find-generic-password", "-s", self._service, "-a", account, "-w"]
-        )
+        result = self._run(["find-generic-password", "-s", self._service, "-a", account, "-w"])
         if result.returncode == 0:
             return result.stdout.rstrip("\n")
-        if result.returncode == _ITEM_NOT_FOUND_EXIT_CODE or "could not be found" in (
-            result.stderr or ""
-        ).lower():
+        if (
+            result.returncode == _ITEM_NOT_FOUND_EXIT_CODE
+            or "could not be found" in (result.stderr or "").lower()
+        ):
             return None
         raise KeychainError("读取钥匙串条目失败")
 
@@ -77,8 +76,9 @@ class KeychainSecretStore:
         result = self._run(["delete-generic-password", "-s", self._service, "-a", account])
         if result.returncode == 0:
             return True
-        if result.returncode == _ITEM_NOT_FOUND_EXIT_CODE or "could not be found" in (
-            result.stderr or ""
-        ).lower():
+        if (
+            result.returncode == _ITEM_NOT_FOUND_EXIT_CODE
+            or "could not be found" in (result.stderr or "").lower()
+        ):
             return False
         raise KeychainError("删除钥匙串条目失败")

@@ -53,16 +53,12 @@ class PgToolchain:
 
     @staticmethod
     def _driver_url(url: str) -> str:
-        return make_url(url).set(drivername="postgresql+psycopg").render_as_string(
-            hide_password=False
+        return (
+            make_url(url).set(drivername="postgresql+psycopg").render_as_string(hide_password=False)
         )
 
     def connection_url(self, database: str) -> str:
-        return (
-            make_url(self._app_url)
-            .set(database=database)
-            .render_as_string(hide_password=False)
-        )
+        return make_url(self._app_url).set(database=database).render_as_string(hide_password=False)
 
     def _engine(self, url: str):
         return create_engine(
@@ -110,8 +106,9 @@ class PgToolchain:
                         counts[key] = 0
                         continue
                     counts[key] = int(
-                        connection.execute(text(f"SELECT count(*) FROM {quote_identifier(table)}"))
-                        .scalar_one()
+                        connection.execute(
+                            text(f"SELECT count(*) FROM {quote_identifier(table)}")
+                        ).scalar_one()
                     )
         except SQLAlchemyError as error:
             raise DatabaseToolError(f"读取条目数失败：{_detail(error)}") from error
@@ -203,9 +200,7 @@ class PgToolchain:
         ]
         completed = self._run(command, url, "pg_restore 恢复数据库失败", check=False)
         errors = [
-            line
-            for line in completed.stderr.splitlines()
-            if line.startswith("pg_restore: error:")
+            line for line in completed.stderr.splitlines() if line.startswith("pg_restore: error:")
         ]
         unexpected = [
             line
@@ -253,11 +248,7 @@ class PgToolchain:
     def provision_extensions(self, database: str, extensions: Sequence[str]) -> None:
         if not extensions:
             return
-        url = (
-            make_url(self._admin_url)
-            .set(database=database)
-            .render_as_string(hide_password=False)
-        )
+        url = make_url(self._admin_url).set(database=database).render_as_string(hide_password=False)
         engine = create_engine(
             self._driver_url(url),
             poolclass=NullPool,

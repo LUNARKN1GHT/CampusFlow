@@ -163,9 +163,7 @@ class TransferService:
         created_at = self._now()
         with tempfile.TemporaryDirectory(dir=output.parent, prefix=".campusflow-dump-") as temp:
             dump_path = Path(temp) / DATABASE_NAME
-            self.tools.dump_database(
-                self.target.url, dump_path, exclude_table_data=exclude_data
-            )
+            self.tools.dump_database(self.target.url, dump_path, exclude_table_data=exclude_data)
             dump_size = dump_path.stat().st_size
             dump_sha256 = sha256_file(dump_path)
             manifest = ArchiveManifest(
@@ -298,8 +296,7 @@ class TransferService:
                     for key, (expected, actual) in mismatched.items()
                 )
                 raise ImportVerificationError(
-                    f"恢复后的数据与归档清单不一致（{detail}）。"
-                    "已放弃切换，本机原有数据保持不变。"
+                    f"恢复后的数据与归档清单不一致（{detail}）。已放弃切换，本机原有数据保持不变。"
                 )
 
             self.store.extract_materials(archive, manifest, materials_dir)

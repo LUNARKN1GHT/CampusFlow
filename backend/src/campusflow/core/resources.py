@@ -66,4 +66,3 @@ def resolve_backup_dir(settings: "Settings") -> Path:
     if settings.data_dir:
         return Path(settings.data_dir).expanduser() / "backups"
     return Path(settings.storage_dir).expanduser().resolve().parent / "backups"
-

@@ -102,8 +102,7 @@ class CampusflowArchive:
             raise ArchiveFormatError(f"manifest.json 字段不合法（{detail}）。") from error
         if manifest.database.path != DATABASE_NAME:
             raise ArchiveFormatError(
-                f"清单声明的数据库文件名必须是 {DATABASE_NAME}，"
-                f"实际为 {manifest.database.path!r}。"
+                f"清单声明的数据库文件名必须是 {DATABASE_NAME}，实际为 {manifest.database.path!r}。"
             )
         return manifest
 
@@ -134,9 +133,7 @@ class CampusflowArchive:
 
     # ------------------------------------------------------------------ 解出
 
-    def extract_database(
-        self, archive: Path, manifest: ArchiveManifest, destination: Path
-    ) -> None:
+    def extract_database(self, archive: Path, manifest: ArchiveManifest, destination: Path) -> None:
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         try:
