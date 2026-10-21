@@ -1,0 +1,175 @@
+name: Desktop archive compatibility
+
+# P012：验证 `.campusflow` 在 Windows 导出、macOS 导入后数据完整且一致。
+# 只验证归档格式与导出/导入流程，不安装桌面应用、不涉及签名。
+on:
+  pull_request:
+    paths:
+      - "backend/src/campusflow/application/transfer/**"
+      - "backend/src/campusflow/infrastructure/transfer/**"
+      - "backend/src/campusflow/sidecar/**"
+      - "backend/migrations/**"
+      - "desktop/postgres/**"
+      - ".github/workflows/desktop-archive-compat.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-archive-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-export:
+    name: Windows export
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
+
+      - name: Bootstrap, seed and export archive
+        shell: pwsh
+        working-directory: backend
+        env:
+          CAMPUSFLOW_DEPLOYMENT_MODE: desktop
+          CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}\campusflow-export
+          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}\desktop\vendor\pgsql\bin
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $staging = Join-Path $env:RUNNER_TEMP 'archive'
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          $archive = Join-Path $staging 'campusflow-from-windows.campusflow'
+
+          $report = & uv run --locked campusflow-sidecar bootstrap --json
+          if ($LASTEXITCODE -ne 0) { throw 'bootstrap failed' }
+          $report | Set-Content -Path (Join-Path $staging 'bootstrap.json') -Encoding utf8
+          $state = $report | ConvertFrom-Json
+          if (-not $state.postgres_running) { throw 'PostgreSQL is not running after bootstrap' }
+
+          $env:CAMPUSFLOW_DATABASE_URL = $state.database_url
+          $psqlUrl = $state.database_url -replace 'postgresql\+psycopg://', 'postgresql://'
+          $seed = 'INSERT INTO workspaces (name, timezone) VALUES (''desktop-transfer-check'', ''Asia/Shanghai'');' +
+                  'INSERT INTO semesters (workspace_id, name, start_date, end_date, archived) SELECT id, ''2026 Fall'', DATE ''2026-09-01'', DATE ''2027-01-15'', false FROM workspaces WHERE name = ''desktop-transfer-check'';' +
+                  'INSERT INTO courses (workspace_id, semester_id, name, code) SELECT w.id, s.id, ''Cross-OS Course'', ''CF101'' FROM workspaces w JOIN semesters s ON s.workspace_id = w.id WHERE w.name = ''desktop-transfer-check'' AND s.name = ''2026 Fall'';'
+          & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -c $seed
+          if ($LASTEXITCODE -ne 0) { throw 'seeding failed' }
+
+          $export = & uv run --locked campusflow-sidecar export --output $archive
+          if ($LASTEXITCODE -ne 0) { throw 'export failed' }
+          $export | Set-Content -Path (Join-Path $staging 'export.json') -Encoding utf8
+          $exported = $export | ConvertFrom-Json
+          if (-not (Test-Path $archive)) { throw "archive missing: $archive" }
+          foreach ($table in @('workspaces', 'semesters', 'courses')) {
+            if ($exported.counts.$table -ne 1) {
+              throw "expected one $table row in export, got $($exported.counts.$table)"
+            }
+          }
+          Write-Host "exported: $($exported.size) bytes, sha256 $($exported.sha256)"
+
+          $info = & uv run --locked campusflow-sidecar import $archive --inspect
+          if ($LASTEXITCODE -ne 0) { throw 'inspect failed' }
+          $inspected = $info | ConvertFrom-Json
+          if ($inspected.platform -notmatch 'Windows') {
+            throw "unexpected archive platform: $($inspected.platform)"
+          }
+          Write-Host "inspect: format $($inspected.format_version), schema $($inspected.schema_head)"
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusflow-windows-archive
+          path: ${{ runner.temp }}/archive
+          if-no-files-found: error
+
+  macos-import:
+    name: macOS import
+    needs: windows-export
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        run: bash desktop/postgres/build_macos.sh
+
+      - name: Download Windows archive
+        uses: actions/download-artifact@v4
+        with:
+          name: campusflow-windows-archive
+          path: ${{ runner.temp }}/archive
+
+      - name: Import archive and verify data
+        working-directory: backend
+        env:
+          CAMPUSFLOW_DEPLOYMENT_MODE: desktop
+          CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}/campusflow-import
+          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}/desktop/vendor/pgsql/bin
+        run: |
+          set -euo pipefail
+          staging="$RUNNER_TEMP/archive"
+          archive="$staging/campusflow-from-windows.campusflow"
+
+          report=$(uv run --locked campusflow-sidecar bootstrap --json)
+          echo "$report" | jq -e '.postgres_running == true' >/dev/null
+          export CAMPUSFLOW_DATABASE_URL
+          CAMPUSFLOW_DATABASE_URL=$(echo "$report" | jq -r '.database_url')
+
+          info=$(uv run --locked campusflow-sidecar import "$archive" --inspect)
+          echo "$info" | jq -e '.platform | startswith("Windows")' >/dev/null
+          echo "$info" | jq -e '.format_version' >/dev/null
+          token=$(echo "$info" | jq -r '.confirm_token')
+
+          result=$(uv run --locked campusflow-sidecar import "$archive" --replace --confirm-token "$token")
+          echo "$result" | jq .
+          echo "$result" > "$staging/import.json"
+
+          uv run --locked python - "$staging/export.json" "$staging/import.json" <<'PY'
+          import json
+          import sys
+
+          exported = json.load(open(sys.argv[1], encoding="utf-8"))["counts"]
+          restored = json.load(open(sys.argv[2], encoding="utf-8"))["restored_counts"]
+          differing = {key: (value, restored.get(key)) for key, value in exported.items() if restored.get(key) != value}
+          if differing:
+              raise SystemExit(f"restored counts differ: {differing}")
+          PY
+
+          psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
+          workspace=$("$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc \
+            "SELECT name FROM workspaces WHERE name = 'desktop-transfer-check'")
+          course=$("$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 -tAc \
+            "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'")
+          if [ "$workspace" != "desktop-transfer-check" ]; then
+            echo "workspace missing after import: '$workspace'" >&2
+            exit 1
+          fi
+          if [ "$course" != "Cross-OS Course" ]; then
+            echo "course missing after import: '$course'" >&2
+            exit 1
+          fi
+          echo "cross-platform archive verified: $workspace / $course"
