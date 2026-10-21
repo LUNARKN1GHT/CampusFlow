@@ -170,3 +170,141 @@ jobs:
             exit 1
           fi
           echo "cross-platform archive verified: $workspace / $course"
+
+  macos-export:
+    name: macOS export
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        run: bash desktop/postgres/build_macos.sh
+
+      - name: Build PyInstaller sidecar
+        run: bash desktop/build_macos.sh
+
+      - name: Bootstrap, seed and export archive
+        env:
+          CAMPUSFLOW_DEPLOYMENT_MODE: desktop
+          CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}/campusflow-export
+          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}/desktop/vendor/pgsql/bin
+        run: |
+          set -euo pipefail
+          sidecar="$GITHUB_WORKSPACE/desktop/dist/campusflow-sidecar/campusflow-sidecar"
+          staging="$RUNNER_TEMP/archive"
+          mkdir -p "$staging"
+          archive="$staging/campusflow-from-macos.campusflow"
+
+          report=$("$sidecar" bootstrap --json)
+          echo "$report" | jq -e '.postgres_running == true' >/dev/null
+          export CAMPUSFLOW_DATABASE_URL
+          CAMPUSFLOW_DATABASE_URL=$(echo "$report" | jq -r '.database_url')
+          psql_url="${CAMPUSFLOW_DATABASE_URL/postgresql+psycopg/postgresql}"
+
+          "$CAMPUSFLOW_PG_BIN/psql" "$psql_url" -v ON_ERROR_STOP=1 \
+            -c "INSERT INTO workspaces (name, timezone) VALUES ('reverse-transfer-check', 'Asia/Shanghai')" \
+            -c "INSERT INTO semesters (workspace_id, name, start_date, end_date, archived) SELECT id, '2026 Fall', DATE '2026-09-01', DATE '2027-01-15', false FROM workspaces WHERE name = 'reverse-transfer-check'" \
+            -c "INSERT INTO courses (workspace_id, semester_id, name, code) SELECT w.id, s.id, 'Reverse OS Course', 'CF102' FROM workspaces w JOIN semesters s ON s.workspace_id = w.id WHERE w.name = 'reverse-transfer-check'"
+
+          exported=$("$sidecar" export --output "$archive")
+          echo "$exported" > "$staging/export.json"
+          echo "$exported" | jq -e '.counts.workspaces == 1 and .counts.semesters == 1 and .counts.courses == 1' >/dev/null
+          echo "$exported" | jq -e '.size > 0' >/dev/null
+
+          info=$("$sidecar" import "$archive" --inspect)
+          echo "$info" | jq -e '.platform | test("macOS|Darwin")' >/dev/null
+          echo "exported from macOS: $(echo "$exported" | jq -r '.size') bytes"
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusflow-macos-archive
+          path: ${{ runner.temp }}/archive
+          if-no-files-found: error
+
+  windows-import:
+    name: Windows import
+    needs: macos-export
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
+
+      - name: Build PyInstaller sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
+
+      - name: Download macOS archive
+        uses: actions/download-artifact@v4
+        with:
+          name: campusflow-macos-archive
+          path: ${{ runner.temp }}/archive
+
+      - name: Import archive and verify data
+        shell: pwsh
+        env:
+          CAMPUSFLOW_DEPLOYMENT_MODE: desktop
+          CAMPUSFLOW_DATA_DIR: ${{ runner.temp }}\campusflow-import
+          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}\desktop\vendor\pgsql\bin
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sidecar = Join-Path $env:GITHUB_WORKSPACE 'desktop\dist\campusflow-sidecar\campusflow-sidecar.exe'
+          $staging = Join-Path $env:RUNNER_TEMP 'archive'
+          $archive = Join-Path $staging 'campusflow-from-macos.campusflow'
+
+          $report = & $sidecar bootstrap --json
+          if ($LASTEXITCODE -ne 0) { throw 'bootstrap failed' }
+          $state = $report | ConvertFrom-Json
+          if (-not $state.postgres_running) { throw 'PostgreSQL is not running after bootstrap' }
+          $env:CAMPUSFLOW_DATABASE_URL = $state.database_url
+
+          $info = & $sidecar import $archive --inspect
+          if ($LASTEXITCODE -ne 0) { throw 'inspect failed' }
+          $inspected = $info | ConvertFrom-Json
+          if ($inspected.platform -notmatch 'macOS|Darwin') {
+            throw "unexpected archive platform: $($inspected.platform)"
+          }
+
+          $result = & $sidecar import $archive --replace --confirm-token $inspected.confirm_token
+          if ($LASTEXITCODE -ne 0) { throw 'import failed' }
+          $result | Set-Content -Path (Join-Path $staging 'import.json') -Encoding utf8
+          $restored = $result | ConvertFrom-Json
+          $exported = Get-Content (Join-Path $staging 'export.json') -Raw | ConvertFrom-Json
+          foreach ($table in @('workspaces', 'semesters', 'courses')) {
+            if ($exported.counts.$table -ne $restored.restored_counts.$table) {
+              throw "count mismatch for ${table}: exported $($exported.counts.$table), restored $($restored.restored_counts.$table)"
+            }
+          }
+
+          $psqlUrl = $state.database_url -replace 'postgresql\+psycopg://', 'postgresql://'
+          $workspace = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc `
+            "SELECT name FROM workspaces WHERE name = 'reverse-transfer-check'"
+          if ($LASTEXITCODE -ne 0) { throw 'workspace query failed' }
+          $course = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc `
+            "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'"
+          if ($LASTEXITCODE -ne 0) { throw 'course query failed' }
+          if ($workspace.Trim() -ne 'reverse-transfer-check') {
+            throw "workspace missing after import: '$workspace'"
+          }
+          if ($course.Trim() -ne 'Reverse OS Course') {
+            throw "course missing after import: '$course'"
+          }
+          Write-Host "reverse cross-platform archive verified: $($workspace.Trim()) / $($course.Trim())"
+
