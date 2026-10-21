@@ -57,6 +57,7 @@ interface Harness {
 interface RunCall {
   command: string
   args: string[]
+  cwd: string
   env: NodeJS.ProcessEnv
 }
 
@@ -122,7 +123,7 @@ function createHarness(
       args: string[],
       runOptions: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number },
     ) => {
-      runCalls.push({ command, args: [...args], env: { ...runOptions.env } })
+      runCalls.push({ command, args: [...args], cwd: runOptions.cwd, env: { ...runOptions.env } })
       // Windows 停止服务走 taskkill；模拟它结束对应子进程，让 exit 与顺序断言有效。
       const pidFlag = args.indexOf('/pid')
       if (command === 'taskkill' && pidFlag >= 0) {
@@ -256,6 +257,9 @@ test('bootstrap 成功时跳过 initdb，先过升级闸门再按 bootstrap → 
     expect(call.env.CAMPUSFLOW_DATA_DIR).toBe(harness.config.dataDir)
   }
   const bootstrapEnv = harness.runCalls[0]!.env
+  // Windows 不能删除自身的当前工作目录；bootstrap 必须从数据目录之外启动。
+  expect(harness.runCalls[0]!.cwd).toBe(harness.config.runDir)
+  expect(harness.runCalls[0]!.cwd).not.toBe(harness.config.dataDir)
   expect(bootstrapEnv.CAMPUSFLOW_LOG_DIR).toBe(harness.config.logDir)
   expect(bootstrapEnv.CAMPUSFLOW_PG_BIN).toBe('/fake/pg')
   expect(bootstrapEnv.CAMPUSFLOW_PG_PORT).toBe(String(harness.config.pgPort))
