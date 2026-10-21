@@ -102,6 +102,8 @@ Run first launch and maintenance flow            1 passed (33.7 s)
 - 使用 electron-builder 生成的 assisted NSIS 安装器，`/S` 静默安装到当前用户目录。
 - 测试对安装后的可执行文件运行 `tests/packaged-maintenance.spec.ts`，sidecar 与
   PostgreSQL 都指向安装目录内的 `resources`，不依赖仓库构建目录。
+- 应用退出后等待主进程结束，再检查 `CampusFlow`、`campusflow-sidecar` 与
+  `postgres` 进程，均无残留（`Verify no leftover processes after exit` 通过）。
 - 同一运行的 Python bootstrap 测试 13 passed、3 skipped；PostgreSQL/pgvector/sidecar
   冒烟全部通过。
 
