@@ -170,7 +170,7 @@ env -i HOME=/tmp/cf-clean/home TMPDIR=/tmp PATH=/usr/bin:/bin:/usr/sbin:/sbin \
   随后 `migrate`（已是最新）→ `api` → `worker` → ready；健康检查 200。
 - SIGTERM 后按 Worker → API → PostgreSQL 回收，无残留进程。
 - 这不是干净机器验收：仍使用同一台已安装 Homebrew／Node 的 macOS，只证明运行时 PATH 中
-  不需要它们；全新 macOS 与 DMG 安装仍未验证。
+  不需要它们；全新 macOS 与 `/Applications` 安装仍未验证。
 
 ### 升级闸门实跑（旧结构 → 新结构）
 
