@@ -1,4 +1,5 @@
 #Requires -Version 5.1
+# Windows runtime smoke (initdb + pgvector + sidecar) runs in desktop-windows-build.yml.
 <#
 P003b: stage a self-contained PostgreSQL 17 + pgvector runtime for the Windows app.
 
