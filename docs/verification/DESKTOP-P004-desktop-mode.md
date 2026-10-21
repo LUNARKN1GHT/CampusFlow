@@ -29,6 +29,7 @@ server GET /                      -> 404 application/json
 ```
 
 - `uv build --wheel` 产物包含 `campusflow/alembic.ini` 与 `campusflow/migrations/**`。
+- 真实浏览器（Playwright Chromium，桌面模式绑定 `127.0.0.1:8123`，静态目录为 `frontend/dist`）：首访重定向 `/login?redirect=/`，登录后进入总览；`/plan` 等 history 路由由 `index.html` 回退并正常渲染；会话 Cookie `campusflow_session` 为 `httpOnly` 且域为 `127.0.0.1`；页面仅有一处登录前的预期 401，无脚本异常。
 
 ## 未验证
 
