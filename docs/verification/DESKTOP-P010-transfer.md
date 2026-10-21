@@ -68,6 +68,22 @@ from campusflow.infrastructure.transfer import (
 配置：`CAMPUSFLOW_PG_BIN`、`CAMPUSFLOW_PG_ADMIN_URL`、`CAMPUSFLOW_BACKUP_DIR`、
 `CAMPUSFLOW_STORAGE_DIR`、`CAMPUSFLOW_MIGRATIONS_DIR`。
 
+## Electron 入口
+
+打包应用通过菜单「数据 → 导出数据归档…／从归档导入…」调用同一套 sidecar 命令，
+不在 Electron 内复制校验、备份或切换逻辑：
+
+- 导出：保存对话框默认指向 `~/Documents/campusflow-<本地时间戳>.campusflow`，完成后只展示
+  路径、大小、SHA-256 与已排除凭据数量；导出期间 API／Worker 继续运行。
+- 导入：先执行 `import --inspect`；确认框展示来源平台与版本、数据库结构、条目与资料数量、
+  需要重新授权的项。确认后暂停 API 与 Worker（PostgreSQL 保持运行），再执行
+  `import --replace --confirm-token <令牌>`，成功后重启应用；失败自动恢复服务并提示。
+  确认令牌只经命令行参数传递，不写日志、不落盘。
+- 维护命令使用 bootstrap 内存中的超级用户连接串与 pg 工具位置，不传本机登录凭据或 API 端口。
+
+验证：`cd desktop/electron && npm test` 40 passed（含 14 项维护流程用例与 1 项菜单用例）。
+真实打包应用中的对话框导出／导入与跨机器迁移仍需在干净机器上补做。
+
 ## 验收记录
 
 - `uv run pytest tests/test_transfer_archive.py`：18 passed（真实 PostgreSQL；

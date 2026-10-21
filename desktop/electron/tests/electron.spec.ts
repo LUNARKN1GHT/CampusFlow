@@ -199,3 +199,26 @@ test('模拟迁移失败时显示错误页，点击重试后进入主窗口', as
   await expect.poll(() => isAlive(apiPid), { timeout: 5_000 }).toBe(false)
   await expect.poll(() => isAlive(workerPid), { timeout: 5_000 }).toBe(false)
 })
+
+test('应用菜单提供数据导出、导入与升级入口', async () => {
+  const { app } = await launchStub()
+  const shell = await app.firstWindow()
+  await expect(shell.locator('[data-testid="splash"]')).toBeVisible({ timeout: 15_000 })
+  await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu()
+    if (!menu) throw new Error('应用菜单尚未构建')
+  })
+  const labels = await app.evaluate(({ Menu }) =>
+    (Menu.getApplicationMenu()?.items ?? []).map((item) => item.label),
+  )
+  expect(labels).toEqual(expect.arrayContaining(['CampusFlow', '数据', '编辑']))
+
+  const dataItems = await app.evaluate(({ Menu }) => {
+    const data = (Menu.getApplicationMenu()?.items ?? []).find((item) => item.label === '数据')
+    return (data?.submenu?.items ?? [])
+      .map((item) => item.label)
+      .filter((label) => label.length > 0)
+  })
+  expect(dataItems).toEqual(['导出数据归档…', '从归档导入…', '检查数据库升级…'])
+  await quitGracefully(app)
+})

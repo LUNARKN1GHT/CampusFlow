@@ -63,6 +63,19 @@ sidecar 启动顺序：先 `upgrade_if_needed(settings)`，再 `check_schema_or_
 - 恢复先校验 dump 和每个资料文件的 SHA-256，校验失败不会清空当前数据库；校验通过后清理当前 schema 中非扩展拥有的表、序列、视图、例程和类型，再用过滤后的 pg_restore 清单恢复，跳过 `EXTENSION` 与 `SCHEMA` 条目，避免普通数据库用户尝试修改 `vector` 扩展。恢复后再次核对 revision，并逐文件复核资料校验和。
 - 口令只通过 `PGPASSWORD` 等环境变量传给子进程；命令行、manifest、日志和错误文本均不包含口令（连接串显示为 `user:***@host`）。
 
+## Electron 接入
+
+- 启动：bootstrap 之后固定执行 `upgrade --check --apply --json`（阶段显示「数据库迁移」），
+  需要升级时先备份再迁移；`database_ahead` 直接拒绝启动并在错误页给出当前结构与内置结构，
+  不降级。仅在启动桩模式下跳过。
+- 手动入口：菜单「数据 → 检查数据库升级…」先只读检查；`up_to_date`／`uninitialized`／
+  `database_ahead` 分别给出明确提示；`upgrade_required` 经用户确认后暂停 API 与 Worker
+  （PostgreSQL 保留），执行备份升级，成功重启应用，失败恢复服务。
+- 维护命令复用 bootstrap 内存中的连接串，不传本机登录凭据；升级前备份路径在成功提示中展示。
+
+验证：`cd desktop/electron && npm test` 40 passed，其中覆盖启动即拒绝降级、需要升级时
+暂停/恢复与重启路径。真实安装器跨版本升级（旧版本导出 → 新版本安装包启动）仍未验证。
+
 ## 保留策略
 
 升级前备份目录名以 `pre-upgrade-` 开头且含 `manifest.json` 才算候选；按目录名（UTC 时间戳）倒序保留最新 `CAMPUSFLOW_BACKUP_RETENTION_COUNT` 份，并强制保留本次用于恢复的备份。清理只在迁移与校验全部成功后执行；失败路径不删除任何旧备份，恢复所用备份也不会被删除。
