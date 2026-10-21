@@ -88,6 +88,12 @@ function broadcastStatus(): void {
   }
 }
 
+/** 外壳窗口在启动页与错误页之间快速切换时，先中止在途导航。 */
+function loadShellPage(target: BrowserWindow, file: string): Promise<void> {
+  if (target.webContents.isLoading()) target.webContents.stop()
+  return target.loadFile(path.join(rendererDir, file))
+}
+
 function createShellWindow(): BrowserWindow {
   if (shellWindow && !shellWindow.isDestroyed()) return shellWindow
   shellWindow = new BrowserWindow({
@@ -105,8 +111,13 @@ function createShellWindow(): BrowserWindow {
     shellWindow = null
   })
   shellView = 'splash'
-  void shellWindow.loadFile(path.join(rendererDir, 'splash.html')).catch((error: unknown) => {
+  void loadShellPage(shellWindow, 'splash.html').catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
+    // 切换到错误页会中止启动页导航；只有仍停留在启动页时才是真的加载失败。
+    if (shellView !== 'splash') {
+      logger?.info('启动页导航已中止（切换到其它页面）')
+      return
+    }
     logger?.error(`启动页加载失败：${message}`)
     // 连本地启动页都无法加载时仍给出可见错误，而不是留下空白窗口。
     dialog.showErrorBox(
@@ -125,7 +136,7 @@ async function showSplash(): Promise<void> {
     target.setSize(460, 320)
     target.setResizable(false)
     try {
-      await target.loadFile(path.join(rendererDir, 'splash.html'))
+      await loadShellPage(target, 'splash.html')
     } catch (error) {
       logger?.error(`启动页重新加载失败：${error instanceof Error ? error.message : String(error)}`)
     }
@@ -145,7 +156,7 @@ async function showError(status: SupervisorStatus): Promise<void> {
     target.setSize(680, 640)
     target.setResizable(true)
     try {
-      await target.loadFile(path.join(rendererDir, 'error.html'))
+      await loadShellPage(target, 'error.html')
     } catch (error) {
       logger?.error(`错误页加载失败：${error instanceof Error ? error.message : String(error)}`)
     }

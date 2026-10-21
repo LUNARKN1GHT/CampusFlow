@@ -57,6 +57,7 @@ CAMPUSFLOW_SIDECAR_BIN=<repo>/desktop/dist/campusflow-sidecar/campusflow-sidecar
 3. 桌面模式缺少模型密钥时 Worker 直接退出 → 桌面模式允许启动：文本解析继续，图片识别与向量索引在真正调用时以“未配置模型密钥”永久失败，不伪造结果。
 4. 打包后未自动发现 `Resources/sidecar`、`Resources/pgsql`、`Resources/static` → 运行时按 `process.resourcesPath` 探测，源码运行保持原有回退。
 5. PyInstaller 入口与 P006 CLI 两套命令 → 统一委托 `campusflow.sidecar.cli:main`。
+6. Linux CI 上 bootstrap 快速失败时，错误页会取代仍在加载的启动页，导航以 `ERR_ABORTED`／`ERR_FAILED` 结束并触发进程退出 → 切换页面前先 `stop()` 在途导航，且只有外壳仍停留在启动页时才把加载失败当作致命错误（`desktop-ci.yml` 覆盖）。
 
 ## 首启初始化与自动登录（P008 接入）
 
@@ -131,6 +132,9 @@ secrets.json: 0600，含 db-password 与 local-password
 - 配置：打包／`CAMPUSFLOW_BOOTSTRAP`／`CAMPUSFLOW_MANAGED_POSTGRES`／测试桩的启用规则，`CAMPUSFLOW_AUTO_LOGIN=0`。
 - 自动登录：登录页填充与提交、未跳转时 1 秒后重试一次、失败只提示用户名且异常信息不含口令、失败提示条脚本不含口令。
 - Electron：测试桩模式不出现 bootstrap 阶段；假 sidecar 退出 1 时显示错误页且不启动 API；应用菜单包含「数据」导出／导入／升级入口。
+
+同一套用例由 `.github/workflows/desktop-ci.yml` 在 Ubuntu + Xvfb 上运行（`desktop/electron/**` 变化时触发），
+用于拦截只在 Linux 时序下暴露的启动/错误页切换问题。
 
 ### 数据维护与升级闸门（2026-10-21 复跑）
 

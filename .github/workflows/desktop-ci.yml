@@ -1,0 +1,59 @@
+name: Desktop shell
+
+# 桌面外壳（Electron）的类型检查与 Playwright 测试。打包与发布仍由
+# desktop-release.yml 负责；这里只保证外壳逻辑在合并前经过验证。
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "desktop/electron/**"
+      - ".github/workflows/desktop-ci.yml"
+  pull_request:
+    paths:
+      - "desktop/electron/**"
+      - ".github/workflows/desktop-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-shell-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  electron:
+    name: Electron tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: desktop/electron
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop/electron/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Electron runtime libraries
+        run: npx playwright install-deps
+
+      # Electron 的 chrome-sandbox 需要 setuid root 才能在 CI 中启用沙箱；
+      # 不关闭沙箱，避免测试环境与发布包的沙箱行为不一致。
+      - name: Configure Chromium sandbox
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: xvfb-run -a npm test

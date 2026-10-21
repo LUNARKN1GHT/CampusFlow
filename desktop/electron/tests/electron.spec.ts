@@ -57,13 +57,27 @@ async function quitWithSignal(app: ElectronApplication, signal: NodeJS.Signals):
   await closed
 }
 
+/** CI 上 Electron 首次启动可能明显慢于本机，给首窗口更长的等待时间。 */
+async function firstWindow(app: ElectronApplication) {
+  return app.firstWindow({ timeout: 60_000 })
+}
+
 test.afterEach(async () => {
   // 测试失败时也确保 Electron 及其桩进程退出，避免污染后续用例。
   for (const app of openApps.splice(0)) {
     try {
-      await app.close()
+      // 主进程卡住时 app.close 会一直等待；超时后强制结束，避免整个 worker 超时。
+      await Promise.race([
+        app.close(),
+        new Promise((resolve) => setTimeout(resolve, 10_000).unref()),
+      ])
     } catch {
       // 已经退出的应用再次关闭会抛错，忽略即可。
+    }
+    try {
+      app.process().kill('SIGKILL')
+    } catch {
+      // 进程已经退出。
     }
   }
   for (const dir of tempDirs.splice(0)) {
@@ -73,7 +87,7 @@ test.afterEach(async () => {
 
 test('测试桩模式：启动页 → 主窗口，日志按阶段推进，退出后无残留子进程', async () => {
   const { app, userData } = await launchStub()
-  const splash = await app.firstWindow()
+  const splash = await firstWindow(app)
   const mainPromise = app.waitForEvent('window', {
     predicate: (page) => page.url().startsWith('http://127.0.0.1:'),
   })
@@ -155,8 +169,29 @@ test('bootstrap 失败时显示错误页，且不启动 API', async () => {
     },
   })
   openApps.push(app)
+  const stderr: Buffer[] = []
+  app.process().stderr?.on('data', (chunk: Buffer) => stderr.push(Buffer.from(chunk)))
 
-  const shell = await app.firstWindow()
+  let shell
+  try {
+    shell = await firstWindow(app)
+  } catch (error) {
+    const logPath = path.join(userData, 'logs', 'main.log')
+    console.log('electron stderr:', Buffer.concat(stderr).toString())
+    console.log('main.log:', existsSync(logPath) ? readFileSync(logPath, 'utf8') : '(missing)')
+    try {
+      const windows = await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map((window) => ({
+          url: window.webContents.getURL(),
+          destroyed: window.isDestroyed(),
+        })),
+      )
+      console.log('browser windows:', JSON.stringify(windows))
+    } catch (probeError) {
+      console.log('browser windows probe failed:', String(probeError))
+    }
+    throw error
+  }
   await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(shell.locator('[data-testid="error-stage"]')).toContainText('首启初始化')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('退出码 1')
@@ -177,7 +212,7 @@ test('模拟迁移失败时显示错误页，点击重试后进入主窗口', as
   const { app, userData } = await launchStub({
     CAMPUSFLOW_ELECTRON_STUB_FAIL_STAGE: 'migrate',
   })
-  const shell = await app.firstWindow()
+  const shell = await firstWindow(app)
   await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(shell.locator('[data-testid="error-stage"]')).toContainText('数据库迁移')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('模拟')
@@ -202,7 +237,7 @@ test('模拟迁移失败时显示错误页，点击重试后进入主窗口', as
 
 test('应用菜单提供数据导出、导入与升级入口', async () => {
   const { app } = await launchStub()
-  const shell = await app.firstWindow()
+  const shell = await firstWindow(app)
   await expect(shell.locator('[data-testid="splash"]')).toBeVisible({ timeout: 15_000 })
   await app.evaluate(({ Menu }) => {
     const menu = Menu.getApplicationMenu()
