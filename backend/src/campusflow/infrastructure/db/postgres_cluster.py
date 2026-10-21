@@ -58,6 +58,26 @@ def _run(
         raise PostgresError(f"无法执行 {Path(command[0]).name}") from exc
 
 
+def _run_detached(
+    command: list[str],
+    *,
+    env: dict[str, str] | None = None,
+    timeout: int = _COMMAND_TIMEOUT_SECONDS,
+) -> int:
+    """启动服务器时不能用管道：postgres 会继承句柄，Windows 上父进程会一直等 EOF。"""
+    try:
+        return subprocess.run(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
+            env=env,
+        ).returncode
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise PostgresError(f"无法执行 {Path(command[0]).name}") from exc
+
+
 def server_env() -> dict[str, str]:
     """服务器与 pg_ctl 的环境：固定 C locale，不传递任何 PGPASSWORD。"""
     env = {key: value for key, value in os.environ.items() if key != "PGPASSWORD"}
@@ -221,7 +241,7 @@ class LocalPostgresCluster:
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise PostgresError("无法写入 PostgreSQL 运行配置，数据目录可能不可写") from exc
-        result = _run(
+        returncode = _run_detached(
             [
                 str(self.binaries.tool("pg_ctl")),
                 "-D",
@@ -235,7 +255,7 @@ class LocalPostgresCluster:
             ],
             env=server_env(),
         )
-        if result.returncode != 0:
+        if returncode != 0:
             raise PostgresError(f"PostgreSQL 启动失败：{self.log_tail()}")
 
     def stop(self) -> bool:
