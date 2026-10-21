@@ -169,8 +169,18 @@ test('bootstrap 失败时显示错误页，且不启动 API', async () => {
     },
   })
   openApps.push(app)
+  const stderr: Buffer[] = []
+  app.process().stderr?.on('data', (chunk: Buffer) => stderr.push(Buffer.from(chunk)))
 
-  const shell = await firstWindow(app)
+  let shell
+  try {
+    shell = await firstWindow(app)
+  } catch (error) {
+    const logPath = path.join(userData, 'logs', 'main.log')
+    console.log('electron stderr:', Buffer.concat(stderr).toString())
+    console.log('main.log:', existsSync(logPath) ? readFileSync(logPath, 'utf8') : '(missing)')
+    throw error
+  }
   await expect(shell.locator('[data-testid="error"]')).toBeVisible({ timeout: 15_000 })
   await expect(shell.locator('[data-testid="error-stage"]')).toContainText('首启初始化')
   await expect(shell.locator('[data-testid="error-message"]')).toContainText('退出码 1')
