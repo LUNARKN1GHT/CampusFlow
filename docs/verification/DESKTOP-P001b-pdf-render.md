@@ -57,7 +57,7 @@ backend$ uv run pytest tests/test_pdf_vision_fallback.py -q
 
 ```text
 backend$ uv run pytest
-=========== 1563 passed, 6 skipped, 4 warnings in 148.56s (0:02:28) ============
+============ 1563 passed, 6 skipped, 4 warnings in 83.89s (0:01:23) ============
 ```
 
 说明：全量测试使用本机 `campusflow_test` PostgreSQL。`tests/conftest.py` 的逐用例清库引擎在本轮补上了 `engine.dispose()`；此前每个用例新建的引擎会把空闲连接累积到 PostgreSQL 默认 `max_connections=100`，导致后段用例出现 “remaining connection slots are reserved” 错误。该修改只影响测试资源释放，不改变产品行为。
