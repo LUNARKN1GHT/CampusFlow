@@ -35,7 +35,20 @@ cd desktop/electron && npm ci && npm run build
 npx electron-builder --mac --arm64 --publish never   # 或 --x64
 ```
 
-产物位于 `desktop/electron/release/`，命名形如 `CampusFlow-<version>-mac-arm64.dmg`。Windows 在 PowerShell 中执行对应的 `build_windows.ps1` 与 `electron-builder --win`；脚本由 P002b／P003b 补充，当前尚未提供。
+产物：`desktop/electron/release/CampusFlow-<version>-mac-<arch>.dmg`。
+
+Windows（PowerShell，x64）：
+
+```powershell
+powershell -File desktop/postgres/build_windows.ps1   # 内置 PostgreSQL + pgvector
+powershell -File desktop/build_windows.ps1            # PyInstaller sidecar
+cd desktop/electron; npm ci; npm run build; npx electron-builder --win --publish never
+```
+
+- PostgreSQL 使用 EnterpriseDB 官方 17.11 x64 二进制包（SHA-256 固定），pgvector 0.8.7 用 MSVC `nmake` 编译进 `desktop/vendor/pgsql`，随后剔除 pgAdmin、StackBuilder 与开发文件。
+- 需要 Visual Studio 2022 的 MSVC x64 工具链；缺少 VC 运行库时从 VS Redist 复制到 `bin`。
+- 产物：`release/CampusFlow-<version>-win-x64.exe`。
+- 两条脚本已加入仓库但尚未在 Windows 实机或 CI 跑通；桌面发布工作流默认跳过 Windows，只有在仓库变量 `DESKTOP_WINDOWS_ENABLED=true` 时才会构建。
 
 ## 签名与公证
 
