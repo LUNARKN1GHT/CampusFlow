@@ -87,7 +87,42 @@ from campusflow.infrastructure.transfer import (
 用真实 sidecar 与内置 PostgreSQL 启动打包应用，脚本替换原生对话框后经「数据」菜单
 完成导出 → 确认归档含 SHA-256 与排除凭据 → 检查升级（已是最新）→ 导入同一归档并
 看到「已恢复条目」，全程 9 秒，1 passed。替代的是对话框返回值，菜单、命令参数、
-暂停/恢复与令牌校验都走真实代码路径。跨机器迁移仍未验证。
+暂停/恢复与令牌校验都走真实代码路径。
+
+## 跨平台迁移（Windows → macOS）
+
+`.github/workflows/desktop-archive-compat.yml` 在 CI 上验证真实跨平台归档：
+`windows-2022` 用打包 sidecar 与内置 PostgreSQL 完成 bootstrap、写入一条工作空间／
+学期／课程，再 `export`；`macos-14` 用打包 sidecar 与内置 PostgreSQL bootstrap 新数据目录后
+`import --inspect` → `import --replace --confirm-token`，并逐表比对导出与恢复条目数、
+查询导入后的工作空间与课程行。
+
+运行 [39641384458](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39641384458)
+通过（Windows export、macOS import 均 success）：
+
+```text
+Windows: bootstrap_ready schema k001_external_calendar
+          exported: 208959 bytes, sha256 b3e69c91…
+          inspect: format 1, schema k001_external_calendar
+macOS:   bootstrap_ready schema k001_external_calendar
+          import_completed migrated_to k001_external_calendar
+          cross-platform archive verified: desktop-transfer-check / Cross-OS Course
+```
+
+这条链路暴露并修复了 6 个 Windows／跨平台缺陷：
+
+1. `PgBinaries` 只查无后缀文件名，Windows 报“缺少 initdb, pg_ctl, pg_isready”，
+   现按 `*.exe` 解析（`infrastructure/db/postgres_cluster.py`）。
+2. `tempfile.mkdtemp` 在 Windows 生成的受限 ACL 使 initdb 无法读取口令文件或创建
+   数据目录；首启改为默认 ACL 建目录，仅在 POSIX 上 `chmod 0700`。
+3. Windows 配置写入 `unix_socket_directories` 时反斜杠被当作转义符导致启动失败；
+   Windows 不再写该配置。
+4. `pg_ctl start` 使用管道时 postgres 继承句柄，父进程等待 EOF 挂起；启动改用
+   无管道方式并从日志文件取错误。
+5. sidecar 在 Windows 控制台输出中文 JSON 触发 `UnicodeEncodeError`，现启动时把
+   stdout／stderr 重设为 UTF-8。
+6. `pg_dump` 默认 gzip 压缩，macOS 内置 PostgreSQL 未编译 zlib 无法恢复；归档内层
+   改为 `--compress=0`，外层 ZIP 仍用 deflate 压缩。
 
 ## 验收记录
 
@@ -106,8 +141,9 @@ from campusflow.infrastructure.transfer import (
 
 ## 未验证
 
-- macOS ↔ Windows 真实 round-trip：无 Windows 环境，只验证相对 POSIX 路径与中文/
-  空格/多级目录的可移植性。
+- macOS ↔ Windows 真实 round-trip：已由 CI 覆盖 Windows 导出 → macOS 导入；反向
+  （macOS 导出 → Windows 导入）尚未执行。
+- 安装后的桌面应用之间迁移：CI 使用打包 sidecar 与内置 PostgreSQL，未安装 Electron 应用。
 - 跨版本真实迁移：只验证版本策略与恢复后迁移流程，没有旧版本应用导出的归档样本。
 - 加密与服务器最小权限账户下的导入。
 - 外部日历授权不随包迁移，导入后必须重新 OAuth（已作为验收要求明确提示）。

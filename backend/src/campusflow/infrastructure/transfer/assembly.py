@@ -34,7 +34,8 @@
 限制：导入需要 CREATEDB（桌面模式默认本机超级用户，服务器请配置
 `CAMPUSFLOW_PG_ADMIN_URL`）；切换会断开目标库连接，应在服务停止时执行；
 旧数据库与旧资料目录保留供人工回退，暂不自动清理；归档未加密，只写入
-0600 权限的文件；跨 Windows 与跨版本的迁移未在本仓库验证。
+0600 权限的文件；Windows 导出 → macOS 导入由 `desktop-archive-compat.yml` 验证，
+反向与跨版本迁移尚未验证。
 """
 
 from __future__ import annotations
