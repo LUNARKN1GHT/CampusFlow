@@ -166,7 +166,11 @@ def _clean_tables(request: pytest.FixtureRequest) -> Iterator[None]:
         return
     request.getfixturevalue("client")
     engine = create_engine(TEST_DATABASE_URL)
-    with engine.connect() as connection:
-        connection.execute(text(f"TRUNCATE TABLE {TABLES} RESTART IDENTITY CASCADE"))
-        connection.commit()
+    try:
+        with engine.connect() as connection:
+            connection.execute(text(f"TRUNCATE TABLE {TABLES} RESTART IDENTITY CASCADE"))
+            connection.commit()
+    finally:
+        # 每个用例新建引擎；不释放会把空闲连接累积到 PostgreSQL 上限。
+        engine.dispose()
     yield

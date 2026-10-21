@@ -641,6 +641,15 @@ class JobRepository(Protocol):
         """列出尚未成功投递的作业（按创建顺序），供补偿扫描重投（J004）。"""
         ...
 
+    def list_claimable_ids(self, *, limit: int = 100) -> list[int]:
+        """列出可被 Worker 领取的作业编号（P005），按创建顺序从早到晚。
+
+        只包含解析与索引阶段且仍为 pending 的作业：处理中的作业不会被再次
+        派发，已结束或永久失败的作业也不会出现。查询结果只是候选，实际执行
+        前仍必须调用 claim，由原子领取兜底并发与重复投递。
+        """
+        ...
+
 
 class SemesterRepository(Protocol):
     """学期；归档只切换标记，不删除或改写关联课程、任务与日程。"""
