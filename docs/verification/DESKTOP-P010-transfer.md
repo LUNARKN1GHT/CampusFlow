@@ -89,7 +89,7 @@ from campusflow.infrastructure.transfer import (
 看到「已恢复条目」，全程 9 秒，1 passed。替代的是对话框返回值，菜单、命令参数、
 暂停/恢复与令牌校验都走真实代码路径。
 
-## 跨平台迁移（Windows → macOS）
+## 跨平台迁移（Windows ↔ macOS）
 
 `.github/workflows/desktop-archive-compat.yml` 在 CI 上验证真实跨平台归档：
 `windows-2022` 用打包 sidecar 与内置 PostgreSQL 完成 bootstrap、写入一条工作空间／
@@ -107,6 +107,16 @@ Windows: bootstrap_ready schema k001_external_calendar
 macOS:   bootstrap_ready schema k001_external_calendar
           import_completed migrated_to k001_external_calendar
           cross-platform archive verified: desktop-transfer-check / Cross-OS Course
+```
+
+反向（macOS 导出 → Windows 导入）由同文件的 `macos-export` → `windows-import` 覆盖，
+运行 [39644194138](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39644194138)
+通过：
+
+```text
+macOS:   exported from macOS: 208958 bytes
+Windows: import_completed migrated_to k001_external_calendar
+          reverse cross-platform archive verified: reverse-transfer-check / Reverse OS Course
 ```
 
 这条链路暴露并修复了 6 个 Windows／跨平台缺陷：
@@ -141,8 +151,8 @@ macOS:   bootstrap_ready schema k001_external_calendar
 
 ## 未验证
 
-- macOS ↔ Windows 真实 round-trip：已由 CI 覆盖 Windows 导出 → macOS 导入；反向
-  （macOS 导出 → Windows 导入）尚未执行。
+- macOS ↔ Windows 双向 round-trip 已由 CI 覆盖（Windows→macOS 与 macOS→Windows）；
+  反向测试同样通过后，`--compress=0` 的互操作修复得到两端确认。
 - 安装后的桌面应用之间迁移：CI 使用打包 sidecar 与内置 PostgreSQL，未安装 Electron 应用。
 - 跨版本真实迁移：只验证版本策略与恢复后迁移流程，没有旧版本应用导出的归档样本。
 - 加密与服务器最小权限账户下的导入。
