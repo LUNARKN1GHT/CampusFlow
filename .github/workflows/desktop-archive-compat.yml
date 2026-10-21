@@ -70,7 +70,7 @@ jobs:
             '--set=course=Cross-OS Course' `
             '--set=code=CF101' `
             '--set=material_title=Cross-OS Material' `
-            '--set=chunk_text=提交截止日期为2026年12月20日。' `
+            '--set=chunk_text=Cross-OS chunk: submit by 2026-12-20.' `
             '--set=task_title=Cross-OS Task' `
             '--set=candidate_title=Cross-OS Task Requirement' `
             -f desktop/postgres/seed_archive.sql
@@ -170,7 +170,7 @@ jobs:
           workspace=$(q "SELECT name FROM workspaces WHERE name = 'desktop-transfer-check'")
           course=$(q "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'")
           material=$(q "SELECT title FROM materials WHERE title = 'Cross-OS Material'")
-          chunk=$(q "SELECT text FROM source_chunks WHERE text = '提交截止日期为2026年12月20日。'")
+          chunk=$(q "SELECT text FROM source_chunks WHERE text = 'Cross-OS chunk: submit by 2026-12-20.'")
           task=$(q "SELECT title || '|' || progress FROM tasks WHERE title = 'Cross-OS Task'")
           candidate=$(q "SELECT f.value #>> '{}' FROM extracted_fields f JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'desktop-transfer-check' AND f.name = 'title'")
           evidence=$(q "SELECT e.quote FROM candidate_field_evidence e JOIN extracted_fields f ON f.id = e.field_id JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'desktop-transfer-check'")
@@ -186,12 +186,12 @@ jobs:
           check workspace "$workspace" "desktop-transfer-check"
           check course "$course" "Cross-OS Course"
           check material "$material" "Cross-OS Material"
-          check chunk "$chunk" "提交截止日期为2026年12月20日。"
+          check chunk "$chunk" "Cross-OS chunk: submit by 2026-12-20."
           check task "$task" "Cross-OS Task|in_progress"
           check candidate "$candidate" "Cross-OS Task Requirement"
-          check evidence "$evidence" "提交截止日期为2026年12月20日。"
+          check evidence "$evidence" "Cross-OS chunk: submit by 2026-12-20."
           check plan-block "$block" "Cross-OS Task|90|true"
-          check citation "$citation" "提交截止日期为2026年12月20日。"
+          check citation "$citation" "Cross-OS chunk: submit by 2026-12-20."
           echo "cross-platform archive verified: $workspace / $course / $task / $block"
 
   macos-export:
@@ -237,7 +237,7 @@ jobs:
             --set=course=Reverse OS Course \
             --set=code=CF102 \
             --set=material_title=Reverse OS Material \
-            --set=chunk_text=反向验收：资料中的作业截止为2027年1月10日。 \
+            --set=chunk_text=Reverse OS chunk: submit by 2027-01-10. \
             --set=task_title=Reverse OS Task \
             --set=candidate_title=Reverse OS Task Requirement \
             -f desktop/postgres/seed_archive.sql
@@ -323,35 +323,52 @@ jobs:
           }
 
           $psqlUrl = $state.database_url -replace 'postgresql\+psycopg://', 'postgresql://'
-          $env:PGCLIENTENCODING = 'UTF8'
-          function Invoke-Query([string]$sql) {
-            $value = & "$env:CAMPUSFLOW_PG_BIN\psql.exe" $psqlUrl -v ON_ERROR_STOP=1 -tAc $sql
-            if ($LASTEXITCODE -ne 0) { throw "query failed: $sql" }
-            return $value.Trim()
+          $psql = "$env:CAMPUSFLOW_PG_BIN\psql.exe"
+          $workspace = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT name FROM workspaces WHERE name = 'reverse-transfer-check'"
+          if ($LASTEXITCODE -ne 0) { throw 'workspace query failed' }
+          $course = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'"
+          if ($LASTEXITCODE -ne 0) { throw 'course query failed' }
+          $material = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT title FROM materials WHERE title = 'Reverse OS Material'"
+          if ($LASTEXITCODE -ne 0) { throw 'material query failed' }
+          $chunk = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT text FROM source_chunks WHERE text = 'Reverse OS chunk: submit by 2027-01-10.'"
+          if ($LASTEXITCODE -ne 0) { throw 'chunk query failed' }
+          $task = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT title || '|' || progress FROM tasks WHERE title = 'Reverse OS Task'"
+          if ($LASTEXITCODE -ne 0) { throw 'task query failed' }
+          $candidate = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT f.value #>> '{}' FROM extracted_fields f JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check' AND f.name = 'title'"
+          if ($LASTEXITCODE -ne 0) { throw 'candidate query failed' }
+          $evidence = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT e.quote FROM candidate_field_evidence e JOIN extracted_fields f ON f.id = e.field_id JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check'"
+          if ($LASTEXITCODE -ne 0) { throw 'evidence query failed' }
+          $block = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT b.title || '|' || b.minutes || '|' || b.locked FROM plan_blocks b JOIN plan_drafts d ON d.id = b.draft_id JOIN workspaces w ON w.id = d.workspace_id WHERE w.name = 'reverse-transfer-check'"
+          if ($LASTEXITCODE -ne 0) { throw 'plan block query failed' }
+          $citation = & $psql $psqlUrl -v ON_ERROR_STOP=1 -tAc "SELECT t.citations->0->>'quote' FROM qa_turns t JOIN qa_conversations q ON q.id = t.conversation_id JOIN workspaces w ON w.id = q.workspace_id WHERE w.name = 'reverse-transfer-check'"
+          if ($LASTEXITCODE -ne 0) { throw 'citation query failed' }
+
+          $expected = @{
+            workspace = 'reverse-transfer-check'
+            course = 'Reverse OS Course'
+            material = 'Reverse OS Material'
+            chunk = 'Reverse OS chunk: submit by 2027-01-10.'
+            task = 'Reverse OS Task|in_progress'
+            candidate = 'Reverse OS Task Requirement'
+            evidence = 'Reverse OS chunk: submit by 2027-01-10.'
+            block = 'Reverse OS Task|90|true'
+            citation = 'Reverse OS chunk: submit by 2027-01-10.'
           }
-          function Assert-Value([string]$name, [string]$actual, [string]$expected) {
-            if ($actual -ne $expected) {
-              throw "${name} mismatch: expected '$expected', got '$actual'"
+          $actual = @{
+            workspace = "$workspace".Trim()
+            course = "$course".Trim()
+            material = "$material".Trim()
+            chunk = "$chunk".Trim()
+            task = "$task".Trim()
+            candidate = "$candidate".Trim()
+            evidence = "$evidence".Trim()
+            block = "$block".Trim()
+            citation = "$citation".Trim()
+          }
+          foreach ($name in $expected.Keys) {
+            if ($actual[$name] -ne $expected[$name]) {
+              throw "${name} mismatch: expected '$($expected[$name])', got '$($actual[$name])'"
             }
           }
-          $workspace = Invoke-Query "SELECT name FROM workspaces WHERE name = 'reverse-transfer-check'"
-          $course = Invoke-Query "SELECT c.name FROM courses c JOIN semesters s ON s.id = c.semester_id WHERE s.name = '2026 Fall'"
-          $material = Invoke-Query "SELECT title FROM materials WHERE title = 'Reverse OS Material'"
-          $chunk = Invoke-Query "SELECT text FROM source_chunks WHERE text = '反向验收：资料中的作业截止为2027年1月10日。'"
-          $task = Invoke-Query "SELECT title || '|' || progress FROM tasks WHERE title = 'Reverse OS Task'"
-          $candidate = Invoke-Query "SELECT f.value #>> '{}' FROM extracted_fields f JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check' AND f.name = 'title'"
-          $evidence = Invoke-Query "SELECT e.quote FROM candidate_field_evidence e JOIN extracted_fields f ON f.id = e.field_id JOIN extracted_items i ON i.id = f.candidate_id JOIN workspaces w ON w.id = i.workspace_id WHERE w.name = 'reverse-transfer-check'"
-          $block = Invoke-Query "SELECT b.title || '|' || b.minutes || '|' || b.locked FROM plan_blocks b JOIN plan_drafts d ON d.id = b.draft_id JOIN workspaces w ON w.id = d.workspace_id WHERE w.name = 'reverse-transfer-check'"
-          $citation = Invoke-Query "SELECT t.citations->0->>'quote' FROM qa_turns t JOIN qa_conversations q ON q.id = t.conversation_id JOIN workspaces w ON w.id = q.workspace_id WHERE w.name = 'reverse-transfer-check'"
-
-          Assert-Value workspace $workspace 'reverse-transfer-check'
-          Assert-Value course $course 'Reverse OS Course'
-          Assert-Value material $material 'Reverse OS Material'
-          Assert-Value chunk $chunk '反向验收：资料中的作业截止为2027年1月10日。'
-          Assert-Value task $task 'Reverse OS Task|in_progress'
-          Assert-Value candidate $candidate 'Reverse OS Task Requirement'
-          Assert-Value evidence $evidence '反向验收：资料中的作业截止为2027年1月10日。'
-          Assert-Value plan-block $block 'Reverse OS Task|90|true'
-          Assert-Value citation $citation '反向验收：资料中的作业截止为2027年1月10日。'
-          Write-Host "reverse cross-platform archive verified: $workspace / $course / $task / $block"
+          Write-Host "reverse cross-platform archive verified: $($actual.workspace) / $($actual.course) / $($actual.task) / $($actual.block)"
 
