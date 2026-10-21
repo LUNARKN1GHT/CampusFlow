@@ -57,6 +57,7 @@ Windows：
 ## 产物与校验
 
 - 每个平台上传一个安装包 artifact，Release 任务汇总后生成 `SHA256SUMS.txt` 并一并附加。
+- Release 只会在 macOS 构建成功、且 Windows（由 `DESKTOP_WINDOWS_ENABLED` 启用时）也成功后创建；任一启用平台失败则不发布，避免半套安装包。
 - 发布说明模板：`docs/desktop/release-notes.md`。
 - 下载后先核对 SHA-256，再按下方清单验收。
 
