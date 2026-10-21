@@ -210,6 +210,30 @@ codesign -dv                                    Signature=adhoc, Info.plist=not 
 - `codesign --verify --deep --strict` 失败（`code has no resources but signature indicates they must be present`），
   确认产物未签名，不能作为正式发布包。
 
+## 从 CI DMG 复制安装后首次启动（arm64）
+
+2026-10-21 使用 `desktop-macos-build.yml` 运行
+[39675252210](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39675252210) 产出的
+`CampusFlow-0.1.0-mac-arm64.dmg`（168 MB）：
+
+```text
+hdiutil attach … -nobrowse -readonly -mountpoint /tmp/cf-dmg2
+ditto /tmp/cf-dmg2/CampusFlow.app /tmp/cf-install/CampusFlow.app   # 模拟拖入 Applications
+```
+
+- 复制后的应用使用全新数据目录启动，bootstrap → API → Worker → ready、自动登录成功；
+  `tests/packaged-maintenance.spec.ts` 经真实菜单完成导出 → 检查升级 → 导入，
+  1 passed（6.8 s）。
+- 资源不依赖仓库目录：用例把 `CAMPUSFLOW_SIDECAR_BIN`／`CAMPUSFLOW_PG_BIN` 指向复制后
+  `.app` 内的 `Resources/sidecar` 与 `Resources/pgsql`，未使用构建目录；自动发现路径本身
+  已由「受限环境启动」一节覆盖。
+- 首次对照发现本地 17:49 构建的 DMG 缺少「数据」菜单（旧于 P010 合入），说明验证必须使用
+  当前提交的产物；上述结果取自 CI 构建。
+
+同一运行的 `CampusFlow-0.1.0-mac-x64.dmg`（175 MB）在 arm64 Mac 上经 Rosetta 复制安装后
+执行同一用例：首次导入步骤等待 120 s 超时，随后两次重跑均通过（14.0 s、15.5 s），未见
+可复现的功能错误；x64 首启的 Rosetta 冷启动耗时仍可能接近超时阈值，未定位根因。
+
 ## CI 打包（arm64 与 x64）
 
 `.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与 `macos-15-intel`
@@ -243,4 +267,5 @@ x64:   dmg: CampusFlow-0.1.0-mac-x64.dmg (176M)
 - **Windows**：已由 `desktop-windows-build.yml` 在 windows-2022 构建并校验安装包内容、运行首启测试；未在 Windows 11 实机安装运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。
-- **DMG 安装流程**：未执行拖入 Applications 后的首次启动；本轮直接运行 `.app` 内可执行文件。
+- **DMG 安装流程**：已在挂载的 CI DMG 上把 `.app` 复制到临时目录后启动并通过维护流程；
+  未执行拖入 `/Applications`、由 Finder/LaunchServices 首次打开及 Gatekeeper 拦截场景。
