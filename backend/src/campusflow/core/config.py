@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     # 原文件私有存储根目录（相对后端工作目录；不进 Git，不对外公开）
     storage_dir: str = "data/materials"
+    # P010：导入前安全备份与迁移包默认目录；未配置时落在数据目录或存储目录旁边。
+    backup_dir: str | None = None
+    # P010：PostgreSQL 客户端工具目录（含 pg_dump/pg_restore）；未配置时使用 PATH。
+    pg_bin: str | None = None
+    # P010：建库/改名用的维护连接；未配置时从 database_url 派生（连到 postgres 库）。
+    pg_admin_url: str | None = None
     # 上传限制（D003）：可通过环境变量覆盖
     upload_max_bytes: int = 20 * 1024 * 1024
     upload_max_files: int = 5
