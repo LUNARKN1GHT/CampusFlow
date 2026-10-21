@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from campusflow.application.jobs import retry_job
 from campusflow.application.processing import ParserRegistry, set_parser_registry
 from campusflow.core.config import Settings
-from campusflow.domain.states import JobStage, JobStatus, MaterialStatus
+from campusflow.domain.states import JobStage, JobStatus, MaterialSourceType, MaterialStatus
 from campusflow.infrastructure.db.models import IndexedBlock
 from campusflow.infrastructure.llm.vision import FakeVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
@@ -449,6 +449,25 @@ def test_server_mode_still_selects_rq_queue(client: TestClient, monkeypatch) -> 
     # 桌面模式不因 redis_url 不可用而失败，也不会连接 Redis
     desktop_settings = settings.model_copy(update={"deployment_mode": "desktop"})
     assert isinstance(build_job_queue(desktop_settings), DBJobQueue)
+
+
+def test_desktop_worker_degrades_without_model_key(tmp_path) -> None:
+    """桌面模式未配置模型密钥时 Worker 仍可启动，识别/索引以明确原因失败。"""
+    from campusflow.domain.errors import PermanentError
+    from campusflow.workers.assembly import UnavailableEmbedder, build_parser_registry
+
+    settings = Settings(
+        _env_file=None,
+        deployment_mode="desktop",
+        data_dir=str(tmp_path),
+        database_url=TEST_DATABASE_URL,
+        zhipu_api_key=None,
+    )
+    registry = build_parser_registry(settings, allow_missing_models=True)
+    with pytest.raises(PermanentError, match="视觉模型密钥"):
+        registry.for_type(MaterialSourceType.IMAGE).parse(PNG_BYTES, "image/png")
+    with pytest.raises(PermanentError, match="向量模型密钥"):
+        UnavailableEmbedder(settings).embed("text")
 
 
 def test_unknown_deployment_mode_is_rejected(client: TestClient) -> None:
