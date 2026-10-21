@@ -81,9 +81,10 @@ connection_env(report: BootstrapReport) -> dict[str, str]
 
 ## 未验证
 
-- Windows DPAPI 只在代码层实现，未单独运行往返用例；Windows 首启已由
-  `desktop-archive-compat.yml` 用打包 sidecar 在内置 PostgreSQL 上实跑（见
-  DESKTOP-P010-transfer.md），但未确认该次运行的凭据后端。`0600` 在 Windows 上只影响只读位。
+- Windows DPAPI 已在 windows-2022 CI 实跑：`desktop-windows-build.yml` 在内置 PostgreSQL
+  就绪后运行 `tests/test_bootstrap.py`，13 passed、3 skipped（跳过的为 POSIX 专用与
+  macOS 钥匙串用例），覆盖 DPAPI 往返与真实 initdb 首启。个人电脑与安装后的应用未验证；
+  `0600` 在 Windows 上只影响只读位。
 - macOS 钥匙串在无图形会话／CI 环境下的可用性未验证；自动化用例默认跳过真实钥匙串写入（`CAMPUSFLOW_TEST_KEYCHAIN=1` 才执行）。
 - Electron 自动登录与钥匙串读取由 P008 接入，本轮只提供跨平台凭据存储抽象与 `connection_env`。
 - 打包内置的 PostgreSQL 17 未参与验证；本机验证使用 Homebrew PostgreSQL 16.14 与 pgvector 0.8.7，代码不假设版本号。

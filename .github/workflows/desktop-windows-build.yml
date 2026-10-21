@@ -54,6 +54,14 @@ jobs:
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
 
+      - name: Run bootstrap tests on Windows
+        shell: pwsh
+        working-directory: backend
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\desktop\vendor\pgsql\bin;$env:PATH"
+          uv sync --locked
+          uv run --locked pytest tests/test_bootstrap.py -q
+
       - name: Build PyInstaller sidecar
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
