@@ -235,6 +235,7 @@ export class Supervisor extends EventEmitter {
     return {
       ...process.env,
       CAMPUSFLOW_DESKTOP: '1',
+      CAMPUSFLOW_DEPLOYMENT_MODE: 'desktop',
       CAMPUSFLOW_DATA_DIR: this.config.dataDir,
       CAMPUSFLOW_STORAGE_DIR: this.config.storageDir,
       CAMPUSFLOW_API_PORT: String(this.port ?? 0),
@@ -385,6 +386,44 @@ export class Supervisor extends EventEmitter {
     this.pgManaged = true
     this.startPostgresMonitor()
     this.logger.info('PostgreSQL 进程已启动')
+    await this.ensureManagedDatabase(env)
+  }
+
+  /** initdb 只创建角色与模板库；业务库不存在时迁移会失败，需要显式建库。 */
+  private async ensureManagedDatabase(env: NodeJS.ProcessEnv): Promise<void> {
+    if (!this.config.pgBin) return
+    const base = [
+      '-h',
+      '127.0.0.1',
+      '-p',
+      String(this.config.pgPort),
+      '-U',
+      this.config.pgUser,
+    ]
+    const exists = await this.deps.run(
+      toolPath(this.config.pgBin, 'psql'),
+      [
+        ...base,
+        '-d',
+        'postgres',
+        '-tAc',
+        `SELECT 1 FROM pg_database WHERE datname='${this.config.pgDatabase}'`,
+      ],
+      { cwd: this.config.dataDir, env, timeoutMs: 30_000 },
+    )
+    if (exists.code !== 0) {
+      throw new Error(`检查数据库失败（退出码 ${exists.code}）：${brief(exists.stderr)}`)
+    }
+    if (exists.stdout.trim() === '1') return
+    const created = await this.deps.run(
+      toolPath(this.config.pgBin, 'createdb'),
+      [...base, this.config.pgDatabase],
+      { cwd: this.config.dataDir, env, timeoutMs: 30_000 },
+    )
+    if (created.code !== 0) {
+      throw new Error(`创建数据库失败（退出码 ${created.code}）：${brief(created.stderr)}`)
+    }
+    this.logger.info('已创建业务数据库')
   }
 
   private async waitForSql(): Promise<void> {
