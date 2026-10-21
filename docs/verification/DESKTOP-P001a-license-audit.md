@@ -6,8 +6,8 @@
 
 ## 结论摘要
 
-1. **当前依赖集不能直接作为桌面包分发。** `pymupdf==1.28.2` 采用 AGPL-3.0 或 Artifex 商业许可双轨；把 PyMuPDF/MuPDF 与桌面应用一起分发会触发 AGPL 的源码提供义务，除非购买商业许可。项目采用 Apache-2.0，不能在不改变整体分发许可的情况下继续捆绑 PyMuPDF。
-2. **推荐替换而不是采购或转 AGPL。** #480 用 `pypdfium2`（BSD-3-Clause／Apache-2.0，内含 PDFium，BSD-3-Clause）加 `Pillow`（MIT-CMU）替换 PyMuPDF。渲染逻辑只有一个函数，替换成本低，且不引入强 copyleft。
+1. **P001a 审计时，当前依赖集不能直接作为桌面包分发。** `pymupdf==1.28.2` 采用 AGPL-3.0 或 Artifex 商业许可双轨；把 PyMuPDF/MuPDF 与桌面应用一起分发会触发 AGPL 的源码提供义务，除非购买商业许可。项目采用 Apache-2.0，不能在不改变整体分发许可的情况下继续捆绑 PyMuPDF。
+2. **推荐替换，P001b 已按推荐落地。** #480 用 `pypdfium2`（BSD-3-Clause／Apache-2.0，内含 PDFium，BSD-3-Clause）加 `Pillow`（MIT-CMU）替换 PyMuPDF；当前分支的 `backend/pyproject.toml` 与 `uv.lock` 不再包含 PyMuPDF，渲染逻辑保持一个函数。替换成本低，且不引入强 copyleft。
 3. **替换后没有强 copyleft 阻塞，但不是“零义务”。** `psycopg`／`psycopg-binary` 为 LGPL-3.0-only，需要随包附许可证、提供对应源码获取方式并保持可重新链接；`psycopg-binary` 还捆绑 libpq、OpenSSL、Kerberos、OpenLDAP 等本地库，wheel 只带了 LGPL 文本，打包时必须补齐这些 notice。
 4. **Electron／Chromium／Node／PostgreSQL 17／pgvector 都是宽松许可，但版本尚未固定。** Electron、Node、PostgreSQL、pgvector 的精确版本与对应 notice 文件仍需在 P002a／P003a 固定后复核；在版本固定前不能把这几项写成“已验证合规”。
 5. **Redis 当前不是桌面包的一部分。** 现有 RQ Worker 依赖 Redis 服务；若最终把 Redis 一并打包，必须单独复核（7.4 起为 RSALv2／SSPLv1，8.x 另含 AGPLv3 选项），本文不把它当作已审计组件。
@@ -27,7 +27,7 @@
 ```text
 backend$ uv sync --locked
 backend$ uv export --frozen --no-dev --no-hashes --format requirements-txt
-backend$ uv run python -c "import importlib.metadata as md; print(md.metadata('pymupdf').get('License'))"
+backend$ uv run python -c "import importlib.metadata as md; print(md.metadata('pypdfium2').get('License'))"
 frontend$ npm view electron version license
 frontend$ python3 -c "import json; d=json.load(open('package-lock.json')); ..."
 ```
@@ -41,10 +41,11 @@ frontend$ python3 -c "import json; d=json.load(open('package-lock.json')); ..."
 | cryptography | 46.0.7 | Apache-2.0 OR BSD-3-Clause [M][L] | 附许可证副本；保留 NOTICE（wheel 内无 NOTICE 文件）；修改需说明 | 随包；BSD/Apache 文本随 wheel |
 | fastapi | 0.141.1 | MIT [M][L] | 保留版权与许可声明 | 随包；纳入 notices |
 | pgvector（Python 客户端） | 0.4.2 | MIT [M][L] | 保留版权与许可声明 | 随包；注意与 pgvector C 扩展许可证不同（见下） |
+| pillow | 13.0.0 | MIT-CMU，另含编解码器第三方文本 [M][L] | 保留 Pillow LICENSE 全份 | 随包；P001b 新增 |
 | psycopg[binary] | 3.3.6（psycopg-binary 3.3.6） | LGPL-3.0-only [M][L] | 附 LGPL 文本；提供对应源码获取方式；允许替换/重新链接；声明修改 | 可随包；需完成 LGPL 清单（见“发布门槛”） |
 | pydantic-settings | 2.15.0 | MIT [M][L] | 保留版权与许可声明 | 随包；纳入 notices |
-| pymupdf | 1.28.2 | AGPL-3.0 或 Artifex 商业许可 [M][L] | AGPL：整个组合作品按 AGPL 提供源码；商业：按合同付费 | **阻断当前分发；#480 移除** |
 | pypdf | 6.19.0 | BSD-3-Clause [M][L] | 保留版权、条件与免责声明；不得用作者名背书 | 随包；纳入 notices |
+| pypdfium2 | 5.14.0 | BSD-3-Clause／Apache-2.0 [M][L] | 保留 wheel 内 LICENSES 与 PDFium 构建依赖文本 | 随包；P001b 新增 |
 | python-docx | 1.2.0 | MIT [M][L] | 保留版权与许可声明 | 随包；纳入 notices |
 | python-multipart | 0.0.32 | Apache-2.0 [M][L] | 附许可证副本；保留 NOTICE（如有）；修改需说明 | 随包；纳入 notices |
 | rq | 2.12.0 | BSD-2-Clause [M][L] | 保留版权、条件与免责声明 | 随包；纳入 notices |
@@ -91,9 +92,9 @@ frontend$ python3 -c "import json; d=json.load(open('package-lock.json')); ..."
 | libxml2 / libxslt（lxml 内置） | 2.14.6 / 1.1.43 | MIT [L] | 保留版权与许可声明 | wheel 的 `LICENSES.txt` 已包含；随包复制 |
 | NumPy 原生依赖 | 2.5.4 平台构建 | BSD-3-Clause 等 [L] | 保留 wheel 内各组件许可证 | macOS 使用系统 Accelerate，不再分发；Linux/Windows wheel 可能内置 OpenBLAS，须按平台复核 |
 | psycopg-binary 内置库 | wheel 3.3.6 | libpq：PostgreSQL License；OpenSSL 3.5.8：Apache-2.0；Kerberos：MIT；OpenLDAP：OpenLDAP Public License；libcom_err：MIT [L][U] | 附各库许可证与版权声明；LGPL 部分提供源码 | **wheel 只带 LGPL 文本，未带上述库的 notice；打包时必须补齐** |
-| PyMuPDF / MuPDF | 1.28.2 | AGPL-3.0 或 Artifex 商业 [M][L] | AGPL 源码提供义务 | **#480 移除；不得进入发行包** |
-| pypdfium2 / PDFium（#480 后） | 5.14.0 | pypdfium2：BSD-3-Clause／Apache-2.0；PDFium：BSD-3-Clause；构建依赖另含 ICU、FreeType、libjpeg-turbo、libpng、zlib 等 [L] | 保留 wheel 内完整 `licenses/LICENSES` 与 `BUILD_LICENSES` | #480 纳入；随包复制整份许可证目录 |
-| Pillow（#480 后） | 13.0.0 | MIT-CMU，另含 AOM、libjpeg-turbo、zlib 等第三方 [M][L] | 保留 Pillow LICENSE（其中已汇总第三方文本） | #480 纳入；随包复制 |
+| PyMuPDF / MuPDF | 1.28.2 | AGPL-3.0 或 Artifex 商业 [M][L] | AGPL 源码提供义务 | **已由 #480 移除；不得进入发行包** |
+| pypdfium2 / PDFium | 5.14.0 / 156.0.8076.0 | pypdfium2：BSD-3-Clause／Apache-2.0；PDFium：BSD-3-Clause；构建依赖另含 ICU、FreeType、libjpeg-turbo、libpng、zlib 等 [L] | 保留 wheel 内完整 `licenses/LICENSES` 与 `BUILD_LICENSES` | 当前分支已纳入；随包复制整份许可证目录 |
+| Pillow | 13.0.0 | MIT-CMU，另含 AOM、libjpeg-turbo、zlib 等第三方 [M][L] | 保留 Pillow LICENSE（其中已汇总第三方文本） | 当前分支已纳入；随包复制 |
 
 ## 表 4：桌面外壳、内置服务与前端运行时
 
@@ -130,11 +131,17 @@ frontend$ python3 -c "import json; d=json.load(open('package-lock.json')); ..."
 
 ## 能否随当前依赖集发布
 
-**当前：不可以（NO-GO）。** 唯一阻断项是 `pymupdf==1.28.2` 的 AGPL-3.0。其余组件为 MIT、BSD、Apache-2.0、PSF、PostgreSQL License 或 LGPL；LGPL 需要履行通知与源码义务，但不阻止分发。
+**P001a 审计时（依赖集仍含 PyMuPDF）：不可以（NO-GO）。** 唯一阻断项是 `pymupdf==1.28.2` 的 AGPL-3.0。其余组件为 MIT、BSD、Apache-2.0、PSF、PostgreSQL License 或 LGPL；LGPL 需要履行通知与源码义务，但不阻止分发。
 
-**完成 #480 后：有条件可以（conditional GO）。**
+**P001b 完成后（当前分支）：有条件可以（conditional GO）。**
 
-- 移除 `pymupdf`，加入 `pypdfium2` 与 `Pillow`，并更新 `uv.lock`；确认 `backend/src`、`backend/tests` 与打包脚本都不再导入 `pymupdf`／`fitz`。
+已完成：
+
+- 移除 `pymupdf`，加入 `pypdfium2==5.14.0` 与 `Pillow==13.0.0`，更新 `uv.lock`；`backend/src`、`backend/tests` 与 `scripts` 不再导入 `pymupdf`／`fitz`。
+- 渲染行为由 `docs/verification/DESKTOP-P001b-pdf-render.md` 的测试覆盖：150 dpi 像素尺寸、扫描页、页码越界、损坏 PDF。
+
+发布前仍需完成：
+
 - 随包附带 `THIRD-PARTY-NOTICES.md`、仓库根 `LICENSE`、各 wheel 的许可证文件，以及 Electron 的 `LICENSES.chromium.html`。
 - 为 psycopg 的 LGPL 部分提供源码获取方式（PyPI sdist 链接或书面要约），并保持动态链接、可替换。
 - 固定 Electron、Node、PostgreSQL、pgvector 的精确版本，逐项补齐 notice；这几项在固定前保持“待复核”，不能写成“已合规”。
