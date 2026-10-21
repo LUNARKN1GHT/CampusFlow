@@ -123,6 +123,12 @@ function createHarness(
       runOptions: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs: number },
     ) => {
       runCalls.push({ command, args: [...args], env: { ...runOptions.env } })
+      // Windows 停止服务走 taskkill；模拟它结束对应子进程，让 exit 与顺序断言有效。
+      const pidFlag = args.indexOf('/pid')
+      if (command === 'taskkill' && pidFlag >= 0) {
+        const target = children.find((child) => child.pid === Number(args[pidFlag + 1]))
+        target?.kill(args.includes('/F') ? 'SIGKILL' : 'SIGTERM')
+      }
       if (options.run) {
         return options.run(command, args, runOptions)
       }
