@@ -35,7 +35,25 @@ installer: desktop\electron\release\CampusFlow-0.1.0-win-x64.exe (184.6 MB)
 ```
 
 - 校验步骤断言 `sidecar.exe`、`vendor\pgsql\bin\postgres.exe` 与 `release\*.exe` 均存在。
-- 产物：artifact `desktop-windows-x64-ci`。
+- 产物：artifact `desktop-windows-ci`（签名未配置，184.6 MB 未签名 NSIS）。
+
+### 运行时冒烟（同一工作流）
+
+后续运行 [39624762230](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39624762230)
+在打包前增加冒烟步骤并通过：
+
+```text
+initdb -U campusflow -A scram-sha-256 -E UTF8 --locale=C   → ok
+pg_ctl start (127.0.0.1:55440)                             → ok
+CREATE EXTENSION vector                                    → CREATE EXTENSION
+CREATE INDEX ... USING hnsw (embedding vector_l2_ops)      → ok
+ORDER BY embedding <-> '[3,1,2]' LIMIT 1                   → ok
+campusflow-sidecar --version                               → campusflow-sidecar 0.1.0
+pg_ctl stop                                                → ok
+```
+
+因此 Windows 上的 initdb、SCRAM、pgvector 扩展、HNSW 索引与 PyInstaller sidecar 可执行性
+均已实际验证。
 
 ### 首次失败与修复
 
