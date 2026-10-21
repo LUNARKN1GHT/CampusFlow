@@ -60,7 +60,17 @@ def _alembic_head() -> str:
 
 def _short_temp_base() -> Path:
     base = Path("/tmp") if Path("/tmp").is_dir() else Path(tempfile.gettempdir())
-    return Path(tempfile.mkdtemp(prefix="cfs-p007-", dir=base))
+    # mkdtemp 在 Windows 上生成受限 ACL，initdb 子进程无法读取其中的口令文件。
+    for _ in range(100):
+        candidate = base / f"cfs-p007-{secrets.token_hex(4)}"
+        try:
+            candidate.mkdir()
+        except FileExistsError:
+            continue
+        if os.name != "nt":
+            os.chmod(candidate, 0o700)
+        return candidate
+    raise RuntimeError("无法创建测试临时目录")
 
 
 def _postgres_pids(pgdata: Path) -> list[str]:
