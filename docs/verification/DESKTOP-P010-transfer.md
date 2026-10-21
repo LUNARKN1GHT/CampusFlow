@@ -82,7 +82,12 @@ from campusflow.infrastructure.transfer import (
 - 维护命令使用 bootstrap 内存中的超级用户连接串与 pg 工具位置，不传本机登录凭据或 API 端口。
 
 验证：`cd desktop/electron && npm test` 40 passed（含 14 项维护流程用例与 1 项菜单用例）。
-真实打包应用中的对话框导出／导入与跨机器迁移仍需在干净机器上补做。
+另有打包应用联调 `tests/packaged-maintenance.spec.ts`（默认跳过，需显式提供
+`CAMPUSFLOW_PACKAGED_APP`／`CAMPUSFLOW_SIDECAR_BIN`／`CAMPUSFLOW_PG_BIN`）：
+用真实 sidecar 与内置 PostgreSQL 启动打包应用，脚本替换原生对话框后经「数据」菜单
+完成导出 → 确认归档含 SHA-256 与排除凭据 → 检查升级（已是最新）→ 导入同一归档并
+看到「已恢复条目」，全程 9 秒，1 passed。替代的是对话框返回值，菜单、命令参数、
+暂停/恢复与令牌校验都走真实代码路径。跨机器迁移仍未验证。
 
 ## 验收记录
 

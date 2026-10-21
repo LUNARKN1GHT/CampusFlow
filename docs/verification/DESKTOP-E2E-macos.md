@@ -145,7 +145,7 @@ secrets.json: 0600，含 db-password 与 local-password
 
 - 本次 bootstrap 默认使用 macOS 钥匙串（未设置 `CAMPUSFLOW_SECRET_BACKEND=file`）。
 - `GET /api/v1/health` → 200；`GET /` → 200；SIGTERM 后按 Worker → API → PostgreSQL 逆序停止，无残留进程。
-- 未通过菜单实际执行导出／导入对话框（会阻塞在原生保存/确认窗口）；菜单存在与流程分支由 Playwright 用例覆盖，归档本身的真实读写见 `DESKTOP-P010-transfer.md` 的 CLI round-trip。
+- 未通过人工点击原生保存/确认窗口执行导出／导入；改为 `tests/packaged-maintenance.spec.ts` 脚本替换对话框返回值，经真实菜单与 sidecar 完成导出 → 升级检查 → 导入（1 passed，9.0 s），档案本身的 CLI round-trip 见 `DESKTOP-P010-transfer.md`。
 
 ## 未验证 / 已知缺口
 
