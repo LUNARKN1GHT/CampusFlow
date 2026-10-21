@@ -113,8 +113,8 @@ function createShellWindow(): BrowserWindow {
   shellView = 'splash'
   void loadShellPage(shellWindow, 'splash.html').catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
-    // 切换到错误页时会主动中止启动页导航，这不是加载失败。
-    if (message.includes('ERR_ABORTED')) {
+    // 切换到错误页会中止启动页导航；只有仍停留在启动页时才是真的加载失败。
+    if (shellView !== 'splash') {
       logger?.info('启动页导航已中止（切换到其它页面）')
       return
     }
