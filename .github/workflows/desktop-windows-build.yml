@@ -97,6 +97,38 @@ jobs:
           Write-Host "sidecar: $sidecar"
           Write-Host "postgres: $pg"
 
+      - name: Verify installer contents
+        shell: pwsh
+        run: |
+          $sevenZip = 'C:\Program Files\7-Zip\7z.exe'
+          if (-not (Test-Path $sevenZip)) { throw '7-Zip is required to inspect the installer' }
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' | Select-Object -First 1
+          $outer = Join-Path $env:RUNNER_TEMP 'installer-outer'
+          Remove-Item -Recurse -Force $outer -ErrorAction SilentlyContinue
+          & $sevenZip x $installer.FullName "-o$outer" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'failed to extract installer' }
+
+          $appArchive = Get-ChildItem $outer -Recurse -Filter 'app-64.7z' | Select-Object -First 1
+          if (-not $appArchive) { throw 'app-64.7z not found inside the installer' }
+          $app = Join-Path $env:RUNNER_TEMP 'installer-app'
+          Remove-Item -Recurse -Force $app -ErrorAction SilentlyContinue
+          & $sevenZip x $appArchive.FullName "-o$app" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'failed to extract app-64.7z' }
+
+          $expected = @(
+            'resources\sidecar\campusflow-sidecar.exe',
+            'resources\pgsql\bin\postgres.exe',
+            'resources\pgsql\share\extension\vector.control',
+            'resources\static\index.html',
+            'resources\THIRD-PARTY-NOTICES.md'
+          )
+          foreach ($relative in $expected) {
+            if (-not (Test-Path (Join-Path $app $relative))) {
+              throw "missing from installer: $relative"
+            }
+          }
+          Write-Host "installer contents verified: $($expected.Count) resources"
+
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4
         with:
