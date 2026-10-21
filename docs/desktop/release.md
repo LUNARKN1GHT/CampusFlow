@@ -42,6 +42,7 @@ Windows（PowerShell，x64）：
 ```powershell
 powershell -File desktop/postgres/build_windows.ps1   # 内置 PostgreSQL + pgvector
 powershell -File desktop/build_windows.ps1            # PyInstaller sidecar
+powershell -File desktop/postgres/smoke_windows.ps1   # initdb / pgvector / 重启 / sidecar
 cd desktop/electron; npm ci; npm run build; npx electron-builder --win --publish never
 ```
 
