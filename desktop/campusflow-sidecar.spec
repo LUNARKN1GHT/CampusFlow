@@ -49,6 +49,10 @@ hiddenimports = [
 hiddenimports += collect_submodules("uvicorn")
 hiddenimports += collect_submodules("rq")
 hiddenimports += collect_submodules("alembic")
+# P006 统一 CLI：子命令按需导入 sidecar 模块、桌面 Worker 与队列装配。
+hiddenimports += collect_submodules("campusflow.sidecar")
+hiddenimports += collect_submodules("campusflow.workers")
+hiddenimports += collect_submodules("campusflow.infrastructure.queue")
 
 a = Analysis(
     [str(ROOT / "desktop" / "sidecar_entry.py")],

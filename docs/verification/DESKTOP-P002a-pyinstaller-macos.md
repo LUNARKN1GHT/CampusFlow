@@ -284,3 +284,8 @@ CAMPUSFLOW_DATABASE_URL=... desktop/dist/campusflow-sidecar/campusflow-sidecar s
 CAMPUSFLOW_DATABASE_URL=... CAMPUSFLOW_REDIS_URL=... \
   desktop/dist/campusflow-sidecar/campusflow-sidecar worker --burst --demo
 ```
+
+
+## 集成更新（P006 合入后）
+
+P002a 最初在 `desktop/sidecar_entry.py` 内维护独立的 serve／migrate／worker。P006 的统一 CLI 合入后，入口改为只转发 `campusflow.sidecar.cli:main`，spec 增加 `campusflow.sidecar`、`campusflow.workers` 与 `campusflow.infrastructure.queue` 的 `collect_submodules`。本地重建 91 MB one-folder（46.4 s）；在 `/tmp` 以 `env -i` 执行 `--help`、`doctor --json`、`serve --port 8999`，`/api/v1/health` 返回 200。原先的 RQ Worker 验证保留，桌面数据库 Worker 由 `worker --mode auto` 在 desktop 模式下选择。

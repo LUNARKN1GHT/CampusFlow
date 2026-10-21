@@ -46,5 +46,5 @@ campusflow_p006_restored tables=45  rev=k001_external_calendar
 - Windows 上的 `pg_dump`／`pg_restore` 发现与路径；本地只验证 macOS + Homebrew PostgreSQL 16.14。
 - `--strategy auto` 的临时库改名路径：本机 `campusflow` 角色没有 `CREATE DATABASE` 权限，实际回退到 `direct`；该分支仅由单元测试覆盖，未在具备建库权限的实例上执行。
 - 直接恢复不是事务性的；中途失败需依赖恢复前安全备份，已在文档中标注。
-- 打包后的 sidecar（PyInstaller）尚未改用本 CLI：P002a 的 `desktop/sidecar_entry.py` 仍是独立入口，后续需切换为调用 `campusflow.sidecar.cli:main`。
+- 打包后的 sidecar 已切换：`desktop/sidecar_entry.py` 现在只调用 `campusflow.sidecar.cli:main`，spec 收集 `campusflow.sidecar`／`workers`／`infrastructure.queue` 子模块。集成分支重建 91 MB one-folder（46.4 s），在 `/tmp` 的 `env -i` 环境执行 `--help`、`doctor --json` 与 `serve --port 8999`，`/api/v1/health` 返回 200 并优雅退出。
 - 真实 Electron 调用与真实视觉/向量模型未验证。
