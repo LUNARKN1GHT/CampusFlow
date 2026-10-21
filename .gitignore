@@ -27,3 +27,7 @@ data/
 *.log
 .DS_Store
 .idea/
+
+# P007：桌面凭据兜底文件绝不入库
+secrets.json
+secrets.dpapi
