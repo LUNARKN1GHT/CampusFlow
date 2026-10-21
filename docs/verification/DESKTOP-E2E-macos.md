@@ -167,6 +167,25 @@ env -i HOME=/tmp/cf-clean/home TMPDIR=/tmp PATH=/usr/bin:/bin:/usr/sbin:/sbin \
 - 这不是干净机器验收：仍使用同一台已安装 Homebrew／Node 的 macOS，只证明运行时 PATH 中
   不需要它们；全新 macOS 与 DMG 安装仍未验证。
 
+### 升级闸门实跑（旧结构 → 新结构）
+
+在同一打包应用的数据目录上，用 backend 虚拟环境执行
+`alembic downgrade -1`（`k001_external_calendar → c007_merge_c003`），确认
+`alembic_version=c007_merge_c003` 后重启应用：
+
+```text
+阶段开始：migrate
+数据库结构已升级：c007_merge_c003 -> k001_external_calendar，
+  升级前备份 <data_dir>/backups/pre-upgrade-20261021T125428Z
+阶段完成：migrate → api → worker → ready；自动登录成功
+```
+
+- 备份含 `database.dump`（181307 字节，SHA-256 `4b02d095…b5717d`）与 `manifest.json`
+  （`kind=pre-upgrade`、`database_revision=c007_merge_c003`、`app_schema_head=k001_external_calendar`），
+  连接串中的口令以 `***` 记录。
+- 升级后 `/api/v1/health` → 200；SIGTERM 正常回收，无残留进程。
+- 覆盖的是“同一应用启动时发现旧结构”；旧版本应用 → 新 DMG 安装的替换流程仍未验证。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
