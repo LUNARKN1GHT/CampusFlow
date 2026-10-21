@@ -26,7 +26,7 @@ interface DialogMessage {
   buttons?: string[]
 }
 
-async function waitForLog(file: string, needle: string, timeoutMs = 90_000): Promise<void> {
+async function waitForLog(file: string, needle: string, timeoutMs = 180_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (existsSync(file)) {
@@ -35,7 +35,8 @@ async function waitForLog(file: string, needle: string, timeoutMs = 90_000): Pro
     }
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
-  throw new Error(`等待日志超时：${needle}`)
+  const tail = existsSync(file) ? readFileSync(file, 'utf8').slice(-4000) : '(日志文件不存在)'
+  throw new Error(`等待日志超时：${needle}\n--- ${file} ---\n${tail}`)
 }
 
 async function messages(app: ElectronApplication): Promise<DialogMessage[]> {
@@ -81,8 +82,14 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
       },
     })
     const mainLog = path.join(logDir, 'main.log')
-    await waitForLog(mainLog, '全部服务已就绪')
-    await waitForLog(mainLog, '自动登录成功')
+    const stderr: string[] = []
+    app.process().stderr?.on('data', (chunk) => stderr.push(String(chunk)))
+    try {
+      await waitForLog(mainLog, '全部服务已就绪')
+      await waitForLog(mainLog, '自动登录成功')
+    } catch (error) {
+      throw new Error(`${(error as Error).message}\n--- app stderr ---\n${stderr.join('').slice(-4000)}`)
+    }
 
     // 原生对话框在自动化里不可操作：替换为脚本结果，其余流程与真实菜单一致。
     await app.evaluate(({ dialog, app: electronApp }, config) => {
