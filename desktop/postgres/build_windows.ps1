@@ -18,6 +18,7 @@ Environment overrides:
 param()
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 $scriptDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptDir)
@@ -51,11 +52,20 @@ function Invoke-Checked {
     }
 }
 
+function Remove-Tree {
+    param([string]$Path)
+    if (Test-Path $Path) {
+        & cmd /c "rmdir /s /q `"$Path`""
+        if ($LASTEXITCODE -ne 0) { throw "failed to remove $Path" }
+    }
+}
+
 function Get-VerifiedFile {
     param([string]$Url, [string]$Target, [string]$ExpectedSha256)
     if (-not (Test-Path $Target)) {
         Write-Host "downloading $(Split-Path -Leaf $Target)"
-        Invoke-WebRequest -Uri $Url -OutFile "$Target.part" -UseBasicParsing
+        & curl.exe -fsSL --retry 3 --connect-timeout 20 -o "$Target.part" $Url
+        if ($LASTEXITCODE -ne 0) { throw "download failed: $Url" }
         Move-Item -Force "$Target.part" $Target
     }
     else {
@@ -106,8 +116,7 @@ function Ensure-VcRuntime {
 function Prune-Stage {
     Write-Host 'pruning development files'
     foreach ($path in @('include', 'lib\pgxs', 'share\doc', 'share\man', 'share\info', 'symbols', 'pgAdmin 4', 'StackBuilder')) {
-        $target = Join-Path $stageDir $path
-        if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+        Remove-Tree (Join-Path $stageDir $path)
     }
     Get-ChildItem -Path $stageDir -Recurse -File |
         Where-Object { @('.lib', '.exp', '.pdb', '.a') -contains $_.Extension } |
@@ -138,12 +147,12 @@ Get-VerifiedFile $pgUrl $pgArchive $pgSha256
 Get-VerifiedFile $vectorUrl $vectorArchive $vectorSha256
 
 Write-Host 'cleaning previous build and staging output'
-if (Test-Path $sourceDir) { Remove-Item -Recurse -Force $sourceDir }
-if (Test-Path $stageDir) { Remove-Item -Recurse -Force $stageDir }
+Remove-Tree $sourceDir
+Remove-Tree $stageDir
 New-Item -ItemType Directory -Force -Path $sourceDir | Out-Null
 
 Write-Host "extracting PostgreSQL $pgVersion"
-& tar -xf $pgArchive -C $sourceDir
+& tar -xf $pgArchive -C $sourceDir --exclude "pgsql/pgAdmin 4/*" --exclude "pgsql/StackBuilder/*"
 if ($LASTEXITCODE -ne 0) { throw 'failed to extract the PostgreSQL archive' }
 $extractedPg = Join-Path $sourceDir 'pgsql'
 if (-not (Test-Path (Join-Path $extractedPg 'bin\postgres.exe'))) {
