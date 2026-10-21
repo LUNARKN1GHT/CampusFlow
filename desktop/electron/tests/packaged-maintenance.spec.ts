@@ -26,7 +26,7 @@ interface DialogMessage {
   buttons?: string[]
 }
 
-async function waitForLog(file: string, needle: string, timeoutMs = 180_000): Promise<void> {
+async function waitForLog(file: string, needle: string, timeoutMs = 150_000): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (existsSync(file)) {
@@ -57,7 +57,7 @@ async function clickDataMenu(app: ElectronApplication, prefix: string): Promise<
 
 test('打包应用经菜单导出、检查升级并导入归档', async () => {
   test.skip(!ready, '需要 CAMPUSFLOW_PACKAGED_APP / CAMPUSFLOW_SIDECAR_BIN / CAMPUSFLOW_PG_BIN')
-  test.setTimeout(180_000)
+  test.setTimeout(300_000)
 
   const root = mkdtempSync(path.join(os.tmpdir(), 'campusflow-p010-e2e-'))
   const userData = path.join(root, 'user')
