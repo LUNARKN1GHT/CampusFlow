@@ -117,7 +117,10 @@ test('测试桩模式：启动页 → 主窗口，日志按阶段推进，退出
     typeof window.open('https://example.com/oauth', 'campusflow-calendar-oauth'),
   )
   expect(popupType).toBe('object')
-  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
+  // 启动页可能在主窗口出现后才关闭，等它退出再断言只剩一个窗口。
+  await expect
+    .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length))
+    .toBe(1)
 
   await expect.poll(() => existsSync(path.join(userData, 'run', 'stub-api.pid'))).toBe(true)
   await expect.poll(() => existsSync(path.join(userData, 'run', 'stub-worker.pid'))).toBe(true)
