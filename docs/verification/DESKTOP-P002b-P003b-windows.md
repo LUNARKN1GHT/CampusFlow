@@ -83,10 +83,41 @@ installer: desktop\electron\release\CampusFlow-0.1.0-win-x64.exe (184.6 MB)
 同时修复了首启迁移中的 Windows 偶发失败：临时目录改名为数据目录时若子进程句柄
 尚未释放（`WinError 5`），现在有限重试后再报错。
 
+## Windows 安装包安装与首启（CI）
+
+2026-10-21 的运行
+[39687931701](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39687931701)
+在 windows-2022 上把安装流程纳入工作流：
+
+```text
+installer: CampusFlow-0.1.0-win-x64.exe（未签名）
+Install the NSIS package silently                 33 s
+  → %LOCALAPPDATA%\Programs\CampusFlow\CampusFlow.exe
+  → resources\{sidecar,pgsql,static} 校验通过
+Run first launch and maintenance flow            1 passed (33.7 s)
+  首启 bootstrap → API → Worker → ready，自动登录成功
+  经真实菜单完成导出 → 检查升级 → 导入归档
+```
+
+- 使用 electron-builder 生成的 assisted NSIS 安装器，`/S` 静默安装到当前用户目录。
+- 测试对安装后的可执行文件运行 `tests/packaged-maintenance.spec.ts`，sidecar 与
+  PostgreSQL 都指向安装目录内的 `resources`，不依赖仓库构建目录。
+- 同一运行的 Python bootstrap 测试 13 passed、3 skipped；PostgreSQL/pgvector/sidecar
+  冒烟全部通过。
+
+### 首启失败与修复：bootstrap 工作目录
+
+首次安装后启动失败，日志为“数据目录已存在且非空，拒绝覆盖”。原因是 Electron
+以 `dataDir` 作为 sidecar 的工作目录，而 bootstrap 需要先 `rmdir` 这个空目录再
+把初始化结果改名过去；Windows 不允许删除仍是某进程当前工作目录的目录，POSIX
+则允许。修复为 bootstrap 固定以 `runDir` 作为工作目录（`supervisor.ts`），并在
+`supervisor.spec.ts` 断言该 cwd 不同于数据目录。修复后安装应用首启通过。
+
 ## 未验证
 
-- **安装与运行**：未在 Windows 11 上执行安装包，未验证首次启动、initdb、pgvector 扩展创建、
-  Worker 轮询与退出后无残留进程。
+- **实机安装**：CI 已完成静默安装与安装后首启；未在 Windows 11 桌面交互式运行
+  安装器，因此安装向导界面、SmartScreen 提示与快捷方式行为未验证。
 - **干净机器**：CI runner 自带 Visual Studio 与多种运行时，不构成干净机器验收。
 - **签名**：未配置 `WINDOWS_CSC_LINK`，产物未签名；SmartScreen 行为未验证。
-- **macOS ↔ Windows 迁移**：未执行 `.campusflow` 跨平台往返。
+- **安装后跨平台迁移**：归档往返已由 `desktop-archive-compat.yml` 覆盖 Windows↔macOS
+  （数据库层），安装后的两个应用之间尚未执行。

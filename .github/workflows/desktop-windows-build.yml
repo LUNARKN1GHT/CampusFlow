@@ -129,6 +129,40 @@ jobs:
           }
           Write-Host "installer contents verified: $($expected.Count) resources"
 
+      # NSIS 是 assisted 安装器，/S 仍可静默安装到 %LOCALAPPDATA%\Programs\CampusFlow。
+      - name: Install the NSIS package silently
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' | Select-Object -First 1
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "installer failed with exit code $($process.ExitCode)"
+          }
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $exe = Join-Path $root 'CampusFlow.exe'
+          if (-not (Test-Path $exe)) { throw "installed executable missing: $exe" }
+          $expected = @(
+            'resources\sidecar\campusflow-sidecar.exe',
+            'resources\pgsql\bin\postgres.exe',
+            'resources\static\index.html'
+          )
+          foreach ($relative in $expected) {
+            if (-not (Test-Path (Join-Path $root $relative))) {
+              throw "missing after install: $relative"
+            }
+          }
+          Write-Host "installed: $exe"
+
+      - name: Run first launch and maintenance flow on installed app
+        shell: pwsh
+        working-directory: desktop/electron
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $env:CAMPUSFLOW_PACKAGED_APP = Join-Path $root 'CampusFlow.exe'
+          $env:CAMPUSFLOW_SIDECAR_BIN = Join-Path $root 'resources\sidecar\campusflow-sidecar.exe'
+          $env:CAMPUSFLOW_PG_BIN = Join-Path $root 'resources\pgsql\bin'
+          npx playwright test tests/packaged-maintenance.spec.ts --reporter=line
+
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4
         with:

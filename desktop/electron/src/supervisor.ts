@@ -523,7 +523,9 @@ export class Supervisor extends EventEmitter {
     }
     const command = this.sidecarCommand('bootstrap', ['--json'])
     const result = await this.deps.run(command.command, command.args, {
-      cwd: command.cwd,
+      // Windows 不允许删除仍是某进程工作目录的目录；bootstrap 会先移走空数据目录，
+      // 因此工作目录必须放在数据目录之外。
+      cwd: this.config.runDir,
       env: this.bootstrapEnv(),
       timeoutMs: 300_000,
     })
