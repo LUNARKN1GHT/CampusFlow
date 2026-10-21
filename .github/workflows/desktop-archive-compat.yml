@@ -42,6 +42,40 @@ jobs:
         shell: powershell
         run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
 
+      - name: Diagnose initdb password file handling
+        shell: pwsh
+        working-directory: backend
+        env:
+          CAMPUSFLOW_PG_BIN: ${{ github.workspace }}\desktop\vendor\pgsql\bin
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'pwprobe'
+          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $root | Out-Null
+
+          function Try-PasswordFile([string]$label, [string]$pw) {
+            $dir = Join-Path $root $label
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            & "$env:CAMPUSFLOW_PG_BIN\initdb.exe" -D (Join-Path $dir 'data') -U probe "--pwfile=$pw" -A scram-sha-256 -E UTF8 --locale=C | Out-Null
+            Write-Host "case $label : exit $LASTEXITCODE"
+          }
+
+          # A: PowerShell 在 runner 临时目录写文件（Windows 冒烟脚本已知可用）
+          $a = Join-Path $root 'pw-a.txt'
+          Set-Content -Path $a -Value 'probe-secret' -NoNewline
+          Try-PasswordFile 'A-powershell' $a
+
+          # B: Python 在 runner 临时目录 mkstemp + write + chmod
+          $b = & uv run --locked python -c 'import os, tempfile; fd, name = tempfile.mkstemp(dir=os.environ["RUNNER_TEMP"], prefix=".campusflow-pw-"); os.close(fd); open(name, "w").write("probe"); os.chmod(name, 0o600); print(name)'
+          Try-PasswordFile 'B-system-temp' $b.Trim()
+
+          # C: Python mkdtemp 目录内写文件（当前实现）
+          $c = & uv run --locked python -c 'import os, pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); os.chmod(f, 0o600); print(f)'
+          Try-PasswordFile 'C-mkdtemp' $c.Trim()
+
+          # D: 同 C，但不 chmod
+          $d = & uv run --locked python -c 'import pathlib, tempfile; d = pathlib.Path(tempfile.mkdtemp(dir=os.environ["RUNNER_TEMP"], prefix="mkdtemp-")); f = d / ".campusflow-pw"; f.write_text("probe", encoding="utf-8"); print(f)'
+          Try-PasswordFile 'D-mkdtemp-no-chmod' $d.Trim()
+
       - name: Bootstrap, seed and export archive
         shell: pwsh
         working-directory: backend
