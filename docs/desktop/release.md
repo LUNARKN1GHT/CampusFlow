@@ -109,6 +109,17 @@ Windows：
 跨版本升级（旧桌面版 → 新桌面版）的实装验收延后，原因是没有可用的历史桌面发布包；
 升级、备份与失败回滚机制已由 `test_upgrade.py` 覆盖。
 
+### 验收交接
+
+- 安装包来源：GitHub Actions 中 `Desktop macOS build`／`Desktop Windows build` 的最近一次
+  成功运行，artifact 分别为 `desktop-macos-arm64-ci`、`desktop-macos-x64-ci` 与
+  `desktop-windows-x64-ci`；每个 artifact 含安装包与 `SHA256SUMS.txt`。
+- 这两个工作流在 PR 命中相关路径时自动运行；`workflow_dispatch` 只有在工作流进入默认分支后
+  才会出现，因此当前从 PR 运行页面下载 artifact。
+- 安装与放行步骤见 `docs/desktop/user-guide.md`；验收结果记录到
+  `docs/verification/DESKTOP-E2E-macos.md`（Windows 另建对应记录），逐项附命令与截图。
+- 记录完成后由维护者核对并关闭阶段 Issue；未执行的项保持未勾选。
+
 ## 回滚
 
 - 应用回滚：重新安装上一个 `desktop-v*` 正式版；不要在没有备份的情况下用旧应用打开新 schema（启动门禁会拒绝并提示）。
