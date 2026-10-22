@@ -80,7 +80,8 @@ Windows：
 
 ## 产物与校验
 
-- 每个平台上传一个安装包 artifact，Release 任务汇总后生成 `SHA256SUMS.txt` 并一并附加。
+- 每个平台上传一个安装包 artifact，并附带 `SHA256SUMS.txt`；Release 任务汇总后重新生成
+  一份并附加。验收人下载 artifact 后可直接核对校验和。
 - 打包后会挂载 DMG 校验架构与随包 sidecar／PostgreSQL／静态资源；构建与发布工作流共用
   `desktop/verify_macos_dmg.sh`。Windows 由 `desktop/verify_windows_installer.ps1`
   解包 NSIS 并检查同样的资源。

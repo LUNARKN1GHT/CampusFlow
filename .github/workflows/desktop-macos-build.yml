@@ -86,9 +86,18 @@ jobs:
           echo "dmg: ${dmgs[0]} ($(du -h "${dmgs[0]}" | cut -f1))"
           bash desktop/verify_macos_dmg.sh "${dmgs[0]}" "$ARCH"
 
+      - name: Write checksums
+        run: |
+          set -euo pipefail
+          cd desktop/electron/release
+          shasum -a 256 *.dmg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
           name: desktop-macos-${{ matrix.arch }}-ci
-          path: desktop/electron/release/*.dmg
+          path: |
+            desktop/electron/release/*.dmg
+            desktop/electron/release/SHA256SUMS.txt
           if-no-files-found: error
