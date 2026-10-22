@@ -114,6 +114,9 @@ Windows：
 
 - 首版不提供自动更新，用户手动下载安装包。
 - 不支持 Mac App Store、Microsoft Store、Windows ARM、Linux 桌面。
+- 无模型密钥时应用仍可启动，本地资料、任务、计划与导出可用；识别／索引作业与问答按
+  既有契约以明确原因失败（`backend/tests/test_desktop_worker.py` 覆盖桌面 Worker 路径，
+  问答装配缺键返回业务错误）。打包应用的界面级提示尚未单独验证。
 - GitHub Actions 已能构建并校验未签名的 macOS DMG 与 Windows NSIS 安装包（见
   `docs/verification/DESKTOP-P002b-P003b-windows.md` 与 `docs/verification/DESKTOP-E2E-macos.md`）；
   签名、公证、Gatekeeper／SmartScreen 与干净机器验收仍未执行，也未创建过 `desktop-v*` 发布。
