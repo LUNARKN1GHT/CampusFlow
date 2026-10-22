@@ -149,6 +149,19 @@ jobs:
           }
           Write-Host 'no leftover CampusFlow, sidecar or postgres processes'
 
+      - name: Verify bundled sidecar without developer toolchain on PATH
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $sidecar = Join-Path $root 'resources\sidecar\campusflow-sidecar.exe'
+          # 只保留系统目录，确认随包 sidecar 不依赖 Python／Node／开发工具链的 PATH。
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $output = & $sidecar --version 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "sidecar --version failed with exit code $($LASTEXITCODE): $output" }
+          $text = $output | Out-String
+          Write-Host "sidecar version: $text"
+          if ($text -notmatch '0\.1\.0') { throw "unexpected sidecar version output: $text" }
+
       - name: Uninstall and verify cleanup
         shell: pwsh
         run: |
