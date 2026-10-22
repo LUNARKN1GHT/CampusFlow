@@ -89,12 +89,13 @@ test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) 
   const slots = await page.request.get('/api/v1/availability-slots')
   expect(slots.ok()).toBeTruthy()
   const slotList = (await slots.json()) as Array<{ day_of_week: number; start_time: string; end_time: string }>
+  // manual-management 在周六固定创建 09:00–11:00；同日再建 10:00–11:00 会因重叠被拒。
   const hasWindow = slotList.some(
-    (slot) => slot.day_of_week === weekday && slot.start_time.slice(0, 5) === '10:00' && slot.end_time.slice(0, 5) === '11:00',
+    (slot) => slot.day_of_week === weekday && slot.start_time.slice(0, 5) === '12:00' && slot.end_time.slice(0, 5) === '13:00',
   )
   if (!hasWindow) {
     const created = await page.request.post('/api/v1/availability-slots', {
-      data: { day_of_week: weekday, start_time: '10:00', end_time: '11:00' },
+      data: { day_of_week: weekday, start_time: '12:00', end_time: '13:00' },
     })
     expect(created.ok()).toBeTruthy()
   }
