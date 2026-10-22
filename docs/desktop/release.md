@@ -1,6 +1,6 @@
 # 桌面版构建与发布
 
-对应 Issue：[#475](https://github.com/LUNARKN1GHT/CampusFlow/issues/475)（P009）。本文记录安装包、签名、公证与独立 Release 的操作方式。当前状态：**配置已落地，真实签名与干净机器验收尚未执行**；未执行的项不得写成已验证。
+对应 Issue：[#475](https://github.com/LUNARKN1GHT/CampusFlow/issues/475)（P009）。本文记录安装包、签名、公证与独立 Release 的操作方式。当前状态：**配置已落地；项目不购买代码签名证书，安装包保持未签名并通过 CI artifact 分发，不创建 `desktop-v*` 正式 Release**（2026-10-22 决定）。签名、公证与干净机器验收未执行，不得写成已验证。
 
 ## 版本与标签
 
@@ -60,6 +60,10 @@ macOS 两个架构由 `.github/workflows/desktop-macos-build.yml` 在 `macos-15`
 架构由 `--arm64`／`--x64` 指定（`electron-builder.yml` 不再写 `arch` 列表）。
 
 ## 签名与公证
+
+2026-10-22 决定：不购买代码签名证书，安装包保持未签名，通过 GitHub Actions artifact
+分发并核对 `SHA256SUMS.txt`；不创建 `desktop-v*` 正式 Release。安装方式与 Gatekeeper／
+SmartScreen 放行步骤见 [user-guide.md](user-guide.md)。以下配置保留，未来具备证书时可直接启用。
 
 安装包资源位于 `desktop/electron/build/`：`icon.png`（1024×1024，macOS 圆角网格，
 electron-builder 会为 DMG 与 NSIS 生成对应图标）与 `entitlements.mac.plist`。
