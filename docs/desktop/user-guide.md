@@ -7,6 +7,31 @@ Docker 服务端部署见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 > 当前安装包尚未签名与公证；Gatekeeper／SmartScreen 的实际表现见“安装”一节。
 > 干净机器验收尚未执行，本指南不构成发布验收结论。
 
+## 核对安装包
+
+每次下载的 artifact 内附带 `SHA256SUMS.txt`，安装前先核对：
+
+macOS：
+
+```bash
+cd <解压后的 artifact 目录>
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+Windows（PowerShell）：
+
+```powershell
+cd <解压后的 artifact 目录>
+Get-Content SHA256SUMS.txt | ForEach-Object {
+  $hash, $file = $_ -split '\s+', 2
+  $actual = (Get-FileHash $file.Trim() -Algorithm SHA256).Hash.ToLower()
+  if ($actual -ne $hash) { throw "校验失败：$file" }
+}
+Write-Host '校验通过'
+```
+
+校验失败时不要安装，重新下载或联系项目组。
+
 ## 安装
 
 macOS：

@@ -321,7 +321,7 @@ open -n --env CAMPUSFLOW_ELECTRON_USER_DATA=/tmp/cf-install-data \
 - **首启凭据**：默认流程已改为 P007 bootstrap（随机口令、凭据后端、自动登录），不再使用 `student/campusflow-dev`；`CAMPUSFLOW_BOOTSTRAP=0` 仍保留旧 trust 流程，只用于测试和排障。
 - **macOS 钥匙串**：本轮自动化显式使用 `CAMPUSFLOW_SECRET_BACKEND=file`；打包应用默认 `auto` 走钥匙串的路径沿用 P007 源码验证，未在打包应用中复跑。
 - **自动登录失败提示**：真实运行中未制造失败，只由单元测试覆盖；页面内提示条的实际样式未截图。
-- **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；打包应用内通过原生对话框实际执行的流程未自动化。跨机器迁移已由 `desktop-archive-compat.yml` 覆盖 Windows↔macOS 双向（见 DESKTOP-P010-transfer.md），安装后的应用之间迁移未验证。
+- **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；`packaged-maintenance.spec.ts` 已在打包／安装后的应用上经菜单触发导出、升级检查与导入（原生对话框以脚本结果替代），Windows CI 同样执行。跨机器迁移由 `desktop-archive-compat.yml` 覆盖 Windows↔macOS 双向（见 DESKTOP-P010-transfer.md）；跨系统的“安装后应用之间”菜单级迁移未单独执行。
 - **Windows**：已由 `desktop-windows-build.yml` 在 windows-2022 构建并校验安装包内容、运行首启测试；未在 Windows 11 实机安装运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。
