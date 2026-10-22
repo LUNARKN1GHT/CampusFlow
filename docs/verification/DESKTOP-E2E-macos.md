@@ -315,6 +315,17 @@ open -n --env CAMPUSFLOW_ELECTRON_USER_DATA=/tmp/cf-install-data \
 - 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
 - 仍未在真正干净的 macOS 上执行，也未验证浏览器下载产生 quarantine 后首次打开的系统弹窗。
 
+### 当前源码重新打包（2026-10-22）
+
+从 `develop` 工作区重新产出 arm64 DMG（`npx electron-builder --mac --arm64 --publish never`；
+Electron 45.0.0 经 npmmirror 下载，本机无 Developer ID，electron-builder 记录跳过签名）：
+
+- `desktop/verify_macos_dmg.sh` 通过：sidecar 可运行，DMG 内容与 Mach-O 架构匹配。
+- `tests/packaged-maintenance.spec.ts`：**1 passed（9.2 s）**，经菜单导出归档、检查数据库升级并导入。
+- 安装到 `/Applications` 后启动：`/api/v1/health` → 200（端口 62854），自动登录成功；
+  `quit app` 后按 Worker → API → PostgreSQL 回收，“子进程已回收，应用退出”，无残留进程。
+- 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
