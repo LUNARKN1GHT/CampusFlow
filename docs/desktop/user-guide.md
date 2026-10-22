@@ -13,15 +13,18 @@ macOS：
 
 1. 打开 `CampusFlow-<版本>-mac-<架构>.dmg`，把 `CampusFlow.app` 拖入“应用程序”
    （或当前用户的 `~/Applications`）。
-2. 未签名包首次打开会被 Gatekeeper 拦截；可在 Finder 中右键应用选择“打开”，或到
-   “系统设置 → 隐私与安全性”允许。签名／公证版本尚未产出，正式发布后不应再出现该提示。
+2. 未签名包首次打开会被 Gatekeeper 拦截。可先在 Finder 中右键应用选择“打开”，或在
+   终端执行 `xattr -dr com.apple.quarantine /Applications/CampusFlow.app` 后重开；
+   前者只需确认一次，后者会清除隔离标记。证书与公证尚未配置，正式发布前所有包都是
+   未签名包；只应从项目组提供的渠道获取，并在打开前核对 SHA-256。
 
 Windows：
 
 1. 运行 `CampusFlow-<版本>-win-x64.exe`，按向导安装。默认安装到当前用户的
    `%LOCALAPPDATA%\Programs\CampusFlow`，不需要管理员权限，安装目录可修改。
-2. 未签名包可能触发 SmartScreen 提示；选择“更多信息 → 仍要运行”。正式签名后仍需
-   时间积累信誉。
+2. 未签名包可能触发 SmartScreen 提示；选择“更多信息 → 仍要运行”。若文件来自下载且
+   被系统锁定，可先右键安装包 → 属性 → 勾选“解除锁定”再运行。正式签名后仍需时间积累
+   信誉。
 
 ## 首次启动与数据位置
 
