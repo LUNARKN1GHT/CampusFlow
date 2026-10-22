@@ -333,6 +333,9 @@ Electron 45.0.0 经 npmmirror 下载，本机无 Developer ID，electron-builder
   属于本机既有的 Homebrew PostgreSQL 16，与本应用无关。
 - 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
 
+- 单实例：使用同一用户目录启动第二个实例，不到 1 s 以退出码 0 结束；首个实例继续运行、
+  health 200，且随包 PostgreSQL 与 CampusFlow 进程仍各只有一个，没有产生第二套子进程。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
