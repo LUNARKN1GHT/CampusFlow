@@ -185,6 +185,13 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: npx electron-builder --win --publish never
 
+      - name: Verify installer contents
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          & (Join-Path $env:GITHUB_WORKSPACE 'desktop\verify_windows_installer.ps1') -Installer $installer.FullName
+
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
