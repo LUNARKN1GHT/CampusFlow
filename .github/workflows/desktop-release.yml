@@ -224,7 +224,18 @@ jobs:
 
       - name: Generate SHA-256 checksums
         working-directory: release-assets
-        run: sha256sum * > SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          # 构建 artifact 各自带一份 SHA256SUMS.txt，合并后同名覆盖且不应进入发布校验和。
+          rm -f SHA256SUMS.txt
+          shopt -s nullglob
+          installers=(*.dmg *.exe)
+          if [ "${#installers[@]}" -eq 0 ]; then
+            echo "::error::没有找到可发布的安装包"
+            exit 1
+          fi
+          sha256sum "${installers[@]}" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create release
         env:
