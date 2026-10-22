@@ -105,6 +105,8 @@ Run first launch and maintenance flow            1 passed (33.7 s)
 - 应用退出后等待主进程结束，再检查 `CampusFlow`、`campusflow-sidecar` 与
   `postgres` 进程，均无残留（`Verify no leftover processes after exit` 通过）。
 - 未显式指定凭据后端时，用例断言首启日志为 `凭据后端 windows-dpapi`，防止静默回退到文件存储。
+- 测试结束后以 `/S` 运行 `Uninstall CampusFlow.exe`，安装目录在 60 秒内移除
+  （`Uninstall and verify cleanup`）。
 - 同一运行的 Python bootstrap 测试 13 passed、3 skipped；PostgreSQL/pgvector/sidecar
   冒烟全部通过。
 
