@@ -121,6 +121,14 @@ Windows：
   （后者为可填写的模板），逐项附命令与截图。
 - 记录完成后由维护者核对并关闭阶段 Issue；未执行的项保持未勾选。
 
+## 与服务端部署的关系
+
+- 桌面改动只在 `CAMPUSFLOW_DEPLOYMENT_MODE=desktop` 下生效；服务端模式不注册 Host／Origin
+  校验与 CSP 中间件（见 `DESKTOP-P012-security.md`）。
+- `infra/docker-compose.yml` 与 `infra/docker-compose.worker.yml` 自 v0.9.0 未改动；
+  `.github/workflows/backend.yml` 只新增 CI 使用的 PostgreSQL 17 客户端安装（P010／P011
+  的转储测试），服务端启动与 Worker 方式不变。
+
 ## 回滚
 
 - 应用回滚：重新安装上一个 `desktop-v*` 正式版；不要在没有备份的情况下用旧应用打开新 schema（启动门禁会拒绝并提示）。
