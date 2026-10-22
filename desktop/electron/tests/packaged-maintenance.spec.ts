@@ -280,3 +280,76 @@ test('打包应用可导航到所有已实现页面', async () => {
     }
   }
 })
+
+test('打包应用可创建任务并在重启后保留', async () => {
+  test.skip(!ready, '需要 CAMPUSFLOW_PACKAGED_APP / CAMPUSFLOW_SIDECAR_BIN / CAMPUSFLOW_PG_BIN')
+  test.setTimeout(300_000)
+
+  const root = mkdtempSync(path.join(os.tmpdir(), 'campusflow-task-e2e-'))
+  const userData = path.join(root, 'user')
+  const dataDir = path.join(root, 'data')
+  const logDir = path.join(root, 'logs')
+  const title = `打包冒烟任务-${Date.now()}`
+  const env = {
+    ...process.env,
+    CAMPUSFLOW_ELECTRON_USER_DATA: userData,
+    CAMPUSFLOW_DATA_DIR: dataDir,
+    CAMPUSFLOW_LOG_DIR: logDir,
+    CAMPUSFLOW_API_PORT: '8143',
+    CAMPUSFLOW_PG_PORT: '55445',
+    CAMPUSFLOW_PG_BIN: PG_BIN!,
+    CAMPUSFLOW_SIDECAR_BIN: SIDECAR!,
+  }
+  let app: ElectronApplication | null = null
+
+  async function launch() {
+    const launched = await electron.launch({ executablePath: APP, timeout: 120_000, env })
+    try {
+      const main = await launched.waitForEvent('window', {
+        predicate: (page) => page.url().startsWith('http://127.0.0.1:'),
+        timeout: 180_000,
+      })
+      await expect(main.getByRole('link', { name: '任务', exact: true })).toBeVisible({ timeout: 60_000 })
+      return { launched, main }
+    } catch (error) {
+      launched.process().kill('SIGKILL')
+      throw error
+    }
+  }
+
+  try {
+    let opened = await launch()
+    app = opened.launched
+    await opened.main.getByRole('link', { name: '任务', exact: true }).click()
+    await opened.main.getByRole('button', { name: '添加任务', exact: true }).click()
+    await opened.main.getByLabel('任务标题').fill(title)
+    await opened.main.getByRole('button', { name: '保存任务', exact: true }).click()
+    await expect(opened.main.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+
+    await opened.launched.evaluate(({ app: electronApp }) => electronApp.quit())
+    await opened.launched.waitForEvent('close', { timeout: 20_000 }).catch(() => undefined)
+    app = null
+    await new Promise((resolve) => setTimeout(resolve, 3_000))
+
+    opened = await launch()
+    app = opened.launched
+    await opened.main.getByRole('link', { name: '任务', exact: true }).click()
+    await expect(opened.main.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  } finally {
+    if (app) {
+      try {
+        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        await app.evaluate(({ app: electronApp }) => electronApp.quit())
+        await closed
+      } catch {
+        app.process().kill('SIGKILL')
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5_000))
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    } catch (error) {
+      console.warn(`临时目录清理失败：${(error as Error).message}`)
+    }
+  }
+})
