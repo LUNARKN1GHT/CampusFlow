@@ -328,6 +328,9 @@ Electron 45.0.0 经 npmmirror 下载，本机无 Developer ID，electron-builder
   `Contents/MacOS/CampusFlow`，health → 200（端口 62213）、自动登录成功；SIGTERM 后同样
   按逆序回收，无残留。说明运行不依赖开发工具的 PATH 或用户目录；但本机仍装有
   Homebrew／Python／Node，不构成真正干净机器的证明。
+- 端口绑定：启动后 `lsof -nP -iTCP -sTCP:LISTEN` 显示随包 API 仅监听 `127.0.0.1:49422`、
+  随包 PostgreSQL 仅监听 `127.0.0.1:49423`，没有 `0.0.0.0` 或外部地址；`5432` 上的监听
+  属于本机既有的 Homebrew PostgreSQL 16，与本应用无关。
 - 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
 
 ## 未验证 / 已知缺口
