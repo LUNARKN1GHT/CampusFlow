@@ -265,7 +265,7 @@ GET /api/v1/health → 200
 
 ## CI 打包（arm64 与 x64）
 
-`.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与 `macos-15-intel`
+`.github/workflows/desktop-macos-build.yml` 在 `macos-15`（arm64）与 `macos-15-intel`
 （x64）上构建前端、内置 PostgreSQL、sidecar 与 DMG，并挂载 DMG 断言资源齐全、架构匹配、
 随包 sidecar 可运行。运行 [39663810965](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39663810965)
 两个任务均通过：
