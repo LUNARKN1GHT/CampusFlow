@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import { chmodSync, mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -259,4 +260,31 @@ test('应用菜单提供数据导出、导入与升级入口', async () => {
   })
   expect(dataItems).toEqual(['导出数据归档…', '从归档导入…', '检查数据库升级…'])
   await quitGracefully(app)
+})
+
+test('单实例：第二个实例立即退出，首个实例继续运行', async () => {
+  const { app, userData } = await launchStub()
+  await firstWindow(app)
+  await expect.poll(() => existsSync(path.join(userData, 'run', 'stub-api.pid'))).toBe(true)
+
+  // 第二个实例会在 Playwright 连上调试端口前退出，不能用 electron.launch。
+  const electronBinary = require('electron') as string
+  const second = spawn(electronBinary, [APP_MAIN], {
+    env: {
+      ...process.env,
+      CAMPUSFLOW_ELECTRON_STUB: '1',
+      CAMPUSFLOW_ELECTRON_USER_DATA: userData,
+    },
+    stdio: 'ignore',
+  })
+  try {
+    const code = await new Promise<number | null>((resolve) => {
+      second.once('exit', (value) => resolve(value))
+      setTimeout(() => resolve(null), 20_000).unref()
+    })
+    expect(code).toBe(0)
+    expect(app.process().exitCode).toBeNull()
+  } finally {
+    second.kill('SIGKILL')
+  }
 })
