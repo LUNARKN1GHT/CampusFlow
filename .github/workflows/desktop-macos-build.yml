@@ -29,10 +29,8 @@ jobs:
         include:
           - runner: macos-14
             arch: arm64
-            macho: arm64
           - runner: macos-15-intel
             arch: x64
-            macho: x86_64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
 
@@ -77,7 +75,6 @@ jobs:
 
       - name: Verify DMG contents
         env:
-          EXPECTED_MACHO: ${{ matrix.macho }}
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
@@ -86,34 +83,8 @@ jobs:
             printf 'expected exactly one DMG, got: %s\n' "${dmgs[*]}" >&2
             exit 1
           fi
-          dmg="${dmgs[0]}"
-          case "$dmg" in
-            *"mac-$ARCH.dmg") ;;
-            *) echo "unexpected DMG for arch $ARCH: $dmg" >&2; exit 1 ;;
-          esac
-          echo "dmg: $dmg ($(du -h "$dmg" | cut -f1))"
-          mount=$(mktemp -d)
-          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$dmg" >/dev/null
-          trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT
-
-          app="$mount/CampusFlow.app"
-          for relative in \
-            Contents/Resources/sidecar/campusflow-sidecar \
-            Contents/Resources/pgsql/bin/postgres \
-            Contents/Resources/pgsql/share/extension/vector.control \
-            Contents/Resources/pgsql/lib/vector.dylib \
-            Contents/Resources/static/index.html \
-            Contents/Resources/THIRD-PARTY-NOTICES.md; do
-            if [ ! -e "$app/$relative" ]; then
-              echo "missing from DMG: $relative" >&2
-              exit 1
-            fi
-          done
-
-          "$app/Contents/Resources/sidecar/campusflow-sidecar" --version
-          file "$app/Contents/MacOS/CampusFlow" | grep -q "$EXPECTED_MACHO"
-          file "$app/Contents/Resources/pgsql/bin/postgres" | grep -q "$EXPECTED_MACHO"
-          echo "DMG contents verified for $EXPECTED_MACHO"
+          echo "dmg: ${dmgs[0]} ($(du -h "${dmgs[0]}" | cut -f1))"
+          bash desktop/verify_macos_dmg.sh "${dmgs[0]}" "$ARCH"
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4

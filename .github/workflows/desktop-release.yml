@@ -101,6 +101,18 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder --mac --${{ matrix.arch }} --publish never
 
+      - name: Verify DMG contents
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          dmgs=(desktop/electron/release/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ] || [ ! -f "${dmgs[0]}" ]; then
+            printf 'expected exactly one DMG, got: %s\n' "${dmgs[*]}" >&2
+            exit 1
+          fi
+          bash desktop/verify_macos_dmg.sh "${dmgs[0]}" "$ARCH"
+
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
