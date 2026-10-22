@@ -353,3 +353,61 @@ test('打包应用可创建任务并在重启后保留', async () => {
     }
   }
 })
+
+test('打包应用可上传资料', async () => {
+  test.skip(!ready, '需要 CAMPUSFLOW_PACKAGED_APP / CAMPUSFLOW_SIDECAR_BIN / CAMPUSFLOW_PG_BIN')
+  test.setTimeout(300_000)
+
+  const root = mkdtempSync(path.join(os.tmpdir(), 'campusflow-upload-e2e-'))
+  const userData = path.join(root, 'user')
+  const dataDir = path.join(root, 'data')
+  const logDir = path.join(root, 'logs')
+  const sample = path.resolve(__dirname, '../../../samples/course-paths/real/2025计算机科学与技术（辅修）.pdf')
+  let app: ElectronApplication | null = null
+
+  try {
+    app = await electron.launch({
+      executablePath: APP,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        CAMPUSFLOW_ELECTRON_USER_DATA: userData,
+        CAMPUSFLOW_DATA_DIR: dataDir,
+        CAMPUSFLOW_LOG_DIR: logDir,
+        CAMPUSFLOW_API_PORT: '8144',
+        CAMPUSFLOW_PG_PORT: '55446',
+        CAMPUSFLOW_PG_BIN: PG_BIN!,
+        CAMPUSFLOW_SIDECAR_BIN: SIDECAR!,
+      },
+    })
+    const main = await app.waitForEvent('window', {
+      predicate: (page) => page.url().startsWith('http://127.0.0.1:'),
+      timeout: 180_000,
+    })
+    await expect(main.getByRole('link', { name: '资料库', exact: true })).toBeVisible({ timeout: 60_000 })
+    await main.getByRole('link', { name: '资料库', exact: true }).click()
+    await main.waitForURL(/\/library$/, { timeout: 30_000 })
+    await main.getByRole('button', { name: '导入资料', exact: true }).click()
+    await expect(main.getByText('粘贴文本、上传文件或读取网页')).toBeVisible({ timeout: 30_000 })
+    await main.getByRole('button', { name: '上传文件', exact: true }).click()
+    await main.locator('input[type="file"]').setInputFiles(sample)
+    await main.getByRole('button', { name: '上传并处理', exact: true }).click()
+    await expect(main.getByText(/2025计算机科学与技术（辅修）/).first()).toBeVisible({ timeout: 30_000 })
+  } finally {
+    if (app) {
+      try {
+        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        await app.evaluate(({ app: electronApp }) => electronApp.quit())
+        await closed
+      } catch {
+        app.process().kill('SIGKILL')
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5_000))
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    } catch (error) {
+      console.warn(`临时目录清理失败：${(error as Error).message}`)
+    }
+  }
+})
