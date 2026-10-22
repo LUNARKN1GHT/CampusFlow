@@ -89,8 +89,10 @@ sidecar 启动顺序：先 `upgrade_if_needed(settings)`，再 `check_schema_or_
 
 备份目录含 `database.dump`（181307 字节，SHA-256 `4b02d095…b5717d`）与 `manifest.json`
 （`kind=pre-upgrade`、`database_revision=c007_merge_c003`、`app_schema_head=k001_external_calendar`、
-连接串口令显示为 `***`）；升级后健康检查 200，SIGTERM 后无残留进程。仍未验证的是
-**安装包替换**（旧版本应用 → 新版本 DMG 安装）而非同一份应用重复启动。
+连接串口令显示为 `***`）；升级后健康检查 200，SIGTERM 后无残留进程。2026-10-22 另做了
+**安装包替换**验证：先用旧 DMG 安装到 `~/Applications` 并初始化数据目录，再用新 DMG
+替换应用包、同一数据目录启动，升级闸门报告“结构已是最新”并正常就绪（同 schema 替换；
+跨 schema 的旧应用升级仍未验证），详见 `DESKTOP-E2E-macos.md`。
 
 ## 保留策略
 

@@ -189,7 +189,18 @@ env -i HOME=/tmp/cf-clean/home TMPDIR=/tmp PATH=/usr/bin:/bin:/usr/sbin:/sbin \
   （`kind=pre-upgrade`、`database_revision=c007_merge_c003`、`app_schema_head=k001_external_calendar`），
   连接串中的口令以 `***` 记录。
 - 升级后 `/api/v1/health` → 200；SIGTERM 正常回收，无残留进程。
-- 覆盖的是“同一应用启动时发现旧结构”；旧版本应用 → 新 DMG 安装的替换流程仍未验证。
+- 覆盖的是“同一应用启动时发现旧结构”。
+
+### 旧应用 → 新 DMG 替换（2026-10-22）
+
+- 旧产物使用本机 17:49 构建的 DMG（代码早于 P010，缺少「数据」菜单，迁移头同为 k001）。
+- 安装到 `~/Applications` 后用临时数据目录启动：bootstrap 完成、`macos-keychain`、
+  health 200、自动登录成功，随后正常退出。
+- 用 CI 产物（run 39675252210）替换 `~/Applications/CampusFlow.app`，同一数据目录
+  再次启动：bootstrap 就绪检查、`数据库结构已是最新，无需升级`、自动登录成功、
+  health 200；退出后无残留进程，新包包含「数据」菜单。
+- 这是一次同 schema 的应用替换；真正的旧 schema → 新 schema 迁移由上一节
+  `alembic downgrade` 覆盖，旧应用直接升级到更高 schema 版本的安装流程仍未验证。
 
 ## DMG 内容与签名检查（本机）
 
