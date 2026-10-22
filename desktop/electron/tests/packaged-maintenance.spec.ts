@@ -234,6 +234,11 @@ test('打包应用可导航到所有已实现页面', async () => {
     })
     await waitForLog(path.join(logDir, 'main.log'), '自动登录成功')
     const main = await mainWindowPromise
+    // Windows CI 的默认窗口较矮，侧栏底部入口不在视口内；放大窗口后再逐项点击。
+    await app.evaluate(({ BrowserWindow }) => {
+      const [window] = BrowserWindow.getAllWindows()
+      window?.setSize(1280, 1000)
+    })
     await expect(main.getByRole('link', { name: '总览', exact: true })).toBeVisible({ timeout: 30_000 })
 
     const routes: Array<[string, string]> = [
@@ -266,6 +271,8 @@ test('打包应用可导航到所有已实现页面', async () => {
         app.process().kill('SIGKILL')
       }
     }
+    // Windows 在进程退出后仍会短暂占用数据库文件句柄。
+    await new Promise((resolve) => setTimeout(resolve, 5_000))
     try {
       rmSync(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
     } catch (error) {
