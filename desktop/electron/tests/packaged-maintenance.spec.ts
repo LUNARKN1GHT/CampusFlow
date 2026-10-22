@@ -202,3 +202,81 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
     }
   }
 })
+
+test('打包应用可导航到所有已实现页面', async () => {
+  test.skip(!ready, '需要 CAMPUSFLOW_PACKAGED_APP / CAMPUSFLOW_SIDECAR_BIN / CAMPUSFLOW_PG_BIN')
+  test.setTimeout(300_000)
+
+  const root = mkdtempSync(path.join(os.tmpdir(), 'campusflow-nav-e2e-'))
+  const userData = path.join(root, 'user')
+  const dataDir = path.join(root, 'data')
+  const logDir = path.join(root, 'logs')
+  let app: ElectronApplication | null = null
+
+  try {
+    app = await electron.launch({
+      executablePath: APP,
+      timeout: 120_000,
+      env: {
+        ...process.env,
+        CAMPUSFLOW_ELECTRON_USER_DATA: userData,
+        CAMPUSFLOW_DATA_DIR: dataDir,
+        CAMPUSFLOW_LOG_DIR: logDir,
+        CAMPUSFLOW_API_PORT: '8142',
+        CAMPUSFLOW_PG_PORT: '55444',
+        CAMPUSFLOW_PG_BIN: PG_BIN!,
+        CAMPUSFLOW_SIDECAR_BIN: SIDECAR!,
+      },
+    })
+    const mainWindowPromise = app.waitForEvent('window', {
+      predicate: (page) => page.url().startsWith('http://127.0.0.1:'),
+      timeout: 180_000,
+    })
+    await waitForLog(path.join(logDir, 'main.log'), '自动登录成功')
+    const main = await mainWindowPromise
+    // Windows CI 的默认窗口较矮，侧栏底部入口不在视口内；放大窗口后再逐项点击。
+    await app.evaluate(({ BrowserWindow }) => {
+      const [window] = BrowserWindow.getAllWindows()
+      window?.setSize(1280, 1000)
+    })
+    await expect(main.getByRole('link', { name: '总览', exact: true })).toBeVisible({ timeout: 30_000 })
+
+    const routes: Array<[string, string]> = [
+      ['课程', '/courses'],
+      ['课程路径', '/course-paths'],
+      ['资料库', '/library'],
+      ['待核对', '/review'],
+      ['版本对照', '/review/changes'],
+      ['智能问答', '/qa'],
+      ['任务', '/tasks'],
+      ['学习计划', '/plan'],
+      ['提醒', '/reminders'],
+      ['导出', '/export'],
+      ['外部日历', '/calendar'],
+      ['设置', '/settings'],
+      ['总览', '/'],
+    ]
+    for (const [label, route] of routes) {
+      await main.getByRole('link', { name: label, exact: true }).click()
+      await expect.poll(() => new URL(main.url()).pathname, { timeout: 15_000 }).toBe(route)
+      await expect(main.locator('h1, h2').first()).toBeVisible()
+    }
+  } finally {
+    if (app) {
+      try {
+        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        await app.evaluate(({ app: electronApp }) => electronApp.quit())
+        await closed
+      } catch {
+        app.process().kill('SIGKILL')
+      }
+    }
+    // Windows 在进程退出后仍会短暂占用数据库文件句柄。
+    await new Promise((resolve) => setTimeout(resolve, 5_000))
+    try {
+      rmSync(root, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
+    } catch (error) {
+      console.warn(`临时目录清理失败：${(error as Error).message}`)
+    }
+  }
+})
