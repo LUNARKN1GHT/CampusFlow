@@ -1,0 +1,31 @@
+{
+  "name": "campusflow-desktop",
+  "productName": "CampusFlow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CampusFlow Electron 外壳与进程监管（P008）；安装器与签名由 P009 负责。",
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "build": "npm run clean && tsc && node scripts/copy-renderer.mjs",
+    "start": "npm run build && electron .",
+    "start:stub": "npm run build && node scripts/start-stub.mjs",
+    "test": "npm run build && playwright test",
+    "test:unit": "npm run build && playwright test tests/supervisor.spec.ts",
+    "test:electron": "npm run build && playwright test tests/electron.spec.ts",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "~24.10.0",
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3",
+    "playwright": "1.64.1",
+    "typescript": "~5.9.0"
+  }
+}

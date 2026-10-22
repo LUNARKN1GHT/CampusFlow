@@ -22,8 +22,25 @@ build/
 playwright-report/
 test-results/
 
+# Desktop sidecar build (P002a): 构建 venv、PyInstaller 中间产物与产物不提交
+desktop/.build-venv/
+desktop/build/
+desktop/dist/
+
+# electron-builder buildResources（图标、签名 entitlements）属于源码，必须提交
+!desktop/electron/build/
+
 # Runtime data and local tools
 data/
 *.log
 .DS_Store
 .idea/
+
+# Desktop bundled runtime, build cache and smoke scratch output
+desktop/vendor/
+desktop/.scratch/
+desktop/postgres/.scratch/
+
+# P007：桌面凭据兜底文件绝不入库
+secrets.json
+secrets.dpapi

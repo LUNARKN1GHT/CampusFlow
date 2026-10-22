@@ -28,7 +28,9 @@ from campusflow.api import schedule as schedule_api
 from campusflow.api import settings as settings_api
 from campusflow.api import tasks as tasks_api
 from campusflow.api import version_relations as version_relations_api
+from campusflow.api.desktop_security import install_desktop_security
 from campusflow.api.health import router as health_router
+from campusflow.api.static_spa import install_static_spa
 from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.jobs import (
     RecoveryResult,
@@ -42,7 +44,7 @@ from campusflow.infrastructure.calendar.factory import build_calendar_provider
 from campusflow.infrastructure.calendar.tokens import TokenCipher
 from campusflow.infrastructure.db.engine import create_db_engine
 from campusflow.infrastructure.db.session import create_session_factory
-from campusflow.infrastructure.queue.rq_queue import RQJobQueue
+from campusflow.infrastructure.queue.factory import build_job_queue
 from campusflow.infrastructure.repositories import build_repositories
 from campusflow.infrastructure.storage.local import LocalFileStorage
 
@@ -163,7 +165,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 进程内随机会话集合：重启即全部失效，不等同于生产身份系统或持久会话。
     app.state.auth_tokens = set()
     app.state.file_storage = LocalFileStorage(settings.storage_dir)
-    app.state.job_queue = RQJobQueue(settings.redis_url)
+    # 服务端模式保持 RQ；桌面模式只登记数据库作业，由 DB 轮询 Worker 领取。
+    app.state.job_queue = build_job_queue(settings)
     app.state.calendar_provider = build_calendar_provider(settings)
     app.state.token_cipher = TokenCipher(settings.calendar_token_key)
 
@@ -192,6 +195,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             prefix="/api/v1",
             dependencies=[Depends(auth_api.require_session)],
         )
+
+    # 桌面模式先安装本机防护中间件：Host／Origin 校验与安全响应头在路由之前生效，
+    # 静态 SPA 回退的响应也会经过它；服务端模式不安装，行为保持不变。
+    install_desktop_security(app, settings)
+
+    # 桌面模式最后挂载 SPA 回退路由，保证先匹配真实 API 与文档路由。
+    install_static_spa(app, settings)
 
     # 领域异常统一映射：不存在 404、状态冲突 409、其余业务拒绝 400，
     # 只回传领域层写好的中文说明，不暴露异常类型、SQL 或外部响应细节。

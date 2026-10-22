@@ -19,28 +19,36 @@ from campusflow.workers.embeddings import make_embedder
 def parse_version_job(job_id: int) -> None:
     """Worker 入口：装配依赖并执行解析作业。
 
-    重复投递由数据库的幂等领取兜底；这里不再做去重判断。
+    重复投递由数据库的幂等领取兜底；这里不再做去重判断。每次执行后释放连接池，
+    长驻的桌面轮询 Worker 不会按作业累计数据库连接。
     """
     settings = Settings()
     engine = create_db_engine(settings)
-    session_factory = create_session_factory(engine)
-    with session_factory() as session:
-        repos = build_repositories(session)
-        storage = LocalFileStorage(settings.storage_dir)
-        parse_version(repos, storage, job_id)
+    try:
+        session_factory = create_session_factory(engine)
+        with session_factory() as session:
+            repos = build_repositories(session)
+            storage = LocalFileStorage(settings.storage_dir)
+            parse_version(repos, storage, job_id)
+    finally:
+        engine.dispose()
 
 
 def index_version_job(job_id: int) -> None:
     """Worker 入口：装配依赖并执行向量索引作业（Q004）。
 
     逐块领取与保存各自提交，模型调用发生在领取事务之外，不长时间持锁。
+    与解析入口一样在结束后释放连接池。
     """
     settings = Settings()
     engine = create_db_engine(settings)
-    session_factory = create_session_factory(engine)
-    with session_factory() as session:
-        repos = build_repositories(session)
-        manifests = SqlIndexManifests(session)
-        profiles = SqlEmbeddingProfiles(session)
-        embedder = make_embedder(settings)
-        index_version(repos, manifests, profiles, embedder, job_id)
+    try:
+        session_factory = create_session_factory(engine)
+        with session_factory() as session:
+            repos = build_repositories(session)
+            manifests = SqlIndexManifests(session)
+            profiles = SqlEmbeddingProfiles(session)
+            embedder = make_embedder(settings)
+            index_version(repos, manifests, profiles, embedder, job_id)
+    finally:
+        engine.dispose()

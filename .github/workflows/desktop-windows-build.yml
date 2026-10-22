@@ -1,0 +1,196 @@
+name: Desktop Windows build
+
+# 验证 P002b/P003b 的 Windows 构建脚本并产出未签名 NSIS 安装包（仅 artifact）。
+# 正式发布仍由 desktop-release.yml 在 desktop-v* 标签上执行。
+on:
+  pull_request:
+    paths:
+      - "desktop/build_windows.ps1"
+      - "desktop/postgres/**"
+      - "desktop/campusflow-sidecar.spec"
+      - "desktop/electron/**"
+      - "frontend/**"
+      - ".github/workflows/desktop-windows-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.15"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/electron/package-lock.json
+
+      - name: Build frontend
+        shell: pwsh
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage bundled PostgreSQL 17 and pgvector
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/build_windows.ps1
+
+      - name: Run bootstrap tests on Windows
+        shell: pwsh
+        working-directory: backend
+        run: |
+          $env:PATH = "$env:GITHUB_WORKSPACE\desktop\vendor\pgsql\bin;$env:PATH"
+          uv sync --locked
+          uv run --locked pytest tests/test_bootstrap.py -q
+
+      - name: Build PyInstaller sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/build_windows.ps1
+
+      - name: Smoke test bundled PostgreSQL, pgvector and sidecar
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File desktop/postgres/smoke_windows.ps1
+
+      - name: Install Electron dependencies and compile
+        shell: pwsh
+        working-directory: desktop/electron
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package NSIS installer
+        shell: pwsh
+        working-directory: desktop/electron
+        run: npx electron-builder --win --publish never
+
+      - name: Verify artifacts
+        shell: pwsh
+        run: |
+          $sidecar = 'desktop/dist/campusflow-sidecar/campusflow-sidecar.exe'
+          if (-not (Test-Path $sidecar)) { throw "missing sidecar: $sidecar" }
+          $pg = 'desktop/vendor/pgsql/bin/postgres.exe'
+          if (-not (Test-Path $pg)) { throw "missing postgres: $pg" }
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          $size = [math]::Round($installer.Length / 1MB, 1)
+          Write-Host "installer: $($installer.FullName) ($size MB)"
+          Write-Host "sidecar: $sidecar"
+          Write-Host "postgres: $pg"
+
+      - name: Verify installer contents
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'NSIS installer was not produced' }
+          & (Join-Path $env:GITHUB_WORKSPACE 'desktop\verify_windows_installer.ps1') -Installer $installer.FullName
+
+      # NSIS 是 assisted 安装器，/S 仍可静默安装到 %LOCALAPPDATA%\Programs\CampusFlow。
+      - name: Install the NSIS package silently
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem 'desktop/electron/release/*.exe' | Select-Object -First 1
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "installer failed with exit code $($process.ExitCode)"
+          }
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $exe = Join-Path $root 'CampusFlow.exe'
+          if (-not (Test-Path $exe)) { throw "installed executable missing: $exe" }
+          $expected = @(
+            'resources\sidecar\campusflow-sidecar.exe',
+            'resources\pgsql\bin\postgres.exe',
+            'resources\static\index.html'
+          )
+          foreach ($relative in $expected) {
+            if (-not (Test-Path (Join-Path $root $relative))) {
+              throw "missing after install: $relative"
+            }
+          }
+          Write-Host "installed: $exe"
+
+      - name: Run first launch and maintenance flow on installed app
+        shell: pwsh
+        working-directory: desktop/electron
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $env:CAMPUSFLOW_PACKAGED_APP = Join-Path $root 'CampusFlow.exe'
+          $env:CAMPUSFLOW_SIDECAR_BIN = Join-Path $root 'resources\sidecar\campusflow-sidecar.exe'
+          $env:CAMPUSFLOW_PG_BIN = Join-Path $root 'resources\pgsql\bin'
+          npx playwright test tests/packaged-maintenance.spec.ts --reporter=line
+
+      - name: Verify no leftover processes after exit
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 3
+          $left = Get-Process -Name CampusFlow, campusflow-sidecar, postgres -ErrorAction SilentlyContinue
+          if ($left) {
+            $left | Format-Table -AutoSize | Out-String | Write-Host
+            throw 'processes still running after application exit'
+          }
+          Write-Host 'no leftover CampusFlow, sidecar or postgres processes'
+
+      - name: Verify bundled sidecar without developer toolchain on PATH
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $sidecar = Join-Path $root 'resources\sidecar\campusflow-sidecar.exe'
+          # 只保留系统目录，确认随包 sidecar 不依赖 Python／Node／开发工具链的 PATH。
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $output = & $sidecar --version 2>&1
+          if ($LASTEXITCODE -ne 0) { throw "sidecar --version failed with exit code $($LASTEXITCODE): $output" }
+          $text = $output | Out-String
+          Write-Host "sidecar version: $text"
+          if ($text -notmatch '0\.1\.0') { throw "unexpected sidecar version output: $text" }
+
+      - name: Uninstall and verify cleanup
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'Programs\CampusFlow'
+          $uninstaller = Join-Path $root 'Uninstall CampusFlow.exe'
+          if (-not (Test-Path $uninstaller)) { throw "uninstaller missing: $uninstaller" }
+          $process = Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "uninstaller failed with exit code $($process.ExitCode)" }
+          $deadline = (Get-Date).AddSeconds(60)
+          while ((Test-Path $root) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
+          if (Test-Path $root) { throw "installation directory still exists after uninstall: $root" }
+          Write-Host 'uninstalled cleanly'
+
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem 'desktop/electron/release/*.exe')
+          if ($files.Count -ne 1) { throw "expected exactly one installer, got $($files.Count)" }
+          $lines = $files | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          }
+          Set-Content -Path 'desktop/electron/release/SHA256SUMS.txt' -Value $lines -Encoding ascii
+          Get-Content 'desktop/electron/release/SHA256SUMS.txt'
+
+      - name: Upload unsigned installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64-ci
+          path: |
+            desktop/electron/release/*.exe
+            desktop/electron/release/SHA256SUMS.txt
+          if-no-files-found: error

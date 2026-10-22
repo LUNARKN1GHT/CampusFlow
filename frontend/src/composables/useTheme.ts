@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 
 // 主题：浅色／深色／跟随系统，解析后写入 documentElement[data-theme]；选择存 localStorage，只影响本机。
-// 首屏由 index.html 内联脚本按同一键预先写入；未保存或存储不可用时回退浅色。
+// 首屏由 public/theme-boot.js（外部同源脚本，兼容桌面 CSP）按同一键预先写入；未保存或存储不可用时回退浅色。
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -34,7 +34,7 @@ const resolved = computed<'light' | 'dark'>(() =>
   mode.value === 'system' ? (systemDark.value ? 'dark' : 'light') : mode.value,
 )
 
-// immediate 保证模块首次导入就写入 data-theme，与首屏内联脚本的解析结果一致。
+// immediate 保证模块首次导入就写入 data-theme，与首屏外部脚本的解析结果一致。
 watch(resolved, (value) => {
   document.documentElement.dataset.theme = value
 }, { immediate: true })
