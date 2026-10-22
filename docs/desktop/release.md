@@ -55,7 +55,7 @@ cd desktop/electron; npm ci; npm run build; npx electron-builder --win --publish
   实机与签名包仍未验证。桌面发布工作流默认跳过 Windows，只有在仓库变量
   `DESKTOP_WINDOWS_ENABLED=true` 时才会构建。
 
-macOS 两个架构由 `.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与
+macOS 两个架构由 `.github/workflows/desktop-macos-build.yml` 在 `macos-15`（arm64）与
 `macos-15-intel`（x64）构建并校验 DMG 内容；`electron-builder` 固定为 `26.15.3`，
 架构由 `--arm64`／`--x64` 指定（`electron-builder.yml` 不再写 `arch` 列表）。
 
