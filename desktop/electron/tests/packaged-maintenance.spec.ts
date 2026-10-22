@@ -93,6 +93,11 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
         CAMPUSFLOW_SIDECAR_BIN: SIDECAR!,
       },
     })
+    // 主窗口在服务就绪后才创建；先注册监听，避免只等到日志却错过窗口。
+    const mainWindowPromise = app.waitForEvent('window', {
+      predicate: (page) => page.url().startsWith('http://127.0.0.1:'),
+      timeout: 180_000,
+    })
     const mainLog = path.join(logDir, 'main.log')
     const stderr: string[] = []
     app.process().stderr?.on('data', (chunk) => stderr.push(String(chunk)))
@@ -102,6 +107,12 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
     } catch (error) {
       throw new Error(`${(error as Error).message}\n--- app stderr ---\n${stderr.join('').slice(-4000)}`)
     }
+    // 自动登录后应进入真实 SPA，而不是停留在登录页。
+    const mainWindow = await mainWindowPromise
+    await expect(mainWindow).toHaveTitle(/CampusFlow/)
+    expect(mainWindow.url()).not.toContain('/login')
+    await expect(mainWindow.locator('body')).toContainText('总览', { timeout: 30_000 })
+
     // 未显式指定后端时，Windows 必须使用 DPAPI；回退到文件说明凭据保护失效。
     if (process.platform === 'win32' && !process.env.CAMPUSFLOW_SECRET_BACKEND) {
       expect(readFileSync(mainLog, 'utf8')).toContain('凭据后端 windows-dpapi')
