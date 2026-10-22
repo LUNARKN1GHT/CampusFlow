@@ -324,6 +324,10 @@ Electron 45.0.0 经 npmmirror 下载，本机无 Developer ID，electron-builder
 - `tests/packaged-maintenance.spec.ts`：**1 passed（9.2 s）**，经菜单导出归档、检查数据库升级并导入。
 - 安装到 `/Applications` 后启动：`/api/v1/health` → 200（端口 62854），自动登录成功；
   `quit app` 后按 Worker → API → PostgreSQL 回收，“子进程已回收，应用退出”，无残留进程。
+- 以最小环境启动：`env -i HOME=<临时目录> PATH=/usr/bin:/bin` 直接运行安装后的
+  `Contents/MacOS/CampusFlow`，health → 200（端口 62213）、自动登录成功；SIGTERM 后同样
+  按逆序回收，无残留。说明运行不依赖开发工具的 PATH 或用户目录；但本机仍装有
+  Homebrew／Python／Node，不构成真正干净机器的证明。
 - 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
 
 ## 未验证 / 已知缺口
