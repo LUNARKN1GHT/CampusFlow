@@ -117,7 +117,8 @@ Windows：
 - 这两个工作流在 PR 命中相关路径时自动运行；`workflow_dispatch` 只有在工作流进入默认分支后
   才会出现，因此当前从 PR 运行页面下载 artifact。
 - 安装与放行步骤见 `docs/desktop/user-guide.md`；验收结果记录到
-  `docs/verification/DESKTOP-E2E-macos.md`（Windows 另建对应记录），逐项附命令与截图。
+  `docs/verification/DESKTOP-E2E-macos.md` 与 `docs/verification/DESKTOP-E2E-windows.md`
+  （后者为可填写的模板），逐项附命令与截图。
 - 记录完成后由维护者核对并关闭阶段 Issue；未执行的项保持未勾选。
 
 ## 回滚
