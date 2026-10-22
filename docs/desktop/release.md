@@ -85,7 +85,7 @@ Windows：
   `desktop/verify_macos_dmg.sh`。Windows 由 `desktop/verify_windows_installer.ps1`
   解包 NSIS 并检查同样的资源。
 - Release 只会在 macOS 构建成功、且 Windows（由 `DESKTOP_WINDOWS_ENABLED` 启用时）也成功后创建；任一启用平台失败则不发布，避免半套安装包。
-- 发布说明模板：`docs/desktop/release-notes.md`。
+- 发布说明模板：`docs/desktop/release-notes.md`；面向用户的安装、迁移与卸载说明：`docs/desktop/user-guide.md`。
 - 下载后先核对 SHA-256，再按下方清单验收。
 
 ## 干净机器验收清单
