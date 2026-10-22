@@ -73,6 +73,8 @@ Windows：
 - `WINDOWS_CSC_LINK` 与 `WINDOWS_CSC_KEY_PASSWORD` 用于代码签名；SmartScreen 信誉需要持续签名积累，首次发布仍可能提示。
 
 未配置密钥时工作流会产出**未签名**安装包；这种包不得作为正式 Release 发布。
+推送 `desktop-v*` 标签时，工作流会在打包前检查上述 secrets，缺失则直接失败，
+避免把未签名产物发布出去；手工 `workflow_dispatch` 仍可用于构建未签名测试产物。
 
 ## 产物与校验
 
