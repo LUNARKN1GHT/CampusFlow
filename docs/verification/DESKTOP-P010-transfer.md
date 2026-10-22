@@ -92,10 +92,11 @@ from campusflow.infrastructure.transfer import (
 ## 跨平台迁移（Windows ↔ macOS）
 
 `.github/workflows/desktop-archive-compat.yml` 在 CI 上验证真实跨平台归档：
-`windows-2022` 用打包 sidecar 与内置 PostgreSQL 完成 bootstrap、写入一条工作空间／
-学期／课程，再 `export`；`macos-14` 用打包 sidecar 与内置 PostgreSQL bootstrap 新数据目录后
+`windows-2022` 用打包 sidecar 与内置 PostgreSQL 完成 bootstrap、执行
+`desktop/postgres/seed_archive.sql` 写入一个工作空间与资料／任务／候选／计划／引用，
+再 `export`；`macos-14` 用打包 sidecar 与内置 PostgreSQL bootstrap 新数据目录后
 `import --inspect` → `import --replace --confirm-token`，并逐表比对导出与恢复条目数、
-查询导入后的工作空间与课程行。
+查询导入后的资料原文、任务进度、候选字段、证据引用、计划时间块与问答引用。
 
 运行 [39641384458](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39641384458)
 通过（Windows export、macOS import 均 success）：
@@ -118,6 +119,26 @@ macOS:   exported from macOS: 208958 bytes
 Windows: import_completed migrated_to k001_external_calendar
           reverse cross-platform archive verified: reverse-transfer-check / Reverse OS Course
 ```
+
+2026-10-22 起夹具扩展为完整链路，运行
+[39696671429](https://github.com/LUNARKN1GHT/CampusFlow/actions/runs/39696671429)
+双向均通过：
+
+```text
+跨平台归档 verified: desktop-transfer-check / Cross-OS Course /
+  Cross-OS Task|in_progress / Cross-OS Task|90|true
+反向 verified: reverse-transfer-check / Reverse OS Course /
+  Reverse OS Task|in_progress / Reverse OS Task|90|true
+```
+
+- 导出与恢复计数逐表一致：workspaces、semesters、courses、materials、
+  material_versions、candidates、tasks、plans、time_blocks 均为 1。
+- 导入端还核对资料标题与片段原文、任务标题与进度、候选字段值与逐字段证据、
+  计划时间块（90 分钟、锁定）以及问答引用中的原文摘录。
+- 夹具文本使用 ASCII，避免 Windows psql 参数编码影响比对；中文内容仍由
+  `tests/test_transfer_archive.py` 的真实 PostgreSQL 用例覆盖。
+- CI 使用 macOS 内置 PostgreSQL 构建与 Windows EDB 二进制，归档内层保持
+  `--compress=0`，跨构建的 dump 可直接恢复。
 
 这条链路暴露并修复了 6 个 Windows／跨平台缺陷：
 
