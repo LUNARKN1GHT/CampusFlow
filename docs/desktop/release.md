@@ -50,8 +50,10 @@ cd desktop/electron; npm ci; npm run build; npx electron-builder --win --publish
 - 需要 Visual Studio 2022 的 MSVC x64 工具链；缺少 VC 运行库时从 VS Redist 复制到 `bin`。
 - 产物：`release/CampusFlow-<version>-win-x64.exe`。
 - 两条脚本已由 `.github/workflows/desktop-windows-build.yml` 在 `windows-2022` 跑通，
-  产出约 184.6 MB 的未签名 NSIS 安装包并校验包内 sidecar、PostgreSQL、静态前端与许可清单；安装与运行仍未在 Windows 实机验证。
-  桌面发布工作流默认跳过 Windows，只有在仓库变量 `DESKTOP_WINDOWS_ENABLED=true` 时才会构建。
+  产出未签名 NSIS 安装包并校验包内 sidecar、PostgreSQL、静态前端与许可清单；该工作流还会
+  静默安装、对安装后的应用跑通首启与维护流程、确认退出无残留并静默卸载。真实 Windows 11
+  实机与签名包仍未验证。桌面发布工作流默认跳过 Windows，只有在仓库变量
+  `DESKTOP_WINDOWS_ENABLED=true` 时才会构建。
 
 macOS 两个架构由 `.github/workflows/desktop-macos-build.yml` 在 `macos-14`（arm64）与
 `macos-15-intel`（x64）构建并校验 DMG 内容；`electron-builder` 固定为 `26.15.3`，
@@ -112,4 +114,6 @@ Windows：
 
 - 首版不提供自动更新，用户手动下载安装包。
 - 不支持 Mac App Store、Microsoft Store、Windows ARM、Linux 桌面。
-- 真实 GitHub Actions 构建、签名、公证与干净机器验收尚未执行；Windows 构建脚本待 P002b／P003b。
+- GitHub Actions 已能构建并校验未签名的 macOS DMG 与 Windows NSIS 安装包（见
+  `docs/verification/DESKTOP-P002b-P003b-windows.md` 与 `docs/verification/DESKTOP-E2E-macos.md`）；
+  签名、公证、Gatekeeper／SmartScreen 与干净机器验收仍未执行，也未创建过 `desktop-v*` 发布。

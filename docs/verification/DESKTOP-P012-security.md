@@ -138,6 +138,21 @@ loopback-origin POST -> 200 {'username': 'student'}
 - 渲染进程不需要额外 `<meta http-equiv="Content-Security-Policy">`；若添加，
   不得弱于服务端头。
 
+### P008 合并后的状态（2026-10-22 更新）
+
+P008（#474）已合并，上述外壳控制在当前代码中落地：
+
+- `desktop/electron/src/main.ts` 使用 `contextIsolation: true`、`sandbox: true`，
+  preload 只暴露最小 API；页面通过 `http://127.0.0.1:<port>` 加载。
+- `desktop/electron/src/security.ts` 用 `will-navigate` 与
+  `setWindowOpenHandler` 拦截外部导航与新窗口；`tests/electron.spec.ts` 覆盖
+  `window.open` 外链场景。
+- `desktop/electron/src/logger.ts` 的 `redact` 覆盖模型密钥、Bearer 令牌与连接串
+  口令；`tests/supervisor.spec.ts` 有脱敏单测，`DESKTOP-E2E-macos.md` 记录打包应用
+  的 `main.log`、`stage-api.log`、`stage-worker.log` 中用户名与随机口令出现次数为 0。
+- 仍未验证：真实浏览器对 CSP 的实际拦截行为、签名／公证包上的同源流程，以及
+  Windows 实机；这些结论不得由本文或 P008 冒烟测试替代。
+
 ## 剩余风险与未验证项
 
 - **仅回环不等于身份认证**：同一台机器上的其他用户或进程可以访问
@@ -151,8 +166,8 @@ loopback-origin POST -> 200 {'username': 'student'}
   请求按设计放行，若本机进程可自由发请求，则 CSRF 防护不覆盖该威胁。
 - **模型密钥在环境变量中**：`ZHIPU_API_KEY`／`DEEPSEEK_API_KEY` 由进程环境读取，
   同用户进程可读取；未接入系统钥匙串。
-- **日志脱敏未审计**：本任务未新增日志，也未验证所有既有日志不含密钥／原文；
-  标为未验证。
+- **日志脱敏**：本任务未新增日志；P008 的 `redact` 已覆盖 Electron 主进程与阶段日志的
+  密钥、令牌与连接串口令，并有单测与打包应用日志检查。后端应用自身的日志未逐条审计。
 - **未处理异常响应**：Starlette `ServerErrorMiddleware` 位于本中间件外层，未捕获的
   500 响应不会经过安全头包装；未写用例验证，标为低风险遗留。
 - **CSP 只验证响应头存在**：本任务未用真实浏览器验证 CSP 实际拦截内联脚本／外部
@@ -171,9 +186,9 @@ loopback-origin POST -> 200 {'username': 'student'}
 | 高 | DNS 重绑定：仅接受回环 Host | 已实现并测试 | `test_desktop_rejects_external_and_malformed_hosts`、`test_desktop_x_forwarded_host_cannot_bypass` |
 | 高 | 跨站写入（CSRF）：写入方法 Origin 允许列表 | 已实现并测试 | `test_desktop_rejects_cross_origin_for_all_write_methods` |
 | 高 | 浏览器注入面：`nosniff`、`no-referrer`、`DENY`、HTML CSP | 已实现并测试（仅头部） | `test_spa_html_has_csp_and_security_headers`、`test_api_json_has_security_headers_but_no_csp` |
-| 中 | Electron `contextIsolation`／沙箱／导航拦截 | 未实现（P008） | 本分支无 Electron 代码 |
+| 中 | Electron `contextIsolation`／沙箱／导航拦截 | 已实现并有测试（P008） | `desktop/electron/src/main.ts`、`security.ts`、`tests/electron.spec.ts` |
 | 中 | 会话安全（内存会话、HTTP、`Secure=False`） | 既有边界，未改变 | 代码现状；本任务未新增会话机制 |
-| 中 | 模型密钥与日志脱敏 | 未验证 | 未审计、无测试 |
+| 中 | 模型密钥与日志脱敏 | 已实现脱敏并有证据（P008） | `logger.ts` 的 `redact`、`supervisor.spec.ts` 单测、`DESKTOP-E2E-macos.md` 日志检查 |
 | 中 | 本机其他进程可访问回环端口 | 接受风险 | 仅靠操作系统用户隔离 |
 | 低 | 未处理 500 不经过安全头 | 遗留风险 | `ServerErrorMiddleware` 在中间件外层 |
 | 低 | `/docs`、`/redoc` 无 CSP | 有意豁免 | Swagger 依赖 CDN |
@@ -182,5 +197,6 @@ loopback-origin POST -> 200 {'username': 'student'}
 ## 结论
 
 桌面模式下，Host 允许列表、写入请求 Origin 校验、基础安全响应头与 HTML CSP 已由
-后端测试覆盖；服务端模式行为保持不变；前端构建未受影响。Electron 外壳控制、真实
-浏览器 CSP 拦截、打包运行时的端到端验证不在本任务范围内，不得据本文宣称已完成。
+后端测试覆盖；服务端模式行为保持不变；前端构建未受影响。Electron 外壳控制由 P008
+实现并有冒烟与单测证据；真实浏览器 CSP 拦截、签名包与 Windows 实机运行仍未验证，
+不得据本文宣称发布验收已完成。
