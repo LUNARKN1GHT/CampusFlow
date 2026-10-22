@@ -162,9 +162,22 @@ jobs:
           if (Test-Path $root) { throw "installation directory still exists after uninstall: $root" }
           Write-Host 'uninstalled cleanly'
 
+      - name: Write checksums
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem 'desktop/electron/release/*.exe')
+          if ($files.Count -ne 1) { throw "expected exactly one installer, got $($files.Count)" }
+          $lines = $files | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          }
+          Set-Content -Path 'desktop/electron/release/SHA256SUMS.txt' -Value $lines -Encoding ascii
+          Get-Content 'desktop/electron/release/SHA256SUMS.txt'
+
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64-ci
-          path: desktop/electron/release/*.exe
+          path: |
+            desktop/electron/release/*.exe
+            desktop/electron/release/SHA256SUMS.txt
           if-no-files-found: error
