@@ -286,6 +286,35 @@ x64:   dmg: CampusFlow-0.1.0-mac-x64.dmg (176M)
 - `electron-builder.yml` 的 `mac.target.arch` 列表会覆盖命令行 `--arm64/--x64`，
   导致每个任务构建两种架构；已删除该列表，架构由工作流指定。
 
+## 未签名 DMG 安装到 /Applications（2026-10-22）
+
+用本机 `desktop/electron/release/CampusFlow-0.1.0-mac-arm64.dmg`（2026-10-21 17:49 构建）
+验证用户指南中的安装命令：
+
+```bash
+hdiutil attach -readonly -nobrowse -mountpoint /tmp/cf-dmg <dmg>
+cp -R /tmp/cf-dmg/CampusFlow.app /Applications/
+xattr -dr com.apple.quarantine /Applications/CampusFlow.app
+open -n --env CAMPUSFLOW_ELECTRON_USER_DATA=/tmp/cf-install-data \
+     --env CAMPUSFLOW_LOG_DIR=/tmp/cf-install-logs -a /Applications/CampusFlow.app
+```
+
+结果：
+
+- `codesign -dv`：`Signature=adhoc`、`TeamIdentifier=not set`、`Identifier=Electron`，
+  且包内没有 `Contents/_CodeSignature`。这是 Electron 上游二进制的 ad-hoc 签名，
+  不是 bundle 级签名；Gatekeeper 会按“未识别开发者”处理，该结果不构成发布签名证据。
+- `spctl -a` 报 `code has no resources but signature indicates they must be present`。
+  由于没有 bundle 级密封资源，新 macOS 上右键「打开」不保证出现；清除 quarantine
+  命令（或「系统设置 → 隐私与安全性 → 仍要打开」）是可靠路径。
+- 启动约 6 s 到达 `phase=ready`，`GET http://127.0.0.1:54049/api/v1/health` → 200
+  `{"status":"ok","service":"campusflow-api"}`，自动登录成功（`campusflow`）。
+- 用同一数据目录二次启动成功，`state.json` 与 `pgdata` 保留。
+- `osascript -e 'quit app "CampusFlow"'` 后日志按 Worker → API → PostgreSQL 顺序停止，
+  记录“子进程已回收，应用退出”，无残留 CampusFlow／sidecar／postgres 进程。
+- 验证后删除 `/Applications/CampusFlow.app` 与临时数据目录。
+- 仍未在真正干净的 macOS 上执行，也未验证浏览器下载产生 quarantine 后首次打开的系统弹窗。
+
 ## 未验证 / 已知缺口
 
 - **签名、公证、Gatekeeper**：本产物未签名，不能作为正式发布包。
@@ -297,5 +326,5 @@ x64:   dmg: CampusFlow-0.1.0-mac-x64.dmg (176M)
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。
 - **真实模型**：未配置模型密钥，未调用真实识别或向量服务。
 - **DMG 安装流程**：已从挂载的 CI DMG 复制 `.app` 到临时目录执行维护流程，并安装到
-  `~/Applications` 经 LaunchServices 启动；未安装到系统 `/Applications`，未模拟 Gatekeeper
-  隔离属性（quarantine）下的首次打开。
+  `~/Applications` 经 LaunchServices 启动；2026-10-22 又安装到系统 `/Applications` 并清除
+  quarantine 后启动（见上节）。仍未在真正干净机器上验证，也未验证浏览器下载后的系统弹窗。

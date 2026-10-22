@@ -13,10 +13,13 @@ macOS：
 
 1. 打开 `CampusFlow-<版本>-mac-<架构>.dmg`，把 `CampusFlow.app` 拖入“应用程序”
    （或当前用户的 `~/Applications`）。
-2. 未签名包首次打开会被 Gatekeeper 拦截。可先在 Finder 中右键应用选择“打开”，或在
-   终端执行 `xattr -dr com.apple.quarantine /Applications/CampusFlow.app` 后重开；
-   前者只需确认一次，后者会清除隔离标记。证书与公证尚未配置，正式发布前所有包都是
-   未签名包；只应从项目组提供的渠道获取，并在打开前核对 SHA-256。
+2. 未签名包首次打开会被 Gatekeeper 拦截。较新版本的 macOS 可能不提供右键「打开」，
+   此时用下面任一方式：
+   - 打开「系统设置 → 隐私与安全性」，在底部选择「仍要打开」；
+   - 或在终端执行 `xattr -dr com.apple.quarantine /Applications/CampusFlow.app` 后重开。
+
+   证书与公证尚未配置，正式发布前所有包都是未签名包；包内只有 Electron 上游的 ad-hoc
+   签名，不是 bundle 级签名。只应从项目组提供的渠道获取，并在打开前核对 SHA-256。
 
 Windows：
 
