@@ -3,6 +3,21 @@
 对应 Issue：#478（P012）与 #466 的干净机器验收。验收人按 `docs/desktop/release.md`
 的清单执行，在本文逐项填写命令、结果与证据路径。未执行的项保持未勾选。
 
+## 获取安装包
+
+CI 产物为未签名安装包，随附校验和：
+
+```bash
+gh run download 39828326855 -n desktop-windows-x64-ci -D ./win-art
+cd ./win-art && shasum -a 256 -c SHA256SUMS.txt   # macOS／Git Bash
+# PowerShell: (Get-FileHash .\CampusFlow-0.1.0-win-x64.exe -Algorithm SHA256).Hash
+```
+
+该产物的 `CampusFlow-0.1.0-win-x64.exe`（185 MB）SHA-256 为
+`45d36e9684260fb2808d8843d44e248b562616f908aee27344fa3502f71839ac`，与
+`SHA256SUMS.txt` 一致（2026-10-23 复核）。产物对应提交 `a7ffdfc`，工作流已在该
+安装包上完成静默安装、四条打包用例与卸载验证；本文仍按干净 Windows 11 实机重新执行。
+
 ## 环境
 
 - Windows 版本／补丁：
