@@ -86,6 +86,18 @@ jobs:
           echo "dmg: ${dmgs[0]} ($(du -h "${dmgs[0]}" | cut -f1))"
           bash desktop/verify_macos_dmg.sh "${dmgs[0]}" "$ARCH"
 
+      - name: Run packaged maintenance tests
+        working-directory: desktop/electron
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          if [ "$ARCH" = "arm64" ]; then app="release/mac-arm64/CampusFlow.app"; else app="release/mac/CampusFlow.app"; fi
+          export CAMPUSFLOW_PACKAGED_APP="$PWD/$app/Contents/MacOS/CampusFlow"
+          export CAMPUSFLOW_SIDECAR_BIN="$PWD/$app/Contents/Resources/sidecar/campusflow-sidecar"
+          export CAMPUSFLOW_PG_BIN="$PWD/$app/Contents/Resources/pgsql/bin"
+          npx playwright test tests/packaged-maintenance.spec.ts --reporter=line
+
       - name: Write checksums
         run: |
           set -euo pipefail
