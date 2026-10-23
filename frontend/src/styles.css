@@ -173,6 +173,7 @@ a { color: inherit; }
 .nav-item.router-link-active { color: var(--on-brand-fill); background: var(--sidebar-active); font-weight: 700; }
 .nav-item-disabled { color: var(--sidebar-disabled); cursor: not-allowed; }
 .nav-item-disabled small { font-size: 10px; }
+.sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .sidebar-note { margin: auto 8px 0; color: var(--sidebar-muted); font-size: 12px; line-height: 1.65; }
 .content-column { min-width: 0; }
 .topbar { min-height: 86px; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px clamp(24px, 5vw, 72px); border-bottom: 1px solid var(--line); background: var(--topbar-bg); backdrop-filter: blur(12px); }
