@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from campusflow.api import ai_settings as ai_settings_api
 from campusflow.api import auth as auth_api
 from campusflow.api import calendar as calendar_api
 from campusflow.api import candidates as candidates_api
@@ -179,6 +180,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tasks_api.router,
         schedule_api.router,
         settings_api.router,
+        ai_settings_api.router,
         materials_api.router,
         jobs_api.router,
         candidates_api.router,

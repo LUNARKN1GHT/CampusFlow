@@ -56,7 +56,7 @@ def test_real_worker_passes_vision_limits(monkeypatch):
     )
     build_parser_registry(settings)
     parser_class.assert_called_once_with(
-        "test-key", timeout_seconds=30, max_retries=1, backoff_seconds=2
+        "test-key", model="glm-4v-flash", timeout_seconds=30, max_retries=1, backoff_seconds=2
     )
 
 

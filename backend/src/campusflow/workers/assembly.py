@@ -10,6 +10,7 @@ from campusflow.application.processing import ParserRegistry, set_parser_registr
 from campusflow.core.config import Settings
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
 from campusflow.domain.errors import PermanentError
+from campusflow.infrastructure.ai_settings import resolve_ai_settings
 from campusflow.infrastructure.llm.vision import FakeVisionParser, ZhipuVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.pdf_with_vision import PdfWithVisionFallbackParser
@@ -46,6 +47,29 @@ class UnavailableEmbedder:
         raise PermanentError("未配置向量模型密钥，无法建立索引；文本解析结果已保留")
 
 
+class DesktopVisionParser:
+    """每次图片调用重新读取配置，避免常驻 Worker 一直使用启动时的旧密钥。"""
+
+    def __init__(self, settings: Settings):
+        self.settings = settings
+
+    def parse(self, content: bytes, mime_type: str):
+        settings = resolve_ai_settings(self.settings)
+        if not settings.zhipu_api_key:
+            return UnavailableVisionParser().parse(content, mime_type)
+        return ZhipuVisionParser(
+            settings.zhipu_api_key,
+            model=settings.vision_model,
+            timeout_seconds=settings.vision_timeout_seconds,
+            max_retries=settings.vision_max_retries,
+            backoff_seconds=settings.vision_retry_backoff_seconds,
+        ).parse(content, mime_type)
+
+
+def build_desktop_embedder(settings: Settings):
+    return build_embedder(settings) if settings.zhipu_api_key else UnavailableEmbedder(settings)
+
+
 def build_parser_registry(
     settings: Settings, *, demo: bool = False, allow_missing_models: bool = False
 ) -> ParserRegistry:
@@ -57,6 +81,8 @@ def build_parser_registry(
     if demo:
         require_test_database(settings)
         vision = FakeVisionParser()
+    elif settings.deployment_mode == "desktop":
+        vision = DesktopVisionParser(settings)
     else:
         if not settings.zhipu_api_key and not allow_missing_models:
             raise ValueError("缺少 ZHIPU_API_KEY，请在 backend/.env 配置后启动")
@@ -65,6 +91,7 @@ def build_parser_registry(
         else:
             vision = ZhipuVisionParser(
                 settings.zhipu_api_key,
+                model=settings.vision_model,
                 timeout_seconds=settings.vision_timeout_seconds,
                 max_retries=settings.vision_max_retries,
                 backoff_seconds=settings.vision_retry_backoff_seconds,
@@ -94,8 +121,8 @@ def configure_worker(settings: Settings, *, demo: bool) -> None:
     if demo:
         require_test_database(settings)
         set_embedder_factory(build_demo_embedder)
-    elif missing_models:
-        set_embedder_factory(lambda current: UnavailableEmbedder(current))
+    elif settings.deployment_mode == "desktop":
+        set_embedder_factory(build_desktop_embedder)
     else:
         set_embedder_factory(build_embedder)
     set_parser_registry(

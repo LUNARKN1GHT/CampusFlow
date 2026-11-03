@@ -233,7 +233,7 @@ def answer_prepared(
     """
     if not prepared.candidates.candidates:
         return _insufficient(prepared)
-    query_embedding = embedder.embed(prepared.question)
+    query_embedding = None if mode is RankingMode.KEYWORD else embedder.embed(prepared.question)
     ranked = rank_candidates(
         prepared.candidates.candidates,
         prepared.question,

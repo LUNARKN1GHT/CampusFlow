@@ -6,11 +6,13 @@
 
 from campusflow.application.ports.generation import TextGenerator
 from campusflow.core.config import Settings
+from campusflow.infrastructure.ai_settings import resolve_ai_settings
 from campusflow.infrastructure.llm.text import DeepSeekTextGenerator, ZhipuTextGenerator
 
 
 def build_text_generator(settings: Settings) -> TextGenerator:
     """按 CAMPUSFLOW_TEXT_PROVIDER 选择适配器，缺少对应密钥时拒绝装配。"""
+    settings = resolve_ai_settings(settings)
     provider = settings.text_provider
     if provider == "deepseek":
         if not settings.deepseek_api_key:

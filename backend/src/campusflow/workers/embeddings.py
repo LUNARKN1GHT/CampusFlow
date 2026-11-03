@@ -9,6 +9,7 @@ import hashlib
 from campusflow.application.ports.embeddings import Embedder
 from campusflow.core.config import Settings
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
+from campusflow.infrastructure.ai_settings import resolve_ai_settings
 from campusflow.infrastructure.llm.embeddings import ZhipuEmbedder
 
 _FACTORY = None
@@ -75,6 +76,7 @@ def set_embedder_factory(factory) -> None:
 
 def make_embedder(settings: Settings) -> Embedder:
     """Worker 每次索引作业调用；未注入工厂时走真实适配器。"""
+    settings = resolve_ai_settings(settings)
     if _FACTORY is not None:
         return _FACTORY(settings)
     return build_embedder(settings)

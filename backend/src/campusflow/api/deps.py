@@ -20,12 +20,13 @@ from campusflow.application.ports.repositories import Repositories, WorkspaceDat
 from campusflow.application.ports.version_relations import VersionRelations
 from campusflow.core.config import Settings
 from campusflow.domain.errors import DomainError
+from campusflow.infrastructure.ai_settings import resolve_ai_settings
 from campusflow.infrastructure.calendar.tokens import TokenCipher
 from campusflow.infrastructure.calendar_store import SqlCalendarStore
 from campusflow.infrastructure.index_manifests import SqlIndexManifests
 from campusflow.infrastructure.repositories import build_repositories
 from campusflow.infrastructure.version_relations import SqlVersionRelations
-from campusflow.workers.embeddings import make_embedder
+from campusflow.workers.embeddings import make_embedder, profile_from_settings
 from campusflow.workers.generation import build_text_generator
 
 
@@ -65,7 +66,7 @@ def get_token_cipher(request: Request) -> TokenCipher:
 
 def get_settings(request: Request) -> Settings:
     """应用配置（app.state），不是 /settings 接口保存的学习偏好。"""
-    return request.app.state.settings
+    return resolve_ai_settings(request.app.state.settings)
 
 
 def get_current_workspace(
@@ -90,15 +91,22 @@ def get_job_queue(request: Request) -> JobQueue | None:
     return getattr(request.app.state, "job_queue", None)
 
 
-def get_embedder(request: Request) -> Embedder:
-    """Q011：真实向量模型按请求装配；未配置密钥时给出明确业务错误。
+class DeferredEmbedder:
+    """读取候选只需要模型配置身份；真正向量查询时才校验调用凭据。"""
 
-    配置缺失是 400 业务错误而非 500：错误信息只说明缺少哪项设置，不暴露密钥。
-    """
-    try:
-        return make_embedder(request.app.state.settings)
-    except ValueError as error:
-        raise DomainError(str(error)) from None
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.profile = profile_from_settings(settings)
+
+    def embed(self, text: str):
+        try:
+            return make_embedder(self.settings).embed(text)
+        except ValueError:
+            raise DomainError("检索模型未配置，请到设置 → AI 服务设置填写智谱密钥。") from None
+
+
+def get_embedder(request: Request) -> Embedder:
+    return DeferredEmbedder(resolve_ai_settings(request.app.state.settings))
 
 
 def get_text_generator(request: Request) -> TextGenerator:

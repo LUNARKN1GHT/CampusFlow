@@ -11,6 +11,7 @@ import { errorMessage } from '../api/client'
 import { settingsApi } from '../api/settings'
 import type { AvailabilitySlot } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import AISettings from '../components/AISettings.vue'
 import { useTheme } from '../composables/useTheme'
 
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -93,6 +94,7 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading"><p class="eyebrow">个人配置</p><h1>设置</h1><p class="intro">这些偏好决定后续排期可使用的时间与缓冲，但不会修改课程 DDL。</p></div>
+    <AISettings />
     <ApiFeedback v-if="loadError" :message="loadError" :busy="loading" @retry="load" />
     <p v-else-if="loading" class="form-help" role="status">正在加载设置…</p>
     <template v-else>
