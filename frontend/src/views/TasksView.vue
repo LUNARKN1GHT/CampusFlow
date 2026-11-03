@@ -22,12 +22,17 @@ import type {
   TaskProgress,
   TaskProgressChange,
   TaskRelations,
+  TaskRollup,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 
 const route = useRoute()
 const tasks = ref<Task[]>([])
+const rollups = ref<Record<number, TaskRollup>>({})
+const rollupError = ref('')
+// 从完整任务列表识别父任务，不能因页面筛选隐藏子任务而改变汇总。
+const parentIds = computed(() => new Set(tasks.value.flatMap((task) => task.parent_task_id === null ? [] : [task.parent_task_id])))
 const courses = ref<Course[]>([])
 const semesters = ref<Semester[]>([])
 const loading = ref(true)
@@ -100,6 +105,7 @@ async function load() {
     ;[tasks.value, courses.value, semesters.value] = await Promise.all([
       tasksApi.list(), coursesApi.list(), semestersApi.list(true),
     ])
+    await refreshRollups()
     try {
       dependencyCheck.value = await tasksApi.dependencyCheck()
     } catch {
@@ -112,6 +118,32 @@ async function load() {
     loading.value = false
   }
   await scrollToHighlighted()
+}
+
+async function refreshRollups() {
+  rollups.value = {}
+  rollupError.value = ''
+  await Promise.all([...parentIds.value].map(async (id) => {
+    try {
+      rollups.value[id] = await tasksApi.rollup(id)
+    } catch {
+      rollupError.value = '部分父任务汇总未能读取，暂不显示剩余时间，请重新加载。'
+    }
+  }))
+}
+
+async function refreshTaskSummaries() {
+  await refreshRollups()
+  if (!selectedTask.value) return
+  const id = selectedTask.value.id
+  relations.value = null
+  relationsError.value = ''
+  try {
+    const updated = await tasksApi.relations(id)
+    if (selectedTask.value?.id === id) relations.value = updated
+  } catch {
+    relationsError.value = '任务已保存，但关系汇总未能刷新，请重新打开“依赖与子任务”。'
+  }
 }
 
 function openEditor(task?: Task) {
@@ -156,6 +188,7 @@ async function saveTask() {
       tasks.value.push(await tasksApi.create(values))
     }
     editorOpen.value = false
+    await refreshTaskSummaries()
   } catch (caught) {
     formError.value = errorMessage(caught)
   } finally {
@@ -193,6 +226,7 @@ async function saveProgress() {
     )
     tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
     progressTask.value = updated
+    await refreshTaskSummaries()
     history.value = await tasksApi.progressHistory(updated.id)
     progressForm.reason = ''
   } catch (caught) {
@@ -349,6 +383,7 @@ onMounted(load)
       </section>
 
       <section class="panel">
+        <p v-if="rollupError" class="form-error" role="alert">{{ rollupError }} <button type="button" class="text-button" @click="refreshRollups">重新加载汇总</button></p>
         <p v-if="loading" class="muted">正在加载任务…</p>
         <div v-else-if="visibleTasks.length" class="task-list">
           <!-- 从核对页跳转时带 ?task=编号，用于滚动定位并高亮对应任务。 -->
@@ -361,7 +396,15 @@ onMounted(load)
               <p>截止来源：{{ dueSourceLabels[task.due_source] }}{{ task.due_note ? ` · ${task.due_note}` : '' }}</p>
               <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>
             </div>
-            <div class="task-meta"><span>优先级 {{ priorityLabels[task.priority] }}</span><strong>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong></div>
+            <div class="task-meta">
+              <span>优先级 {{ priorityLabels[task.priority] }}</span>
+              <template v-if="parentIds.has(task.id)">
+                <strong>{{ rollups[task.id]?.remaining_minutes ?? '—' }}<small> 分钟剩余（子任务合计）</small></strong>
+                <small>父任务原始预计：{{ task.estimated_minutes ?? '—' }} 分钟</small>
+                <small v-if="rollups[task.id]?.missing_duration_count">另有 {{ rollups[task.id]?.missing_duration_count }} 项子任务未填写耗时</small>
+              </template>
+              <strong v-else>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong>
+            </div>
             <div class="task-actions"><button type="button" class="button-secondary" @click="openRelations(task)">依赖与子任务</button><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
           </article>
         </div>
@@ -440,7 +483,7 @@ onMounted(load)
               <h3 class="subheading">子任务</h3>
               <ul v-if="relations.subtasks.length" class="plain-list">
                 <li v-for="item in relations.subtasks" :key="item.id">
-                  {{ item.title }} · {{ item.progress }}
+                  {{ item.title }} · {{ progressLabels[item.progress] }}
                   <button type="button" class="text-button" @click="editSubtask(item.id)">编辑</button>
                 </li>
               </ul>
