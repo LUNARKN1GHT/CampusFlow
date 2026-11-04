@@ -39,6 +39,11 @@ export type MaterialFilters = {
 export type TextImportResult = { material: Material; chunks: SourceChunk[] }
 export type UploadResult = { results: MaterialUploadItem[] }
 export type DeleteResult = { delivered: number; failed: number }
+export type IndexProgress = {
+  job_id: number
+  manifest_id: string | null
+  summary: { fully_searchable: boolean; indexed: number; expected: number; uncovered_source_count: number; source_coverage_known: boolean } | null
+}
 
 export const materialsApi = {
   list: (filters: MaterialFilters = {}) => apiRequest<Material[]>(`/materials${queryString({
@@ -88,6 +93,7 @@ export const materialsApi = {
 }
 
 export const jobsApi = {
+  indexProgress: (id: number) => apiRequest<IndexProgress>(`/jobs/${id}/index-progress`),
   forMaterial: (id: number) => apiRequest<ProcessingJob[]>(`/jobs?material_id=${id}`),
   get: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}`),
   attempts: (id: number) => apiRequest<JobAttempt[]>(`/jobs/${id}/attempts`),
