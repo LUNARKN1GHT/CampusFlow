@@ -9,9 +9,10 @@ import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import { jobsApi, materialsApi, type MaterialFilters } from '../api/library'
+import { jobsApi, materialsApi, type IndexProgress, type MaterialFilters } from '../api/library'
 import type {
   Course,
+  JobStage,
   Material,
   MaterialSourceType,
   MaterialStatus,
@@ -57,6 +58,8 @@ const filters = reactive({ semesterId: '', courseId: '', sourceType: '', status:
 const jobByMaterial = reactive<Record<number, number>>({})
 const jobs = reactive<Record<number, ProcessingJob>>({})
 const jobErrors = reactive<Record<number, string>>({})
+const currentJobs = reactive<Record<number, ProcessingJob[]>>({})
+const indexProgress = reactive<Record<number, IndexProgress>>({})
 const retryingId = ref<number | null>(null)
 const sourceMaterial = ref<Material | null>(null)
 const sourceVersionNo = ref<number | null>(null)
@@ -72,7 +75,7 @@ const sourceTypeLabels: Record<MaterialSourceType, string> = {
   pdf: 'PDF', image: '图片', text: '粘贴文本', word: 'Word', web: '网页',
 }
 const statusLabels: Record<MaterialStatus, string> = {
-  pending: '待处理', processing: '处理中', done: '完成', partial: '部分成功', failed: '失败',
+  pending: '原文待读取', processing: '原文读取中', done: '原文读取完成', partial: '原文部分读取成功', failed: '原文读取失败',
 }
 const semesterMap = computed(() => new Map(semesters.value.map((item) => [item.id, item])))
 const courseMap = computed(() => new Map(courses.value.map((item) => [item.id, item])))
@@ -107,8 +110,33 @@ function jobFor(material: Material): ProcessingJob | null {
 
 /** 仅当存在尚未进入终态的处理作业时才算“处理中”，避免对同步导入的资料无限轮询。 */
 function hasActiveJob(material: Material): boolean {
+  if (currentJobs[material.id]?.some((job) => !job.is_terminal)) return true
   const jobId = jobByMaterial[material.id]
   return jobId ? !(jobs[jobId]?.is_terminal ?? false) : false
+}
+
+function stageJob(material: Material, stage: JobStage): ProcessingJob | undefined {
+  return currentJobs[material.id]?.find((job) => job.stage === stage)
+}
+
+function questionStatus(material: Material): string {
+  if (material.archived) return '已归档，不参与问答'
+  if (jobErrors[material.id]) return '状态未知，请刷新'
+  const job = stageJob(material, 'embed')
+  if (!job) return '未开始'
+  if (!job.is_terminal) return '准备中'
+  if (job.status === 'failed') return '准备失败'
+  const summary = indexProgress[material.id]?.summary
+  if (job.status === 'done' && summary?.fully_searchable) return '可问答'
+  if (summary?.indexed) return '部分可用（有未覆盖内容）'
+  return '尚不可问答'
+}
+
+function extractionStatus(material: Material): string {
+  if (jobErrors[material.id]) return '状态未知，请刷新'
+  const job = stageJob(material, 'extract')
+  if (!job) return '未开始'
+  return { pending: '等待整理', running: '整理中', done: '已整理，请到待核对查看', partial: '部分整理成功', failed: '整理失败' }[job.status]
 }
 
 function currentFilters(): MaterialFilters {
@@ -136,16 +164,27 @@ function formatDateTime(value: string): string {
 
 async function ensureJob(material: Material) {
   try {
-    // 只取 parse 阶段最新作业；同步导入（如粘贴文本）没有作业时清除本地关联，避免轮询旧记录。
-    const latest = (await jobsApi.forMaterial(material.id)).find((job) => job.stage === 'parse')
+    // 以最新资料版本为准，不能拿旧版本的失败或成功覆盖当前状态。
+    const [allJobs, versions] = await Promise.all([jobsApi.forMaterial(material.id), materialsApi.versions(material.id)])
+    const version = versions.reduce<(typeof versions)[number] | undefined>((latest, item) => !latest || item.version_no > latest.version_no ? item : latest, undefined)
+    if (!version) throw new Error('missing material version')
+    const active = allJobs.filter((job) => job.version_id === version?.id).sort((a, b) => b.id - a.id)
+    currentJobs[material.id] = active
+    const latest = active.find((job) => job.stage === 'parse')
     delete jobErrors[material.id]
+    delete indexProgress[material.id]
     if (latest) {
       jobByMaterial[material.id] = latest.id
       jobs[latest.id] = latest
     } else {
       delete jobByMaterial[material.id]
     }
+    const embed = active.find((job) => job.stage === 'embed')
+    if (embed) indexProgress[material.id] = await jobsApi.indexProgress(embed.id)
   } catch (caught) {
+    delete currentJobs[material.id]
+    delete indexProgress[material.id]
+    delete jobByMaterial[material.id]
     jobErrors[material.id] = `处理详情读取失败：${errorMessage(caught)}。请刷新重试。`
   }
 }
@@ -210,8 +249,8 @@ async function manualRefresh() {
   await refresh()
 }
 
-async function retry(material: Material) {
-  const jobId = jobByMaterial[material.id]
+async function retry(material: Material, stage: JobStage = 'parse') {
+  const jobId = stageJob(material, stage)?.id
   retryingId.value = material.id
   error.value = ''
   try {
@@ -561,6 +600,17 @@ onBeforeUnmount(stopPolling)
               <p>{{ sourceTypeLabels[material.source_type] }} · {{ scopeText(material) }} · 导入于 {{ formatDateTime(material.imported_at) }}</p>
               <p v-if="material.publisher">发布方：{{ material.publisher }}{{ material.published_at ? ` · ${material.published_at.slice(0, 10)}` : '' }}</p>
               <p v-if="jobErrors[material.id]" class="form-error" role="alert">{{ jobErrors[material.id] }}</p>
+              <div class="coverage-box" aria-label="资料处理阶段">
+                <p><strong>事项整理：{{ extractionStatus(material) }}</strong></p>
+                <p v-if="stageJob(material, 'extract')?.error_reason">{{ stageJob(material, 'extract')?.error_reason }}</p>
+                <button v-if="stageJob(material, 'extract')?.retryable" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'extract')">重试事项整理</button>
+                <p><strong>资料问答：{{ questionStatus(material) }}</strong></p>
+                <p v-if="stageJob(material, 'embed')?.error_reason">{{ stageJob(material, 'embed')?.error_reason }}</p>
+                <p v-if="indexProgress[material.id]?.summary" class="form-help">已准备 {{ indexProgress[material.id]?.summary?.indexed }} / {{ indexProgress[material.id]?.summary?.expected }} 段；原文未覆盖 {{ indexProgress[material.id]?.summary?.uncovered_source_count }} 处{{ indexProgress[material.id]?.summary?.source_coverage_known ? '' : '（原文覆盖范围尚未确认）' }}。</p>
+                <p v-if="stageJob(material, 'embed')?.error_reason || stageJob(material, 'extract')?.error_reason" class="form-help">请根据失败原因检查 AI 服务设置或补充资料；已读出的原文仍可查看。</p>
+                <RouterLink v-if="stageJob(material, 'embed')?.status === 'failed' || stageJob(material, 'extract')?.status === 'failed'" to="/settings#ai-settings">打开 AI 服务设置</RouterLink>
+                <button v-if="stageJob(material, 'embed')?.retryable" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'embed')">重试问答准备</button>
+              </div>
 
               <!-- 部分成功必须展示未覆盖范围与失败原因；缺失内容不能被当作“没有要求”。 -->
               <div v-if="material.status === 'partial'" class="coverage-box">
