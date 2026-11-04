@@ -3,7 +3,7 @@
 import re
 
 from campusflow.domain.errors import TransientError
-from campusflow.domain.states import JobStatus
+from campusflow.domain.states import JobStage, JobStatus
 
 MAX_ERROR_REASON_LENGTH = 300
 
@@ -12,6 +12,28 @@ TERMINAL_JOB_STATUSES = frozenset({JobStatus.DONE, JobStatus.PARTIAL, JobStatus.
 
 # 允许重新处理的状态：作业没有完全成功，重试仍有意义（J005/J006）
 RETRYABLE_JOB_STATUSES = frozenset({JobStatus.FAILED, JobStatus.PARTIAL})
+
+
+def allows_model_repair(stage: str, status: str, reason: str | None) -> bool:
+    """仅人工修复入口使用，不将配置问题变成自动重试。
+
+    兼容旧版将向量请求拒绝归为 invalid_response 的记录；文件损坏、
+    来源删除和旧版本作业不属于模型修复范围。
+    """
+    if status not in RETRYABLE_JOB_STATUSES or not reason:
+        return False
+    if stage == JobStage.EMBED:
+        return reason in ("索引全部块失败", "部分索引块失败，结果不完整") or reason.startswith(
+            "未配置向量模型密钥"
+        )
+    if stage == JobStage.PARSE:
+        return (
+            "未配置视觉模型密钥" in reason
+            or "视觉识别请求被拒绝（HTTP 401）" in reason
+            or "视觉识别请求被拒绝（HTTP 403）" in reason
+        )
+    return False
+
 
 DEFAULT_JOB_TIMEOUT_SECONDS = 900
 # 索引作业按块推进，用最近一次心跳判断是否卡死（Q004）

@@ -65,6 +65,12 @@ def index_version(
         abandon_write(repos, job_id, blocked)
         return None
 
+    # 桌面缺配置占位器在调用前报告原因，不把每个块都标成永久响应错误。
+    configuration_error = getattr(embedder, "configuration_error", None)
+    if configuration_error:
+        _record_failure(repos, job_id, configuration_error, retryable=False)
+        return None
+
     try:
         # 先登记并核对配置身份：索引行按配置编号隔离，配置不一致时不得写入任何向量。
         profile = register_embedder_profile(profiles, embedder)
@@ -234,5 +240,7 @@ def _error_reason(summary: IndexProgressSummary) -> str | None:
     if summary.status == JobStatus.FAILED:
         return "索引全部块失败"
     if summary.status == JobStatus.PARTIAL:
+        if not summary.failed:
+            return "原文覆盖不完整，请补充未识别内容；已索引部分仍可使用"
         return "部分索引块失败，结果不完整"
     return None

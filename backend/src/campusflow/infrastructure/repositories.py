@@ -52,6 +52,8 @@ from campusflow.infrastructure.db.models import (
     Course,
     CourseRule,
     FixedEvent,
+    IndexedBlock,
+    IndexManifest,
     Material,
     MaterialVersion,
     MaterialVersionRelation,
@@ -1336,17 +1338,40 @@ class SqlAlchemyJobRepository:
         )
         return [_job_to_data(row) for row in rows]
 
-    def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
-        from campusflow.domain.jobs import can_retry
+    def prepare_retry(self, job_id: int, *, repair_model: bool = False) -> ProcessingJobData | None:
+        from campusflow.domain.jobs import allows_model_repair, can_retry
         from campusflow.domain.states import JobStatus
 
         if _row_missing(self._session, ProcessingJob, job_id):
             return None  # 作业已随资料删除（J007），没有可重投的目标
-        row = self._session.get(ProcessingJob, job_id)
+        row = self._session.scalar(
+            select(ProcessingJob)
+            .where(ProcessingJob.id == job_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
         # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
         # 成功，反复重投只会白烧资源（J005/J006）
-        if row is None or not can_retry(row.status, row.retryable):
+        if row is None:
             return None
+        repairing = repair_model and allows_model_repair(row.stage, row.status, row.error_reason)
+        if not can_retry(row.status, row.retryable) and not repairing:
+            return None
+        if repairing and row.manifest_id:
+            manifest = self._session.get(IndexManifest, row.manifest_id)
+            if manifest is not None:
+                self._session.execute(
+                    update(IndexedBlock)
+                    .where(
+                        IndexedBlock.workspace_id == row.workspace_id,
+                        IndexedBlock.version_id == row.version_id,
+                        IndexedBlock.profile_id == manifest.profile_id,
+                        IndexedBlock.block_id.in_(manifest.snapshot["block_ids"]),
+                        IndexedBlock.state == "failed",
+                        IndexedBlock.failure_code == "invalid_response",
+                    )
+                    .values(state="pending", attempts=0, retryable=False, failure_code=None)
+                )
         row.status = JobStatus.PENDING
         row.scope = None
         row.error_reason = None

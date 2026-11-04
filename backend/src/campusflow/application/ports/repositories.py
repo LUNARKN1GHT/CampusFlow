@@ -619,7 +619,7 @@ class JobRepository(Protocol):
         """列出某份资料的全部处理作业（D009 删除影响预览：还有几个没跑完）。"""
         ...
 
-    def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
+    def prepare_retry(self, job_id: int, *, repair_model: bool = False) -> ProcessingJobData | None:
         """把可重试的失败/部分成功作业重置为待处理，供重新投递（J005）。
 
         只有标记为可重试的作业能被重置；永久失败返回 None，避免反复重投。

@@ -18,6 +18,7 @@ from campusflow.application.ports.repositories import (
     ProcessingJobData,
     Repositories,
 )
+from campusflow.application.processing import blocked_write_reason
 from campusflow.application.scope import require_in_workspace
 from campusflow.domain.errors import NotFoundError
 from campusflow.domain.jobs import (
@@ -105,14 +106,25 @@ def reclaim_stale_jobs(
     return reclaimed
 
 
-def retry_job(repos: Repositories, queue: JobQueue | None, job_id: int) -> ProcessingJobData | None:
+def retry_job(
+    repos: Repositories, queue: JobQueue | None, job_id: int, *, repair_model: bool = False
+) -> ProcessingJobData | None:
     """重新处理一个可重试的作业（J005），返回重置后的作业。
 
     永久失败、已完成或无权重投的作业返回 None。重置与投递分开：先把待处理
     状态落库，再尝试投递；投递失败也不会回滚，记录留在待投递队列等补偿。
     索引作业重投不清资料状态：资料早已解析成功，索引只是附加的可检索性。
     """
-    job = repos.jobs.prepare_retry(job_id)
+    if repair_model:
+        original = repos.jobs.get(job_id)
+        if original is None or blocked_write_reason(repos, original):
+            return None
+        material = repos.materials.get(original.material_id)
+        if material is None or material.archived:
+            return None
+        job = repos.jobs.prepare_retry(job_id, repair_model=True)
+    else:
+        job = repos.jobs.prepare_retry(job_id)
     if job is None:
         return None
     if job.stage == JobStage.PARSE:

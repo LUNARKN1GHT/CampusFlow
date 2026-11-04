@@ -8,7 +8,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict
 
 from campusflow.api.deps import (
@@ -32,8 +32,9 @@ from campusflow.domain.indexing import (
     BlockIndexState,
     IndexProgressSummary,
 )
-from campusflow.domain.jobs import can_retry, is_terminal
+from campusflow.domain.jobs import allows_model_repair, can_retry, is_terminal
 from campusflow.domain.states import JobStage, JobStatus
+from campusflow.infrastructure.ai_settings import resolve_ai_settings
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -79,6 +80,7 @@ class JobOut(BaseModel):
     started_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    recovery_action: str | None = None
 
 
 def _to_out(job: ProcessingJobData) -> JobOut:
@@ -97,6 +99,9 @@ def _to_out(job: ProcessingJobData) -> JobOut:
         started_at=job.started_at,
         created_at=job.created_at,
         updated_at=job.updated_at,
+        recovery_action="configure_ai"
+        if allows_model_repair(job.stage, job.status, job.error_reason)
+        else None,
     )
 
 
@@ -229,15 +234,22 @@ def get_index_progress(
 
 @router.post("/{job_id}/retry", response_model=JobOut)
 def retry_job(
-    job_id: int, workspace: CurrentWorkspace, repos: Repos, queue: JobQueueDep = None
+    job_id: int,
+    request: Request,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    queue: JobQueueDep = None,
 ) -> JobOut:
     """重新处理失败或部分成功的作业（J005/J006）。
 
     只接受可重试的作业：已完成、处理中与永久失败返回 400，并说明原因，
     避免前端反复触发无效重投。
     """
-    use_cases.get_job(repos, workspace.id, job_id)  # 归属校验：不匹配即 404
-    job = use_cases.retry_job(repos, queue, job_id)
+    original = use_cases.get_job(repos, workspace.id, job_id)
+    repair_model = allows_model_repair(original.stage, original.status, original.error_reason)
+    if repair_model and not resolve_ai_settings(request.app.state.settings).zhipu_api_key:
+        raise DomainError("请先到设置 → AI 服务设置保存智谱密钥，再手动重试此作业。")
+    job = use_cases.retry_job(repos, queue, job_id, repair_model=repair_model)
     if job is None:
         raise DomainError("该作业当前不可重试：已完成的作业无需重试，永久失败重试不会成功")
     return _to_out(job)

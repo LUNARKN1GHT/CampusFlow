@@ -36,6 +36,8 @@ class UnavailableVisionParser:
 class UnavailableEmbedder:
     """缺少向量密钥时的占位实现：解析结果保留，索引作业以明确原因失败。"""
 
+    configuration_error = "未配置向量模型密钥，请到设置 → AI 服务设置填写后手动重试；原文已保留"
+
     def __init__(self, settings: Settings) -> None:
         self._profile: EmbeddingProfile = profile_from_settings(settings)
 
