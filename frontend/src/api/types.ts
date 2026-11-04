@@ -439,6 +439,7 @@ export type JobStage = 'parse' | 'extract' | 'embed'
 export type JobStatus = 'pending' | 'running' | 'done' | 'partial' | 'failed'
 
 export type ProcessingJob = {
+  recovery_action?: 'configure_ai' | null
   id: number
   material_id: number
   version_id: number

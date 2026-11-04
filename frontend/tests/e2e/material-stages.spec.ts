@@ -13,7 +13,8 @@ test('原文、事项整理与问答状态分开，重试和刷新只显示当�
   }))
   const job = (id: number, material: number, stage: JobStage, status: JobStatus, version = material): ProcessingJob => ({
     id, material_id: material, version_id: version, stage, status,
-    is_terminal: !['pending', 'running'].includes(status), retryable: status === 'failed',
+    is_terminal: !['pending', 'running'].includes(status), retryable: false,
+    recovery_action: status === 'failed' && stage === 'embed' ? 'configure_ai' : null,
     scope: status === 'partial' ? '第2页未识别' : null,
     error_reason: status === 'failed' ? `${stage} 合成失败原因` : null,
     attempts: 1, enqueued_at: null, started_at: null, created_at: '2026-11-04T08:00:00Z', updated_at: '2026-11-04T08:00:00Z',

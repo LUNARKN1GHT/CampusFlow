@@ -603,13 +603,13 @@ onBeforeUnmount(stopPolling)
               <div class="coverage-box" aria-label="资料处理阶段">
                 <p><strong>事项整理：{{ extractionStatus(material) }}</strong></p>
                 <p v-if="stageJob(material, 'extract')?.error_reason">{{ stageJob(material, 'extract')?.error_reason }}</p>
-                <button v-if="stageJob(material, 'extract')?.retryable" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'extract')">重试事项整理</button>
+                <button v-if="stageJob(material, 'extract')?.retryable || stageJob(material, 'extract')?.recovery_action === 'configure_ai'" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'extract')">重试事项整理</button>
                 <p><strong>资料问答：{{ questionStatus(material) }}</strong></p>
                 <p v-if="stageJob(material, 'embed')?.error_reason">{{ stageJob(material, 'embed')?.error_reason }}</p>
                 <p v-if="indexProgress[material.id]?.summary" class="form-help">已准备 {{ indexProgress[material.id]?.summary?.indexed }} / {{ indexProgress[material.id]?.summary?.expected }} 段；原文未覆盖 {{ indexProgress[material.id]?.summary?.uncovered_source_count }} 处{{ indexProgress[material.id]?.summary?.source_coverage_known ? '' : '（原文覆盖范围尚未确认）' }}。</p>
                 <p v-if="stageJob(material, 'embed')?.error_reason || stageJob(material, 'extract')?.error_reason" class="form-help">请根据失败原因检查 AI 服务设置或补充资料；已读出的原文仍可查看。</p>
                 <RouterLink v-if="stageJob(material, 'embed')?.status === 'failed' || stageJob(material, 'extract')?.status === 'failed'" to="/settings#ai-settings">打开 AI 服务设置</RouterLink>
-                <button v-if="stageJob(material, 'embed')?.retryable" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'embed')">重试问答准备</button>
+                <button v-if="stageJob(material, 'embed')?.retryable || stageJob(material, 'embed')?.recovery_action === 'configure_ai'" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'embed')">重试问答准备</button>
               </div>
 
               <!-- 部分成功必须展示未覆盖范围与失败原因；缺失内容不能被当作“没有要求”。 -->
@@ -631,11 +631,12 @@ onBeforeUnmount(stopPolling)
                   <button type="button" class="text-button" @click="useMaterialFallback(material, 'files')">上传网页文件</button>
                 </div>
               </div>
+              <p v-if="jobFor(material)?.recovery_action === 'configure_ai'" class="form-help">请先<RouterLink to="/settings#ai-settings">检查 AI 服务设置</RouterLink>，保存后返回此处手动重试。已有原文会保留。</p>
             </div>
             <div class="material-actions">
               <button v-if="hasActiveJob(material)" type="button" class="text-button" disabled>处理中…</button>
               <button
-                v-else-if="jobFor(material)?.retryable"
+                v-else-if="jobFor(material)?.retryable || jobFor(material)?.recovery_action === 'configure_ai'"
                 type="button"
                 class="button-secondary"
                 :disabled="retryingId === material.id"
