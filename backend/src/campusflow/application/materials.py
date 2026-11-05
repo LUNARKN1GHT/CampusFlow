@@ -114,6 +114,7 @@ def import_pasted_text(
     course_id: int | None,
     class_name: str | None,
     text_parser: DocumentParser,
+    process_ai: bool = False,
 ) -> tuple[MaterialData, list[SourceChunkData]]:
     """粘贴文本导入：保存为稳定原文版本并关联来源与课程范围（D004）。
 
@@ -144,13 +145,22 @@ def import_pasted_text(
             "粘贴文本导入",
             storage_key,
         )
+        outcome = text_parser.parse(content.encode("utf-8"), "text/plain")
+        from campusflow.application.processing import coverage_metadata
+        from campusflow.application.source_uncertainty import COVERAGE_KEY
+
+        repos.materials.merge_version_metadata(
+            version.id, {COVERAGE_KEY: coverage_metadata(outcome)}
+        )
         chunks = repos.materials.add_chunks(
             fragments_to_chunks(
-                text_parser.parse(content.encode("utf-8"), "text/plain"),
+                outcome,
                 version.id,
             )
         )
         material = repos.materials.set_status(material.id, MaterialStatus.DONE) or material
+        if process_ai:
+            _queue_ai_processing(repos, workspace_id, material.id, version.id)
         # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
         # 不留下无法被资料版本引用的孤立文件。
         repos.uow.commit()
@@ -159,6 +169,39 @@ def import_pasted_text(
         storage.delete(storage_key)
         raise
     return material, chunks
+
+
+def _queue_ai_processing(
+    repos: Repositories, workspace_id: int, material_id: int, version_id: int
+) -> list[int]:
+    from campusflow.domain.states import JobStage
+
+    extract = repos.jobs.ensure_extraction(workspace_id, material_id, version_id)
+    # ensure_extraction 持有版本行锁，当前事务内并发调用不能重复创建索引作业。
+    embed = next(
+        (
+            job
+            for job in repos.jobs.list_by_material(material_id)
+            if job.version_id == version_id and job.stage == JobStage.EMBED
+        ),
+        None,
+    )
+    if embed is None:
+        embed = repos.jobs.create_or_requeue(workspace_id, material_id, version_id, JobStage.EMBED)
+    return [extract.id, embed.id]
+
+
+def request_ai_processing(repos: Repositories, workspace_id: int, material_id: int) -> list[int]:
+    material = get_material(repos, workspace_id, material_id)
+    if material.archived:
+        raise DomainError("请先恢复已归档资料，再启动处理")
+    versions = repos.materials.list_versions(material_id)
+    version = max(versions, key=lambda item: item.version_no, default=None)
+    if version is None or not repos.materials.list_chunks(version.id):
+        raise DomainError("还没有可处理的原文，请先完成原文读取")
+    ids = _queue_ai_processing(repos, workspace_id, material_id, version.id)
+    repos.uow.commit()
+    return ids
 
 
 def list_materials(

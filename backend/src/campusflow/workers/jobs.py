@@ -4,6 +4,7 @@ RQ 消息只携带 job_id；作业函数从数据库读取详情并调用应用�
 独立会话，不捕获业务异常——失败由用例写回作业状态，异常交给 RQ 记录。
 """
 
+from campusflow.application.extraction_jobs import extract_version
 from campusflow.application.indexing import index_version
 from campusflow.application.processing import parse_version
 from campusflow.core.config import Settings
@@ -14,6 +15,20 @@ from campusflow.infrastructure.index_manifests import SqlIndexManifests
 from campusflow.infrastructure.repositories import build_repositories
 from campusflow.infrastructure.storage.local import LocalFileStorage
 from campusflow.workers.embeddings import make_embedder
+from campusflow.workers.extraction import make_extraction_generator
+
+
+def extract_version_job(job_id: int) -> None:
+    settings = Settings()
+
+    engine = create_db_engine(settings)
+    try:
+        with create_session_factory(engine)() as session:
+            extract_version(
+                build_repositories(session), make_extraction_generator(settings), job_id
+            )
+    finally:
+        engine.dispose()
 
 
 def parse_version_job(job_id: int) -> None:

@@ -36,7 +36,7 @@ export type MaterialFilters = {
   includeArchived?: boolean
 }
 
-export type TextImportResult = { material: Material; chunks: SourceChunk[] }
+export type TextImportResult = { material: Material; chunks: SourceChunk[]; job_ids?: number[] }
 export type UploadResult = { results: MaterialUploadItem[] }
 export type DeleteResult = { delivered: number; failed: number }
 export type IndexProgress = {
@@ -46,6 +46,7 @@ export type IndexProgress = {
 }
 
 export const materialsApi = {
+  process: (id: number) => apiRequest<{ job_ids: number[] }>(`/materials/${id}/process`, { method: 'POST' }),
   list: (filters: MaterialFilters = {}) => apiRequest<Material[]>(`/materials${queryString({
     semester_id: filters.semesterId,
     course_id: filters.courseId,

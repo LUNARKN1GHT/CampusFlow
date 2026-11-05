@@ -23,6 +23,11 @@ class RecordingQueue:
     def __init__(self) -> None:
         self.parse_calls: list[int] = []
         self.index_calls: list[int] = []
+        self.extract_calls: list[int] = []
+
+    def enqueue_extract(self, job_id: int) -> str:
+        self.extract_calls.append(job_id)
+        return f"extract-{job_id}"
 
     def enqueue_parse(self, job_id: int) -> str:
         self.parse_calls.append(job_id)
@@ -195,24 +200,28 @@ def test_dispatch_routes_by_stage(client):
     queue = RecordingQueue()
     parse_id = _create_job(client, JobStage.PARSE)
     embed_id = _create_job(client, JobStage.EMBED)
+    extract_id = _create_job(client, JobStage.EXTRACT)
 
     # dispatch_job 自己提交（outbox 语义），调用方不另行开启事务
     with open_session() as session:
         repos = build_repositories(session)
         assert dispatch_job(repos, queue, parse_id) is True
         assert dispatch_job(repos, queue, embed_id) is True
+        assert dispatch_job(repos, queue, extract_id) is True
 
     assert queue.parse_calls == [parse_id]
     assert queue.index_calls == [embed_id]
+    assert queue.extract_calls == [extract_id]
     assert get_job(parse_id).enqueued_at is not None
     assert get_job(embed_id).enqueued_at is not None
+    assert get_job(extract_id).enqueued_at is not None
 
 
 def test_unknown_stage_is_marked_failed_without_dispatch(client):
     queue = RecordingQueue()
     job_id = _create_job(client, JobStage.PARSE)
     with open_session() as session, session.begin():
-        session.get(ProcessingJob, job_id).stage = "extract"
+        session.get(ProcessingJob, job_id).stage = "unsupported"
     with open_session() as session:
         assert dispatch_job(build_repositories(session), queue, job_id) is False
 

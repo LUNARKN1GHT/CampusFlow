@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
+from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
@@ -50,6 +51,7 @@ JobQueueDep = Annotated[JobQueue | None, Depends(get_job_queue)]
 
 
 class TextImportIn(BaseModel):
+    process_ai: bool = False
     title: str = Field(min_length=1, max_length=300)
     content: str = Field(min_length=1)
     publisher: str | None = Field(default=None, max_length=200)
@@ -111,6 +113,7 @@ class SourceChunkOut(BaseModel):
 class TextImportOut(BaseModel):
     material: MaterialOut
     chunks: list[SourceChunkOut]
+    job_ids: list[int] = Field(default_factory=list)
 
 
 class MaterialMetadataUpdate(BaseModel):
@@ -144,8 +147,9 @@ def import_text(
     repos: Repos,
     storage: Storage,
     text_parser: TextParser,
+    queue: JobQueueDep = None,
 ) -> TextImportOut:
-    """保存粘贴文本为不可变版本并切分片段；不会自动建立索引作业。"""
+    """保存文本；显式 process_ai=true 时同事务建立提取与索引作业。"""
     material, chunks = use_cases.import_pasted_text(
         repos,
         storage,
@@ -158,11 +162,30 @@ def import_text(
         course_id=payload.course_id,
         class_name=payload.class_name,
         text_parser=text_parser,
+        process_ai=payload.process_ai,
     )
+    ids = [job.id for job in repos.jobs.list_by_material(material.id)] if payload.process_ai else []
+    dispatch_pending_jobs(repos, queue, job_ids=ids)
     return TextImportOut(
         material=MaterialOut.model_validate(material),
         chunks=[SourceChunkOut.model_validate(c) for c in chunks],
+        job_ids=ids,
     )
+
+
+@router.post("/{material_id}/process", status_code=202)
+def process_existing(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos, queue: JobQueueDep = None
+):
+    """已有原文的资料可显式继续处理；重复请求返回同一组作业。"""
+    ids = use_cases.request_ai_processing(repos, workspace.id, material_id)
+    pending = [
+        job.id
+        for job in repos.jobs.list_by_material(material_id)
+        if job.id in ids and job.status == "pending"
+    ]
+    dispatch_pending_jobs(repos, queue, job_ids=pending)
+    return {"job_ids": ids}
 
 
 @router.get("", response_model=list[MaterialOut])

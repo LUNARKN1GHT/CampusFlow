@@ -32,6 +32,8 @@ def allows_model_repair(stage: str, status: str, reason: str | None) -> bool:
             or "视觉识别请求被拒绝（HTTP 401）" in reason
             or "视觉识别请求被拒绝（HTTP 403）" in reason
         )
+    if stage == JobStage.EXTRACT:
+        return reason.startswith(("文字模型配置不可用", "事项提取结果未通过校验"))
     return False
 
 

@@ -31,6 +31,15 @@ def rq_index_job_key(job_id: int) -> str:
 class RQJobQueue:
     """基于 RQ/Redis 的投递实现；消息只含 job_id，真实状态以数据库为准。"""
 
+    def enqueue_extract(self, job_id: int) -> str:
+        from campusflow.workers.jobs import extract_version_job
+
+        # 复用现有解析队列，不要求额外启动第三个消费者。
+        job = self._queue.enqueue(
+            extract_version_job, job_id, job_id=f"extract-{job_id}", job_timeout=900
+        )
+        return job.id
+
     def __init__(
         self, redis_url: str, *, connection: Any | None = None, connect_timeout: int = 3
     ) -> None:

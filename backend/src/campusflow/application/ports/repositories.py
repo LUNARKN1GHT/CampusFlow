@@ -553,6 +553,16 @@ class JobRepository(Protocol):
         """
         ...
 
+    def ensure_extraction(
+        self, workspace_id: int, material_id: int, version_id: int
+    ) -> ProcessingJobData:
+        """锁定来源版本后获取或创建唯一提取作业，不重置已完成作业。"""
+        ...
+
+    def lock_running(self, job_id: int, started_at: datetime) -> bool:
+        """锁定本次领取及来源；旧执行者不得覆盖已回收或重新领取的作业。"""
+        ...
+
     def record_attempt(
         self,
         job_id: int,

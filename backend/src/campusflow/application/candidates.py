@@ -36,6 +36,8 @@ def save_candidates(
     material_id: int,
     version_no: int,
     drafts: list[CandidateDraft],
+    *,
+    commit: bool = True,
 ) -> list[CandidateData]:
     """整批保存候选：空间、适用范围与证据全部核对通过后才写入。
 
@@ -93,7 +95,8 @@ def save_candidates(
             for item in (repos.candidates.get(workspace_id, c.id) for c in created)
             if item is not None
         ]
-        repos.uow.commit()
+        if commit:
+            repos.uow.commit()
     except Exception:
         repos.uow.rollback()
         raise

@@ -30,7 +30,7 @@ from campusflow.infrastructure.db.session import create_session_factory
 from campusflow.infrastructure.queue.db_queue import DBJobQueue
 from campusflow.infrastructure.repositories import build_repositories
 from campusflow.workers.assembly import configure_worker
-from campusflow.workers.jobs import index_version_job, parse_version_job
+from campusflow.workers.jobs import extract_version_job, index_version_job, parse_version_job
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,8 @@ def run_claimed_job(stage: str, job_id: int) -> None:
         parse_version_job(job_id)
     elif stage == JobStage.EMBED:
         index_version_job(job_id)
+    elif stage == JobStage.EXTRACT:
+        extract_version_job(job_id)
     else:
         # 查询已限定阶段；出现其它值说明调用方传错，不尝试执行未知入口。
         raise ValueError("作业阶段没有对应的处理入口")

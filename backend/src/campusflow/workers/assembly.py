@@ -24,6 +24,7 @@ from campusflow.workers.embeddings import (
     profile_from_settings,
     set_embedder_factory,
 )
+from campusflow.workers.extraction import set_extraction_demo
 
 
 class UnavailableVisionParser:
@@ -120,6 +121,9 @@ def configure_worker(settings: Settings, *, demo: bool) -> None:
     真实模式缺密钥时在这里直接失败，不进入消费或轮询循环。
     """
     missing_models = settings.deployment_mode == "desktop" and not settings.zhipu_api_key
+    if demo:
+        require_test_database(settings)
+    set_extraction_demo(demo)
     if demo:
         require_test_database(settings)
         set_embedder_factory(build_demo_embedder)

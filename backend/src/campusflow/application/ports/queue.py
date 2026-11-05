@@ -25,3 +25,7 @@ class JobQueue(Protocol):
     def enqueue_index(self, job_id: int) -> str:
         """投递向量索引作业（Q004），同样使用稳定作业键与独立队列。"""
         ...
+
+    def enqueue_extract(self, job_id: int) -> str:
+        """投递候选事项提取；结果不自动生成正式任务。"""
+        ...

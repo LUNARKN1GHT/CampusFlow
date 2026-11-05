@@ -507,6 +507,7 @@ export type MaterialDeleteImpact = {
 }
 
 export type TextImportInput = {
+  process_ai?: boolean
   title: string
   content: string
   publisher: string | null

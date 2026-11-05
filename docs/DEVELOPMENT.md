@@ -114,7 +114,7 @@ R006 新增 `course_rules` 表；更新代码后需运行 `uv run --locked alemb
 R007 给 `fixed_events` 补齐来源失效留痕列；更新代码后需运行 `uv run --locked alembic upgrade head`。来源详情接口 `GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source` 返回出处、引用与可验证状态，资料删除后不再返回可验证引用。专项测试：`uv run --locked pytest tests/test_source_detail.py -q`；结构与失效行为见 [R007 说明](verification/R007-source-detail.md)。
 X005 复用相同文字模型配置，通过 `rule_extraction.extract_rule_drafts` 得到待核对规则，按需显式保存。无新增依赖、迁移和自动入口。专项测试：`uv run --locked pytest tests/test_rule_extraction.py -q`；完整原文及条件字段契约见 [X005 说明](verification/X005-rule-extraction.md)。
 
-X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。X002 尚无提取按钮或自动 Worker 任务，后续业务接入时才使用此入口。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
+X002 文字生成复用私有 `ZHIPU_API_KEY`，型号与视觉识别独立：`CAMPUSFLOW_TEXT_MODEL=glm-4-flash-250414`、`CAMPUSFLOW_TEXT_TIMEOUT_SECONDS=60`、`CAMPUSFLOW_TEXT_MAX_TOKENS=4096`。等待设置是网络连接/读取等待上限（最长 120 秒），不是整个多次读取的总时限；单次生成长度可设置 1–8192。配置在 `backend/.env.example`，真实密钥只写本地环境，不提交。装配入口 `workers.generation.build_text_generator` 缺密钥时拒绝创建真实适配器；启动及普通测试不会自动调用模型。资料库现已接入提取 Worker，可选择导入文本后立即处理或稍后继续，操作见 [资料处理手册](MATERIAL_PROCESSING.md)。桌面版可在“设置 → AI 服务设置”保存配置，新任务读取最新设置。测试和调用契约见 [X002 说明](verification/X002-generation-contract.md)。
 
 Q019 为文字生成增加供应方切换：`CAMPUSFLOW_TEXT_PROVIDER=zhipu|deepseek`（默认 `zhipu`）；`deepseek` 使用 `DEEPSEEK_API_KEY` 与 `deepseek-chat` 等型号，适配器固定地址、禁止跳转，与智谱同样不在适配器内自动重试。真实模型语义补跑默认跳过，只在显式开启时运行（仅合成样本，护栏最多 10 次生成调用）：
 

@@ -43,6 +43,7 @@ const successMessage = ref('')
 const uploadResults = ref<MaterialUploadItem[] | null>(null)
 
 const textForm = reactive({
+  process_ai: true,
   title: '', content: '', publisher: '', published_at: '', semester_id: '', course_id: '', class_name: '',
 })
 const webForm = reactive({
@@ -268,6 +269,17 @@ async function retry(material: Material, stage: JobStage = 'parse') {
   }
 }
 
+async function processMaterial(material: Material) {
+  retryingId.value = material.id
+  error.value = ''
+  try {
+    await materialsApi.process(material.id)
+    successMessage.value = '已提交事项整理和问答准备；提取结果需要到“待核对”确认。'
+    await refresh()
+  } catch (caught) { error.value = errorMessage(caught) }
+  finally { retryingId.value = null }
+}
+
 async function onArchiveChanged() {
   await refresh()
   const id = lifecycleMaterial.value?.id
@@ -362,8 +374,9 @@ async function submitText() {
   successMessage.value = ''
   uploadResults.value = null
   try {
-    // 粘贴文本同步完成切分并直接返回片段，不创建解析作业，因此不会触发轮询。
+    // 原文同步保存，用户选择的 AI 阶段由后台处理，前端轮询实际作业。
     const result = await materialsApi.importText({
+      process_ai: textForm.process_ai,
       title: textForm.title.trim(),
       content: textForm.content,
       publisher: textForm.publisher.trim() || null,
@@ -372,7 +385,7 @@ async function submitText() {
       course_id: textForm.course_id ? Number(textForm.course_id) : null,
       class_name: textForm.class_name.trim() || null,
     })
-    successMessage.value = `已导入「${result.material.title}」，切分 ${result.chunks.length} 个段落。`
+    successMessage.value = `已导入「${result.material.title}」，切分 ${result.chunks.length} 个段落。${textForm.process_ai ? '事项整理和问答准备已提交，结果请到待核对查看。' : '仅保存原文，尚未启动 AI 处理。'}`
     fallbackNotice.value = ''
     Object.assign(textForm, { title: '', content: '', publisher: '', published_at: '', class_name: '' })
     await refresh()
@@ -511,6 +524,8 @@ onBeforeUnmount(stopPolling)
             <label>发布方<input v-model.trim="textForm.publisher" maxlength="200" placeholder="可选" /></label>
           </div>
           <label>正文<textarea v-model="textForm.content" rows="6" required placeholder="粘贴通知或课程要求原文"></textarea></label>
+          <label><input v-model="textForm.process_ai" type="checkbox" />导入后整理事项并准备问答（会调用已配置的模型，可能产生费用）</label>
+          <p class="form-help">取消勾选只保存原文。整理结果进入“待核对”，不会自动生成正式任务。</p>
           <div class="form-grid form-grid-3">
             <label>学期<select v-model="textForm.semester_id" @change="textForm.course_id = ''"><option value="">未指定</option><option v-for="semester in semesters" :key="semester.id" :value="semester.id">{{ semester.name }}{{ semester.archived ? '（已归档）' : '' }}</option></select></label>
             <label>课程<select v-model="textForm.course_id"><option value="">未关联课程</option><option v-for="course in textCourses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label>
@@ -602,6 +617,7 @@ onBeforeUnmount(stopPolling)
               <p v-if="jobErrors[material.id]" class="form-error" role="alert">{{ jobErrors[material.id] }}</p>
               <div class="coverage-box" aria-label="资料处理阶段">
                 <p><strong>事项整理：{{ extractionStatus(material) }}</strong></p>
+                <p v-if="stageJob(material, 'extract')?.scope">{{ stageJob(material, 'extract')?.scope }}</p>
                 <p v-if="stageJob(material, 'extract')?.error_reason">{{ stageJob(material, 'extract')?.error_reason }}</p>
                 <button v-if="stageJob(material, 'extract')?.retryable || stageJob(material, 'extract')?.recovery_action === 'configure_ai'" type="button" class="text-button" :disabled="retryingId === material.id" @click="retry(material, 'extract')">重试事项整理</button>
                 <p><strong>资料问答：{{ questionStatus(material) }}</strong></p>
@@ -632,6 +648,9 @@ onBeforeUnmount(stopPolling)
                 </div>
               </div>
               <p v-if="jobFor(material)?.recovery_action === 'configure_ai'" class="form-help">请先<RouterLink to="/settings#ai-settings">检查 AI 服务设置</RouterLink>，保存后返回此处手动重试。已有原文会保留。</p>
+              <p v-if="!material.archived && !jobErrors[material.id] && (material.status === 'done' || material.status === 'partial') && (!stageJob(material, 'extract') || !stageJob(material, 'embed'))" class="form-help">
+                <button type="button" class="button-secondary" :disabled="retryingId === material.id" @click="processMaterial(material)">继续整理与问答准备</button> 将调用已配置模型，可能产生费用；提取结果需人工核对。
+              </p>
             </div>
             <div class="material-actions">
               <button v-if="hasActiveJob(material)" type="button" class="text-button" disabled>处理中…</button>

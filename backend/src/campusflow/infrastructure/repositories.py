@@ -1248,6 +1248,55 @@ class SqlAlchemyJobRepository:
         self._session.flush()
         return bool(result.rowcount)
 
+    def ensure_extraction(
+        self, workspace_id: int, material_id: int, version_id: int
+    ) -> ProcessingJobData:
+        from campusflow.domain.states import JobStage
+
+        # 所有生产创建入口共用版本行锁；重复点击或并发请求只会建一个作业。
+        version = self._session.scalar(
+            select(MaterialVersion)
+            .join(Material)
+            .where(
+                MaterialVersion.id == version_id,
+                MaterialVersion.material_id == material_id,
+                Material.workspace_id == workspace_id,
+            )
+            .with_for_update(of=MaterialVersion)
+        )
+        if version is None:
+            raise DomainError("提取来源不存在")
+        existing = self._session.scalar(
+            select(ProcessingJob)
+            .where(
+                ProcessingJob.version_id == version_id,
+                ProcessingJob.stage == JobStage.EXTRACT,
+            )
+            .order_by(ProcessingJob.id.desc())
+        )
+        return (
+            _job_to_data(existing)
+            if existing
+            else self.create(workspace_id, material_id, version_id, JobStage.EXTRACT)
+        )
+
+    def lock_running(self, job_id: int, started_at: datetime) -> bool:
+        from campusflow.domain.states import JobStatus
+
+        row = self._session.scalar(
+            select(ProcessingJob)
+            .join(Material, ProcessingJob.material_id == Material.id)
+            .join(MaterialVersion, ProcessingJob.version_id == MaterialVersion.id)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.status == JobStatus.RUNNING,
+                ProcessingJob.started_at == started_at,
+            )
+            .with_for_update(of=[ProcessingJob, Material, MaterialVersion])
+            .execution_options(populate_existing=True)
+        )
+        return row is not None
+
     def record_attempt(
         self,
         job_id: int,
@@ -1424,7 +1473,7 @@ class SqlAlchemyJobRepository:
         rows = self._session.scalars(
             select(ProcessingJob.id)
             .where(
-                ProcessingJob.stage.in_([JobStage.PARSE, JobStage.EMBED]),
+                ProcessingJob.stage.in_([JobStage.PARSE, JobStage.EMBED, JobStage.EXTRACT]),
                 ProcessingJob.status == JobStatus.PENDING,
             )
             .order_by(ProcessingJob.id)

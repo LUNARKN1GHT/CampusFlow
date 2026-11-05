@@ -292,6 +292,8 @@ def generate_for_version(
         material.class_name,
         curriculum_plan_id,
     )
-    drafts = generate_candidates(generator, spec, chunks, scope=scope)
     version = get_version(repos, workspace_id, material_id, version_no)
+    # 模型调用前结束读取事务，不能持有数据库连接等待外部服务。
+    repos.uow.commit()
+    drafts = generate_candidates(generator, spec, chunks, scope=scope)
     return with_coverage_reasons(drafts, stored_uncovered_ranges(version))

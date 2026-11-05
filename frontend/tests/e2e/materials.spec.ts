@@ -35,6 +35,7 @@ test.describe('M2 资料库真实队列闭环', () => {
     const title = `M2 text ${Date.now()}`
     await page.getByLabel('标题', { exact: true }).fill(title)
     await page.getByLabel('正文', { exact: true }).fill('课程通知第一段\n\n课程通知第二段\n\n课程通知第一段')
+    await page.getByLabel('导入后整理事项并准备问答（会调用已配置的模型，可能产生费用）').uncheck()
     await page.getByRole('button', { name: '导入文本', exact: true }).click()
     const textRow = page.locator('.material-row').filter({ hasText: title })
     await expect(textRow.locator('[data-status]')).toHaveText('原文读取完成')

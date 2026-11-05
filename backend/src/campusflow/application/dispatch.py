@@ -41,8 +41,10 @@ def dispatch_job(repos: Repositories, queue: JobQueue, job_id: int) -> bool:
         enqueue = queue.enqueue_parse
     elif job.stage == JobStage.EMBED:
         enqueue = queue.enqueue_index
+    elif job.stage == JobStage.EXTRACT:
+        enqueue = queue.enqueue_extract
     else:
-        # 目前只有解析与索引阶段有 Worker 入口；其余阶段没有可执行处理器，标记为不可重试。
+        # 未知阶段没有可执行处理器，标记为不可重试。
         repos.jobs.record_attempt(
             job_id,
             status=JobStatus.FAILED,

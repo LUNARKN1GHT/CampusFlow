@@ -12,6 +12,9 @@ DESKTOP_INDEX_JOB_PREFIX = "desktop-index-"
 class DBJobQueue:
     """数据库轮询模式的队列占位实现；不保存状态，也不触碰数据库。"""
 
+    def enqueue_extract(self, job_id: int) -> str:
+        return f"desktop-extract-{job_id}"
+
     def enqueue_parse(self, job_id: int) -> str:
         """返回解析作业的稳定本地标识；同一数据库作业始终得到同一标识。"""
         return f"{DESKTOP_PARSE_JOB_PREFIX}{job_id}"

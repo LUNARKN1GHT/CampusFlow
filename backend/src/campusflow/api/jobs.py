@@ -247,8 +247,15 @@ def retry_job(
     """
     original = use_cases.get_job(repos, workspace.id, job_id)
     repair_model = allows_model_repair(original.stage, original.status, original.error_reason)
-    if repair_model and not resolve_ai_settings(request.app.state.settings).zhipu_api_key:
-        raise DomainError("请先到设置 → AI 服务设置保存智谱密钥，再手动重试此作业。")
+    if repair_model:
+        settings = resolve_ai_settings(request.app.state.settings)
+        key = (
+            settings.deepseek_api_key
+            if original.stage == JobStage.EXTRACT and settings.text_provider == "deepseek"
+            else settings.zhipu_api_key
+        )
+        if not key:
+            raise DomainError("请先到设置 → AI 服务设置保存对应服务的密钥，再手动重试此作业。")
     job = use_cases.retry_job(repos, queue, job_id, repair_model=repair_model)
     if job is None:
         raise DomainError("该作业当前不可重试：已完成的作业无需重试，永久失败重试不会成功")

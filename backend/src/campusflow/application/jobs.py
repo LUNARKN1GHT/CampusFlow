@@ -130,7 +130,8 @@ def retry_job(
     if job.stage == JobStage.PARSE:
         repos.materials.set_status(job.material_id, MaterialStatus.PENDING)
     repos.uow.commit()
-    dispatch_job(repos, queue, job_id)
+    if queue is not None:
+        dispatch_job(repos, queue, job_id)
     return repos.jobs.get(job_id)
 
 
