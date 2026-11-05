@@ -215,6 +215,7 @@ def test_upload_parse_and_index_without_redis(
 @pytest.mark.parametrize(
     ("name", "payload"),
     [("桌面资料.pdf", PDF_BYTES), ("桌面通知.docx", DOCX_BYTES)],
+    ids=["pdf", "docx"],
 )
 def test_pdf_and_docx_parse_without_redis(
     client: TestClient,

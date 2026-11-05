@@ -3,9 +3,25 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
 from fastapi.testclient import TestClient
 
+from campusflow.application import reminders
+
 SHANGHAI = ZoneInfo("Asia/Shanghai")
+
+
+@pytest.fixture(autouse=True)
+def fixed_reminder_clock(monkeypatch):
+    """固定在样本截止前，避免测试结果随真实日历变化。"""
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            moment = datetime(2026, 11, 1, 8, tzinfo=SHANGHAI)
+            return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+    monkeypatch.setattr(reminders, "datetime", FixedDateTime)
 
 
 def _instant(value: str) -> datetime:
