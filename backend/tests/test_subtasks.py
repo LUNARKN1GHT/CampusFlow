@@ -94,9 +94,10 @@ def test_task_list_rollup_matches_detail_for_parent(client: TestClient) -> None:
     listing = {item["id"]: item for item in client.get("/api/v1/tasks").json()}
     assert listing[plain["id"]]["subtask_rollup"] is None
     assert listing[parent["id"]]["remaining_minutes"] == 60
-    assert listing[parent["id"]]["subtask_rollup"] == client.get(
-        f"/api/v1/tasks/{parent['id']}/rollup"
-    ).json()
+    assert (
+        listing[parent["id"]]["subtask_rollup"]
+        == client.get(f"/api/v1/tasks/{parent['id']}/rollup").json()
+    )
 
     client.patch(
         f"/api/v1/tasks/{children[0]['id']}/progress",
@@ -107,9 +108,9 @@ def test_task_list_rollup_matches_detail_for_parent(client: TestClient) -> None:
     )
     assert parent_item["subtask_rollup"]["remaining_minutes"] == 40
     assert parent_item["subtask_rollup"]["percent_complete"] == 33
-    assert parent_item["subtask_rollup"] == client.get(
-        f"/api/v1/tasks/{parent['id']}/rollup"
-    ).json()
+    assert (
+        parent_item["subtask_rollup"] == client.get(f"/api/v1/tasks/{parent['id']}/rollup").json()
+    )
 
     # 全部子任务完成后卡片汇总为剩余 0 / 完成度 100%，与详情一致
     client.patch(
@@ -121,9 +122,9 @@ def test_task_list_rollup_matches_detail_for_parent(client: TestClient) -> None:
     )
     assert parent_item["subtask_rollup"]["remaining_minutes"] == 0
     assert parent_item["subtask_rollup"]["percent_complete"] == 100
-    assert parent_item["subtask_rollup"] == client.get(
-        f"/api/v1/tasks/{parent['id']}/rollup"
-    ).json()
+    assert (
+        parent_item["subtask_rollup"] == client.get(f"/api/v1/tasks/{parent['id']}/rollup").json()
+    )
 
 
 def test_parent_minutes_are_not_double_counted_in_schedule(

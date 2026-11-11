@@ -52,9 +52,7 @@ class UnavailableEmbedder:
         hint = missing_model_key_hint(
             self._settings, env_name="ZHIPU_API_KEY", next_step="重新建立索引"
         )
-        raise ConfigurationError(
-            f"未配置向量模型密钥，无法建立索引；文本解析结果已保留；{hint}"
-        )
+        raise ConfigurationError(f"未配置向量模型密钥，无法建立索引；文本解析结果已保留；{hint}")
 
 
 def build_parser_registry(

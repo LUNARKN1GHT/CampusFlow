@@ -725,8 +725,8 @@ onBeforeUnmount(stopPolling)
             <div class="material-main">
               <div class="task-title-line">
                 <h3>{{ material.title }}</h3>
-                <span class="status-pill" :data-status="material.processing.text_state">{{ textStateLabels[material.processing.text_state] }}</span>
-                <span class="status-pill" :data-status="material.processing.index.state">{{ indexStateLabels[material.processing.index.state] }}</span>
+                <span class="status-pill" data-axis="text" :data-status="material.processing.text_state">{{ textStateLabels[material.processing.text_state] }}</span>
+                <span class="status-pill" data-axis="index" :data-status="material.processing.index.state">{{ indexStateLabels[material.processing.index.state] }}</span>
                 <span v-if="material.archived" class="status-pill archived-pill">已归档</span>
               </div>
               <p>{{ sourceTypeLabels[material.source_type] }} · {{ scopeText(material) }} · 导入于 {{ formatDateTime(material.imported_at) }}</p>

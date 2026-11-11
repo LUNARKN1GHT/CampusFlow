@@ -64,9 +64,7 @@ def test_e10_workspace_settings_archive_restart_and_restore(client: TestClient) 
         assert saved["workspace_id"] == workspace_id
         assert saved["weekly_capacity_minutes"] == 900
         assert saved["timezone"] == "America/New_York"
-        listed = restarted.get(
-            "/api/v1/tasks", params={"semester_id": semester["id"]}
-        ).json()
+        listed = restarted.get("/api/v1/tasks", params={"semester_id": semester["id"]}).json()
         # 列表接口额外返回父任务汇总（#557）；这里比较其余字段，并确认普通任务为 null。
         assert [
             {key: value for key, value in item.items() if key != "subtask_rollup"}
