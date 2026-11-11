@@ -16,7 +16,8 @@
 ## 验证
 
 - `uv run ruff check`（改动文件）：通过。
-- `uv run pytest tests/test_index_orchestration.py tests/test_indexing_progress.py tests/test_jobs_api.py tests/test_job_retry_timeout.py -q`：72 passed。
+- `uv run pytest tests/test_index_orchestration.py tests/test_indexing_progress.py tests/test_jobs_api.py tests/test_job_retry_timeout.py -q`：73 passed（含新增索引恢复与 API 重试用例）。
+- `uv run pytest tests/test_jobs_api.py -q`：16 passed；新增 API 用例确认缺配置失败返回 `retryable=true`，`POST /jobs/{id}/retry` 返回 200 并重新投递，不再返回 400。
 - `uv run pytest tests/test_processing_jobs.py tests/test_job_fault_injection.py tests/test_desktop_worker.py -q`：20 passed。
 - 新增用例覆盖：单块缺配置 → 部分成功、可人工重试、成功块不重做；全部块缺配置 → 失败可人工重试；重试后相同资料恢复完整可检索；永久失败仍不可重试（既有用例）。
 
