@@ -396,6 +396,23 @@ export type WorkspaceSettings = {
   buffer_minutes: number
 }
 
+// 桌面 AI 服务配置：只描述可用性与存储后端，后端不返回密钥明文或片段。
+export type TextProvider = 'zhipu' | 'deepseek'
+
+export type AiSettingsStatus = {
+  editable: boolean
+  text_provider: TextProvider
+  zhipu_configured: boolean
+  deepseek_configured: boolean
+  text_available: boolean
+  vision_available: boolean
+  embedding_available: boolean
+  // environment 表示服务器模式由环境变量配置；桌面模式为实际凭据后端名。
+  secret_backend: string
+  restart_required: boolean
+  warnings: string[]
+}
+
 export type MaterialSourceType = 'pdf' | 'image' | 'text' | 'word' | 'web'
 // partial 表示部分解析／索引成功，未覆盖范围必须显式提示，不能当作完整可用。
 export type MaterialStatus = 'pending' | 'processing' | 'done' | 'partial' | 'failed'

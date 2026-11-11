@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager, contextmanager, suppress
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from campusflow.api import ai_settings as ai_settings_api
 from campusflow.api import auth as auth_api
 from campusflow.api import calendar as calendar_api
 from campusflow.api import candidates as candidates_api
@@ -31,6 +32,7 @@ from campusflow.api import version_relations as version_relations_api
 from campusflow.api.desktop_security import install_desktop_security
 from campusflow.api.health import router as health_router
 from campusflow.api.static_spa import install_static_spa
+from campusflow.application.ai_settings import apply_stored_ai_settings
 from campusflow.application.dispatch import dispatch_pending_jobs
 from campusflow.application.jobs import (
     RecoveryResult,
@@ -135,6 +137,9 @@ async def _recovery_loop(app: FastAPI, interval_seconds: int) -> None:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings()
+    # 桌面模式把已保存的模型密钥与文字供应方填进配置（环境变量优先）；
+    # 其它模式是 no-op，不读写数据目录。加载失败只记录警告，不阻塞启动。
+    apply_stored_ai_settings(settings)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -179,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tasks_api.router,
         schedule_api.router,
         settings_api.router,
+        ai_settings_api.router,
         materials_api.router,
         jobs_api.router,
         candidates_api.router,

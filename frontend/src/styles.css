@@ -299,6 +299,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .availability-grid article { display: flex; align-items: center; justify-content: space-between; padding: 13px; border: 1px solid var(--line); border-radius: 10px; }
 .availability-grid article span { display: grid; }
 .availability-grid small { color: var(--muted); }
+/* AI 服务状态卡：左侧说明较长，状态标签必须单行显示，不能被挤成两行。 */
+.availability-grid .ai-status-pill { align-self: center; white-space: nowrap; }
 
 .small { font-size: 12px; }
 .lifecycle-panel { margin-top: 22px; }
