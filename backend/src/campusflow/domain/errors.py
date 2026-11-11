@@ -35,3 +35,11 @@ class ModelOutputError(PermanentError):
     与「请求被拒绝」区分：这类失败重试通常无效，但也不是服务不可用。
     它是 PermanentError 的子类，分类时必须先于 PermanentError 判断。
     """
+
+
+class ConfigurationError(PermanentError):
+    """缺少可由用户修正的配置（模型密钥等）。
+
+    与损坏文件等永久失败不同：配置补齐后同一输入可以重新处理，因此作业
+    允许人工重试；但在配置改变前不应反复自动重投。
+    """

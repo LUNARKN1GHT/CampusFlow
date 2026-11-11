@@ -1,11 +1,14 @@
 """A010：提醒规则、触发生成、幂等与操作接口。"""
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
+# 截止日期必须相对测试运行日生成：固定过去日期会让提醒窗口永远不生成。
+DUE_DAY = date.today() + timedelta(days=30)
+DUE_ONLY_DAY = DUE_DAY + timedelta(days=1)
 
 
 def _instant(value: str) -> datetime:
@@ -17,10 +20,14 @@ def _local(*args: int) -> datetime:
     return datetime(*args, tzinfo=SHANGHAI)
 
 
+def _at(day: date, hour: int, minute: int = 0) -> datetime:
+    return datetime(day.year, day.month, day.day, hour, minute, tzinfo=SHANGHAI)
+
+
 def _task(client: TestClient, title: str = "提醒任务", **overrides) -> dict:
     payload = {
         "title": title,
-        "due_date": "2026-11-02",
+        "due_date": DUE_DAY.isoformat(),
         "due_time": "10:00:00",
         "estimated_minutes": 60,
         "remaining_minutes": 60,
@@ -81,9 +88,9 @@ def test_repeat_windows_generated_and_idempotent(client: TestClient) -> None:
     first = _reminders(client, status="pending")
     assert len(first) == 3
     assert sorted(_instant(item["scheduled_for"]) for item in first) == [
-        _local(2026, 11, 2, 9, 0),
-        _local(2026, 11, 2, 9, 30),
-        _local(2026, 11, 2, 10, 0),
+        _at(DUE_DAY, 9, 0),
+        _at(DUE_DAY, 9, 30),
+        _at(DUE_DAY, 10, 0),
     ]
     assert all(item["status"] == "pending" for item in first)
     assert all("10:00" in item["message"] for item in first)
@@ -93,13 +100,13 @@ def test_repeat_windows_generated_and_idempotent(client: TestClient) -> None:
 
 
 def test_date_only_ddl_never_claims_a_time(client: TestClient) -> None:
-    _task(client, due_time=None, due_date="2026-11-03")
+    _task(client, due_time=None, due_date=DUE_ONLY_DAY.isoformat())
 
     reminders = _reminders(client)
     assert len(reminders) == 1
     item = reminders[0]
     assert item["payload"]["date_only"] is True
-    assert "2026-11-03" in item["message"]
+    assert DUE_ONLY_DAY.isoformat() in item["message"]
     assert "未指定具体时刻" in item["message"]
     assert ":" not in item["message"]
 
@@ -178,4 +185,4 @@ def test_delete_task_rule_falls_back_to_default(client: TestClient) -> None:
     assert deleted.status_code == 204
     pending = _reminders(client, status="pending")
     assert len(pending) == 1
-    assert _instant(pending[0]["scheduled_for"]) == _local(2026, 11, 1, 10, 0)
+    assert _instant(pending[0]["scheduled_for"]) == _at(DUE_DAY - timedelta(days=1), 10, 0)

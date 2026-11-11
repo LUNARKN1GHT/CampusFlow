@@ -43,6 +43,8 @@ export type Task = {
   estimated_minutes: number | null
   remaining_minutes: number | null
   parent_task_id: number | null
+  // 列表接口只对有子任务的父任务返回汇总；卡片与详情共用这一口径。
+  subtask_rollup?: TaskRollup | null
   created_at: string
   updated_at: string
 }
@@ -394,9 +396,44 @@ export type WorkspaceSettings = {
   buffer_minutes: number
 }
 
+// 桌面 AI 服务配置：只描述可用性与存储后端，后端不返回密钥明文或片段。
+export type TextProvider = 'zhipu' | 'deepseek'
+
+export type AiSettingsStatus = {
+  editable: boolean
+  text_provider: TextProvider
+  zhipu_configured: boolean
+  deepseek_configured: boolean
+  text_available: boolean
+  vision_available: boolean
+  embedding_available: boolean
+  // environment 表示服务器模式由环境变量配置；桌面模式为实际凭据后端名。
+  secret_backend: string
+  restart_required: boolean
+  warnings: string[]
+}
+
 export type MaterialSourceType = 'pdf' | 'image' | 'text' | 'word' | 'web'
 // partial 表示部分解析／索引成功，未覆盖范围必须显式提示，不能当作完整可用。
 export type MaterialStatus = 'pending' | 'processing' | 'done' | 'partial' | 'failed'
+
+// 原文读取与问答索引是两条独立状态轴（#555）：解析完成不代表可以问答。
+export type TextReadState = 'queued' | 'reading' | 'ready' | 'partial' | 'failed'
+export type IndexState = 'not_started' | 'preparing' | 'ready' | 'partial' | 'failed' | 'unknown'
+export type MaterialIndexStatus = {
+  state: IndexState
+  // reason_code 是稳定协议值；message／detail／error 为后端已脱敏的可读说明。
+  reason_code: string
+  message: string
+  detail: string | null
+  error: string | null
+  job_id: number | null
+  retryable: boolean
+}
+export type MaterialProcessing = {
+  text_state: TextReadState
+  index: MaterialIndexStatus
+}
 
 export type Material = {
   id: number
@@ -411,6 +448,7 @@ export type Material = {
   status: MaterialStatus
   archived: boolean
   imported_at: string
+  processing: MaterialProcessing
 }
 
 export type MaterialVersion = {
@@ -530,6 +568,44 @@ export type MaterialUploadParams = {
   course_id: number | null
   class_name: string | null
   allow_duplicate: boolean
+}
+
+// 粘贴文本的显式识别状态：原文保存完成不代表问答索引或事项提取已经完成。
+export type RecognitionIndexState = 'not_started' | 'queued' | 'running' | 'done' | 'partial' | 'failed'
+export type RecognitionExtractionState = 'not_started' | 'running' | 'done' | 'empty' | 'failed'
+
+export type MaterialRecognitionIndex = {
+  state: RecognitionIndexState
+  job_id: number | null
+  searchable: boolean
+  reason: string | null
+  updated_at: string | null
+}
+
+export type MaterialRecognitionExtraction = {
+  state: RecognitionExtractionState
+  candidate_count: number
+  pending_count: number
+  reason: string | null
+  extracted_at: string | null
+}
+
+export type MaterialRecognition = {
+  material_id: number
+  version_no: number | null
+  chunk_count: number
+  source_type: MaterialSourceType
+  archived: boolean
+  supported: boolean
+  can_start: boolean
+  blocked_reason: string | null
+  index: MaterialRecognitionIndex
+  extraction: MaterialRecognitionExtraction
+}
+
+export type MaterialRecognitionStart = MaterialRecognition & {
+  started: boolean
+  message: string
 }
 
 // 候选核对状态：superseded 是被新版本取代而失效，不是用户主动忽略；已失效只能退回待核对。

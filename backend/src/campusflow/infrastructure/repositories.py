@@ -52,6 +52,8 @@ from campusflow.infrastructure.db.models import (
     Course,
     CourseRule,
     FixedEvent,
+    IndexedBlock,
+    IndexManifest,
     Material,
     MaterialVersion,
     MaterialVersionRelation,
@@ -284,9 +286,11 @@ class SqlAlchemyMaterialRepository:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
 
-    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
-        """删除前锁住资料行：与版本关系创建共用同一把锁，预览确认到删除之间
-        不允许插入新关系绕过影响检查。返回 False 表示资料不存在或不在本空间。"""
+    def lock(self, workspace_id: int, material_id: int) -> bool:
+        """按空间锁住资料行，供识别启动等需要串行化的流程使用。
+
+        返回 False 表示资料不存在或不在本空间；锁随当前事务提交/回滚释放。
+        """
         return (
             self._session.scalar(
                 select(Material.id)
@@ -298,6 +302,11 @@ class SqlAlchemyMaterialRepository:
             )
             is not None
         )
+
+    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
+        """删除前锁住资料行：与版本关系创建共用同一把锁，预览确认到删除之间
+        不允许插入新关系绕过影响检查。返回 False 表示资料不存在或不在本空间。"""
+        return self.lock(workspace_id, material_id)
 
     def version_relation_ids(self, material_id: int) -> list[int]:
         """列出与该资料任一版本相关的关系（任一端），用于删除影响预览与确认指纹。"""
@@ -1336,30 +1345,93 @@ class SqlAlchemyJobRepository:
         )
         return [_job_to_data(row) for row in rows]
 
+    def latest_stage_jobs_by_materials(
+        self, material_ids: list[int], *, stages: tuple[str, ...]
+    ) -> dict[tuple[int, str], ProcessingJobData]:
+        """整页资料的解析/索引作业一次取回，每阶段只保留最新版本的作业。"""
+        if not material_ids or not stages:
+            return {}
+        rows = self._session.execute(
+            select(ProcessingJob, MaterialVersion.version_no)
+            .join(MaterialVersion, ProcessingJob.version_id == MaterialVersion.id)
+            .where(
+                ProcessingJob.material_id.in_(material_ids),
+                ProcessingJob.stage.in_(stages),
+            )
+            .order_by(
+                ProcessingJob.material_id,
+                ProcessingJob.stage,
+                MaterialVersion.version_no.desc(),
+                ProcessingJob.id.desc(),
+            )
+        )
+        latest: dict[tuple[int, str], ProcessingJobData] = {}
+        for row, _version_no in rows:
+            key = (row.material_id, row.stage)
+            # 已按版本号与作业编号倒序：每组第一次出现的即当前版本最新作业。
+            latest.setdefault(key, _job_to_data(row))
+        return latest
+
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
-        from campusflow.domain.jobs import can_retry
-        from campusflow.domain.states import JobStatus
+        from campusflow.domain.states import JobStage, JobStatus
 
         if _row_missing(self._session, ProcessingJob, job_id):
             return None  # 作业已随资料删除（J007），没有可重投的目标
         row = self._session.get(ProcessingJob, job_id)
-        # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
-        # 成功，反复重投只会白烧资源（J005/J006）
-        if row is None or not can_retry(row.status, row.retryable):
+        if row is None:
             return None
-        row.status = JobStatus.PENDING
-        row.scope = None
-        row.error_reason = None
-        row.retryable = None
-        row.started_at = None
-        row.heartbeat_at = None
-        row.manifest_id = None
-        # 人工重试重新计算自动重投额度，避免历史自动重投次数把人工重试挡住
-        row.auto_retry_count = 0
-        # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
-        row.enqueued_at = None
+        manifest_id = row.manifest_id if row.stage == JobStage.EMBED else None
+        # 条件更新原子占用重试资格：并发请求只有一个能把失败作业重置为待处理，
+        # 其余请求看到状态已变化后返回 None，不会重复投递（J005/J006）。
+        result = self._session.execute(
+            update(ProcessingJob)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.status.in_((JobStatus.FAILED, JobStatus.PARTIAL)),
+                ProcessingJob.retryable.is_(True),
+            )
+            .values(
+                status=JobStatus.PENDING,
+                scope=None,
+                error_reason=None,
+                retryable=None,
+                started_at=None,
+                heartbeat_at=None,
+                manifest_id=None,
+                # 人工重试重新计算自动重投额度，避免历史自动重投次数挡住人工重试
+                auto_retry_count=0,
+                # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
+                enqueued_at=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount == 0:
+            return None
+        # 缺配置而失败的索引块不自动重试；人工重试时恢复为待处理，
+        # 已成功块保持不动，配置补齐后只补失败部分（J005/J006）。
+        if manifest_id is not None:
+            manifest = self._session.get(IndexManifest, manifest_id)
+            if manifest is not None:
+                self._session.execute(
+                    update(IndexedBlock)
+                    .where(
+                        IndexedBlock.workspace_id == row.workspace_id,
+                        IndexedBlock.version_id == row.version_id,
+                        IndexedBlock.profile_id == manifest.profile_id,
+                        IndexedBlock.failure_code == "configuration_missing",
+                    )
+                    .values(
+                        state="pending",
+                        retryable=False,
+                        failure_code=None,
+                        attempts=0,
+                        claim_token=None,
+                        lease_until=None,
+                    )
+                )
+        self._session.expire(row)
         self._session.flush()
-        return _job_to_data(row)
+        return self.get(job_id)
 
     def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
         # 投递前资料可能刚被删除（J007）：作业没了就不必再登记投递

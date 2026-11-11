@@ -2,14 +2,15 @@
 /*
  * 设置页：维护工作空间时区、每日／每周学习容量、休息与提交缓冲，以及每周可用时段。
  * 偏好只影响后续生成或重排计划时的时间解释与容量，不改写已存日程、任务 DDL 或既有计划。
+ * AI 服务面板只在桌面版可编辑：密钥写本机凭据存储，页面只显示是否已保存，绝不回显密钥。
  * 保存后服务端会按新的工作空间时区重算提醒窗口；界面主题保存在本机浏览器，不写入工作空间。
  */
 import { onMounted, reactive, ref } from 'vue'
 
 import { scheduleApi } from '../api/business'
 import { errorMessage } from '../api/client'
-import { settingsApi } from '../api/settings'
-import type { AvailabilitySlot } from '../api/types'
+import { aiSettingsApi, settingsApi } from '../api/settings'
+import type { AiSettingsStatus, AvailabilitySlot, TextProvider } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import { useTheme } from '../composables/useTheme'
 
@@ -26,6 +27,83 @@ const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, 
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
 const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
+
+// AI 服务：后端只返回可用性；密钥输入框永远是空白，提交后立即清空本地副本。
+const providerLabels: Record<TextProvider, string> = { zhipu: '智谱 GLM（ZHIPU）', deepseek: 'DeepSeek' }
+const secretBackendLabels: Record<string, string> = {
+  environment: '环境变量',
+  'macos-keychain': 'macOS 钥匙串',
+  'windows-dpapi': 'Windows DPAPI',
+  file: '数据目录内 0600 凭据文件',
+  memory: '内存（仅测试）',
+  unavailable: '不可用',
+}
+const ai = ref<AiSettingsStatus | null>(null)
+const aiLoading = ref(true)
+const aiSaving = ref(false)
+const aiLoadError = ref('')
+const aiError = ref('')
+const aiMessage = ref('')
+const aiForm = reactive({
+  text_provider: 'zhipu' as TextProvider,
+  zhipu_api_key: '',
+  deepseek_api_key: '',
+  clear_zhipu_api_key: false,
+  clear_deepseek_api_key: false,
+})
+
+function applyAiStatus(status: AiSettingsStatus) {
+  ai.value = status
+  aiForm.text_provider = status.text_provider
+}
+
+// AI 配置读取失败只影响本面板，不阻塞时区与可用时间的编辑。
+async function loadAiSettings() {
+  aiLoading.value = true
+  aiLoadError.value = ''
+  try {
+    applyAiStatus(await aiSettingsApi.get())
+  } catch (caught) {
+    aiLoadError.value = errorMessage(caught)
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+// 只提交用户实际填写的字段：留空的密钥表示"不修改"，清除必须显式勾选。
+// 服务端仍会校验最终供应方是否有对应密钥，失败时不保存任何一项。
+async function saveAiSettings() {
+  aiError.value = ''
+  aiMessage.value = ''
+  if (aiForm.zhipu_api_key && aiForm.clear_zhipu_api_key) {
+    aiError.value = '不能同时填写并清除 ZHIPU 密钥，请只保留一种操作。'
+    return
+  }
+  if (aiForm.deepseek_api_key && aiForm.clear_deepseek_api_key) {
+    aiError.value = '不能同时填写并清除 DeepSeek 密钥，请只保留一种操作。'
+    return
+  }
+  aiSaving.value = true
+  try {
+    const updated = await aiSettingsApi.update({
+      text_provider: aiForm.text_provider,
+      ...(aiForm.zhipu_api_key ? { zhipu_api_key: aiForm.zhipu_api_key } : {}),
+      ...(aiForm.deepseek_api_key ? { deepseek_api_key: aiForm.deepseek_api_key } : {}),
+      ...(aiForm.clear_zhipu_api_key ? { clear_zhipu_api_key: true } : {}),
+      ...(aiForm.clear_deepseek_api_key ? { clear_deepseek_api_key: true } : {}),
+    })
+    applyAiStatus(updated)
+    aiForm.zhipu_api_key = ''
+    aiForm.deepseek_api_key = ''
+    aiForm.clear_zhipu_api_key = false
+    aiForm.clear_deepseek_api_key = false
+    aiMessage.value = 'AI 配置已保存，文字问答与检索立即使用新密钥；后台资料处理需重启应用生效。'
+  } catch (caught) {
+    aiError.value = errorMessage(caught)
+  } finally {
+    aiSaving.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -87,7 +165,10 @@ async function deleteSlot(slot: AvailabilitySlot) {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadAiSettings()
+})
 </script>
 
 <template>
@@ -128,6 +209,37 @@ onMounted(load)
         <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排学习块。</div>
       </section>
     </template>
+
+    <section class="panel editor-panel">
+      <div class="section-heading"><div><p class="eyebrow">模型配置</p><h2>AI 服务</h2></div><span v-if="ai" class="count-badge">{{ ai.editable ? '可在应用内保存' : '由环境变量配置' }}</span></div>
+      <p v-if="aiLoadError" class="form-error" role="alert">{{ aiLoadError }} <button type="button" class="text-button" @click="loadAiSettings">重新读取</button></p>
+      <p v-else-if="aiLoading" class="form-help" role="status">正在读取 AI 配置…</p>
+      <template v-else-if="ai">
+        <div class="availability-grid">
+          <article><span><strong>文字生成</strong><small>当前供应方：{{ ai.text_provider === 'zhipu' ? 'ZHIPU' : 'DeepSeek' }}</small></span><span class="status-pill ai-status-pill" :data-status="ai.text_available ? 'done' : 'failed'">{{ ai.text_available ? '可用' : '缺少密钥' }}</span></article>
+          <article><span><strong>图片识别</strong><small>使用 ZHIPU 密钥</small></span><span class="status-pill ai-status-pill" :data-status="ai.vision_available ? 'done' : 'failed'">{{ ai.vision_available ? '可用' : '缺少密钥' }}</span></article>
+          <article><span><strong>向量检索</strong><small>使用 ZHIPU 密钥</small></span><span class="status-pill ai-status-pill" :data-status="ai.embedding_available ? 'done' : 'failed'">{{ ai.embedding_available ? '可用' : '缺少密钥' }}</span></article>
+        </div>
+        <p class="form-help">安全存储：{{ secretBackendLabels[ai.secret_backend] ?? ai.secret_backend }}。页面只显示密钥是否已保存，不显示任何密钥内容或片段。</p>
+        <p v-for="warning in ai.warnings" :key="warning" class="inline-notice">{{ warning }}</p>
+        <p v-if="ai.restart_required" class="inline-notice">已保存的 AI 配置需要重启应用，后台资料处理（解析与索引）才会使用新密钥；前台问答与检索已使用新配置。</p>
+        <form v-if="ai.editable" class="stack-form" @submit.prevent="saveAiSettings">
+          <label>文字生成供应方<select v-model="aiForm.text_provider"><option value="zhipu">{{ providerLabels.zhipu }}</option><option value="deepseek">{{ providerLabels.deepseek }}</option></select></label>
+          <div class="form-grid">
+            <label>ZHIPU API 密钥（{{ ai.zhipu_configured ? '已保存，留空不修改' : '尚未保存' }}）<input v-model.trim="aiForm.zhipu_api_key" type="password" autocomplete="new-password" placeholder="留空表示不修改" /></label>
+            <label>DeepSeek API 密钥（{{ ai.deepseek_configured ? '已保存，留空不修改' : '尚未保存' }}）<input v-model.trim="aiForm.deepseek_api_key" type="password" autocomplete="new-password" placeholder="留空表示不修改" /></label>
+          </div>
+          <div class="form-grid">
+            <label class="switch-field"><input v-model="aiForm.clear_zhipu_api_key" type="checkbox" />清除已保存的 ZHIPU 密钥</label>
+            <label class="switch-field"><input v-model="aiForm.clear_deepseek_api_key" type="checkbox" />清除已保存的 DeepSeek 密钥</label>
+          </div>
+          <p class="form-help">ZHIPU 密钥同时用于文字生成、图片识别和向量检索；DeepSeek 密钥只用于文字生成。密钥写入本机凭据存储，不进入页面、日志或导出文件。保存后文字问答立即生效，后台资料处理需重启应用生效。</p>
+          <p v-if="aiError" class="form-error" role="alert">{{ aiError }}</p><p v-if="aiMessage" class="success-message" role="status">{{ aiMessage }}</p>
+          <button type="submit" :disabled="aiSaving">{{ aiSaving ? '正在保存…' : '保存 AI 配置' }}</button>
+        </form>
+        <p v-else class="form-help">服务器／开发环境由环境变量配置模型密钥：ZHIPU_API_KEY、DEEPSEEK_API_KEY，文字供应方由 CAMPUSFLOW_TEXT_PROVIDER 决定（默认 zhipu）。桌面版可在本页直接填写密钥并保存。</p>
+      </template>
+    </section>
 
     <section class="panel editor-panel">
       <div class="section-heading"><div><p class="eyebrow">显示</p><h2>界面主题</h2></div></div>
