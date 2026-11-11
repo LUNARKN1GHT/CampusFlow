@@ -11,13 +11,14 @@
 - 新增领域错误 `ConfigurationError(PermanentError)`，表示“配置修正后可恢复”。桌面 Worker 的视觉／向量占位实现改抛该错误，提示指向「设置 → AI 服务」。
 - `is_retryable` 对 `TransientError` 与 `ConfigurationError` 返回真：作业可人工重试；自动重投仍受既有上限约束，不会无限重试。损坏文件等 `PermanentError` 保持不可重试。
 - 索引块新增失败码 `configuration_missing`：不参与块级自动重试；索引汇总新增 `configuration_failed` 计数，全部或部分块因此失败时作业标记为可人工重试，错误原因提示先补齐配置。
-- `prepare_retry` 在人工重试索引作业时，仅把 `configuration_missing` 的块恢复为待处理并清零尝试次数；已成功块保持不动，重试只补失败部分。人工重试仍走原有条件更新，重复点击不会并发重复处理。
+- `prepare_retry` 在人工重试索引作业时，仅把 `configuration_missing` 的块恢复为待处理并清零尝试次数；已成功块保持不动，重试只补失败部分。重试资格改为单条条件 `UPDATE`（状态为失败/部分成功且 `retryable=true`）原子占用，并发重复点击只有一个请求能重置作业与投递。
 
 ## 验证
 
 - `uv run ruff check`（改动文件）：通过。
 - `uv run pytest tests/test_index_orchestration.py tests/test_indexing_progress.py tests/test_jobs_api.py tests/test_job_retry_timeout.py -q`：73 passed（含新增索引恢复与 API 重试用例）。
 - `uv run pytest tests/test_jobs_api.py -q`：16 passed；新增 API 用例确认缺配置失败返回 `retryable=true`，`POST /jobs/{id}/retry` 返回 200 并重新投递，不再返回 400。
+- 原子重试改动后在隔离库复跑 `tests/test_jobs_api.py` 与两条配置恢复用例：18 passed。
 - `uv run pytest tests/test_processing_jobs.py tests/test_job_fault_injection.py tests/test_desktop_worker.py -q`：20 passed。
 - 新增用例覆盖：单块缺配置 → 部分成功、可人工重试、成功块不重做；全部块缺配置 → 失败可人工重试；重试后相同资料恢复完整可检索；永久失败仍不可重试（既有用例）。
 

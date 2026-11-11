@@ -1339,20 +1339,44 @@ class SqlAlchemyJobRepository:
         return [_job_to_data(row) for row in rows]
 
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
-        from campusflow.domain.jobs import can_retry
         from campusflow.domain.states import JobStage, JobStatus
 
         if _row_missing(self._session, ProcessingJob, job_id):
             return None  # 作业已随资料删除（J007），没有可重投的目标
         row = self._session.get(ProcessingJob, job_id)
-        # 只有"没完全成功且标记为可重试"的作业能重投：永久失败重试也不会
-        # 成功，反复重投只会白烧资源（J005/J006）
-        if row is None or not can_retry(row.status, row.retryable):
+        if row is None:
+            return None
+        manifest_id = row.manifest_id if row.stage == JobStage.EMBED else None
+        # 条件更新原子占用重试资格：并发请求只有一个能把失败作业重置为待处理，
+        # 其余请求看到状态已变化后返回 None，不会重复投递（J005/J006）。
+        result = self._session.execute(
+            update(ProcessingJob)
+            .where(
+                ProcessingJob.id == job_id,
+                ProcessingJob.status.in_((JobStatus.FAILED, JobStatus.PARTIAL)),
+                ProcessingJob.retryable.is_(True),
+            )
+            .values(
+                status=JobStatus.PENDING,
+                scope=None,
+                error_reason=None,
+                retryable=None,
+                started_at=None,
+                heartbeat_at=None,
+                manifest_id=None,
+                # 人工重试重新计算自动重投额度，避免历史自动重投次数挡住人工重试
+                auto_retry_count=0,
+                # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
+                enqueued_at=None,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount == 0:
             return None
         # 缺配置而失败的索引块不自动重试；人工重试时恢复为待处理，
         # 已成功块保持不动，配置补齐后只补失败部分（J005/J006）。
-        if row.stage == JobStage.EMBED and row.manifest_id is not None:
-            manifest = self._session.get(IndexManifest, row.manifest_id)
+        if manifest_id is not None:
+            manifest = self._session.get(IndexManifest, manifest_id)
             if manifest is not None:
                 self._session.execute(
                     update(IndexedBlock)
@@ -1371,19 +1395,9 @@ class SqlAlchemyJobRepository:
                         lease_until=None,
                     )
                 )
-        row.status = JobStatus.PENDING
-        row.scope = None
-        row.error_reason = None
-        row.retryable = None
-        row.started_at = None
-        row.heartbeat_at = None
-        row.manifest_id = None
-        # 人工重试重新计算自动重投额度，避免历史自动重投次数把人工重试挡住
-        row.auto_retry_count = 0
-        # 清空投递时间，重新回到"待投递"：投递失败时仍会被补偿扫描捞起来
-        row.enqueued_at = None
+        self._session.expire(row)
         self._session.flush()
-        return _job_to_data(row)
+        return self.get(job_id)
 
     def record_delivery(self, job_id: int, *, delivered: bool) -> ProcessingJobData | None:
         # 投递前资料可能刚被删除（J007）：作业没了就不必再登记投递
