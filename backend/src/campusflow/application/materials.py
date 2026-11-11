@@ -25,7 +25,9 @@ from campusflow.application.ports.repositories import (
     SourceChunkData,
 )
 from campusflow.application.ports.storage import FileStorage
+from campusflow.application.processing import coverage_metadata
 from campusflow.application.scope import require_in_workspace
+from campusflow.application.source_uncertainty import COVERAGE_KEY
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.jobs import is_terminal
 from campusflow.domain.materials import (
@@ -138,18 +140,17 @@ def import_pasted_text(
             source_type=MaterialSourceType.TEXT,
             source_url=None,
         )
+        outcome = text_parser.parse(content.encode("utf-8"), "text/plain")
         version = repos.materials.create_version(
             material.id,
             next_version_no(repos.materials.list_version_numbers(material.id)),
             "粘贴文本导入",
             storage_key,
+            # 粘贴文本同步解析完成，没有未覆盖范围；记录完整覆盖，后续索引才能
+            # 如实判定“完整可检索”，而不是因覆盖未知一直停在部分成功（BUG-554）。
+            source_metadata={COVERAGE_KEY: coverage_metadata(outcome)},
         )
-        chunks = repos.materials.add_chunks(
-            fragments_to_chunks(
-                text_parser.parse(content.encode("utf-8"), "text/plain"),
-                version.id,
-            )
-        )
+        chunks = repos.materials.add_chunks(fragments_to_chunks(outcome, version.id))
         material = repos.materials.set_status(material.id, MaterialStatus.DONE) or material
         # commit 也在受保护范围内：若提交失败，回滚数据库并删除已保存的原文件，
         # 不留下无法被资料版本引用的孤立文件。

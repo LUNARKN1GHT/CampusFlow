@@ -6,20 +6,31 @@
 
 from dataclasses import replace
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
+from campusflow.api.auth import require_session
+from campusflow.api.deps import (
+    RecognitionModels,
+    get_current_workspace,
+    get_job_queue,
+    get_recognition_models,
+    get_repositories,
+)
 from campusflow.application import materials as use_cases
+from campusflow.application import recognition as recognition_use_cases
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
 from campusflow.application.ports.repositories import Repositories, WorkspaceData
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.ports.web_fetch import WebFetcher
 from campusflow.application.web_materials import import_requested_webpage
+from campusflow.domain.errors import DomainError
+from campusflow.domain.model_failures import ModelFailureKind, classify_model_failure
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
 from campusflow.infrastructure.parsers.text import TextDocumentParser
 from campusflow.infrastructure.web_fetch import PublicWebFetcher
@@ -162,6 +173,140 @@ def import_text(
     return TextImportOut(
         material=MaterialOut.model_validate(material),
         chunks=[SourceChunkOut.model_validate(c) for c in chunks],
+    )
+
+
+class RecognitionIndexOut(BaseModel):
+    """问答索引进度；not_started 表示尚未准备，不冒充已完成。"""
+
+    state: Literal["not_started", "queued", "running", "done", "partial", "failed"]
+    job_id: int | None
+    searchable: bool
+    reason: str | None
+    updated_at: datetime | None
+
+
+class RecognitionExtractionOut(BaseModel):
+    """事项提取状态；空结果（empty）与失败（failed）分开显示。"""
+
+    state: Literal["not_started", "running", "done", "empty", "failed"]
+    candidate_count: int
+    pending_count: int
+    reason: str | None
+    extracted_at: datetime | None
+
+
+class RecognitionOut(BaseModel):
+    """资料识别真实状态：原文保存完成不等于事项提取或问答准备完成。"""
+
+    material_id: int
+    version_no: int | None
+    chunk_count: int
+    source_type: MaterialSourceType
+    archived: bool
+    supported: bool
+    can_start: bool
+    blocked_reason: str | None
+    index: RecognitionIndexOut
+    extraction: RecognitionExtractionOut
+
+
+class RecognitionStartOut(RecognitionOut):
+    """显式启动结果；started=false 表示重复点击没有再次执行。"""
+
+    started: bool
+    message: str
+
+
+def _recognition_out(status: recognition_use_cases.RecognitionStatus) -> RecognitionOut:
+    return RecognitionOut(
+        material_id=status.material_id,
+        version_no=status.version_no,
+        chunk_count=status.chunk_count,
+        source_type=status.source_type,
+        archived=status.archived,
+        supported=status.supported,
+        can_start=status.can_start,
+        blocked_reason=status.blocked_reason,
+        index=RecognitionIndexOut(
+            state=status.index.state,
+            job_id=status.index.job_id,
+            searchable=status.index.searchable,
+            reason=status.index.reason,
+            updated_at=status.index.updated_at,
+        ),
+        extraction=RecognitionExtractionOut(
+            state=status.extraction.state,
+            candidate_count=status.extraction.candidate_count,
+            pending_count=status.extraction.pending_count,
+            reason=status.extraction.reason,
+            extracted_at=status.extraction.extracted_at,
+        ),
+    )
+
+
+@router.get("/{material_id}/recognition", response_model=RecognitionOut)
+def get_material_recognition(
+    material_id: int, workspace: CurrentWorkspace, repos: Repos
+) -> RecognitionOut:
+    """只读识别状态：不创建作业、不调用模型，也不把保存成功当作识别完成。"""
+    return _recognition_out(
+        recognition_use_cases.recognition_status(repos, workspace.id, material_id)
+    )
+
+
+_RECOGNITION_FAILURE_MESSAGES = {
+    ModelFailureKind.SERVICE_UNAVAILABLE: (
+        "文字模型暂时不可用，本次未保存任何候选事项；请稍后重试。"
+    ),
+    ModelFailureKind.REQUEST_REJECTED: (
+        "文字模型拒绝了本次请求，本次未保存任何候选事项；请检查模型配置后重试。"
+    ),
+    ModelFailureKind.INVALID_OUTPUT: (
+        "模型返回的内容无法用于提取，本次未保存任何候选事项；请检查资料后重试。"
+    ),
+}
+
+
+@router.post("/{material_id}/recognition", response_model=RecognitionStartOut)
+def start_material_recognition(
+    material_id: int,
+    workspace: CurrentWorkspace,
+    repos: Repos,
+    models: Annotated[RecognitionModels, Depends(get_recognition_models)],
+    operator: Annotated[str, Depends(require_session)],
+    queue: JobQueueDep = None,
+) -> RecognitionStartOut | JSONResponse:
+    """显式启动识别：准备问答索引并提取任务候选，绝不自动执行。
+
+    未配置模型密钥时在产生任何副作用前返回 400，并说明需要先配置；
+    重复点击不会重复建作业或候选。模型失败按 Q009 契约返回 502/503 固定文案。
+    """
+    try:
+        result = recognition_use_cases.start_recognition(
+            repos,
+            queue,
+            workspace.id,
+            material_id,
+            generator=models.generator,
+            operator=operator,
+        )
+    except DomainError as error:
+        failure = classify_model_failure(error)
+        if failure is None:
+            raise
+        return JSONResponse(
+            status_code=503 if failure.retryable else 502,
+            content={
+                "detail": _RECOGNITION_FAILURE_MESSAGES[failure.kind],
+                "failure_kind": failure.kind.value,
+            },
+        )
+    base = _recognition_out(result.status)
+    return RecognitionStartOut(
+        **base.model_dump(),
+        started=result.started,
+        message=result.message,
     )
 
 

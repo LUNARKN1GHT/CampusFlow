@@ -7,6 +7,8 @@ import type {
   Material,
   MaterialDeleteImpact,
   MaterialMetadataInput,
+  MaterialRecognition,
+  MaterialRecognitionStart,
   MaterialSourceType,
   MaterialStatus,
   MaterialUploadItem,
@@ -53,6 +55,12 @@ export const materialsApi = {
     method: 'POST',
     body: JSON.stringify(input),
   }),
+  // 粘贴文本只保存原文；识别状态与“开始识别”入口分开查询和触发，不自动调用模型。
+  recognition: (id: number) => apiRequest<MaterialRecognition>(`/materials/${id}/recognition`),
+  // 事项提取在请求内同步调用文字模型，最长等待 120 秒；这里放宽默认 8 秒超时。
+  startRecognition: (id: number) => apiRequest<MaterialRecognitionStart>(`/materials/${id}/recognition`, {
+    method: 'POST',
+  }, 130000),
   importWeb: (input: WebImportInput) => apiRequest<WebImportResult>('/materials/web', {
     method: 'POST',
     body: JSON.stringify(input),

@@ -830,6 +830,10 @@ class MaterialRepository(Protocol):
         """只按 ID 读取；调用方必须自行校验空间归属。"""
         ...
 
+    def lock(self, workspace_id: int, material_id: int) -> bool:
+        """按空间锁定资料行，用于需要串行化的读取-写入流程（识别启动等）。"""
+        ...
+
     def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
         """删除前锁资料行并确认空间归属，避免与解析/索引写回并发。"""
         ...

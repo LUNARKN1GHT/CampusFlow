@@ -6,6 +6,7 @@ W005：当前空间通过应用用例解析（get_or_create_default_workspace）
 """
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -107,3 +108,30 @@ def get_text_generator(request: Request) -> TextGenerator:
         return build_text_generator(request.app.state.settings)
     except ValueError as error:
         raise DomainError(str(error)) from None
+
+
+@dataclass(frozen=True)
+class RecognitionModels:
+    """粘贴文本显式识别所需的模型能力；构造适配器本身不联网。"""
+
+    embedder: Embedder
+    generator: TextGenerator
+
+
+def get_recognition_models(request: Request) -> RecognitionModels:
+    """识别入口的两项模型配置校验（BUG-554）。
+
+    未配置密钥时返回清晰的 400 业务错误，不把密钥或供应商响应细节带给用户；
+    错误信息说明缺少哪个环境变量以及需要先配置再重启，不假装已经能识别。
+    """
+    settings = request.app.state.settings
+    hint = "请先在设置中配置模型密钥（进程环境变量或 backend/.env）并重启服务后重试。"
+    try:
+        embedder = make_embedder(settings)
+    except ValueError as error:
+        raise DomainError(f"{error}。{hint}") from None
+    try:
+        generator = build_text_generator(settings)
+    except ValueError as error:
+        raise DomainError(f"{error}。{hint}") from None
+    return RecognitionModels(embedder=embedder, generator=generator)
