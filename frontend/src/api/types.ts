@@ -43,6 +43,8 @@ export type Task = {
   estimated_minutes: number | null
   remaining_minutes: number | null
   parent_task_id: number | null
+  // 列表接口只对有子任务的父任务返回汇总；卡片与详情共用这一口径。
+  subtask_rollup?: TaskRollup | null
   created_at: string
   updated_at: string
 }

@@ -77,6 +77,41 @@ def test_create_edit_and_roll_up_subtasks(client: TestClient) -> None:
     assert relations["rollup"] == rollup
 
 
+def test_task_list_rollup_matches_detail_for_parent(client: TestClient) -> None:
+    """#557：列表卡片与详情使用同一份父任务汇总，且不改写父任务自身字段。"""
+    parent = _task(client, "课程论文", estimated_minutes=60, remaining_minutes=60)
+    plain = _task(client, "普通任务", estimated_minutes=30, remaining_minutes=30)
+    children = client.post(
+        f"/api/v1/tasks/{parent['id']}/subtasks",
+        json={
+            "items": [
+                {"title": "整理需求", "remaining_minutes": 20},
+                {"title": "绘制流程图", "remaining_minutes": 40},
+            ]
+        },
+    ).json()
+
+    listing = {item["id"]: item for item in client.get("/api/v1/tasks").json()}
+    assert listing[plain["id"]]["subtask_rollup"] is None
+    assert listing[parent["id"]]["remaining_minutes"] == 60
+    assert listing[parent["id"]]["subtask_rollup"] == client.get(
+        f"/api/v1/tasks/{parent['id']}/rollup"
+    ).json()
+
+    client.patch(
+        f"/api/v1/tasks/{children[0]['id']}/progress",
+        json={"progress": "done", "reason": "已完成"},
+    )
+    parent_item = next(
+        item for item in client.get("/api/v1/tasks").json() if item["id"] == parent["id"]
+    )
+    assert parent_item["subtask_rollup"]["remaining_minutes"] == 40
+    assert parent_item["subtask_rollup"]["percent_complete"] == 33
+    assert parent_item["subtask_rollup"] == client.get(
+        f"/api/v1/tasks/{parent['id']}/rollup"
+    ).json()
+
+
 def test_parent_minutes_are_not_double_counted_in_schedule(
     client: TestClient, fixed_planning_clock: None
 ) -> None:
