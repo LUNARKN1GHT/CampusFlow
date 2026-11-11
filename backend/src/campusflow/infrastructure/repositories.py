@@ -286,9 +286,11 @@ class SqlAlchemyMaterialRepository:
         row = self._session.get(Material, material_id)
         return _material_to_data(row) if row is not None else None
 
-    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
-        """删除前锁住资料行：与版本关系创建共用同一把锁，预览确认到删除之间
-        不允许插入新关系绕过影响检查。返回 False 表示资料不存在或不在本空间。"""
+    def lock(self, workspace_id: int, material_id: int) -> bool:
+        """按空间锁住资料行，供识别启动等需要串行化的流程使用。
+
+        返回 False 表示资料不存在或不在本空间；锁随当前事务提交/回滚释放。
+        """
         return (
             self._session.scalar(
                 select(Material.id)
@@ -300,6 +302,11 @@ class SqlAlchemyMaterialRepository:
             )
             is not None
         )
+
+    def lock_for_delete(self, workspace_id: int, material_id: int) -> bool:
+        """删除前锁住资料行：与版本关系创建共用同一把锁，预览确认到删除之间
+        不允许插入新关系绕过影响检查。返回 False 表示资料不存在或不在本空间。"""
+        return self.lock(workspace_id, material_id)
 
     def version_relation_ids(self, material_id: int) -> list[int]:
         """列出与该资料任一版本相关的关系（任一端），用于删除影响预览与确认指纹。"""

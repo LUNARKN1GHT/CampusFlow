@@ -553,6 +553,44 @@ export type MaterialUploadParams = {
   allow_duplicate: boolean
 }
 
+// 粘贴文本的显式识别状态：原文保存完成不代表问答索引或事项提取已经完成。
+export type RecognitionIndexState = 'not_started' | 'queued' | 'running' | 'done' | 'partial' | 'failed'
+export type RecognitionExtractionState = 'not_started' | 'running' | 'done' | 'empty' | 'failed'
+
+export type MaterialRecognitionIndex = {
+  state: RecognitionIndexState
+  job_id: number | null
+  searchable: boolean
+  reason: string | null
+  updated_at: string | null
+}
+
+export type MaterialRecognitionExtraction = {
+  state: RecognitionExtractionState
+  candidate_count: number
+  pending_count: number
+  reason: string | null
+  extracted_at: string | null
+}
+
+export type MaterialRecognition = {
+  material_id: number
+  version_no: number | null
+  chunk_count: number
+  source_type: MaterialSourceType
+  archived: boolean
+  supported: boolean
+  can_start: boolean
+  blocked_reason: string | null
+  index: MaterialRecognitionIndex
+  extraction: MaterialRecognitionExtraction
+}
+
+export type MaterialRecognitionStart = MaterialRecognition & {
+  started: boolean
+  message: string
+}
+
 // 候选核对状态：superseded 是被新版本取代而失效，不是用户主动忽略；已失效只能退回待核对。
 export type ReviewStatus = 'pending' | 'confirmed' | 'ignored' | 'superseded'
 export type CandidateKind = 'task' | 'event' | 'rule'

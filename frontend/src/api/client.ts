@@ -90,8 +90,10 @@ async function performRequest(
   }
 }
 
-/** 普通 JSON 接口：204 返回 undefined，响应不是 JSON 时报 invalid-response 而不是当作成功。 */
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** 普通 JSON 接口：204 返回 undefined，响应不是 JSON 时报 invalid-response 而不是当作成功。
+ * timeoutMs 默认 8 秒；显式识别等可能同步调用模型的入口需要单独放宽。
+ */
+export async function apiRequest<T>(path: string, init: RequestInit = {}, timeoutMs = 8000): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
   // FormData 由浏览器自行设置 multipart 边界，不能强制覆盖为 JSON。
@@ -99,7 +101,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await performRequest(path, init, headers, 8000)
+  const response = await performRequest(path, init, headers, timeoutMs)
   if (response.status === 204) return undefined as T
   try {
     return await response.json() as T

@@ -360,6 +360,10 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .coverage-box p { margin: 4px 0 0; color: var(--warn-ink-soft); font-size: 13px; }
 .coverage-box.failed { border-color: var(--danger-border); border-left-color: var(--danger); background: var(--danger-bg); }
 .coverage-box.failed p { color: var(--danger-ink-soft); }
+/* 粘贴文本的保存与识别分开：原文保存完成只显示保存状态，识别进度单独展示。 */
+.recognition-box { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--brand-border); border-radius: 10px; background: var(--surface-soft); }
+.recognition-box p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.recognition-box .material-actions { margin-top: 8px; flex-wrap: wrap; }
 .status-pill[data-status="pending"], .status-pill[data-status="processing"] { color: var(--info-ink); background: var(--info-bg); }
 .status-pill[data-status="queued"], .status-pill[data-status="not_started"] { color: var(--neutral-ink); background: var(--neutral-bg); }
 .status-pill[data-status="reading"], .status-pill[data-status="preparing"] { color: var(--info-ink); background: var(--info-bg); }

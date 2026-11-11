@@ -5,7 +5,7 @@
  * 约束：状态与未覆盖范围只取自后端作业，不做本地推断；归档与删除分别处理，删除前必须先看影响预览。
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -14,6 +14,7 @@ import type {
   Course,
   IndexState,
   Material,
+  MaterialRecognition,
   MaterialSourceType,
   MaterialStatus,
   MaterialUploadItem,
@@ -61,6 +62,11 @@ const jobs = reactive<Record<number, ProcessingJob>>({})
 const jobErrors = reactive<Record<number, string>>({})
 const retryingId = ref<number | null>(null)
 const retryingIndexId = ref<number | null>(null)
+// 粘贴文本的识别状态：原文保存完成不等于问答索引或事项提取完成。
+const recognitionByMaterial = reactive<Record<number, MaterialRecognition>>({})
+const recognitionErrors = reactive<Record<number, string>>({})
+const recognizingId = ref<number | null>(null)
+const recognitionNotice = ref('')
 const sourceMaterial = ref<Material | null>(null)
 const sourceVersionNo = ref<number | null>(null)
 const sourceChunkId = ref<number | null>(null)
@@ -117,10 +123,132 @@ function jobFor(material: Material): ProcessingJob | null {
   return jobId ? jobs[jobId] ?? null : null
 }
 
+function recognitionFor(material: Material): MaterialRecognition | null {
+  return recognitionByMaterial[material.id] ?? null
+}
+
 /** 仅当存在尚未进入终态的处理作业时才算“处理中”，避免对同步导入的资料无限轮询。 */
 function hasActiveJob(material: Material): boolean {
   const jobId = jobByMaterial[material.id]
   return jobId ? !(jobs[jobId]?.is_terminal ?? false) : false
+}
+
+/** 粘贴文本的识别（问答索引或事项提取）仍在进行时需要继续刷新。 */
+function hasRecognitionInProgress(material: Material): boolean {
+  if (material.source_type !== 'text') return false
+  const state = recognitionByMaterial[material.id]
+  if (!state) return false
+  return state.index.state === 'queued'
+    || state.index.state === 'running'
+    || state.extraction.state === 'running'
+}
+
+/** 读取粘贴文本的真实识别状态；失败只影响该行，不清空其它资料。 */
+async function ensureRecognition(material: Material) {
+  if (material.source_type !== 'text') return
+  try {
+    recognitionByMaterial[material.id] = await materialsApi.recognition(material.id)
+    delete recognitionErrors[material.id]
+  } catch (caught) {
+    recognitionErrors[material.id] = `识别状态读取失败：${errorMessage(caught)}。请刷新重试。`
+  }
+}
+
+const indexRecognitionLabels: Record<MaterialRecognition['index']['state'], string> = {
+  not_started: '尚未准备',
+  queued: '排队中',
+  running: '处理中',
+  done: '已可问答',
+  partial: '部分完成',
+  failed: '失败',
+}
+const extractionRecognitionLabels: Record<MaterialRecognition['extraction']['state'], string> = {
+  not_started: '尚未提取',
+  running: '识别中',
+  done: '已提取待核对事项',
+  empty: '未提取到任务',
+  failed: '失败',
+}
+
+/** 行内摘要只使用后端返回的真实状态，不根据资料 status 推断识别完成。 */
+function recognitionSummary(material: Material): { tone: string; text: string } {
+  const state = recognitionByMaterial[material.id]
+  if (!state) return { tone: 'pending', text: '识别状态读取中' }
+  if (state.archived) return { tone: 'failed', text: '已归档，识别入口不可用' }
+  if (state.extraction.state === 'running') return { tone: 'processing', text: '正在识别事项' }
+  if (state.extraction.state === 'failed') return { tone: 'failed', text: '事项识别失败' }
+  if (state.index.state === 'failed') return { tone: 'failed', text: '问答索引失败' }
+  if (state.extraction.state === 'done') {
+    return { tone: 'done', text: `已提取 ${state.extraction.candidate_count} 条待核对事项` }
+  }
+  if (state.extraction.state === 'empty') return { tone: 'partial', text: '未提取到任务' }
+  if (state.index.state === 'done') return { tone: 'partial', text: '可问答，尚未提取事项' }
+  if (state.index.state === 'queued' || state.index.state === 'running') {
+    return { tone: 'processing', text: '问答索引处理中' }
+  }
+  return { tone: 'pending', text: '尚未准备问答或提取事项' }
+}
+
+function recognitionActionLabel(material: Material): string {
+  const state = recognitionByMaterial[material.id]
+  if (!state) return '开始识别'
+  // 事项已完成但索引仍在排队：按钮只用于补投索引，不重复调用模型。
+  if (state.index.state === 'queued' && (state.extraction.state === 'done' || state.extraction.state === 'empty')) {
+    return '重新尝试准备问答'
+  }
+  const retry = state.extraction.state === 'failed'
+    || state.index.state === 'failed'
+    || state.index.state === 'partial'
+  return retry ? '重新识别' : '开始识别'
+}
+
+function recognitionIndexText(material: Material): string {
+  const state = recognitionFor(material)
+  if (!state) return '读取中'
+  const reason = state.index.reason ? `（${state.index.reason}）` : ''
+  return `${indexRecognitionLabels[state.index.state]}${reason}`
+}
+
+function recognitionExtractionText(material: Material): string {
+  const state = recognitionFor(material)
+  if (!state) return '读取中'
+  const reason = state.extraction.reason ? `（${state.extraction.reason}）` : ''
+  return `${extractionRecognitionLabels[state.extraction.state]}${reason}`
+}
+
+function recognitionCanStart(material: Material): boolean {
+  return recognitionFor(material)?.can_start ?? false
+}
+
+function recognitionSearchable(material: Material): boolean {
+  return recognitionFor(material)?.index.searchable ?? false
+}
+
+function recognitionCandidateCount(material: Material): number {
+  return recognitionFor(material)?.extraction.candidate_count ?? 0
+}
+
+function recognitionBlockedReason(material: Material): string | null {
+  return recognitionFor(material)?.blocked_reason ?? null
+}
+
+/** 只有用户显式点击才调用模型；请求期间禁用按钮，避免并发重复触发。 */
+async function startRecognition(material: Material) {
+  recognizingId.value = material.id
+  recognitionNotice.value = ''
+  delete recognitionErrors[material.id]
+  try {
+    const result = await materialsApi.startRecognition(material.id)
+    recognitionByMaterial[material.id] = result
+    recognitionNotice.value = `「${material.title}」：${result.message}`
+    await refresh()
+  } catch (caught) {
+    recognitionErrors[material.id] = errorMessage(caught)
+    // 失败后重新读取状态，区分“识别失败”“配置缺失”和“确实没有事项”。
+    await ensureRecognition(material)
+  } finally {
+    recognizingId.value = null
+  }
 }
 
 function currentFilters(): MaterialFilters {
@@ -173,6 +301,7 @@ async function load() {
     semesters.value = semesterList
     courses.value = courseList
     await Promise.all(materialList.map(ensureJob))
+    await Promise.all(materialList.map(ensureRecognition))
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -186,6 +315,7 @@ async function refresh() {
     const materialList = await materialsApi.list(currentFilters())
     materials.value = materialList
     await Promise.all(materialList.map(ensureJob))
+    await Promise.all(materialList.map(ensureRecognition))
   } catch {
     // 轮询中的偶发失败保留上一次结果，不打断用户。
   } finally {
@@ -194,9 +324,11 @@ async function refresh() {
 }
 
 function syncPolling() {
-  // 解析或索引仍在排队/处理中时保持轮询；两条状态轴都进入终态后停止，避免空转。
+  // 解析/索引作业、两条状态轴或粘贴文本识别仍在进行时保持轮询；
+  // 同步导入（无作业）且识别已完成时不轮询。
   const active = materials.value.some((material) =>
     hasActiveJob(material)
+    || hasRecognitionInProgress(material)
     || material.processing.text_state === 'queued'
     || material.processing.text_state === 'reading'
     || material.processing.index.state === 'preparing')
@@ -279,6 +411,8 @@ async function onArchiveChanged() {
 async function onMaterialDeleted(id: number) {
   delete jobByMaterial[id]
   delete jobErrors[id]
+  delete recognitionByMaterial[id]
+  delete recognitionErrors[id]
   if (sourceMaterial.value?.id === id) sourceMaterial.value = null
   // 保持生命周期面板打开，让用户看到“删除完成”的结果；列表在后台同步移除该资料。
   await refresh()
@@ -368,7 +502,7 @@ async function submitText() {
       course_id: textForm.course_id ? Number(textForm.course_id) : null,
       class_name: textForm.class_name.trim() || null,
     })
-    successMessage.value = `已导入「${result.material.title}」，切分 ${result.chunks.length} 个段落。`
+    successMessage.value = `已保存「${result.material.title}」原文并切分 ${result.chunks.length} 个段落；这只是保存，尚未准备问答或提取事项。请在下方资料条目点击「开始识别」。`
     fallbackNotice.value = ''
     Object.assign(textForm, { title: '', content: '', publisher: '', published_at: '', class_name: '' })
     await refresh()
@@ -584,6 +718,7 @@ onBeforeUnmount(stopPolling)
           <button type="button" class="text-button" @click="manualRefresh">刷新</button>
         </div>
         <p v-if="pollPaused" class="inline-notice" role="status">自动刷新已暂停，请手动刷新查看最新处理状态。</p>
+        <p v-if="recognitionNotice" class="inline-notice" role="status">{{ recognitionNotice }}</p>
         <p v-if="loading" class="muted">正在加载资料…</p>
         <div v-else-if="visibleMaterials.length" class="material-list">
           <article v-for="material in visibleMaterials" :key="material.id" class="material-row">
@@ -601,6 +736,35 @@ onBeforeUnmount(stopPolling)
               <p v-if="['failed', 'partial', 'unknown'].includes(material.processing.index.state)" class="index-warning">
                 {{ material.processing.index.message }}
               </p>
+
+              <!-- 粘贴文本：原文保存只是第一步；问答索引与事项提取必须显示真实状态并提供显式入口。 -->
+              <div v-if="material.source_type === 'text'" class="recognition-box">
+                <div class="task-title-line">
+                  <strong>原文保存与识别分开</strong>
+                  <span class="status-pill" :data-status="recognitionSummary(material).tone">{{ recognitionSummary(material).text }}</span>
+                </div>
+                <template v-if="recognitionFor(material)">
+                  <p>问答：{{ recognitionIndexText(material) }} · 事项：{{ recognitionExtractionText(material) }}</p>
+                  <p v-if="recognitionBlockedReason(material)" class="form-help">{{ recognitionBlockedReason(material) }}</p>
+                  <p v-if="recognitionSearchable(material)" class="form-help">问答索引已完成，可在智能问答中按学期／课程范围提问。</p>
+                  <p v-if="recognitionFor(material)?.extraction.state === 'done'" class="form-help">候选仍需人工核对，确认前不会成为正式任务。</p>
+                </template>
+                <p v-else class="form-help">正在读取识别状态…</p>
+                <p v-if="recognitionErrors[material.id]" class="form-error" role="alert">{{ recognitionErrors[material.id] }}</p>
+                <div v-if="recognitionFor(material)" class="material-actions">
+                  <button
+                    v-if="recognitionCanStart(material)"
+                    type="button"
+                    class="button-secondary"
+                    :disabled="recognizingId === material.id"
+                    @click="startRecognition(material)"
+                  >{{ recognizingId === material.id ? '正在识别…' : recognitionActionLabel(material) }}</button>
+                  <span v-else-if="hasRecognitionInProgress(material)" class="muted small">识别进行中，页面会自动刷新</span>
+                  <RouterLink v-if="recognitionCandidateCount(material) > 0" class="text-button" to="/review">去待核对</RouterLink>
+                  <RouterLink v-if="recognitionSearchable(material)" class="text-button" to="/qa">去问答</RouterLink>
+                </div>
+                <p class="form-help">只有点击「开始识别」才会调用模型；保存原文不会自动提取，也不会自动把候选确认为正式任务。</p>
+              </div>
 
               <!-- 部分成功必须展示未覆盖范围与失败原因；缺失内容不能被当作“没有要求”。 -->
               <div v-if="material.status === 'partial'" class="coverage-box">
