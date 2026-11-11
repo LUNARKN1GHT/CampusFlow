@@ -19,6 +19,10 @@ DEFAULT_EMBED_JOB_TIMEOUT_SECONDS = 300
 # 索引作业自动重投上限：超过之后只保留人工重试入口（Q004）
 DEFAULT_EMBED_MAX_AUTO_RETRIES = 3
 
+# 超时原因的固定前缀：#555 据此把超时从其它失败原因中识别出来，
+# 不依赖完整文案，也不把超时误报为模型或来源故障。
+TIMEOUT_REASON_PREFIX = "处理超时"
+
 # 密钥/令牌/隐私内容模式：Bearer 令牌、sk- 密钥、key= 参数、身份证/手机号等长数字串
 _SENSITIVE_PATTERNS = [
     re.compile(r"Bearer\s+\S+", re.IGNORECASE),
@@ -58,7 +62,7 @@ def timeout_reason(timeout_seconds: int) -> str:
     """超时回收说明：让"处理中"变成长时间停留的情况可见（J005）。"""
     # 不足一分钟也显示 1 分钟，避免写出"超过 0 分钟"这种无法理解的说明。
     minutes = max(1, timeout_seconds // 60)
-    return f"处理超时：超过 {minutes} 分钟未完成，已标记为可重试失败"
+    return f"{TIMEOUT_REASON_PREFIX}：超过 {minutes} 分钟未完成，已标记为可重试失败"
 
 
 def is_terminal(status: str) -> bool:

@@ -35,6 +35,14 @@ ATTEMPTS_EXHAUSTED_CODE = "attempts_exhausted"
 LEASE_EXPIRED_CODE = "lease_expired"
 TERMINAL_FAILURE_CODES = frozenset({ATTEMPTS_EXHAUSTED_CODE, LEASE_EXPIRED_CODE})
 
+# 索引作业的固定失败原因（#555）：作业只保存这一份文案，资料状态据此映射
+# 稳定原因代码；集中定义避免应用层与状态派生各自复制字符串。
+INDEX_SOURCE_CHANGED_REASON = "索引来源在运行中变化，需要重新生成清单"
+INDEX_SOURCE_UNAVAILABLE_REASON = "索引来源不可用或已归档"
+INDEX_PROFILE_MISMATCH_REASON = "向量配置未登记或与调用模型不一致"
+INDEX_ALL_BLOCKS_FAILED_REASON = "索引全部块失败"
+INDEX_PARTIAL_BLOCKS_FAILED_REASON = "部分索引块失败，结果不完整"
+
 
 @dataclass(frozen=True)
 class BlockClaim:

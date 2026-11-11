@@ -619,6 +619,17 @@ class JobRepository(Protocol):
         """列出某份资料的全部处理作业（D009 删除影响预览：还有几个没跑完）。"""
         ...
 
+    def latest_stage_jobs_by_materials(
+        self, material_ids: list[int], *, stages: tuple[str, ...]
+    ) -> dict[tuple[int, str], ProcessingJobData]:
+        """批量取每份资料当前版本、每个阶段的最新作业（#555 状态视图）。
+
+        返回 (资料 id, 阶段) → 作业；没有作业的组合不出现在字典中。一次查询
+        覆盖整页资料，避免列表为每份资料单独读作业；旧版本的作业不能被选中，
+        否则已经成功的新版本会被历史失败记录覆盖。
+        """
+        ...
+
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
         """把可重试的失败/部分成功作业重置为待处理，供重新投递（J005）。
 

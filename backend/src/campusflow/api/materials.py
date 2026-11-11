@@ -14,12 +14,21 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from campusflow.api.deps import get_current_workspace, get_job_queue, get_repositories
 from campusflow.application import materials as use_cases
+from campusflow.application.material_status import (
+    MaterialProcessingView,
+    build_processing_views,
+)
 from campusflow.application.ports.parsers import DocumentParser
 from campusflow.application.ports.queue import JobQueue
-from campusflow.application.ports.repositories import Repositories, WorkspaceData
+from campusflow.application.ports.repositories import (
+    MaterialData,
+    Repositories,
+    WorkspaceData,
+)
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.ports.web_fetch import WebFetcher
 from campusflow.application.web_materials import import_requested_webpage
+from campusflow.domain.material_status import IndexState, TextReadState
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
 from campusflow.infrastructure.parsers.text import TextDocumentParser
 from campusflow.infrastructure.web_fetch import PublicWebFetcher
@@ -75,6 +84,26 @@ class TextImportIn(BaseModel):
         return value
 
 
+class MaterialIndexOut(BaseModel):
+    """问答索引状态（#555）：与原文读取分开，不能由解析完成推断可用。"""
+
+    state: IndexState
+    # 稳定原因代码供程序判断；message／detail／error 是已脱敏的可读说明。
+    reason_code: str
+    message: str
+    detail: str | None
+    error: str | None
+    job_id: int | None
+    retryable: bool
+
+
+class MaterialProcessingOut(BaseModel):
+    """资料处理的两条独立状态轴：#555 原文读取与问答索引。"""
+
+    text_state: TextReadState
+    index: MaterialIndexOut
+
+
 class MaterialOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -90,6 +119,43 @@ class MaterialOut(BaseModel):
     status: MaterialStatus
     archived: bool
     imported_at: datetime
+    processing: MaterialProcessingOut
+
+
+def material_out(material: MaterialData, view: MaterialProcessingView) -> MaterialOut:
+    """资料响应统一附带两条状态轴；所有返回资料的入口共用，避免字段缺失。"""
+    return MaterialOut(
+        id=material.id,
+        semester_id=material.semester_id,
+        course_id=material.course_id,
+        class_name=material.class_name,
+        title=material.title,
+        publisher=material.publisher,
+        published_at=material.published_at,
+        source_type=material.source_type,
+        source_url=material.source_url,
+        status=material.status,
+        archived=material.archived,
+        imported_at=material.imported_at,
+        processing=MaterialProcessingOut(
+            text_state=view.text_state,
+            index=MaterialIndexOut(
+                state=view.index.state,
+                reason_code=view.index.reason_code,
+                message=view.index.message,
+                detail=view.index.detail,
+                error=view.index.error,
+                job_id=view.index.job_id,
+                retryable=view.index.retryable,
+            ),
+        ),
+    )
+
+
+def materials_out(repos: Repositories, materials: list[MaterialData]) -> list[MaterialOut]:
+    """批量构造资料响应：一次作业查询覆盖整页资料，不按资料逐个查。"""
+    views = build_processing_views(repos, materials)
+    return [material_out(material, views[material.id]) for material in materials]
 
 
 class SourceChunkOut(BaseModel):
@@ -160,7 +226,7 @@ def import_text(
         text_parser=text_parser,
     )
     return TextImportOut(
-        material=MaterialOut.model_validate(material),
+        material=materials_out(repos, [material])[0],
         chunks=[SourceChunkOut.model_validate(c) for c in chunks],
     )
 
@@ -175,10 +241,13 @@ def list_materials(
     status: Annotated[MaterialStatus | None, Query()] = None,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[MaterialOut]:
-    """默认不含已归档资料；归档资料同时退出检索与问答范围。"""
-    return [
-        MaterialOut.model_validate(m)
-        for m in use_cases.list_materials(
+    """默认不含已归档资料；归档资料同时退出检索与问答范围。
+
+    每份资料分别给出原文读取与问答索引状态，索引失败不会被“完成”掩盖。
+    """
+    return materials_out(
+        repos,
+        use_cases.list_materials(
             repos,
             workspace.id,
             semester_id=semester_id,
@@ -186,8 +255,8 @@ def list_materials(
             source_type=source_type,
             status=status,
             include_archived=include_archived,
-        )
-    ]
+        ),
+    )
 
 
 class DeleteImpactOut(BaseModel):
@@ -222,7 +291,7 @@ def delete_impact(
     impact = use_cases.preview_delete_impact(repos, workspace.id, material_id)
     days = request.app.state.settings.backup_retention_days
     return DeleteImpactOut(
-        material=MaterialOut.model_validate(impact.material),
+        material=materials_out(repos, [impact.material])[0],
         version_count=impact.version_count,
         chunk_count=impact.chunk_count,
         linked_task_ids=impact.linked_task_ids,
@@ -388,7 +457,7 @@ def import_web(
         queue=queue,
     )
     return WebImportOut(
-        material=MaterialOut.model_validate(material),
+        material=materials_out(repos, [material])[0],
         version=MaterialVersionOut.model_validate(version),
         job_id=job_id,
     )
@@ -396,23 +465,22 @@ def import_web(
 
 @router.get("/{material_id}", response_model=MaterialOut)
 def get_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
-    return MaterialOut.model_validate(use_cases.get_material(repos, workspace.id, material_id))
+    material = use_cases.get_material(repos, workspace.id, material_id)
+    return materials_out(repos, [material])[0]
 
 
 @router.post("/{material_id}/archive", response_model=MaterialOut)
 def archive_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
     """归档只是标记：原文、版本与引用保留，但退出检索、问答与默认列表。"""
-    return MaterialOut.model_validate(
-        use_cases.set_material_archived(repos, workspace.id, material_id, archived=True)
-    )
+    material = use_cases.set_material_archived(repos, workspace.id, material_id, archived=True)
+    return materials_out(repos, [material])[0]
 
 
 @router.post("/{material_id}/restore", response_model=MaterialOut)
 def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos) -> MaterialOut:
     """恢复归档后资料与既有引用重新进入有效范围。"""
-    return MaterialOut.model_validate(
-        use_cases.set_material_archived(repos, workspace.id, material_id, archived=False)
-    )
+    material = use_cases.set_material_archived(repos, workspace.id, material_id, archived=False)
+    return materials_out(repos, [material])[0]
 
 
 @router.patch("/{material_id}", response_model=MaterialOut)
@@ -437,7 +505,7 @@ def update_material(
         course_id=merged.course_id,
         class_name=merged.class_name,
     )
-    return MaterialOut.model_validate(material)
+    return materials_out(repos, [material])[0]
 
 
 class UploadItemOut(BaseModel):
@@ -493,14 +561,24 @@ def upload_files(
         allow_duplicate=allow_duplicate,
         queue=queue,
     )
+    # 新导入与重复命中的资料一次性取状态视图，逐文件结果不额外增加查询。
+    related = [
+        material
+        for result in results
+        for material in (result.material, result.duplicate_of)
+        if material is not None
+    ]
+    views = build_processing_views(repos, related)
     return UploadOut(
         results=[
             UploadItemOut(
                 filename=r.filename,
-                material=MaterialOut.model_validate(r.material) if r.material else None,
+                material=material_out(r.material, views[r.material.id]) if r.material else None,
                 error=r.error,
                 duplicate_of=(
-                    MaterialOut.model_validate(r.duplicate_of) if r.duplicate_of else None
+                    material_out(r.duplicate_of, views[r.duplicate_of.id])
+                    if r.duplicate_of
+                    else None
                 ),
                 job_id=r.job_id,
             )

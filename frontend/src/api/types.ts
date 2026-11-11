@@ -400,6 +400,24 @@ export type MaterialSourceType = 'pdf' | 'image' | 'text' | 'word' | 'web'
 // partial 表示部分解析／索引成功，未覆盖范围必须显式提示，不能当作完整可用。
 export type MaterialStatus = 'pending' | 'processing' | 'done' | 'partial' | 'failed'
 
+// 原文读取与问答索引是两条独立状态轴（#555）：解析完成不代表可以问答。
+export type TextReadState = 'queued' | 'reading' | 'ready' | 'partial' | 'failed'
+export type IndexState = 'not_started' | 'preparing' | 'ready' | 'partial' | 'failed' | 'unknown'
+export type MaterialIndexStatus = {
+  state: IndexState
+  // reason_code 是稳定协议值；message／detail／error 为后端已脱敏的可读说明。
+  reason_code: string
+  message: string
+  detail: string | null
+  error: string | null
+  job_id: number | null
+  retryable: boolean
+}
+export type MaterialProcessing = {
+  text_state: TextReadState
+  index: MaterialIndexStatus
+}
+
 export type Material = {
   id: number
   semester_id: number | null
@@ -413,6 +431,7 @@ export type Material = {
   status: MaterialStatus
   archived: boolean
   imported_at: string
+  processing: MaterialProcessing
 }
 
 export type MaterialVersion = {
