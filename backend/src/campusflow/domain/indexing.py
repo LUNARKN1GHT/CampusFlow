@@ -25,7 +25,10 @@ DEFAULT_BLOCK_LEASE_SECONDS = 180
 MAX_BLOCK_LEASE_SECONDS = 900
 
 # 调用方可以写入的块失败码；只允许安全代码，不能写异常原文或密钥。
-BLOCK_FAILURE_CODES = frozenset({"upstream_transient", "invalid_response", "source_unavailable"})
+# configuration_missing 表示缺少模型配置：不自动重试，但配置修正后允许人工重试。
+BLOCK_FAILURE_CODES = frozenset(
+    {"upstream_transient", "invalid_response", "source_unavailable", "configuration_missing"}
+)
 
 # 由系统在领取/恢复时写入的终态失败码，调用方不能自行指定。
 ATTEMPTS_EXHAUSTED_CODE = "attempts_exhausted"
@@ -102,6 +105,7 @@ class IndexProgressSummary:
     failed: int
     skipped: int
     retryable_failed: int
+    configuration_failed: int
     source_coverage_known: bool
     uncovered_source_count: int
     fully_searchable: bool
@@ -149,11 +153,15 @@ def summarize_index_progress(
     by_id = _progress_by_id(expected_block_ids, records)
     counts = dict.fromkeys(BlockIndexState, 0)
     retryable_failed = 0
+    configuration_failed = 0
     for key in expected_block_ids:
         record = by_id.get(key)
         state = record.state if record is not None else BlockIndexState.PENDING
         counts[state] += 1
         retryable_failed += int(record is not None and record.retryable)
+        configuration_failed += int(
+            record is not None and record.failure_code == "configuration_missing"
+        )
     indexed = counts[BlockIndexState.DONE]
     fully_searchable = (
         bool(expected_block_ids)
@@ -185,6 +193,7 @@ def summarize_index_progress(
         failed=counts[BlockIndexState.FAILED],
         skipped=counts[BlockIndexState.SKIPPED],
         retryable_failed=retryable_failed,
+        configuration_failed=configuration_failed,
         source_coverage_known=source_coverage_known,
         uncovered_source_count=uncovered_source_count,
         fully_searchable=fully_searchable,

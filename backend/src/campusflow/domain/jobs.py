@@ -2,7 +2,7 @@
 
 import re
 
-from campusflow.domain.errors import TransientError
+from campusflow.domain.errors import ConfigurationError, TransientError
 from campusflow.domain.states import JobStatus
 
 MAX_ERROR_REASON_LENGTH = 300
@@ -45,12 +45,13 @@ def sanitize_error_reason(raw: str | None) -> str | None:
 
 
 def is_retryable(error: BaseException) -> bool:
-    """区分可重试与永久失败（J005）。
+    """区分可重试与永久失败（J005/J006）。
 
-    只有显式标记为临时故障的错误（上游限流、超时、5xx、连接中断）才可重试；
-    格式不支持、来源已删除这类永久失败重试也不会成功，不得反复重投。
+    临时故障（上游限流、超时、5xx、连接中断）可重试；缺少模型密钥属于
+    “配置修正后可恢复”，也允许人工重试，但调用方仍受自动重投上限约束，
+    不会在配置不变时无限重试。格式不支持、来源已删除等永久失败不可重试。
     """
-    return isinstance(error, TransientError)
+    return isinstance(error, (TransientError, ConfigurationError))
 
 
 def timeout_reason(timeout_seconds: int) -> str:

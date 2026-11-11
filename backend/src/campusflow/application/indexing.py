@@ -14,7 +14,13 @@ from campusflow.application.ports.embeddings import Embedder, EmbeddingProfiles
 from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.repositories import Repositories
 from campusflow.application.processing import abandon_write, blocked_write_reason
-from campusflow.domain.errors import DomainError, NotFoundError, PermanentError, TransientError
+from campusflow.domain.errors import (
+    ConfigurationError,
+    DomainError,
+    NotFoundError,
+    PermanentError,
+    TransientError,
+)
 from campusflow.domain.indexing import (
     DEFAULT_BLOCK_LEASE_SECONDS,
     MAX_BLOCK_ATTEMPTS,
@@ -116,12 +122,14 @@ def index_version(
         logger.info("索引作业 %s 尚有未完成块，保留处理中状态", job_id)
         return None
 
+    # 缺少模型配置的失败允许人工重试（配置修正后重建清单补齐），
+    # 其余失败不重投；块级自动重试仍只认 upstream_transient。
     repos.jobs.record_attempt(
         job_id,
         status=summary.status,
         scope=_scope_text(summary),
         error_reason=_error_reason(summary),
-        retryable=False,
+        retryable=summary.configuration_failed > 0,
     )
     repos.uow.commit()
     return summary
@@ -190,6 +198,9 @@ def _failure_code(exc: BaseException) -> str:
         return "source_unavailable"
     if isinstance(exc, TransientError):
         return "upstream_transient"
+    if isinstance(exc, ConfigurationError):
+        # 不自动重试；配置补齐后人工重试会把这类块恢复为待处理。
+        return "configuration_missing"
     if isinstance(exc, (PermanentError, DomainError)):
         return "invalid_response"
     # 未预期异常按临时失败处理：仍受每块次数上限约束，不会无限重试。
@@ -231,6 +242,8 @@ def _scope_text(summary: IndexProgressSummary) -> str:
 
 
 def _error_reason(summary: IndexProgressSummary) -> str | None:
+    if summary.configuration_failed:
+        return "缺少模型配置，问答索引未完成；请在设置 → AI 服务配置向量模型密钥后重试"
     if summary.status == JobStatus.FAILED:
         return "索引全部块失败"
     if summary.status == JobStatus.PARTIAL:

@@ -52,6 +52,8 @@ from campusflow.infrastructure.db.models import (
     Course,
     CourseRule,
     FixedEvent,
+    IndexedBlock,
+    IndexManifest,
     Material,
     MaterialVersion,
     MaterialVersionRelation,
@@ -1338,7 +1340,7 @@ class SqlAlchemyJobRepository:
 
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
         from campusflow.domain.jobs import can_retry
-        from campusflow.domain.states import JobStatus
+        from campusflow.domain.states import JobStage, JobStatus
 
         if _row_missing(self._session, ProcessingJob, job_id):
             return None  # 作业已随资料删除（J007），没有可重投的目标
@@ -1347,6 +1349,28 @@ class SqlAlchemyJobRepository:
         # 成功，反复重投只会白烧资源（J005/J006）
         if row is None or not can_retry(row.status, row.retryable):
             return None
+        # 缺配置而失败的索引块不自动重试；人工重试时恢复为待处理，
+        # 已成功块保持不动，配置补齐后只补失败部分（J005/J006）。
+        if row.stage == JobStage.EMBED and row.manifest_id is not None:
+            manifest = self._session.get(IndexManifest, row.manifest_id)
+            if manifest is not None:
+                self._session.execute(
+                    update(IndexedBlock)
+                    .where(
+                        IndexedBlock.workspace_id == row.workspace_id,
+                        IndexedBlock.version_id == row.version_id,
+                        IndexedBlock.profile_id == manifest.profile_id,
+                        IndexedBlock.failure_code == "configuration_missing",
+                    )
+                    .values(
+                        state="pending",
+                        retryable=False,
+                        failure_code=None,
+                        attempts=0,
+                        claim_token=None,
+                        lease_until=None,
+                    )
+                )
         row.status = JobStatus.PENDING
         row.scope = None
         row.error_reason = None
