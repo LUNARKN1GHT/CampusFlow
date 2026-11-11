@@ -23,13 +23,18 @@ from campusflow.workers.embeddings import (
     profile_from_settings,
     set_embedder_factory,
 )
+from campusflow.workers.model_hints import missing_model_key_hint
 
 
 class UnavailableVisionParser:
     """桌面模式未配置模型密钥：Worker 保留，真被调用时明确失败，不伪造识别结果。"""
 
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+
     def parse(self, content: bytes, mime_type: str):
-        raise PermanentError("未配置视觉模型密钥，无法识别图片；请在设置中填写模型密钥后重试")
+        hint = missing_model_key_hint(self._settings, env_name="ZHIPU_API_KEY", next_step="重试")
+        raise PermanentError(f"未配置视觉模型密钥，无法识别图片；{hint}")
 
 
 class UnavailableEmbedder:
@@ -37,13 +42,17 @@ class UnavailableEmbedder:
 
     def __init__(self, settings: Settings) -> None:
         self._profile: EmbeddingProfile = profile_from_settings(settings)
+        self._settings = settings
 
     @property
     def profile(self) -> EmbeddingProfile:
         return self._profile
 
     def embed(self, text: str) -> EmbeddedText:
-        raise PermanentError("未配置向量模型密钥，无法建立索引；文本解析结果已保留")
+        hint = missing_model_key_hint(
+            self._settings, env_name="ZHIPU_API_KEY", next_step="重新建立索引"
+        )
+        raise PermanentError(f"未配置向量模型密钥，无法建立索引；文本解析结果已保留；{hint}")
 
 
 def build_parser_registry(
@@ -61,7 +70,7 @@ def build_parser_registry(
         if not settings.zhipu_api_key and not allow_missing_models:
             raise ValueError("缺少 ZHIPU_API_KEY，请在 backend/.env 配置后启动")
         if not settings.zhipu_api_key:
-            vision = UnavailableVisionParser()
+            vision = UnavailableVisionParser(settings)
         else:
             vision = ZhipuVisionParser(
                 settings.zhipu_api_key,
