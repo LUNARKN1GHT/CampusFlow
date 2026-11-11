@@ -10,6 +10,7 @@ from enum import StrEnum
 
 from campusflow.domain.indexing import (
     INDEX_ALL_BLOCKS_FAILED_REASON,
+    INDEX_CONFIGURATION_MISSING_REASON,
     INDEX_PARTIAL_BLOCKS_FAILED_REASON,
     INDEX_PROFILE_MISMATCH_REASON,
     INDEX_SOURCE_CHANGED_REASON,
@@ -96,6 +97,11 @@ _INDEX_FAILURE_REASONS = {
         "index_model_profile_mismatch",
         "向量模型配置缺失或与已登记配置不一致，问答索引未建立；"
         "原文读取结果已保留，请先检查向量模型配置。",
+    ),
+    INDEX_CONFIGURATION_MISSING_REASON: (
+        "index_configuration_missing",
+        "缺少向量模型配置，问答索引未完成；原文已读取并保留，"
+        "请在设置 → AI 服务配置 ZHIPU 密钥并重启应用后重试索引。",
     ),
     INDEX_ALL_BLOCKS_FAILED_REASON: (
         "index_failed_all_blocks",

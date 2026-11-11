@@ -24,6 +24,7 @@ from campusflow.domain.errors import (
 from campusflow.domain.indexing import (
     DEFAULT_BLOCK_LEASE_SECONDS,
     INDEX_ALL_BLOCKS_FAILED_REASON,
+    INDEX_CONFIGURATION_MISSING_REASON,
     INDEX_PARTIAL_BLOCKS_FAILED_REASON,
     INDEX_PROFILE_MISMATCH_REASON,
     INDEX_SOURCE_CHANGED_REASON,
@@ -248,7 +249,7 @@ def _scope_text(summary: IndexProgressSummary) -> str:
 
 def _error_reason(summary: IndexProgressSummary) -> str | None:
     if summary.configuration_failed:
-        return "缺少模型配置，问答索引未完成；请在设置 → AI 服务配置向量模型密钥后重试"
+        return INDEX_CONFIGURATION_MISSING_REASON
     if summary.status == JobStatus.FAILED:
         return INDEX_ALL_BLOCKS_FAILED_REASON
     if summary.status == JobStatus.PARTIAL:

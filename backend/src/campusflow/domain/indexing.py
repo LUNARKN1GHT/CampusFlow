@@ -42,6 +42,9 @@ INDEX_SOURCE_UNAVAILABLE_REASON = "索引来源不可用或已归档"
 INDEX_PROFILE_MISMATCH_REASON = "向量配置未登记或与调用模型不一致"
 INDEX_ALL_BLOCKS_FAILED_REASON = "索引全部块失败"
 INDEX_PARTIAL_BLOCKS_FAILED_REASON = "部分索引块失败，结果不完整"
+INDEX_CONFIGURATION_MISSING_REASON = (
+    "缺少模型配置，问答索引未完成；请在设置 → AI 服务配置向量模型密钥后重试"
+)
 
 
 @dataclass(frozen=True)
