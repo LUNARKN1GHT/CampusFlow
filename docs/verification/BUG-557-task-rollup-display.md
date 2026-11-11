@@ -18,7 +18,7 @@
 - `uv run pytest tests/test_subtasks.py tests/test_tasks_api.py -q`：21 passed。
 - `uv run ruff check`（改动文件）：All checks passed。
 - 前端 `npm run build`（含 `vue-tsc --noEmit`）：通过。
-- 新增用例覆盖：父任务自身 60 分钟、子任务 20+40、完成 20 分钟后列表汇总与详情均为剩余 40 / 完成度 33%；普通任务 `subtask_rollup` 为 null；父任务自身字段不被改写。
+- 新增用例覆盖：父任务自身 60 分钟、子任务 20+40、完成 20 分钟后列表汇总与详情均为剩余 40 / 完成度 33%；全部完成后汇总为剩余 0 / 完成度 100%；普通任务 `subtask_rollup` 为 null；父任务自身字段不被改写。
 
 ## 浏览器验证
 
