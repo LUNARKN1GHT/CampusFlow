@@ -9,7 +9,7 @@ from sqlalchemy.engine import make_url
 from campusflow.application.processing import ParserRegistry, set_parser_registry
 from campusflow.core.config import Settings
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
-from campusflow.domain.errors import PermanentError
+from campusflow.domain.errors import ConfigurationError
 from campusflow.infrastructure.llm.vision import FakeVisionParser, ZhipuVisionParser
 from campusflow.infrastructure.parsers.pdf import PdfDocumentParser
 from campusflow.infrastructure.parsers.pdf_with_vision import PdfWithVisionFallbackParser
@@ -29,7 +29,10 @@ class UnavailableVisionParser:
     """桌面模式未配置模型密钥：Worker 保留，真被调用时明确失败，不伪造识别结果。"""
 
     def parse(self, content: bytes, mime_type: str):
-        raise PermanentError("未配置视觉模型密钥，无法识别图片；请在设置中填写模型密钥后重试")
+        raise ConfigurationError(
+            "未配置视觉模型密钥，无法识别图片；"
+            "请在设置 → AI 服务配置 ZHIPU 密钥并重启应用后重新处理"
+        )
 
 
 class UnavailableEmbedder:
@@ -43,7 +46,10 @@ class UnavailableEmbedder:
         return self._profile
 
     def embed(self, text: str) -> EmbeddedText:
-        raise PermanentError("未配置向量模型密钥，无法建立索引；文本解析结果已保留")
+        raise ConfigurationError(
+            "未配置向量模型密钥，无法建立索引；文本解析结果已保留。"
+            "请在设置 → AI 服务配置 ZHIPU 密钥并重启应用后重试"
+        )
 
 
 def build_parser_registry(
