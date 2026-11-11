@@ -154,7 +154,11 @@ npm run build   # 含 vue-tsc 类型检查
 
 结果：
 
-<!-- 待填 -->
+- `uv run ruff check .`：All checks passed。
+- `uv run --locked pytest tests/test_ai_settings.py -q`：15 passed。
+- 合并到集成分支后复跑 `tests/test_ai_settings.py tests/test_jobs_api.py tests/test_material_recognition.py tests/test_material_status_views.py tests/test_desktop_worker.py`：66 passed。
+- `npm run build`（含 `vue-tsc --noEmit`）：通过。
+- 设置页 AI 服务面板在本机浏览器以服务器模式加载，显示只读环境变量配置状态；桌面可编辑路径由后端测试覆盖，未在打包安装包内实测。
 
 ## 9. 未覆盖项与已知限制
 
