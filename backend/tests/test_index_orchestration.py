@@ -1,5 +1,7 @@
 """Q004 编排用例：领取、模型调用、写回、失败与中断恢复（真实 PostgreSQL）。"""
 
+import threading
+
 from index_helpers import (
     DEFAULT_TEXTS,
     FakeEmbedder,
@@ -134,6 +136,38 @@ def test_all_blocks_configuration_failure_allows_manual_retry(client):
         assert build_repositories(session).jobs.prepare_retry(job_id) is not None
     summary = run_index(job_id, FakeEmbedder())
     assert summary is not None and summary.fully_searchable
+
+
+def test_concurrent_retry_only_one_request_wins(client):
+    """并发点击重试只允许一个请求重置作业，避免同一版本被重复投递（#556）。"""
+    job_id, _, _ = create_embed_job(client)
+    with open_session() as session, session.begin():
+        build_repositories(session).jobs.record_attempt(
+            job_id,
+            status=JobStatus.FAILED,
+            scope=None,
+            error_reason="缺少模型配置",
+            retryable=True,
+        )
+
+    barrier = threading.Barrier(2)
+    outcomes: list[bool] = []
+
+    def attempt() -> None:
+        with open_session() as session:
+            repos = build_repositories(session)
+            barrier.wait()
+            outcomes.append(repos.jobs.prepare_retry(job_id) is not None)
+            session.commit()
+
+    threads = [threading.Thread(target=attempt) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(outcomes) == [False, True]
+    assert get_job(job_id).status == JobStatus.PENDING
 
 
 def test_attempts_exhausted_stops_calling_model(client):
