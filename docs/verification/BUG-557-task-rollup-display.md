@@ -18,6 +18,7 @@
 - `uv run pytest tests/test_subtasks.py tests/test_tasks_api.py -q`：21 passed。
 - `uv run ruff check`（改动文件）：All checks passed。
 - 前端 `npm run build`（含 `vue-tsc --noEmit`）：通过。
+- 列表响应新增可选 `subtask_rollup` 字段；E10 集成测试改为忽略该字段比较其余任务字段，并断言普通任务为 `null`。
 - 新增用例覆盖：父任务自身 60 分钟、子任务 20+40、完成 20 分钟后列表汇总与详情均为剩余 40 / 完成度 33%；全部完成后汇总为剩余 0 / 完成度 100%；普通任务 `subtask_rollup` 为 null；父任务自身字段不被改写。
 
 ## 浏览器验证
