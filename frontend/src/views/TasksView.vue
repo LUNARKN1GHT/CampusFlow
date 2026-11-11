@@ -361,7 +361,14 @@ onMounted(load)
               <p>截止来源：{{ dueSourceLabels[task.due_source] }}{{ task.due_note ? ` · ${task.due_note}` : '' }}</p>
               <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>
             </div>
-            <div class="task-meta"><span>优先级 {{ priorityLabels[task.priority] }}</span><strong>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong></div>
+            <div class="task-meta">
+              <span>优先级 {{ priorityLabels[task.priority] }}</span>
+              <template v-if="task.subtask_rollup">
+                <strong>{{ task.subtask_rollup.remaining_minutes }}<small> 分钟剩余（子任务汇总）</small></strong>
+                <span>完成度 {{ task.subtask_rollup.percent_complete === null ? '—' : `${task.subtask_rollup.percent_complete}%` }}</span>
+              </template>
+              <strong v-else>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong>
+            </div>
             <div class="task-actions"><button type="button" class="button-secondary" @click="openRelations(task)">依赖与子任务</button><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
           </article>
         </div>
@@ -440,7 +447,7 @@ onMounted(load)
               <h3 class="subheading">子任务</h3>
               <ul v-if="relations.subtasks.length" class="plain-list">
                 <li v-for="item in relations.subtasks" :key="item.id">
-                  {{ item.title }} · {{ item.progress }}
+                  {{ item.title }} · {{ progressLabels[item.progress] ?? item.progress }}
                   <button type="button" class="text-button" @click="editSubtask(item.id)">编辑</button>
                 </li>
               </ul>
