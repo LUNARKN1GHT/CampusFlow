@@ -73,6 +73,7 @@
 | `index_source_changed` | 索引来源在处理中变化，需要重建清单 |
 | `index_source_unavailable` | 索引来源不可用或已归档 |
 | `index_model_profile_mismatch` | 向量配置未登记或与调用模型不一致 |
+| `index_configuration_missing` | 缺少向量模型密钥；配置补齐并重启后可人工重试 |
 | `index_failed` | 其它失败 |
 | `index_unverified` | 作业已完成但缺少索引清单，不能确认 |
 | `index_status_unknown` | 作业状态值无法识别 |
