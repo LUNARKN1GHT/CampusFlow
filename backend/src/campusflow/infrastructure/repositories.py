@@ -1336,6 +1336,33 @@ class SqlAlchemyJobRepository:
         )
         return [_job_to_data(row) for row in rows]
 
+    def latest_stage_jobs_by_materials(
+        self, material_ids: list[int], *, stages: tuple[str, ...]
+    ) -> dict[tuple[int, str], ProcessingJobData]:
+        """整页资料的解析/索引作业一次取回，每阶段只保留最新版本的作业。"""
+        if not material_ids or not stages:
+            return {}
+        rows = self._session.execute(
+            select(ProcessingJob, MaterialVersion.version_no)
+            .join(MaterialVersion, ProcessingJob.version_id == MaterialVersion.id)
+            .where(
+                ProcessingJob.material_id.in_(material_ids),
+                ProcessingJob.stage.in_(stages),
+            )
+            .order_by(
+                ProcessingJob.material_id,
+                ProcessingJob.stage,
+                MaterialVersion.version_no.desc(),
+                ProcessingJob.id.desc(),
+            )
+        )
+        latest: dict[tuple[int, str], ProcessingJobData] = {}
+        for row, _version_no in rows:
+            key = (row.material_id, row.stage)
+            # 已按版本号与作业编号倒序：每组第一次出现的即当前版本最新作业。
+            latest.setdefault(key, _job_to_data(row))
+        return latest
+
     def prepare_retry(self, job_id: int) -> ProcessingJobData | None:
         from campusflow.domain.jobs import can_retry
         from campusflow.domain.states import JobStatus

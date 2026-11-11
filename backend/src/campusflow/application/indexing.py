@@ -17,6 +17,11 @@ from campusflow.application.processing import abandon_write, blocked_write_reaso
 from campusflow.domain.errors import DomainError, NotFoundError, PermanentError, TransientError
 from campusflow.domain.indexing import (
     DEFAULT_BLOCK_LEASE_SECONDS,
+    INDEX_ALL_BLOCKS_FAILED_REASON,
+    INDEX_PARTIAL_BLOCKS_FAILED_REASON,
+    INDEX_PROFILE_MISMATCH_REASON,
+    INDEX_SOURCE_CHANGED_REASON,
+    INDEX_SOURCE_UNAVAILABLE_REASON,
     MAX_BLOCK_ATTEMPTS,
     IndexProgressSummary,
 )
@@ -24,9 +29,9 @@ from campusflow.domain.states import JobStage, JobStatus
 
 logger = logging.getLogger(__name__)
 
-_SOURCE_CHANGED_REASON = "索引来源在运行中变化，需要重新生成清单"
-_SOURCE_UNAVAILABLE_REASON = "索引来源不可用或已归档"
-_PROFILE_MISMATCH_REASON = "向量配置未登记或与调用模型不一致"
+_SOURCE_CHANGED_REASON = INDEX_SOURCE_CHANGED_REASON
+_SOURCE_UNAVAILABLE_REASON = INDEX_SOURCE_UNAVAILABLE_REASON
+_PROFILE_MISMATCH_REASON = INDEX_PROFILE_MISMATCH_REASON
 _STAGE_MISMATCH_REASON = "作业阶段与索引用例不匹配"
 
 
@@ -232,7 +237,7 @@ def _scope_text(summary: IndexProgressSummary) -> str:
 
 def _error_reason(summary: IndexProgressSummary) -> str | None:
     if summary.status == JobStatus.FAILED:
-        return "索引全部块失败"
+        return INDEX_ALL_BLOCKS_FAILED_REASON
     if summary.status == JobStatus.PARTIAL:
-        return "部分索引块失败，结果不完整"
+        return INDEX_PARTIAL_BLOCKS_FAILED_REASON
     return None

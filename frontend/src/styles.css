@@ -348,12 +348,21 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .material-row:last-child { padding-bottom: 0; border-bottom: 0; }
 .material-main p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .material-actions { display: flex; align-items: center; gap: 6px; }
+.material-main .index-warning { padding: 8px 12px; border: 1px solid var(--warn-border); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink-soft); }
+.processing-details { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.processing-details summary { cursor: pointer; color: var(--muted-strong); font-size: 12px; font-weight: 800; }
+.processing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 10px; }
+.processing-axis { display: grid; align-content: start; gap: 4px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.processing-axis strong { font-size: 13px; }
+.processing-axis p { margin: 0; color: var(--muted); font-size: 13px; }
 .coverage-box { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--warn-border); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--warn-bg); }
 .coverage-box p { margin: 4px 0 0; color: var(--warn-ink-soft); font-size: 13px; }
 .coverage-box.failed { border-color: var(--danger-border); border-left-color: var(--danger); background: var(--danger-bg); }
 .coverage-box.failed p { color: var(--danger-ink-soft); }
 .status-pill[data-status="pending"], .status-pill[data-status="processing"] { color: var(--info-ink); background: var(--info-bg); }
-.status-pill[data-status="partial"] { color: var(--warn-strong-ink); background: var(--accent-soft); }
+.status-pill[data-status="queued"], .status-pill[data-status="not_started"] { color: var(--neutral-ink); background: var(--neutral-bg); }
+.status-pill[data-status="reading"], .status-pill[data-status="preparing"] { color: var(--info-ink); background: var(--info-bg); }
+.status-pill[data-status="partial"], .status-pill[data-status="unknown"] { color: var(--warn-strong-ink); background: var(--accent-soft); }
 .status-pill[data-status="failed"], .failed-pill { color: var(--danger-strong-ink); background: var(--danger-bg-soft); }
 .archived-pill { color: var(--neutral-ink); background: var(--neutral-bg); }
 .duplicate-pill { color: var(--warn-chip-ink); background: var(--warn-chip-bg); }
