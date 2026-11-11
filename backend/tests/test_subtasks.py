@@ -111,6 +111,20 @@ def test_task_list_rollup_matches_detail_for_parent(client: TestClient) -> None:
         f"/api/v1/tasks/{parent['id']}/rollup"
     ).json()
 
+    # 全部子任务完成后卡片汇总为剩余 0 / 完成度 100%，与详情一致
+    client.patch(
+        f"/api/v1/tasks/{children[1]['id']}/progress",
+        json={"progress": "done", "reason": "已完成"},
+    )
+    parent_item = next(
+        item for item in client.get("/api/v1/tasks").json() if item["id"] == parent["id"]
+    )
+    assert parent_item["subtask_rollup"]["remaining_minutes"] == 0
+    assert parent_item["subtask_rollup"]["percent_complete"] == 100
+    assert parent_item["subtask_rollup"] == client.get(
+        f"/api/v1/tasks/{parent['id']}/rollup"
+    ).json()
+
 
 def test_parent_minutes_are_not_double_counted_in_schedule(
     client: TestClient, fixed_planning_clock: None
