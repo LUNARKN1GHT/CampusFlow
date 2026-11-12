@@ -12,7 +12,7 @@ test('窄屏下导航完整可见且页面不横向溢出', async ({ page }) => 
   await page.getByLabel('密码').press('Enter')
   await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
 
-  for (const label of ['总览', '课程', '资料库', '待核对', '任务', '设置']) {
+  for (const label of ['总览', '课程', '资料库', '任务', '设置']) {
     await expect(page.getByRole('link', { name: label, exact: true })).toBeVisible()
   }
   expect(

@@ -244,8 +244,6 @@ test('打包应用可导航到所有已实现页面', async () => {
     const routes: Array<[string, string]> = [
       ['课程', '/courses'],
       ['资料库', '/library'],
-      ['待核对', '/review'],
-      ['版本对照', '/review/changes'],
       ['任务', '/tasks'],
       ['学习计划', '/plan'],
       ['提醒', '/reminders'],

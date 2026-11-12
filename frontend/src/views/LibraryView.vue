@@ -5,7 +5,7 @@
  * 约束：状态与未覆盖范围只取自后端作业，不做本地推断；归档与删除分别处理，删除前必须先看影响预览。
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -165,7 +165,7 @@ const indexRecognitionLabels: Record<MaterialRecognition['index']['state'], stri
 const extractionRecognitionLabels: Record<MaterialRecognition['extraction']['state'], string> = {
   not_started: '尚未提取',
   running: '识别中',
-  done: '已提取待核对事项',
+  done: '已提取候选事项',
   empty: '未提取到任务',
   failed: '失败',
 }
@@ -179,7 +179,7 @@ function recognitionSummary(material: Material): { tone: string; text: string } 
   if (state.extraction.state === 'failed') return { tone: 'failed', text: '事项识别失败' }
   if (state.index.state === 'failed') return { tone: 'failed', text: '问答索引失败' }
   if (state.extraction.state === 'done') {
-    return { tone: 'done', text: `已提取 ${state.extraction.candidate_count} 条待核对事项` }
+    return { tone: 'done', text: `已提取 ${state.extraction.candidate_count} 条候选事项` }
   }
   if (state.extraction.state === 'empty') return { tone: 'partial', text: '未提取到任务' }
   if (state.index.state === 'done') return { tone: 'partial', text: '可问答，尚未提取事项' }
@@ -218,10 +218,6 @@ function recognitionExtractionText(material: Material): string {
 
 function recognitionCanStart(material: Material): boolean {
   return recognitionFor(material)?.can_start ?? false
-}
-
-function recognitionCandidateCount(material: Material): number {
-  return recognitionFor(material)?.extraction.candidate_count ?? 0
 }
 
 function recognitionBlockedReason(material: Material): string | null {
@@ -755,7 +751,6 @@ onBeforeUnmount(stopPolling)
                     @click="startRecognition(material)"
                   >{{ recognizingId === material.id ? '正在识别…' : recognitionActionLabel(material) }}</button>
                   <span v-else-if="hasRecognitionInProgress(material)" class="muted small">识别进行中，页面会自动刷新</span>
-                  <RouterLink v-if="recognitionCandidateCount(material) > 0" class="text-button" to="/review">去待核对</RouterLink>
                 </div>
                 <p class="form-help">只有点击「开始识别」才会调用模型；保存原文不会自动提取，也不会自动把候选确认为正式任务。</p>
               </div>

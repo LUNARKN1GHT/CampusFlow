@@ -11,11 +11,9 @@ import LoginView from './views/LoginView.vue'
 import OverviewView from './views/OverviewView.vue'
 import PlanView from './views/PlanView.vue'
 import RemindersView from './views/RemindersView.vue'
-import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
 import ToolsView from './views/ToolsView.vue'
-import VersionChangeView from './views/VersionChangeView.vue'
 
 // 路由表与登录守卫：受保护页面统一挂在 AppShell 下，未登录跳登录页并保留 redirect 目标。
 // 会话检查复用 useAuth 的缓存与并发去重；已登录访问登录页回到总览，未知路径回首页。
@@ -44,16 +42,6 @@ const router = createRouter({
           path: 'library',
           name: 'library',
           component: LibraryView,
-        },
-        {
-          path: 'review',
-          name: 'review',
-          component: ReviewView,
-        },
-        {
-          path: 'review/changes',
-          name: 'review-changes',
-          component: VersionChangeView,
         },
         {
           path: 'tasks',

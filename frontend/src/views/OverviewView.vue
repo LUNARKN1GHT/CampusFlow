@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /*
- * 今日总览：只读汇总当日时间块、下一段安排、未来 7 天截止、待核对数量、未排入与冲突风险。
- * 数据来自最近一次已接受计划与任务／候选统计；没有已接受计划时提示先生成并接受草案。
- * 页面不提供写操作，各入口只跳转到任务、计划、待核对或问答页。
+ * 今日总览：只读汇总当日时间块、下一段安排、未来 7 天截止、未排入与冲突风险。
+ * 数据来自最近一次已接受计划与任务统计；没有已接受计划时提示先生成并接受草案。
+ * 页面不提供写操作，各入口只跳转到任务或计划页。
  */
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -54,7 +54,7 @@ onMounted(load)
     <div class="page-heading">
       <p class="eyebrow">今日总览</p>
       <h1>今天先做什么，<br />一眼看清。</h1>
-      <p class="intro">今日安排、近期截止和待核对事项集中展示；总览只读取数据，不修改计划。</p>
+      <p class="intro">今日安排、近期截止和计划风险集中展示；总览只读取数据，不修改计划。</p>
     </div>
 
     <ApiFeedback v-if="error" :message="error" @retry="load" />
@@ -70,10 +70,6 @@ onMounted(load)
         <div>
           <span>近期截止任务</span>
           <strong>{{ overview.upcoming_tasks.length }}</strong>
-        </div>
-        <div>
-          <span>待核对事项</span>
-          <strong>{{ overview.pending_review_count }}</strong>
         </div>
         <div>
           <span>未完整排入</span>
@@ -137,7 +133,6 @@ onMounted(load)
       <section class="panel quick-links" aria-label="下一步">
         <h2>下一步</h2>
         <div class="page-actions">
-          <RouterLink class="button-link" to="/review">处理待核对事项（{{ overview.pending_review_count }}）</RouterLink>
           <RouterLink class="button-link" to="/plan">调整两周计划</RouterLink>
         </div>
       </section>

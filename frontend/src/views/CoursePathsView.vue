@@ -871,7 +871,7 @@ onMounted(async () => {
                   <td>{{ course.credits ?? '未知' }}</td>
                   <td>{{ course.offered_terms.length ? course.offered_terms.map((term) => termLabels[term]).join('、') : '未知' }}</td>
                   <td>
-                    <RouterLink v-if="course.source_candidate_id" :to="{ path: '/review', query: { candidate: course.source_candidate_id } }">候选 #{{ course.source_candidate_id }}</RouterLink>
+                    <span v-if="course.source_candidate_id">候选 #{{ course.source_candidate_id }}</span>
                     <span v-else>手动</span>
                   </td>
                   <td class="row-actions">
@@ -922,7 +922,7 @@ onMounted(async () => {
                   <td>{{ relationName(relation.from_course_id) }} → {{ relationName(relation.to_course_id) }}</td>
                   <td>{{ relation.condition_text ?? '未填写' }}</td>
                   <td>
-                    <RouterLink v-if="relation.source_candidate_id" :to="{ path: '/review', query: { candidate: relation.source_candidate_id } }">候选 #{{ relation.source_candidate_id }}</RouterLink>
+                    <span v-if="relation.source_candidate_id">候选 #{{ relation.source_candidate_id }}</span>
                     <span v-else>手动</span>
                   </td>
                   <td class="row-actions"><button type="button" class="text-button danger" @click="removeRelation(relation)">删除</button></td>
@@ -1237,12 +1237,12 @@ onMounted(async () => {
                 <div>
                   <dt>来源候选</dt>
                   <dd>
-                    <RouterLink v-if="selectedGraphEdge.source_candidate_id" :to="{ path: '/review', query: { candidate: selectedGraphEdge.source_candidate_id } }">候选 #{{ selectedGraphEdge.source_candidate_id }}</RouterLink>
+                    <span v-if="selectedGraphEdge.source_candidate_id">候选 #{{ selectedGraphEdge.source_candidate_id }}</span>
                     <span v-else>手动录入</span>
                   </dd>
                 </div>
               </dl>
-              <!-- 证据停留在字段／片段／版本／资料编号，不在本页跳转资料库；关系候选另给出核对入口。 -->
+              <!-- 证据停留在字段／片段／版本／资料编号，不在本页跳转资料库；关系候选保留编号用于追溯。 -->
               <div class="evidence-list">
                 <p class="eyebrow">原文证据</p>
                 <p v-if="!selectedGraphEdge.evidence.length" class="compact-empty">该关系没有可展示的原文证据；不代表关系已被原文确认。</p>
@@ -1279,8 +1279,7 @@ onMounted(async () => {
                   <p v-if="problemCourseNames(problem)" class="form-help">涉及课程：{{ problemCourseNames(problem) }}</p>
                   <p v-if="problem.relation_ids.length" class="form-help">相关关系：{{ problem.relation_ids.map((id) => `#${id}`).join('、') }}</p>
                   <p v-if="problem.candidate_ids.length" class="form-help">
-                    来源候选：
-                    <RouterLink v-for="candidateId in problem.candidate_ids" :key="candidateId" :to="{ path: '/review', query: { candidate: candidateId } }">#{{ candidateId }}</RouterLink>
+                    来源候选：{{ problem.candidate_ids.map((id) => `#${id}`).join('、') }}
                   </p>
                 </li>
               </ul>
