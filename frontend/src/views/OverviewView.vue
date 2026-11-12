@@ -139,7 +139,6 @@ onMounted(load)
         <div class="page-actions">
           <RouterLink class="button-link" to="/review">处理待核对事项（{{ overview.pending_review_count }}）</RouterLink>
           <RouterLink class="button-link" to="/plan">调整两周计划</RouterLink>
-          <RouterLink class="button-link" to="/qa">带引用提问</RouterLink>
         </div>
       </section>
     </template>

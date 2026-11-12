@@ -220,10 +220,6 @@ function recognitionCanStart(material: Material): boolean {
   return recognitionFor(material)?.can_start ?? false
 }
 
-function recognitionSearchable(material: Material): boolean {
-  return recognitionFor(material)?.index.searchable ?? false
-}
-
 function recognitionCandidateCount(material: Material): number {
   return recognitionFor(material)?.extraction.candidate_count ?? 0
 }
@@ -746,7 +742,6 @@ onBeforeUnmount(stopPolling)
                 <template v-if="recognitionFor(material)">
                   <p>问答：{{ recognitionIndexText(material) }} · 事项：{{ recognitionExtractionText(material) }}</p>
                   <p v-if="recognitionBlockedReason(material)" class="form-help">{{ recognitionBlockedReason(material) }}</p>
-                  <p v-if="recognitionSearchable(material)" class="form-help">问答索引已完成，可在智能问答中按学期／课程范围提问。</p>
                   <p v-if="recognitionFor(material)?.extraction.state === 'done'" class="form-help">候选仍需人工核对，确认前不会成为正式任务。</p>
                 </template>
                 <p v-else class="form-help">正在读取识别状态…</p>
@@ -761,7 +756,6 @@ onBeforeUnmount(stopPolling)
                   >{{ recognizingId === material.id ? '正在识别…' : recognitionActionLabel(material) }}</button>
                   <span v-else-if="hasRecognitionInProgress(material)" class="muted small">识别进行中，页面会自动刷新</span>
                   <RouterLink v-if="recognitionCandidateCount(material) > 0" class="text-button" to="/review">去待核对</RouterLink>
-                  <RouterLink v-if="recognitionSearchable(material)" class="text-button" to="/qa">去问答</RouterLink>
                 </div>
                 <p class="form-help">只有点击「开始识别」才会调用模型；保存原文不会自动提取，也不会自动把候选确认为正式任务。</p>
               </div>
