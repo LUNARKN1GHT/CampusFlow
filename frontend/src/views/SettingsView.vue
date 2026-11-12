@@ -3,9 +3,10 @@
  * 设置页：维护工作空间时区、每日／每周学习容量、休息与提交缓冲，以及每周可用时段。
  * 偏好只影响后续生成或重排计划时的时间解释与容量，不改写已存日程、任务 DDL 或既有计划。
  * AI 服务面板只在桌面版可编辑：密钥写本机凭据存储，页面只显示是否已保存，绝不回显密钥。
- * 保存后服务端会按新的工作空间时区重算提醒窗口；界面主题保存在本机浏览器，不写入工作空间。
+ * 保存后服务端会按新的工作空间时区重算提醒窗口；深浅模式在页面右上角切换，色系保存在本机浏览器，不写入工作空间。
  */
 import { onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { scheduleApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -26,7 +27,9 @@ const slots = ref<AvailabilitySlot[]>([])
 const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
-const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
+const slotDeleteError = ref('')
+const removingSlotId = ref<number | null>(null)
+const { paletteOptions, palette, setColorPalette } = useTheme()
 
 // AI 服务：后端只返回可用性；密钥输入框永远是空白，提交后立即清空本地副本。
 const providerLabels: Record<TextProvider, string> = { zhipu: '智谱 GLM（ZHIPU）', deepseek: 'DeepSeek' }
@@ -155,13 +158,20 @@ async function addSlot() {
 }
 
 // 服务端删除成功后才从本地列表移除；失败保留原时段并显示错误。
+// 删除前展示星期与时段范围并确认，取消不发送请求；请求期间按钮禁用，避免重复提交。
 async function deleteSlot(slot: AvailabilitySlot) {
-  slotError.value = ''
+  if (removingSlotId.value !== null) return
+  const range = `${weekdays[slot.day_of_week]} ${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`
+  if (!confirm(`移除可用时段“${range}”？移除后该时段不再参与后续排期，已生成计划中的时间块不会被改写。`)) return
+  slotDeleteError.value = ''
+  removingSlotId.value = slot.id
   try {
     await scheduleApi.deleteSlot(slot.id)
     slots.value = slots.value.filter((item) => item.id !== slot.id)
   } catch (caught) {
-    slotError.value = errorMessage(caught)
+    slotDeleteError.value = errorMessage(caught)
+  } finally {
+    removingSlotId.value = null
   }
 }
 
@@ -205,7 +215,8 @@ onMounted(() => {
 
       <section class="panel editor-panel">
         <div class="section-heading"><div><p class="eyebrow">真实配置</p><h2>每周可用时间</h2></div><span class="count-badge">{{ slots.length }} 段</span></div>
-        <div v-if="slots.length" class="availability-grid"><article v-for="slot in slots" :key="slot.id"><span><strong>{{ weekdays[slot.day_of_week] }}</strong><small>{{ slot.start_time.slice(0, 5) }}–{{ slot.end_time.slice(0, 5) }}</small></span><button type="button" class="text-button" @click="deleteSlot(slot)">移除</button></article></div>
+        <p v-if="slotDeleteError" class="form-error" role="alert">{{ slotDeleteError }}</p>
+        <div v-if="slots.length" class="availability-grid"><article v-for="slot in slots" :key="slot.id"><span><strong>{{ weekdays[slot.day_of_week] }}</strong><small>{{ slot.start_time.slice(0, 5) }}–{{ slot.end_time.slice(0, 5) }}</small></span><button type="button" class="text-button" :disabled="removingSlotId !== null" @click="deleteSlot(slot)">{{ removingSlotId === slot.id ? '移除中…' : '移除' }}</button></article></div>
         <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排学习块。</div>
       </section>
     </template>
@@ -242,11 +253,22 @@ onMounted(() => {
     </section>
 
     <section class="panel editor-panel">
-      <div class="section-heading"><div><p class="eyebrow">显示</p><h2>界面主题</h2></div></div>
-      <div class="segmented" role="group" aria-label="界面主题">
-        <button v-for="option in themeOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': themeMode === option.value }" :aria-pressed="themeMode === option.value" @click="setThemeMode(option.value)">{{ option.label }}</button>
+      <div class="section-heading"><div><p class="eyebrow">显示</p><h2>主题色系</h2></div></div>
+      <div class="segmented" role="group" aria-label="主题色系">
+        <button v-for="option in paletteOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': palette === option.value }" :aria-pressed="palette === option.value" @click="setColorPalette(option.value)">{{ option.label }}</button>
       </div>
-      <p class="form-help">选择立即生效，并保存在本机浏览器；“跟随系统”会随操作系统深浅色设置自动切换。主题只影响当前浏览器，不写入工作空间设置。</p>
+      <p class="form-help">深浅模式在页面右上角切换；色系（绿色为默认）与深浅模式独立叠加，选择立即生效并保存在本机浏览器，不写入工作空间设置。</p>
+    </section>
+
+    <section class="panel editor-panel">
+      <div class="section-heading"><div><p class="eyebrow">低频功能</p><h2>工具箱</h2></div></div>
+      <p class="form-help">课程路径等低频能力不在主导航展示，集中放在工具箱里按需进入；入口位置调整不影响已保存的培养方案、课程关系与计划。</p>
+      <RouterLink class="toolbox-link" to="/tools">进入工具箱</RouterLink>
     </section>
   </main>
 </template>
+
+<style scoped>
+.toolbox-link { display: inline-flex; margin-top: 14px; padding: 9px 14px; border: 1px solid var(--brand-border); border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 13px; font-weight: 800; text-decoration: none; }
+.toolbox-link:hover { border-color: var(--brand); }
+</style>

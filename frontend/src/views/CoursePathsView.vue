@@ -8,7 +8,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { semestersApi } from '../api/business'
-import { errorMessage } from '../api/client'
+import { ApiError, errorMessage } from '../api/client'
 import { pathsApi } from '../api/paths'
 import type {
   AliasResolution,
@@ -30,6 +30,9 @@ import type {
   StudyStatus,
   SwitchPreview,
 } from '../api/types'
+import ApiFeedback from '../components/ApiFeedback.vue'
+import CourseGraphDiagram from '../components/CourseGraph.vue'
+import { buildGraphLayout } from '../utils/courseGraph'
 
 // 三类关系互斥；只有强制先修进入拓扑分层，并修只约束同修，建议先学仅提示。
 const relationLabels: Record<string, string> = {
@@ -37,7 +40,6 @@ const relationLabels: Record<string, string> = {
   corequisite: '并修',
   recommended: '建议先学',
 }
-const relationTypes = ['prerequisite', 'corequisite', 'recommended'] as const
 const statusLabels: Record<string, string> = {
   completed: '已修',
   in_progress: '在修',
@@ -77,6 +79,8 @@ const studyStatus = ref<CourseStudyStatusSummary | null>(null)
 const semesters = ref<Semester[]>([])
 const dataLoading = ref(false)
 const studyUnavailable = ref(false)
+const studyError = ref('')
+const studyRetrying = ref(false)
 
 const preview = ref<SwitchPreview | null>(null)
 const previewLoading = ref(false)
@@ -88,6 +92,8 @@ const planForm = reactive({
   version_label: '',
   credit_limit_per_term: null as number | null,
 })
+// 创建方案没有撤销入口，提交期间禁用按钮并忽略重复触发，避免生成字段相同的重复版本。
+const planSaving = ref(false)
 
 const courseForm = reactive({
   id: null as number | null,
@@ -118,6 +124,11 @@ const resolveClass = ref('')
 const resolveSemester = ref<number | null>(null)
 const resolution = ref<AliasResolution | null>(null)
 const resolving = ref(false)
+
+// 三类删除共用一组“正在删除的行”标记：点击后按钮显示忙碌并阻止重复提交。
+const removingRelationId = ref<number | null>(null)
+const removingAliasId = ref<number | null>(null)
+const removingStudyRecordId = ref<number | null>(null)
 
 const studyForm = reactive({
   curriculum_course_id: null as number | null,
@@ -192,121 +203,9 @@ const graphProblemGroups = computed(() => {
   ]
 })
 
-// 节点尺寸与间距固定，SVG 宽高、连线锚点和点击热区都由这些常量推导。
-const GRAPH_NODE_WIDTH = 172
-const GRAPH_NODE_HEIGHT = 54
-const GRAPH_COLUMN_GAP = 72
-const GRAPH_ROW_GAP = 18
-const GRAPH_PADDING = 18
+// 布局是纯计算，放在 utils/courseGraph 中；这里只把图数据与成环关系传入。
+const graphLayout = computed(() => buildGraphLayout(graph.value, cycleRelationIds.value))
 
-type GraphLayout = {
-  nodes: Array<{ node: CourseGraphNode; x: number; y: number; column: number; row: number }>
-  edges: Array<{ edge: CourseGraphEdge; path: string; self: boolean; cycle: boolean }>
-  width: number
-  height: number
-  columns: number
-}
-
-const graphLayout = computed<GraphLayout>(() => {
-  const current = graph.value
-  if (!current || !current.nodes.length) {
-    return { nodes: [], edges: [], width: 0, height: 0, columns: 0 }
-  }
-  // 布局要画出全部课程，因此自行按强制先修做一次 Kahn 分层，不复用 /order：
-  // 后者在存在问题时返回空层次，直接使用会让有问题的图无节点可渲染。
-  const ids = current.nodes.map((node) => node.id)
-  const idSet = new Set(ids)
-  const indegree = new Map(ids.map((id) => [id, 0]))
-  const adjacency = new Map<number, number[]>()
-  current.edges.forEach((edge) => {
-    if (edge.relation_type !== 'prerequisite') return
-    if (!idSet.has(edge.from_course_id) || !idSet.has(edge.to_course_id)) return
-    const targets = adjacency.get(edge.from_course_id) ?? []
-    targets.push(edge.to_course_id)
-    adjacency.set(edge.from_course_id, targets)
-    indegree.set(edge.to_course_id, (indegree.get(edge.to_course_id) ?? 0) + 1)
-  })
-  const levelById = new Map<number, number>()
-  let frontier = ids.filter((id) => (indegree.get(id) ?? 0) === 0)
-  let depth = 0
-  while (frontier.length) {
-    frontier.forEach((id) => levelById.set(id, depth))
-    const next: number[] = []
-    frontier.forEach((id) => {
-      for (const target of adjacency.get(id) ?? []) {
-        const degree = (indegree.get(target) ?? 0) - 1
-        indegree.set(target, degree)
-        if (degree === 0) next.push(target)
-      }
-    })
-    frontier = Array.from(new Set(next))
-    depth += 1
-  }
-  // 成环及环下游的课程没有稳定层，统一放到最后一列，不伪造层次。
-  const remaining = current.nodes.filter((node) => !levelById.has(node.id))
-  const finalColumn = remaining.length ? Math.max(0, depth) : Math.max(0, depth - 1)
-  remaining.forEach((node) => levelById.set(node.id, finalColumn))
-  const groups = new Map<number, CourseGraphNode[]>()
-  current.nodes.forEach((node) => {
-    const column = levelById.get(node.id) ?? 0
-    const group = groups.get(column) ?? []
-    group.push(node)
-    groups.set(column, group)
-  })
-  const columns = Array.from(groups.entries())
-    .sort(([left], [right]) => left - right)
-    .map(([, nodes]) => [...nodes].sort((left, right) => left.name.localeCompare(right.name, 'zh')))
-  const maxRows = Math.max(...columns.map((nodes) => nodes.length))
-  const width =
-    columns.length * GRAPH_NODE_WIDTH +
-    Math.max(0, columns.length - 1) * GRAPH_COLUMN_GAP +
-    GRAPH_PADDING * 2
-  const height =
-    maxRows * GRAPH_NODE_HEIGHT +
-    Math.max(0, maxRows - 1) * GRAPH_ROW_GAP +
-    GRAPH_PADDING * 2
-  // 列号来自强制先修链上的 Kahn 分层，行号按中文课名排序；
-  // 位置只由节点集合推导，重复渲染结果稳定。
-  const positions = new Map<number, { x: number; y: number; column: number; row: number }>()
-  const layoutNodes: GraphLayout['nodes'] = []
-  columns.forEach((nodes, column) => {
-    nodes.forEach((node, row) => {
-      const position = {
-        x: GRAPH_PADDING + column * (GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP),
-        y: GRAPH_PADDING + row * (GRAPH_NODE_HEIGHT + GRAPH_ROW_GAP),
-        column,
-        row,
-      }
-      positions.set(node.id, position)
-      layoutNodes.push({ node, ...position })
-    })
-  })
-  const layoutEdges = current.edges.flatMap((edge) => {
-    const source = positions.get(edge.from_course_id)
-    const target = positions.get(edge.to_course_id)
-    if (!source || !target) return []
-    const sx = source.x + GRAPH_NODE_WIDTH
-    const sy = source.y + GRAPH_NODE_HEIGHT / 2
-    const tx = target.x
-    const ty = target.y + GRAPH_NODE_HEIGHT / 2
-    // 连线从源节点右侧中点连到目标节点左侧中点；同列或回边改用绕行曲率只为
-    // 避免穿过节点，箭头方向仍表示“来源课程 → 受限课程”。
-    let path: string
-    if (edge.from_course_id === edge.to_course_id) {
-      // 自环必须可见：从节点右侧绕出再回到自身。
-      path = `M ${sx} ${sy - 9} C ${sx + 52} ${sy - 34}, ${sx + 52} ${sy + 34}, ${sx} ${sy + 9}`
-    } else if (target.column > source.column) {
-      const handle = Math.max(36, (tx - sx) / 2)
-      path = `M ${sx} ${sy} C ${sx + handle} ${sy}, ${tx - handle} ${ty}, ${tx} ${ty}`
-    } else if (target.column === source.column) {
-      path = `M ${sx} ${sy} C ${sx + 58} ${sy}, ${tx + 58} ${ty}, ${tx} ${ty}`
-    } else {
-      path = `M ${sx} ${sy} C ${sx + 76} ${sy - 66}, ${tx - 76} ${ty + 66}, ${tx} ${ty}`
-    }
-    return [{ edge, path, self: edge.from_course_id === edge.to_course_id, cycle: cycleRelationIds.value.has(edge.id) }]
-  })
-  return { nodes: layoutNodes, edges: layoutEdges, width, height, columns: columns.length }
-})
 
 // next 接口把已完成课程标为不可进入，两处列表都排除，避免出现在“待满足条件”里；
 // 没有修读记录时状态为 unknown，按未完成处理，不推断为已修或未修。
@@ -344,16 +243,11 @@ function problemCourseNames(problem: CourseGraphProblem): string {
   return ids.map(courseName).join(' → ')
 }
 
-// 节点宽度固定，超长课名截断；完整名称由模板里的 <title> 提供悬浮提示。
-function shortNodeName(name: string): string {
-  return name.length > 12 ? `${name.slice(0, 12)}…` : name
-}
-
 // 默认查看档案中的当前方案；没有当前方案时只选中第一个版本供查看，
 // 真正写入档案仍需用户在切换预览中确认。
+// 失败信息保留到本次加载成功为止，重试期间由 ApiFeedback 的 busy 状态提示进行中。
 async function load() {
   loading.value = true
-  error.value = ''
   try {
     const [loadedProfile, loadedPlans, loadedSemesters] = await Promise.all([
       pathsApi.profile(),
@@ -374,11 +268,19 @@ async function load() {
         credit_limit_per_term: selectedPlan.value.credit_limit_per_term,
       })
     }
+    error.value = ''
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
     loading.value = false
   }
+}
+
+// 首屏失败后可就地重试：先重新读取方案与学期，成功后再加载方案数据。
+async function retryLoad() {
+  if (loading.value) return
+  await load()
+  if (!error.value) await loadPlanData()
 }
 
 // 方案切换后所有列表与分析都重新拉取；没有选中方案时清空并重置，
@@ -390,6 +292,8 @@ async function loadPlanData() {
     aliases.value = []
     studyRecords.value = []
     studyStatus.value = null
+    studyUnavailable.value = false
+    studyError.value = ''
     resetAnalysis()
     return
   }
@@ -493,10 +397,10 @@ async function generateSemesterPlan() {
   }
 }
 
-// 修读记录与汇总任一失败即整体标记不可用，避免把空数据展示成“未修”或“状态未知”。
+// 修读记录与汇总任一失败即整体不可用，避免把空数据展示成“未修”或“状态未知”。
+// 只有 404 才视为接口未接入；超时、网络或 5xx 视为本次读取失败，保留可读原因供重试。
 async function loadStudy() {
   if (selectedPlanId.value === null) return
-  studyUnavailable.value = false
   try {
     const [records, statuses] = await Promise.all([
       pathsApi.listStudyRecords(selectedPlanId.value),
@@ -504,11 +408,27 @@ async function loadStudy() {
     ])
     studyRecords.value = records
     studyStatus.value = statuses
-  } catch {
-    studyUnavailable.value = true
+    studyUnavailable.value = false
+    studyError.value = ''
+  } catch (caught) {
     studyRecords.value = []
     studyStatus.value = null
+    if (caught instanceof ApiError && caught.status === 404) {
+      studyUnavailable.value = true
+      studyError.value = ''
+    } else {
+      studyUnavailable.value = false
+      studyError.value = errorMessage(caught)
+    }
   }
+}
+
+// 修读状态读取失败后就地重试；失败原因保留到本次读取成功为止，便于按钮显示进行中。
+async function retryStudy() {
+  if (studyRetrying.value) return
+  studyRetrying.value = true
+  await loadStudy()
+  studyRetrying.value = false
 }
 
 // 查看版本与档案当前方案分离：仅当二者不同时读取切换影响预览，
@@ -556,9 +476,12 @@ async function applyCurrentPlan() {
   }
 }
 
+// 提交期间保持表单内容并禁用按钮；失败只显示原因，已填字段不丢失。
 async function createPlan() {
+  if (planSaving.value) return
   actionError.value = ''
   notice.value = ''
+  planSaving.value = true
   try {
     const created = await pathsApi.createPlan({
       title: planForm.title,
@@ -572,6 +495,8 @@ async function createPlan() {
     notice.value = '培养方案版本已创建；请确认无误后设为当前方案。'
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    planSaving.value = false
   }
 }
 
@@ -655,14 +580,25 @@ async function addRelation() {
   }
 }
 
+// 三类删除都没有撤销入口：先展示将删除的关系方向与条件、别名范围或修读记录字段，
+// 取消不发送请求；请求期间按钮禁用，失败保留原列表并显示原因。
 async function removeRelation(relation: CourseRelation) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingRelationId.value !== null) return
+  const typeLabel = relationLabels[relation.relation_type] ?? relation.relation_type
+  const condition = relation.condition_text ? `条件原文：${relation.condition_text}。` : ''
+  const confirmed = confirm(
+    `删除${typeLabel}关系“${relationName(relation.from_course_id)} → ${relationName(relation.to_course_id)}”？${condition}删除后该关系不再参与关系图、修读顺序与下一步判断，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingRelationId.value = relation.id
   try {
     await pathsApi.deleteRelation(selectedPlanId.value, relation.id)
     await loadPlanData()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingRelationId.value = null
   }
 }
 
@@ -688,13 +624,21 @@ async function addAlias() {
 }
 
 async function removeAlias(alias: CourseAlias) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingAliasId.value !== null) return
+  const scope = `${alias.class_name ? `教学班 ${alias.class_name}` : '不限教学班'}、${alias.semester_id ? semesterName(alias.semester_id) : '不限学期'}`
+  const confirmed = confirm(
+    `删除别名“${alias.alias}”（对应课程 ${relationName(alias.curriculum_course_id)}，${scope}）？删除后名称解析不再使用该别名，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingAliasId.value = alias.id
   try {
     await pathsApi.deleteAlias(selectedPlanId.value, alias.id)
     await loadPlanData()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingAliasId.value = null
   }
 }
 
@@ -742,13 +686,27 @@ async function addStudyRecord() {
 }
 
 async function removeStudyRecord(record: CourseStudyRecord) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingStudyRecordId.value !== null) return
+  const fields = [
+    `状态：${statusLabels[record.status] ?? record.status}`,
+    `学期：${semesterName(record.semester_id)}`,
+    `成绩：${record.grade ?? '未填写'}`,
+    `已获学分：${record.credits_earned ?? '未填写'}`,
+    `备注：${record.note ?? '未填写'}`,
+  ].join('；')
+  const confirmed = confirm(
+    `删除“${relationName(record.curriculum_course_id)}”的修读记录？将删除 ${fields}。删除后该课程回到状态未知，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingStudyRecordId.value = record.id
   try {
     await pathsApi.deleteStudyRecord(selectedPlanId.value, record.id)
     await loadStudy()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingStudyRecordId.value = null
   }
 }
 
@@ -773,9 +731,7 @@ onMounted(async () => {
       </p>
     </div>
 
-    <div v-if="error" class="status-banner failed" role="alert">
-      <div><strong>加载失败</strong><p>{{ error }}</p></div>
-    </div>
+    <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="retryLoad" />
     <p v-else-if="loading" class="muted">正在加载培养方案…</p>
 
     <template v-else>
@@ -839,7 +795,7 @@ onMounted(async () => {
               <label>版本标签<input v-model.trim="planForm.version_label" required maxlength="100" placeholder="例如：2024 版" /></label>
             </div>
             <label>每学期学分上限（未知留空）<input v-model.number="planForm.credit_limit_per_term" type="number" min="1" /></label>
-            <button type="submit">创建方案版本</button>
+            <button type="submit" :disabled="planSaving">{{ planSaving ? '创建中…' : '创建方案版本' }}</button>
           </form>
         </section>
       </div>
@@ -848,11 +804,11 @@ onMounted(async () => {
       <div v-if="notice" class="status-banner success"><div><strong>{{ notice }}</strong></div></div>
 
       <section class="panel">
-        <div class="tab-row" role="tablist">
-          <button type="button" :class="{ active: activeTab === 'courses' }" @click="activeTab = 'courses'">课程目录</button>
-          <button type="button" :class="{ active: activeTab === 'relations' }" @click="activeTab = 'relations'">课程关系</button>
-          <button type="button" :class="{ active: activeTab === 'aliases' }" @click="activeTab = 'aliases'">别名匹配</button>
-          <button type="button" :class="{ active: activeTab === 'study' }" @click="activeTab = 'study'">修读状态</button>
+        <div class="tab-row" role="group" aria-label="培养方案数据视图">
+          <button type="button" :class="{ active: activeTab === 'courses' }" :aria-pressed="activeTab === 'courses'" @click="activeTab = 'courses'">课程目录</button>
+          <button type="button" :class="{ active: activeTab === 'relations' }" :aria-pressed="activeTab === 'relations'" @click="activeTab = 'relations'">课程关系</button>
+          <button type="button" :class="{ active: activeTab === 'aliases' }" :aria-pressed="activeTab === 'aliases'" @click="activeTab = 'aliases'">别名匹配</button>
+          <button type="button" :class="{ active: activeTab === 'study' }" :aria-pressed="activeTab === 'study'" @click="activeTab = 'study'">修读状态</button>
         </div>
         <p v-if="dataLoading" class="muted">正在加载方案数据…</p>
 
@@ -871,7 +827,7 @@ onMounted(async () => {
                   <td>{{ course.credits ?? '未知' }}</td>
                   <td>{{ course.offered_terms.length ? course.offered_terms.map((term) => termLabels[term]).join('、') : '未知' }}</td>
                   <td>
-                    <RouterLink v-if="course.source_candidate_id" :to="{ path: '/review', query: { candidate: course.source_candidate_id } }">候选 #{{ course.source_candidate_id }}</RouterLink>
+                    <span v-if="course.source_candidate_id">候选 #{{ course.source_candidate_id }}</span>
                     <span v-else>手动</span>
                   </td>
                   <td class="row-actions">
@@ -922,10 +878,14 @@ onMounted(async () => {
                   <td>{{ relationName(relation.from_course_id) }} → {{ relationName(relation.to_course_id) }}</td>
                   <td>{{ relation.condition_text ?? '未填写' }}</td>
                   <td>
-                    <RouterLink v-if="relation.source_candidate_id" :to="{ path: '/review', query: { candidate: relation.source_candidate_id } }">候选 #{{ relation.source_candidate_id }}</RouterLink>
+                    <span v-if="relation.source_candidate_id">候选 #{{ relation.source_candidate_id }}</span>
                     <span v-else>手动</span>
                   </td>
-                  <td class="row-actions"><button type="button" class="text-button danger" @click="removeRelation(relation)">删除</button></td>
+                  <td class="row-actions">
+                    <button type="button" class="text-button danger" :disabled="removingRelationId !== null" @click="removeRelation(relation)">
+                      {{ removingRelationId === relation.id ? '删除中…' : '删除' }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -972,7 +932,11 @@ onMounted(async () => {
                   <td>{{ relationName(alias.curriculum_course_id) }}</td>
                   <td>{{ alias.class_name ?? '不限' }}</td>
                   <td>{{ alias.semester_id ? semesterName(alias.semester_id) : '不限' }}</td>
-                  <td class="row-actions"><button type="button" class="text-button danger" @click="removeAlias(alias)">删除</button></td>
+                  <td class="row-actions">
+                    <button type="button" class="text-button danger" :disabled="removingAliasId !== null" @click="removeAlias(alias)">
+                      {{ removingAliasId === alias.id ? '删除中…' : '删除' }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -1028,7 +992,15 @@ onMounted(async () => {
             <div><p class="eyebrow">个人修读</p><h2>已修、在修与待修</h2></div>
             <span class="count-badge">{{ studyRecords.length }} 条记录</span>
           </div>
-          <p v-if="studyUnavailable" class="status-banner failed">
+          <!-- 只有 404 才说明接口尚未接入；超时、网络或 5xx 属于本次读取失败，给出原因与原位重试。 -->
+          <ApiFeedback
+            v-if="studyError"
+            title="修读状态读取失败"
+            :message="studyError"
+            :busy="studyRetrying"
+            @retry="retryStudy"
+          />
+          <p v-else-if="studyUnavailable" class="status-banner failed">
             <span><strong>修读状态暂不可用</strong><p>后端修读记录接口尚未接入；当前不会伪造任何状态。</p></span>
           </p>
           <template v-else>
@@ -1043,7 +1015,11 @@ onMounted(async () => {
                     <td>{{ record.grade ?? '未填写' }}</td>
                     <td>{{ record.credits_earned ?? '未填写' }}</td>
                     <td>{{ record.note ?? '—' }}</td>
-                    <td class="row-actions"><button type="button" class="text-button danger" @click="removeStudyRecord(record)">删除</button></td>
+                    <td class="row-actions">
+                      <button type="button" class="text-button danger" :disabled="removingStudyRecordId !== null" @click="removeStudyRecord(record)">
+                        {{ removingStudyRecordId === record.id ? '删除中…' : '删除' }}
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -1130,86 +1106,17 @@ onMounted(async () => {
           <ul v-if="graph.limitations.length" class="limitations-list">
             <li v-for="(limitation, index) in graph.limitations" :key="`graph-limit-${index}`">{{ limitation }}</li>
           </ul>
-          <div class="legend-row graph-legend">
-            <span class="legend-chip prerequisite">强制先修 · 实线箭头</span>
-            <span class="legend-chip corequisite">并修 · 点划线</span>
-            <span class="legend-chip recommended">建议先学 · 虚线</span>
-            <span class="legend-chip cycle">成环 · 高亮加粗</span>
-          </div>
-          <p v-if="!graph.nodes.length" class="compact-empty">当前方案还没有课程，无法绘制关系图。</p>
-          <template v-else>
-            <div class="graph-scroll">
-              <svg
-                :width="graphLayout.width"
-                :height="graphLayout.height"
-                :viewBox="`0 0 ${graphLayout.width} ${graphLayout.height}`"
-                class="graph-svg"
-                role="img"
-                aria-label="课程关系图"
-              >
-                <defs>
-                  <marker
-                    v-for="type in relationTypes"
-                    :id="`graph-arrow-${type}`"
-                    :key="`marker-${type}`"
-                    markerWidth="9"
-                    markerHeight="9"
-                    refX="8"
-                    refY="4.5"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M0,0 L9,4.5 L0,9 z" :class="`marker-${type}`" />
-                  </marker>
-                </defs>
-                <g>
-                  <g
-                    v-for="item in graphLayout.edges"
-                    :key="`edge-${item.edge.id}`"
-                    :class="['graph-edge', { cycle: item.cycle, selected: selectedEdgeId === item.edge.id }]"
-                    @click.stop="toggleGraphEdge(item.edge.id)"
-                  >
-                    <path :d="item.path" class="edge-hit" />
-                    <path
-                      :d="item.path"
-                      :class="[
-                        'edge-line',
-                        `edge-${item.edge.relation_type}`,
-                        {
-                          selected: selectedEdgeId === item.edge.id,
-                          'edge-self': item.self,
-                          'edge-cycle': item.cycle,
-                        },
-                      ]"
-                      :marker-end="`url(#graph-arrow-${item.edge.relation_type})`"
-                    />
-                  </g>
-                </g>
-                <g
-                  v-for="item in graphLayout.nodes"
-                  :key="`node-${item.node.id}`"
-                  :class="[
-                    'graph-node',
-                    {
-                      cycle: cycleCourseIds.has(item.node.id),
-                      selected: selectedNodeId === item.node.id,
-                    },
-                  ]"
-                  :transform="`translate(${item.x}, ${item.y})`"
-                  role="button"
-                  tabindex="0"
-                  @click.stop="toggleGraphNode(item.node.id)"
-                  @keydown.enter.prevent="toggleGraphNode(item.node.id)"
-                  @keydown.space.prevent="toggleGraphNode(item.node.id)"
-                >
-                  <title>{{ item.node.name }}</title>
-                  <rect :width="GRAPH_NODE_WIDTH" :height="GRAPH_NODE_HEIGHT" rx="12" />
-                  <text x="12" y="23" class="node-name">{{ shortNodeName(item.node.name) }}</text>
-                  <text x="12" y="41" class="node-meta">
-                    {{ item.node.code ?? '未填写代码' }} · {{ item.node.credits ?? '?' }} 学分 · {{ statusLabels[item.node.study_status] ?? item.node.study_status }}
-                  </text>
-                </g>
-              </svg>
-            </div>
+          <CourseGraphDiagram
+            :layout="graphLayout"
+            :selected-node-id="selectedNodeId"
+            :selected-edge-id="selectedEdgeId"
+            :cycle-course-ids="cycleCourseIds"
+            :relation-labels="relationLabels"
+            :status-labels="statusLabels"
+            @select-node="toggleGraphNode"
+            @select-edge="toggleGraphEdge"
+          />
+          <template v-if="graph.nodes.length">
             <div v-if="selectedGraphNode" class="graph-detail">
               <div class="section-heading">
                 <div><p class="eyebrow">课程详情</p><h3>{{ selectedGraphNode.name }}</h3></div>
@@ -1237,12 +1144,12 @@ onMounted(async () => {
                 <div>
                   <dt>来源候选</dt>
                   <dd>
-                    <RouterLink v-if="selectedGraphEdge.source_candidate_id" :to="{ path: '/review', query: { candidate: selectedGraphEdge.source_candidate_id } }">候选 #{{ selectedGraphEdge.source_candidate_id }}</RouterLink>
+                    <span v-if="selectedGraphEdge.source_candidate_id">候选 #{{ selectedGraphEdge.source_candidate_id }}</span>
                     <span v-else>手动录入</span>
                   </dd>
                 </div>
               </dl>
-              <!-- 证据停留在字段／片段／版本／资料编号，不在本页跳转资料库；关系候选另给出核对入口。 -->
+              <!-- 证据停留在字段／片段／版本／资料编号，不在本页跳转资料库；关系候选保留编号用于追溯。 -->
               <div class="evidence-list">
                 <p class="eyebrow">原文证据</p>
                 <p v-if="!selectedGraphEdge.evidence.length" class="compact-empty">该关系没有可展示的原文证据；不代表关系已被原文确认。</p>
@@ -1279,8 +1186,7 @@ onMounted(async () => {
                   <p v-if="problemCourseNames(problem)" class="form-help">涉及课程：{{ problemCourseNames(problem) }}</p>
                   <p v-if="problem.relation_ids.length" class="form-help">相关关系：{{ problem.relation_ids.map((id) => `#${id}`).join('、') }}</p>
                   <p v-if="problem.candidate_ids.length" class="form-help">
-                    来源候选：
-                    <RouterLink v-for="candidateId in problem.candidate_ids" :key="candidateId" :to="{ path: '/review', query: { candidate: candidateId } }">#{{ candidateId }}</RouterLink>
+                    来源候选：{{ problem.candidate_ids.map((id) => `#${id}`).join('、') }}
                   </p>
                 </li>
               </ul>
@@ -1485,7 +1391,7 @@ onMounted(async () => {
 .switch-preview p { margin: 0; font-size: 13px; }
 .tab-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .tab-row button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--paper-strong); color: var(--muted); padding: 7px 13px; }
-.tab-row button.active { color: var(--brand); border-color: var(--brand-border); background: var(--brand-selected); font-weight: 800; }
+.tab-row button.active { color: var(--brand); border-color: var(--brand-border); background: var(--brand-selected); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 .data-table { overflow-x: auto; margin: 10px 0 16px; }
 .data-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th, .data-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -1507,29 +1413,6 @@ onMounted(async () => {
 .graph-panel { margin-top: 18px; }
 .graph-complete { color: var(--brand); background: var(--brand-soft); }
 .graph-incomplete { color: var(--danger-strong-ink); background: var(--danger-bg-soft); }
-.graph-legend { margin: 10px 0 12px; }
-.legend-chip.cycle { color: var(--danger-strong-ink); background: var(--danger-bg); border-color: var(--danger-border); }
-.graph-scroll { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
-.graph-svg { display: block; min-width: 100%; }
-.graph-edge { cursor: pointer; }
-.edge-hit { fill: none; stroke: transparent; stroke-width: 14; }
-.edge-line { fill: none; stroke: var(--line-strong); stroke-width: 1.8; }
-.edge-prerequisite { stroke: var(--danger-strong-ink); stroke-width: 2.1; }
-.edge-corequisite { stroke: var(--warn-strong-ink); stroke-width: 2.1; stroke-dasharray: 9 4 2 4; }
-.edge-recommended { stroke: var(--info-ink); stroke-width: 1.8; stroke-dasharray: 5 5; }
-.graph-edge.cycle .edge-line, .edge-cycle { stroke-width: 3.2; }
-.graph-edge.selected .edge-line { stroke-width: 3.6; }
-.marker-prerequisite { fill: var(--danger-strong-ink); }
-.marker-corequisite { fill: var(--warn-strong-ink); }
-.marker-recommended { fill: var(--info-ink); }
-.graph-node { cursor: pointer; outline: none; }
-.graph-node rect { fill: var(--paper-strong); stroke: var(--line-strong); stroke-width: 1.5; }
-.graph-node:hover rect, .graph-node:focus-visible rect { stroke: var(--brand-border); }
-.graph-node.selected rect { stroke: var(--brand); stroke-width: 2.6; }
-.graph-node.cycle rect { stroke: var(--danger-strong-ink); stroke-dasharray: 6 3; }
-.node-name { fill: var(--ink); font-size: 13px; font-weight: 800; }
-.node-meta { fill: var(--muted); font-size: 10.5px; }
-.graph-node.cycle .node-name { fill: var(--danger-strong-ink); }
 .graph-detail { display: grid; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid var(--brand-border); border-radius: 12px; background: var(--brand-selected); }
 .graph-detail .section-heading { margin-bottom: 0; }
 .detail-grid { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; }

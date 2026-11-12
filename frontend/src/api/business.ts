@@ -1,6 +1,8 @@
 // 学期、课程、任务、固定日程／可用时间与提醒的业务接口。
 // 所有读写都由后端按当前会话工作空间隔离，前端不传 workspace 标识。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest } from './client'
 import type {
   AvailabilitySlot,
@@ -27,16 +29,6 @@ import type {
   TaskRelations,
   TaskRollup,
 } from './types'
-
-/** 只省略 null／undefined／空串；false 与 0 仍会编码（例如 include_archived=false 也会发送）。 */
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
 
 // 归档只切换学期标记，不删除或改写课程、任务、进度与日程。
 export const semestersApi = {

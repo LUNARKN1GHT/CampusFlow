@@ -2,23 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import AppShell from './components/AppShell.vue'
 import { useAuth } from './composables/useAuth'
-import CalendarView from './views/CalendarView.vue'
-import CoursePathsView from './views/CoursePathsView.vue'
-import CoursesView from './views/CoursesView.vue'
-import ExportView from './views/ExportView.vue'
-import HealthView from './views/HealthView.vue'
-import LibraryView from './views/LibraryView.vue'
-import LoginView from './views/LoginView.vue'
-import OverviewView from './views/OverviewView.vue'
-import PlanView from './views/PlanView.vue'
-import QaView from './views/QaView.vue'
-import RemindersView from './views/RemindersView.vue'
-import ReviewView from './views/ReviewView.vue'
-import SettingsView from './views/SettingsView.vue'
-import TasksView from './views/TasksView.vue'
-import VersionChangeView from './views/VersionChangeView.vue'
 
 // 路由表与登录守卫：受保护页面统一挂在 AppShell 下，未登录跳登录页并保留 redirect 目标。
+// 视图按路由动态加载，避免首屏一次性下载全部页面；AppShell 保持同步以稳定主布局。
 // 会话检查复用 useAuth 的缓存与并发去重；已登录访问登录页回到总览，未知路径回首页。
 const router = createRouter({
   history: createWebHistory(),
@@ -28,67 +14,53 @@ const router = createRouter({
       component: AppShell,
       meta: { requiresAuth: true },
       children: [
-        { path: '', name: 'overview', component: OverviewView },
-        { path: 'health', name: 'health', component: HealthView },
-        { path: 'plan', name: 'plan', component: PlanView },
+        { path: '', name: 'overview', component: () => import('./views/OverviewView.vue') },
+        { path: 'health', name: 'health', component: () => import('./views/HealthView.vue') },
+        { path: 'plan', name: 'plan', component: () => import('./views/PlanView.vue') },
         {
           path: 'courses',
           name: 'courses',
-          component: CoursesView,
+          component: () => import('./views/CoursesView.vue'),
         },
         {
           path: 'course-paths',
           name: 'course-paths',
-          component: CoursePathsView,
+          component: () => import('./views/CoursePathsView.vue'),
         },
         {
           path: 'library',
           name: 'library',
-          component: LibraryView,
-        },
-        {
-          path: 'review',
-          name: 'review',
-          component: ReviewView,
-        },
-        {
-          path: 'review/changes',
-          name: 'review-changes',
-          component: VersionChangeView,
-        },
-        {
-          path: 'qa',
-          name: 'qa',
-          component: QaView,
+          component: () => import('./views/LibraryView.vue'),
         },
         {
           path: 'tasks',
           name: 'tasks',
-          component: TasksView,
+          component: () => import('./views/TasksView.vue'),
         },
         {
           path: 'reminders',
           name: 'reminders',
-          component: RemindersView,
+          component: () => import('./views/RemindersView.vue'),
         },
         {
           path: 'export',
           name: 'export',
-          component: ExportView,
-        },
-        {
-          path: 'calendar',
-          name: 'calendar',
-          component: CalendarView,
+          component: () => import('./views/ExportView.vue'),
         },
         {
           path: 'settings',
           name: 'settings',
-          component: SettingsView,
+          component: () => import('./views/SettingsView.vue'),
+        },
+        {
+          // 低频工具集中入口：课程路径等不占用主导航，原路由仍可直接访问。
+          path: 'tools',
+          name: 'tools',
+          component: () => import('./views/ToolsView.vue'),
         },
       ],
     },
-    { path: '/login', name: 'login', component: LoginView },
+    { path: '/login', name: 'login', component: () => import('./views/LoginView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: () => ({ top: 0 }),

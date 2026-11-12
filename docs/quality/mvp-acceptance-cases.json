@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "scope": "CampusFlow MVP business acceptance definition; no case is marked as executed",
+  "scope": "CampusFlow MVP business acceptance definition; no case is marked as executed. Cases that depend on a currently unavailable UI (智能问答 / 待核对) are marked readiness=blocked and must not be reported as executable until those pages return.",
+  "readiness_values": ["ready", "blocked"],
   "result_statuses": ["passed", "failed", "blocked"],
   "result_required_fields": [
     "case_id",
@@ -18,6 +19,8 @@
     {
       "case_id": "MVP-01",
       "readme_scenario": "从资料回答作业 DDL",
+      "readiness": "blocked",
+      "blocked_reason": "第 1–2 步需要「智能问答」前端页面；该页面自 2026-11-12 起暂不提供入口（后端问答与引用接口保留）。页面恢复前不得按当前界面执行或记为通过。",
       "sample_ids": ["CF-PDF-001"],
       "preconditions": ["新建测试工作空间", "导入 CF-PDF-001 并等待处理结束"],
       "steps": [
@@ -39,6 +42,8 @@
     {
       "case_id": "MVP-02",
       "readme_scenario": "截图日期不完整",
+      "readiness": "blocked",
+      "blocked_reason": "第 1–2 步需要「待核对」集中入口；该页面自 2026-11-12 起暂不提供入口（候选查询、字段修正与确认转换接口保留），资料库当前只显示识别状态与候选数量。页面恢复前本条只能记为 blocked。",
       "sample_ids": ["CF-IMG-004", "CF-TXT-002"],
       "preconditions": ["新建测试工作空间", "分别导入截断截图和缺少年份时刻的文本通知"],
       "steps": ["查看提取候选和待核对原因", "尝试从候选生成正式任务", "检查任务截止字段"],
@@ -56,6 +61,8 @@
     {
       "case_id": "MVP-03",
       "readme_scenario": "用户询问未覆盖课程",
+      "readiness": "blocked",
+      "blocked_reason": "第 1 步需要「智能问答」前端页面；该页面自 2026-11-12 起暂不提供入口（后端问答接口与「现有资料中没有找到」文案保留）。页面恢复前不得按当前界面执行或记为通过。",
       "sample_ids": ["CF-PDF-001"],
       "preconditions": ["工作空间仅导入 CF-PDF-001", "未导入任何离散数学资料"],
       "steps": ["提问：离散数学最近有作业吗？", "检查回答措辞、引用和副作用"],
@@ -73,6 +80,7 @@
     {
       "case_id": "MVP-04",
       "readme_scenario": "生成未来两周计划",
+      "readiness": "ready",
       "sample_ids": [],
       "preconditions": [
         "时区为 Asia/Shanghai，计划范围为 2026-10-05 至 2026-10-18",
@@ -95,6 +103,7 @@
     {
       "case_id": "MVP-05",
       "readme_scenario": "工作量超出可用时间",
+      "readiness": "ready",
       "sample_ids": [],
       "preconditions": ["未来两周可用学习容量为 10 小时", "未完成测试任务总剩余耗时为 14 小时"],
       "steps": ["生成计划草案", "汇总已排和未排耗时", "查看容量风险与调整选项"],
@@ -113,6 +122,7 @@
     {
       "case_id": "MVP-06",
       "readme_scenario": "修改学习时间块",
+      "readiness": "ready",
       "sample_ids": ["CF-PDF-001"],
       "preconditions": ["作业三已确认且原始 DDL 为 2026-10-08 18:00", "已有一个已接受且未锁定的学习时间块"],
       "steps": ["记录任务 DDL、来源和值版本", "移动个人学习时间块", "再次读取任务和计划"],
@@ -131,6 +141,7 @@
     {
       "case_id": "MVP-07",
       "readme_scenario": "文件部分识别失败",
+      "readiness": "ready",
       "sample_ids": ["CF-IMG-002", "CF-IMG-003"],
       "preconditions": ["新建测试工作空间", "导入局部模糊扫描和缺页扫描"],
       "steps": ["等待处理结束", "查看资料状态、已提取字段和原文定位", "打开未覆盖范围"],
@@ -148,6 +159,8 @@
     {
       "case_id": "MVP-08",
       "readme_scenario": "删除被引用资料",
+      "readiness": "blocked",
+      "blocked_reason": "第 3 步「重新打开旧回答」需要「智能问答」前端页面；该页面自 2026-11-12 起暂不提供入口（后端引用与来源失效接口保留）。删除前影响预览与任务保留可在资料库验证，但整条用例页面恢复前只能记为 blocked。",
       "sample_ids": ["CF-PDF-001"],
       "preconditions": ["资料已产生一条带引用回答和一项已确认任务", "记录资料、引用和任务 ID"],
       "steps": ["请求删除资料并查看影响预览", "确认删除", "重新打开旧回答、任务和资料列表"],

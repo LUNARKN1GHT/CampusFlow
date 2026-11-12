@@ -36,6 +36,11 @@ data/
 .DS_Store
 .idea/
 
+# Redis 本地持久化文件（在 backend/ 等工作目录启动 Redis 时生成，属于运行时状态）
+dump.rdb
+*.rdb
+appendonlydir/
+
 # Desktop bundled runtime, build cache and smoke scratch output
 desktop/vendor/
 desktop/.scratch/
