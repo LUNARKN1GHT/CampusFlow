@@ -31,6 +31,8 @@ import type {
   SwitchPreview,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import CourseGraphDiagram from '../components/CourseGraph.vue'
+import { buildGraphLayout } from '../utils/courseGraph'
 
 // 三类关系互斥；只有强制先修进入拓扑分层，并修只约束同修，建议先学仅提示。
 const relationLabels: Record<string, string> = {
@@ -38,7 +40,6 @@ const relationLabels: Record<string, string> = {
   corequisite: '并修',
   recommended: '建议先学',
 }
-const relationTypes = ['prerequisite', 'corequisite', 'recommended'] as const
 const statusLabels: Record<string, string> = {
   completed: '已修',
   in_progress: '在修',
@@ -202,121 +203,9 @@ const graphProblemGroups = computed(() => {
   ]
 })
 
-// 节点尺寸与间距固定，SVG 宽高、连线锚点和点击热区都由这些常量推导。
-const GRAPH_NODE_WIDTH = 172
-const GRAPH_NODE_HEIGHT = 54
-const GRAPH_COLUMN_GAP = 72
-const GRAPH_ROW_GAP = 18
-const GRAPH_PADDING = 18
+// 布局是纯计算，放在 utils/courseGraph 中；这里只把图数据与成环关系传入。
+const graphLayout = computed(() => buildGraphLayout(graph.value, cycleRelationIds.value))
 
-type GraphLayout = {
-  nodes: Array<{ node: CourseGraphNode; x: number; y: number; column: number; row: number }>
-  edges: Array<{ edge: CourseGraphEdge; path: string; self: boolean; cycle: boolean }>
-  width: number
-  height: number
-  columns: number
-}
-
-const graphLayout = computed<GraphLayout>(() => {
-  const current = graph.value
-  if (!current || !current.nodes.length) {
-    return { nodes: [], edges: [], width: 0, height: 0, columns: 0 }
-  }
-  // 布局要画出全部课程，因此自行按强制先修做一次 Kahn 分层，不复用 /order：
-  // 后者在存在问题时返回空层次，直接使用会让有问题的图无节点可渲染。
-  const ids = current.nodes.map((node) => node.id)
-  const idSet = new Set(ids)
-  const indegree = new Map(ids.map((id) => [id, 0]))
-  const adjacency = new Map<number, number[]>()
-  current.edges.forEach((edge) => {
-    if (edge.relation_type !== 'prerequisite') return
-    if (!idSet.has(edge.from_course_id) || !idSet.has(edge.to_course_id)) return
-    const targets = adjacency.get(edge.from_course_id) ?? []
-    targets.push(edge.to_course_id)
-    adjacency.set(edge.from_course_id, targets)
-    indegree.set(edge.to_course_id, (indegree.get(edge.to_course_id) ?? 0) + 1)
-  })
-  const levelById = new Map<number, number>()
-  let frontier = ids.filter((id) => (indegree.get(id) ?? 0) === 0)
-  let depth = 0
-  while (frontier.length) {
-    frontier.forEach((id) => levelById.set(id, depth))
-    const next: number[] = []
-    frontier.forEach((id) => {
-      for (const target of adjacency.get(id) ?? []) {
-        const degree = (indegree.get(target) ?? 0) - 1
-        indegree.set(target, degree)
-        if (degree === 0) next.push(target)
-      }
-    })
-    frontier = Array.from(new Set(next))
-    depth += 1
-  }
-  // 成环及环下游的课程没有稳定层，统一放到最后一列，不伪造层次。
-  const remaining = current.nodes.filter((node) => !levelById.has(node.id))
-  const finalColumn = remaining.length ? Math.max(0, depth) : Math.max(0, depth - 1)
-  remaining.forEach((node) => levelById.set(node.id, finalColumn))
-  const groups = new Map<number, CourseGraphNode[]>()
-  current.nodes.forEach((node) => {
-    const column = levelById.get(node.id) ?? 0
-    const group = groups.get(column) ?? []
-    group.push(node)
-    groups.set(column, group)
-  })
-  const columns = Array.from(groups.entries())
-    .sort(([left], [right]) => left - right)
-    .map(([, nodes]) => [...nodes].sort((left, right) => left.name.localeCompare(right.name, 'zh')))
-  const maxRows = Math.max(...columns.map((nodes) => nodes.length))
-  const width =
-    columns.length * GRAPH_NODE_WIDTH +
-    Math.max(0, columns.length - 1) * GRAPH_COLUMN_GAP +
-    GRAPH_PADDING * 2
-  const height =
-    maxRows * GRAPH_NODE_HEIGHT +
-    Math.max(0, maxRows - 1) * GRAPH_ROW_GAP +
-    GRAPH_PADDING * 2
-  // 列号来自强制先修链上的 Kahn 分层，行号按中文课名排序；
-  // 位置只由节点集合推导，重复渲染结果稳定。
-  const positions = new Map<number, { x: number; y: number; column: number; row: number }>()
-  const layoutNodes: GraphLayout['nodes'] = []
-  columns.forEach((nodes, column) => {
-    nodes.forEach((node, row) => {
-      const position = {
-        x: GRAPH_PADDING + column * (GRAPH_NODE_WIDTH + GRAPH_COLUMN_GAP),
-        y: GRAPH_PADDING + row * (GRAPH_NODE_HEIGHT + GRAPH_ROW_GAP),
-        column,
-        row,
-      }
-      positions.set(node.id, position)
-      layoutNodes.push({ node, ...position })
-    })
-  })
-  const layoutEdges = current.edges.flatMap((edge) => {
-    const source = positions.get(edge.from_course_id)
-    const target = positions.get(edge.to_course_id)
-    if (!source || !target) return []
-    const sx = source.x + GRAPH_NODE_WIDTH
-    const sy = source.y + GRAPH_NODE_HEIGHT / 2
-    const tx = target.x
-    const ty = target.y + GRAPH_NODE_HEIGHT / 2
-    // 连线从源节点右侧中点连到目标节点左侧中点；同列或回边改用绕行曲率只为
-    // 避免穿过节点，箭头方向仍表示“来源课程 → 受限课程”。
-    let path: string
-    if (edge.from_course_id === edge.to_course_id) {
-      // 自环必须可见：从节点右侧绕出再回到自身。
-      path = `M ${sx} ${sy - 9} C ${sx + 52} ${sy - 34}, ${sx + 52} ${sy + 34}, ${sx} ${sy + 9}`
-    } else if (target.column > source.column) {
-      const handle = Math.max(36, (tx - sx) / 2)
-      path = `M ${sx} ${sy} C ${sx + handle} ${sy}, ${tx - handle} ${ty}, ${tx} ${ty}`
-    } else if (target.column === source.column) {
-      path = `M ${sx} ${sy} C ${sx + 58} ${sy}, ${tx + 58} ${ty}, ${tx} ${ty}`
-    } else {
-      path = `M ${sx} ${sy} C ${sx + 76} ${sy - 66}, ${tx - 76} ${ty + 66}, ${tx} ${ty}`
-    }
-    return [{ edge, path, self: edge.from_course_id === edge.to_course_id, cycle: cycleRelationIds.value.has(edge.id) }]
-  })
-  return { nodes: layoutNodes, edges: layoutEdges, width, height, columns: columns.length }
-})
 
 // next 接口把已完成课程标为不可进入，两处列表都排除，避免出现在“待满足条件”里；
 // 没有修读记录时状态为 unknown，按未完成处理，不推断为已修或未修。
@@ -352,11 +241,6 @@ function problemCodeLabel(code: string): string {
 function problemCourseNames(problem: CourseGraphProblem): string {
   const ids = problem.path.length ? problem.path : problem.course_ids
   return ids.map(courseName).join(' → ')
-}
-
-// 节点宽度固定，超长课名截断；完整名称由模板里的 <title> 提供悬浮提示。
-function shortNodeName(name: string): string {
-  return name.length > 12 ? `${name.slice(0, 12)}…` : name
 }
 
 // 默认查看档案中的当前方案；没有当前方案时只选中第一个版本供查看，
@@ -1222,94 +1106,17 @@ onMounted(async () => {
           <ul v-if="graph.limitations.length" class="limitations-list">
             <li v-for="(limitation, index) in graph.limitations" :key="`graph-limit-${index}`">{{ limitation }}</li>
           </ul>
-          <div class="legend-row graph-legend">
-            <span class="legend-chip prerequisite">强制先修 · 实线箭头</span>
-            <span class="legend-chip corequisite">并修 · 点划线</span>
-            <span class="legend-chip recommended">建议先学 · 虚线</span>
-            <span class="legend-chip cycle">成环 · 高亮加粗</span>
-          </div>
-          <p v-if="!graph.nodes.length" class="compact-empty">当前方案还没有课程，无法绘制关系图。</p>
-          <template v-else>
-            <div class="graph-scroll">
-              <svg
-                :width="graphLayout.width"
-                :height="graphLayout.height"
-                :viewBox="`0 0 ${graphLayout.width} ${graphLayout.height}`"
-                class="graph-svg"
-                role="group"
-                aria-label="课程关系图，可用键盘聚焦课程节点与连线查看详情和来源证据"
-              >
-                <defs>
-                  <marker
-                    v-for="type in relationTypes"
-                    :id="`graph-arrow-${type}`"
-                    :key="`marker-${type}`"
-                    markerWidth="9"
-                    markerHeight="9"
-                    refX="8"
-                    refY="4.5"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M0,0 L9,4.5 L0,9 z" :class="`marker-${type}`" />
-                  </marker>
-                </defs>
-                <g>
-                  <g
-                    v-for="item in graphLayout.edges"
-                    :key="`edge-${item.edge.id}`"
-                    :class="['graph-edge', { cycle: item.cycle, selected: selectedEdgeId === item.edge.id }]"
-                    role="button"
-                    tabindex="0"
-                    :aria-pressed="selectedEdgeId === item.edge.id"
-                    :aria-label="`${relationLabels[item.edge.relation_type] ?? item.edge.relation_type}：${courseName(item.edge.from_course_id)} → ${courseName(item.edge.to_course_id)}，查看条件原文与来源候选`"
-                    @click.stop="toggleGraphEdge(item.edge.id)"
-                    @keydown.enter.prevent="toggleGraphEdge(item.edge.id)"
-                    @keydown.space.prevent="toggleGraphEdge(item.edge.id)"
-                  >
-                    <path :d="item.path" class="edge-hit" />
-                    <path
-                      :d="item.path"
-                      :class="[
-                        'edge-line',
-                        `edge-${item.edge.relation_type}`,
-                        {
-                          selected: selectedEdgeId === item.edge.id,
-                          'edge-self': item.self,
-                          'edge-cycle': item.cycle,
-                        },
-                      ]"
-                      :marker-end="`url(#graph-arrow-${item.edge.relation_type})`"
-                    />
-                  </g>
-                </g>
-                <g
-                  v-for="item in graphLayout.nodes"
-                  :key="`node-${item.node.id}`"
-                  :class="[
-                    'graph-node',
-                    {
-                      cycle: cycleCourseIds.has(item.node.id),
-                      selected: selectedNodeId === item.node.id,
-                    },
-                  ]"
-                  :transform="`translate(${item.x}, ${item.y})`"
-                  role="button"
-                  tabindex="0"
-                  :aria-pressed="selectedNodeId === item.node.id"
-                  :aria-label="`课程 ${item.node.name}，代码 ${item.node.code ?? '未填写'}，${item.node.credits ?? '未知'} 学分，修读状态 ${statusLabels[item.node.study_status] ?? item.node.study_status}，查看课程详情`"
-                  @click.stop="toggleGraphNode(item.node.id)"
-                  @keydown.enter.prevent="toggleGraphNode(item.node.id)"
-                  @keydown.space.prevent="toggleGraphNode(item.node.id)"
-                >
-                  <title>{{ item.node.name }}</title>
-                  <rect :width="GRAPH_NODE_WIDTH" :height="GRAPH_NODE_HEIGHT" rx="12" />
-                  <text x="12" y="23" class="node-name">{{ shortNodeName(item.node.name) }}</text>
-                  <text x="12" y="41" class="node-meta">
-                    {{ item.node.code ?? '未填写代码' }} · {{ item.node.credits ?? '?' }} 学分 · {{ statusLabels[item.node.study_status] ?? item.node.study_status }}
-                  </text>
-                </g>
-              </svg>
-            </div>
+          <CourseGraphDiagram
+            :layout="graphLayout"
+            :selected-node-id="selectedNodeId"
+            :selected-edge-id="selectedEdgeId"
+            :cycle-course-ids="cycleCourseIds"
+            :relation-labels="relationLabels"
+            :status-labels="statusLabels"
+            @select-node="toggleGraphNode"
+            @select-edge="toggleGraphEdge"
+          />
+          <template v-if="graph.nodes.length">
             <div v-if="selectedGraphNode" class="graph-detail">
               <div class="section-heading">
                 <div><p class="eyebrow">课程详情</p><h3>{{ selectedGraphNode.name }}</h3></div>
@@ -1606,30 +1413,6 @@ onMounted(async () => {
 .graph-panel { margin-top: 18px; }
 .graph-complete { color: var(--brand); background: var(--brand-soft); }
 .graph-incomplete { color: var(--danger-strong-ink); background: var(--danger-bg-soft); }
-.graph-legend { margin: 10px 0 12px; }
-.legend-chip.cycle { color: var(--danger-strong-ink); background: var(--danger-bg); border-color: var(--danger-border); }
-.graph-scroll { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
-.graph-svg { display: block; min-width: 100%; }
-.graph-edge { cursor: pointer; outline: none; }
-.edge-hit { fill: none; stroke: transparent; stroke-width: 14; }
-.edge-line { fill: none; stroke: var(--line-strong); stroke-width: 1.8; }
-.edge-prerequisite { stroke: var(--danger-strong-ink); stroke-width: 2.1; }
-.edge-corequisite { stroke: var(--warn-strong-ink); stroke-width: 2.1; stroke-dasharray: 9 4 2 4; }
-.edge-recommended { stroke: var(--info-ink); stroke-width: 1.8; stroke-dasharray: 5 5; }
-.graph-edge.cycle .edge-line, .edge-cycle { stroke-width: 3.2; }
-.graph-edge.selected .edge-line { stroke-width: 3.6; }
-.graph-edge:focus-visible .edge-line { stroke: var(--brand); stroke-width: 4.2; }
-.marker-prerequisite { fill: var(--danger-strong-ink); }
-.marker-corequisite { fill: var(--warn-strong-ink); }
-.marker-recommended { fill: var(--info-ink); }
-.graph-node { cursor: pointer; outline: none; }
-.graph-node rect { fill: var(--paper-strong); stroke: var(--line-strong); stroke-width: 1.5; }
-.graph-node:hover rect, .graph-node:focus-visible rect { stroke: var(--brand-border); }
-.graph-node.selected rect { stroke: var(--brand); stroke-width: 2.6; }
-.graph-node.cycle rect { stroke: var(--danger-strong-ink); stroke-dasharray: 6 3; }
-.node-name { fill: var(--ink); font-size: 13px; font-weight: 800; }
-.node-meta { fill: var(--muted); font-size: 10.5px; }
-.graph-node.cycle .node-name { fill: var(--danger-strong-ink); }
 .graph-detail { display: grid; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid var(--brand-border); border-radius: 12px; background: var(--brand-selected); }
 .graph-detail .section-heading { margin-bottom: 0; }
 .detail-grid { display: flex; flex-wrap: wrap; gap: 18px; margin: 0; }
