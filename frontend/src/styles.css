@@ -275,7 +275,7 @@ a { color: inherit; }
 .nav-item { flex: none; display: inline-flex; align-items: center; min-height: 38px; padding: 7px 13px; border-radius: 999px; color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
 .nav-item:hover { color: var(--ink); background: var(--surface-soft); }
 .nav-item.router-link-active { color: var(--brand); background: var(--brand-soft); font-weight: 800; }
-.header-actions { display: flex; flex: none; align-items: center; gap: 10px; margin-left: auto; }
+.header-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .theme-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-segmented); }
 .theme-switch-item { padding: 4px 10px; border-radius: 999px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .theme-switch-item:hover { color: var(--ink); }
@@ -296,6 +296,9 @@ button { border: 0; border-radius: 10px; background: var(--brand-fill); color: v
 button:disabled { opacity: .58; cursor: wait; }
 button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .button-secondary { color: var(--brand); background: var(--brand-soft); }
+/* 按钮型链接：复用次要按钮的品牌色块视觉，仍保持链接语义与键盘可达。 */
+.button-link { display: inline-flex; align-items: center; padding: 10px 18px; border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 14px; font-weight: 700; text-decoration: none; }
+.button-link:hover { color: var(--ink); }
 .api-feedback { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid var(--danger-border); border-radius: 12px; color: var(--danger-ink); background: var(--danger-bg); }
 .api-feedback p { margin: 3px 0 0; color: var(--danger-ink-soft); }
 .note { color: var(--muted); font-size: 14px; margin-top: 28px; }
@@ -317,6 +320,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .panel { margin-top: 0; }
 .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; }
 .section-heading .eyebrow { margin-bottom: 3px; }
+/* 区块标题右侧的文字链接：只强调可点击，不与按钮型链接混用视觉。 */
+.nav-link { color: var(--brand); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.nav-link:hover { color: var(--ink); text-decoration: underline; }
 .count-badge { padding: 4px 9px; border-radius: 999px; color: var(--muted); background: var(--surface-soft); font-size: 12px; font-weight: 700; }
 .switch-field { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
 .semester-list { display: grid; gap: 10px; }
@@ -386,7 +392,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .day-events article { display: grid; padding: 8px; border-radius: 8px; color: var(--event-ink); background: var(--event-bg); }
 .day-events time, .day-events span { font-size: 10px; }
 .day-events b { font-size: 12px; }
-.day-empty { display: block; margin-top: 10px; color: var(--muted-soft); font-size: 10px; }
+.day-empty { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; font-weight: 600; }
 .definition-list { margin-top: 24px; }
 .definition-list > div { display: grid; }
 .definition-list article { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line); }
@@ -474,43 +480,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .archived-pill { color: var(--neutral-ink); background: var(--neutral-bg); }
 .duplicate-pill { color: var(--warn-chip-ink); background: var(--warn-chip-bg); }
 
-/* 待核对（R008） */
-.candidate-row { grid-template-columns: minmax(0, 1fr) auto; }
+/* 类型、原因与来源状态标记：课程路径、导出与提醒页面共用。 */
 .kind-pill { color: var(--info-ink); background: var(--info-bg); }
-.review-pill[data-status="confirmed"] { color: var(--brand); background: var(--brand-soft); }
-.review-pill[data-status="ignored"], .review-pill[data-status="superseded"] { color: var(--neutral-ink); background: var(--neutral-bg); }
-.status-breakdown { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
-.chip-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .reason-chip { padding: 3px 9px; border: 1px solid var(--warn-border); border-radius: 999px; color: var(--warn-chip-ink); background: var(--warn-chip-bg); font-size: 11px; font-weight: 700; }
-.review-detail-panel .subheading { margin-top: 22px; }
-.review-status-line { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
-.source-brief { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
-.source-brief p { margin: 0; color: var(--muted); font-size: 13px; }
-.source-brief p strong { color: var(--ink); font-size: 14px; }
-.source-brief a { justify-self: start; }
-.field-review { display: grid; gap: 6px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.field-review:last-child { padding-bottom: 0; border-bottom: 0; }
-.field-review-head { display: flex; align-items: center; gap: 8px; }
-.field-review-head strong { font-size: 14px; }
-.field-review p { margin: 0; color: var(--muted); font-size: 13px; }
-.origin-pill[data-origin="document"] { color: var(--brand); background: var(--brand-soft); }
-.origin-pill[data-origin="user"] { color: var(--info-ink); background: var(--info-bg); }
-.origin-pill[data-origin="inferred"] { color: var(--warn-strong-ink); background: var(--accent-soft); }
-.origin-pill[data-origin="suggestion"] { color: var(--neutral-ink); background: var(--neutral-bg); }
 .evidence-list { display: grid; gap: 8px; margin-top: 4px; }
-.evidence-quote { margin: 0; padding: 10px 12px; border-left: 3px solid var(--brand-border); border-radius: 8px; background: var(--surface-muted); }
-.evidence-quote.is-stale { border-left-color: var(--danger); background: var(--danger-bg); }
-.evidence-quote blockquote { margin: 0; color: var(--ink); font-size: 13px; }
-.evidence-caption { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 6px; color: var(--muted); font-size: 11px; }
-.verified-pill { color: var(--brand); background: var(--brand-soft); }
 .stale-pill { color: var(--danger-strong-ink); background: var(--danger-bg-soft); }
 
-/* 字段修正与生成正式事项（R009）；.is-highlighted 供核对确认后的跳转定位使用 */
-.correction-form { margin-top: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
-.field-review-head .text-button { margin-left: auto; }
-.convert-box { display: grid; gap: 10px; justify-items: start; }
-.convert-identity { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; }
-.link-button { display: inline-block; padding: 10px 18px; border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 14px; font-weight: 700; text-decoration: none; }
+/* 跳转定位高亮：核对确认后生成的任务／固定日程通过 ?task=／?event= 定位。 */
 .task-row.is-highlighted, .definition-list article.is-highlighted { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; background: var(--accent-soft); }
 
 /* 提醒中心（A015） */
@@ -569,12 +545,14 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
   .top-nav { order: 3; flex: 1 0 100%; }
 }
 
+/* 窄屏：导航换行（不隐藏滚动条），账号与主题操作独占一行并允许换行；顺序与 DOM 一致。 */
 @media (max-width: 760px) {
   .app-header { gap: 8px; padding: 10px 14px; }
   .brand small { display: none; }
   .brand-mark { width: 36px; height: 36px; border-radius: 11px; font-size: 14px; }
   .brand strong { font-size: 14px; }
-  .header-actions { gap: 6px; }
+  .top-nav { order: 2; flex-wrap: wrap; overflow-x: visible; white-space: normal; row-gap: 2px; }
+  .header-actions { order: 3; flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: 0; }
   .theme-switch { padding: 2px; }
   .theme-switch-item { padding: 4px 8px; font-size: 11px; }
   .user-badge { max-width: 96px; padding: 4px 9px; font-size: 11px; }

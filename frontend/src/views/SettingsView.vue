@@ -252,7 +252,7 @@ onMounted(() => {
 
     <section class="panel editor-panel">
       <div class="section-heading"><div><p class="eyebrow">低频功能</p><h2>工具箱</h2></div></div>
-      <p class="form-help">课程路径等低频能力不在左侧主导航展示，集中放在工具箱里按需进入；入口位置调整不影响已保存的培养方案、课程关系与计划。</p>
+      <p class="form-help">课程路径等低频能力不在主导航展示，集中放在工具箱里按需进入；入口位置调整不影响已保存的培养方案、课程关系与计划。</p>
       <RouterLink class="toolbox-link" to="/tools">进入工具箱</RouterLink>
     </section>
   </main>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 工具箱：集中承载使用频率较低、但功能完整的工具，不占用左侧主导航。
+ * 工具箱：集中承载使用频率较低、但功能完整的工具，不占用主导航。
  * 课程路径按培养方案版本维护课程关系、关系图、拓扑顺序与学期试排，属于低频操作，
  * 因此从一级导航移到这里；页面本身与后端能力保持不变，仍可直接访问 /course-paths。
  */
@@ -12,7 +12,7 @@ import { RouterLink } from 'vue-router'
     <div class="page-heading">
       <p class="eyebrow">低频工具</p>
       <h1>工具箱</h1>
-      <p class="intro">这里放使用频率较低、但功能完整的能力。它们不占用左侧主导航，需要时从工具箱进入。</p>
+      <p class="intro">这里放使用频率较低、但功能完整的能力。它们不占用主导航，需要时从工具箱进入。</p>
     </div>
 
     <section class="panel" aria-label="工具箱内容">
