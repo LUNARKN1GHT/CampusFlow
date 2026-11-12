@@ -16,9 +16,14 @@ import ApiFeedback from '../components/ApiFeedback.vue'
 const draft = ref<PlanDraft | null>(null)
 const current = ref<PlanDraft | null>(null)
 const loading = ref(true)
-const generating = ref(false)
+// 生成草案、保留锁定块重排与调整草案都会替换当前预览草案，共用一把互斥锁：
+// 同一时刻只允许一个写操作，后返回的草案不会覆盖另一个仍显示中的结果。
+const planningBusy = ref<null | 'generate' | 'reschedule' | 'adjustment'>(null)
+const planningLocked = computed(() => planningBusy.value !== null)
+const generating = computed(() => planningBusy.value === 'generate')
+const rescheduling = computed(() => planningBusy.value === 'reschedule')
+const adjustmentDrafting = computed(() => planningBusy.value === 'adjustment')
 const accepting = ref(false)
-const rescheduling = ref(false)
 const adjustmentLoading = ref(false)
 const adjustments = ref<AdjustmentSummary | null>(null)
 const acceptedNotice = ref('')
@@ -225,16 +230,17 @@ function assumptionsPayload() {
 }
 
 // 假设留空表示不假设缺失信息；自定义区间必须同时给起止，否则本地拦截、不请求后端。
+// 已有生成／重排／调整草案在进行时直接忽略重复触发，失败后按钮恢复且表单内容保留。
 async function generate() {
-  generating.value = true
+  if (planningLocked.value) return
   error.value = ''
   actionError.value = ''
   acceptedNotice.value = ''
   if (rangeForm.type === 'custom' && (!rangeForm.start || !rangeForm.end)) {
     actionError.value = '自定义区间需要同时选择开始和结束日期'
-    generating.value = false
     return
   }
+  planningBusy.value = 'generate'
   try {
     draft.value = await plansApi.generate({
       range_type: rangeForm.type,
@@ -245,13 +251,14 @@ async function generate() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    generating.value = false
+    planningBusy.value = null
   }
 }
 
 // 两者都基于当前已接受计划生成新的待接受草案，不直接改当前计划：前者按变化建议范围，后者保留锁定块整体重排。
 async function createAdjustmentDraft() {
-  rescheduling.value = true
+  if (planningLocked.value) return
+  planningBusy.value = 'adjustment'
   actionError.value = ''
   acceptedNotice.value = ''
   try {
@@ -260,13 +267,14 @@ async function createAdjustmentDraft() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    rescheduling.value = false
+    planningBusy.value = null
   }
 }
 
 // 局部重排只产出新草案；已锁定的块由服务端原样带回。
 async function reschedulePlan() {
-  rescheduling.value = true
+  if (planningLocked.value) return
+  planningBusy.value = 'reschedule'
   actionError.value = ''
   acceptedNotice.value = ''
   try {
@@ -275,7 +283,7 @@ async function reschedulePlan() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    rescheduling.value = false
+    planningBusy.value = null
   }
 }
 
@@ -360,14 +368,14 @@ onMounted(load)
         <p class="form-help">调整时间块不会改写任务原始 DDL。未接受前不会影响现有安排；锁定块会在局部重排时保留。</p>
       </div>
       <div class="page-actions">
-        <button type="button" :disabled="generating" @click="generate">
+        <button type="button" :disabled="planningLocked" @click="generate">
           {{ generating ? '生成中…' : '生成草案' }}
         </button>
-        <button v-if="current" type="button" class="button-secondary" :disabled="rescheduling" @click="reschedulePlan">
+        <button v-if="current" type="button" class="button-secondary" :disabled="planningLocked" @click="reschedulePlan">
           {{ rescheduling ? '重排中…' : '保留锁定块重排' }}
         </button>
         <!-- 预览草案与当前计划不同时提供一键回退，避免把未接受的草案误认为已生效。 -->
-        <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" @click="showCurrentPlan">
+        <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" :disabled="planningLocked" @click="showCurrentPlan">
           查看当前计划
         </button>
       </div>
@@ -428,7 +436,7 @@ onMounted(load)
         </p>
         <p v-if="acceptedNotice" class="inline-notice" role="status">{{ acceptedNotice }}</p>
         <div class="page-actions" v-if="draft.status === 'draft'">
-          <button type="button" :disabled="accepting" @click="accept">
+          <button type="button" :disabled="accepting || planningLocked" @click="accept">
             {{ accepting ? '接受中…' : '接受为当前计划' }}
           </button>
         </div>
@@ -448,10 +456,10 @@ onMounted(load)
           当前计划 v{{ adjustments.current_plan_version }} 尚未修改。
         </p>
         <div class="page-actions">
-          <button type="button" :disabled="rescheduling || adjustmentLoading" @click="createAdjustmentDraft">
-            {{ rescheduling ? '生成中…' : '生成本地调整草案' }}
+          <button type="button" :disabled="planningLocked || adjustmentLoading" @click="createAdjustmentDraft">
+            {{ adjustmentDrafting ? '生成中…' : '生成本地调整草案' }}
           </button>
-          <button type="button" class="text-button" :disabled="adjustmentLoading" @click="loadAdjustments">重新检查</button>
+          <button type="button" class="text-button" :disabled="adjustmentLoading || planningLocked" @click="loadAdjustments">重新检查</button>
         </div>
       </section>
 
