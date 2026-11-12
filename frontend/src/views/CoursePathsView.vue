@@ -920,11 +920,11 @@ onMounted(async () => {
       <div v-if="notice" class="status-banner success"><div><strong>{{ notice }}</strong></div></div>
 
       <section class="panel">
-        <div class="tab-row" role="tablist">
-          <button type="button" :class="{ active: activeTab === 'courses' }" @click="activeTab = 'courses'">课程目录</button>
-          <button type="button" :class="{ active: activeTab === 'relations' }" @click="activeTab = 'relations'">课程关系</button>
-          <button type="button" :class="{ active: activeTab === 'aliases' }" @click="activeTab = 'aliases'">别名匹配</button>
-          <button type="button" :class="{ active: activeTab === 'study' }" @click="activeTab = 'study'">修读状态</button>
+        <div class="tab-row" role="group" aria-label="培养方案数据视图">
+          <button type="button" :class="{ active: activeTab === 'courses' }" :aria-pressed="activeTab === 'courses'" @click="activeTab = 'courses'">课程目录</button>
+          <button type="button" :class="{ active: activeTab === 'relations' }" :aria-pressed="activeTab === 'relations'" @click="activeTab = 'relations'">课程关系</button>
+          <button type="button" :class="{ active: activeTab === 'aliases' }" :aria-pressed="activeTab === 'aliases'" @click="activeTab = 'aliases'">别名匹配</button>
+          <button type="button" :class="{ active: activeTab === 'study' }" :aria-pressed="activeTab === 'study'" @click="activeTab = 'study'">修读状态</button>
         </div>
         <p v-if="dataLoading" class="muted">正在加载方案数据…</p>
 
@@ -1236,8 +1236,8 @@ onMounted(async () => {
                 :height="graphLayout.height"
                 :viewBox="`0 0 ${graphLayout.width} ${graphLayout.height}`"
                 class="graph-svg"
-                role="img"
-                aria-label="课程关系图"
+                role="group"
+                aria-label="课程关系图，可用键盘聚焦课程节点与连线查看详情和来源证据"
               >
                 <defs>
                   <marker
@@ -1258,7 +1258,13 @@ onMounted(async () => {
                     v-for="item in graphLayout.edges"
                     :key="`edge-${item.edge.id}`"
                     :class="['graph-edge', { cycle: item.cycle, selected: selectedEdgeId === item.edge.id }]"
+                    role="button"
+                    tabindex="0"
+                    :aria-pressed="selectedEdgeId === item.edge.id"
+                    :aria-label="`${relationLabels[item.edge.relation_type] ?? item.edge.relation_type}：${courseName(item.edge.from_course_id)} → ${courseName(item.edge.to_course_id)}，查看条件原文与来源候选`"
                     @click.stop="toggleGraphEdge(item.edge.id)"
+                    @keydown.enter.prevent="toggleGraphEdge(item.edge.id)"
+                    @keydown.space.prevent="toggleGraphEdge(item.edge.id)"
                   >
                     <path :d="item.path" class="edge-hit" />
                     <path
@@ -1289,6 +1295,8 @@ onMounted(async () => {
                   :transform="`translate(${item.x}, ${item.y})`"
                   role="button"
                   tabindex="0"
+                  :aria-pressed="selectedNodeId === item.node.id"
+                  :aria-label="`课程 ${item.node.name}，代码 ${item.node.code ?? '未填写'}，${item.node.credits ?? '未知'} 学分，修读状态 ${statusLabels[item.node.study_status] ?? item.node.study_status}，查看课程详情`"
                   @click.stop="toggleGraphNode(item.node.id)"
                   @keydown.enter.prevent="toggleGraphNode(item.node.id)"
                   @keydown.space.prevent="toggleGraphNode(item.node.id)"
@@ -1576,7 +1584,7 @@ onMounted(async () => {
 .switch-preview p { margin: 0; font-size: 13px; }
 .tab-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .tab-row button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--paper-strong); color: var(--muted); padding: 7px 13px; }
-.tab-row button.active { color: var(--brand); border-color: var(--brand-border); background: var(--brand-selected); font-weight: 800; }
+.tab-row button.active { color: var(--brand); border-color: var(--brand-border); background: var(--brand-selected); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
 .data-table { overflow-x: auto; margin: 10px 0 16px; }
 .data-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th, .data-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -1602,7 +1610,7 @@ onMounted(async () => {
 .legend-chip.cycle { color: var(--danger-strong-ink); background: var(--danger-bg); border-color: var(--danger-border); }
 .graph-scroll { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
 .graph-svg { display: block; min-width: 100%; }
-.graph-edge { cursor: pointer; }
+.graph-edge { cursor: pointer; outline: none; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 14; }
 .edge-line { fill: none; stroke: var(--line-strong); stroke-width: 1.8; }
 .edge-prerequisite { stroke: var(--danger-strong-ink); stroke-width: 2.1; }
@@ -1610,6 +1618,7 @@ onMounted(async () => {
 .edge-recommended { stroke: var(--info-ink); stroke-width: 1.8; stroke-dasharray: 5 5; }
 .graph-edge.cycle .edge-line, .edge-cycle { stroke-width: 3.2; }
 .graph-edge.selected .edge-line { stroke-width: 3.6; }
+.graph-edge:focus-visible .edge-line { stroke: var(--brand); stroke-width: 4.2; }
 .marker-prerequisite { fill: var(--danger-strong-ink); }
 .marker-corequisite { fill: var(--warn-strong-ink); }
 .marker-recommended { fill: var(--info-ink); }
