@@ -123,6 +123,8 @@ export function loadConfig(
     maxRestarts: positiveInt(env.CAMPUSFLOW_MAX_RESTARTS, 3, 0),
     pgMode,
     pgBin,
+    pgRuntimeDir: env.CAMPUSFLOW_PG_RUNTIME_DIR ||
+      (env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'CampusFlow', 'pg-runtime') : null),
     pgPort,
     pgUser: env.CAMPUSFLOW_PG_USER?.trim() || 'campusflow',
     pgDatabase: env.CAMPUSFLOW_PG_DATABASE?.trim() || 'campusflow',

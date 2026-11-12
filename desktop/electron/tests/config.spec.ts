@@ -36,3 +36,13 @@ test('自动登录默认开启，可用 CAMPUSFLOW_AUTO_LOGIN=0 关闭', () => {
   expect(configFor({}).autoLogin).toBe(true)
   expect(configFor({ CAMPUSFLOW_AUTO_LOGIN: '0' }).autoLogin).toBe(false)
 })
+
+test('数据库运行副本使用用户本地目录或显式覆盖，不改变数据目录', () => {
+  const local = path.join(os.tmpdir(), 'cf-local-runtime')
+  const configured = configFor({ LOCALAPPDATA: local })
+  expect(configured.pgRuntimeDir).toBe(path.join(local, 'CampusFlow', 'pg-runtime'))
+  expect(configured.dataDir).toBe(path.join(configured.userDataDir, 'data'))
+  const override = path.join(os.tmpdir(), 'cf-override-runtime')
+  expect(configFor({ LOCALAPPDATA: local, CAMPUSFLOW_PG_RUNTIME_DIR: override }).pgRuntimeDir).toBe(override)
+  expect(configFor({}).pgRuntimeDir).toBeNull()
+})

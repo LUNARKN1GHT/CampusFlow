@@ -14,6 +14,7 @@ test('修复版真实桌面：配置持久化、文本处理失败可见、父�
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     !key.startsWith('CAMPUSFLOW_') && !['ZHIPU_API_KEY', 'DEEPSEEK_API_KEY'].includes(key)))
   let app: ElectronApplication | null = null
+  const runtimeBins: string[] = []
   async function launch(): Promise<Page> {
     app = await electron.launch({
       executablePath: executable, cwd: root, timeout: 120_000,
@@ -24,6 +25,18 @@ test('修复版真实桌面：配置持久化、文本处理失败可见、父�
       { timeout: 150_000 }).toBe(true)
     const page = app.windows().find(p => p.url().startsWith('http://127.0.0.1:'))!
     await expect(page.getByRole('link', { name: '资料库', exact: true })).toBeVisible({ timeout: 30_000 })
+    if (process.platform === 'win32' && /[^\x20-\x7e]/.test(executable!)) {
+      const log = readFileSync(path.join(root, 'user', 'logs', 'main.log'), 'utf8')
+      const bins = [...log.matchAll(/数据库运行文件：([^\r\n]+)/g)]
+      const bin = bins.at(-1)?.[1]?.trim()
+      expect(bin).toBeTruthy()
+      expect(bin).not.toMatch(/[^\x20-\x7e]/)
+      expect(existsSync(path.join(bin!, 'initdb.exe'))).toBe(true)
+      expect(existsSync(path.join(root, 'user', 'data', 'pgdata', 'PG_VERSION'))).toBe(true)
+      expect(existsSync(path.join(bin!, '..', 'pgdata'))).toBe(false)
+      runtimeBins.push(bin!)
+      if (runtimeBins.length > 1) expect(bin).toBe(runtimeBins[0])
+    }
     return page
   }
   async function quit() {
@@ -99,6 +112,26 @@ test('修复版真实桌面：配置持久化、文本处理失败可见、父�
     await page.reload()
     await expect(parentCard.locator('strong')).toContainText('40 分钟剩余')
     await page.screenshot({ path: path.join(root, '03-task-rollup.png'), fullPage: true })
+
+    // pg_dump 也必须使用英文运行副本；仅将合成数据导出到本轮验收目录。
+    const archive = path.join(root, 'synthetic-backup.campusflow')
+    await app!.evaluate(({ dialog, Menu }, filePath) => {
+      const scope = globalThis as Record<string, unknown>
+      scope.__cfExportMessages = []
+      dialog.showSaveDialog = (async () => ({ canceled: false, filePath })) as typeof dialog.showSaveDialog
+      dialog.showMessageBox = (async (...args: unknown[]) => {
+        (scope.__cfExportMessages as unknown[]).push(args.at(-1))
+        return { response: 0 }
+      }) as typeof dialog.showMessageBox
+      const item = Menu.getApplicationMenu()?.items.find(entry => entry.label === '数据')
+        ?.submenu?.items.find(entry => entry.label.startsWith('导出数据归档'))
+      if (!item) throw new Error('缺少导出数据归档菜单')
+      item.click()
+    }, archive)
+    await expect.poll(async () => app!.evaluate(() =>
+      ((globalThis as Record<string, unknown>).__cfExportMessages as { title?: string }[])
+        .some(message => message.title === '导出完成')), { timeout: 60_000 }).toBe(true)
+    expect(existsSync(archive)).toBe(true)
     expect(readFileSync(path.join(root, 'user', 'logs', 'main.log'), 'utf8')).toContain('凭据后端 windows-dpapi')
   } finally {
     await quit()

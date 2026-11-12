@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 import { defaultDeps } from './runtime'
+import { preparePgRuntime } from './pg-runtime'
 import { redact, type Logger } from './logger'
 import type {
   ChildLike,
@@ -135,6 +136,7 @@ export function parseBootstrapPayload(stdout: string): BootstrapPayload | null {
  */
 export class Supervisor extends EventEmitter {
   private readonly config: RuntimeConfig
+  private readonly originalPgBin: string | null
   private readonly logger: Logger
   private readonly deps: SupervisorDeps
   private status: SupervisorStatus
@@ -162,6 +164,7 @@ export class Supervisor extends EventEmitter {
   constructor(options: SupervisorOptions) {
     super()
     this.config = options.config
+    this.originalPgBin = options.config.pgBin
     this.logger = options.logger
     this.deps = { ...defaultDeps, ...options.deps }
     this.status = {
@@ -294,6 +297,15 @@ export class Supervisor extends EventEmitter {
     })
 
     try {
+      if (!this.config.stub && this.originalPgBin &&
+          (this.config.bootstrap || this.config.pgMode === 'managed')) {
+        this.config.pgBin = await preparePgRuntime({
+          pgBin: this.originalPgBin,
+          cacheRoot: this.config.pgRuntimeDir,
+          progress: message => this.setStatus({ message }),
+        })
+        this.logger.info(`数据库运行文件：${this.config.pgBin}`)
+      }
       if (this.config.bootstrap) {
         // P007：sidecar 负责建库、迁移与凭据，Electron 不再自行 initdb／migrate。
         await this.stage('bootstrap', () => this.runBootstrapStage())

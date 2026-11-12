@@ -95,6 +95,8 @@ export interface RuntimeConfig {
   maxRestarts: number
   pgMode: 'managed' | 'external' | 'skip'
   pgBin: string | null
+  /** 中文安装路径使用的英文运行副本目录；不存放课程数据。 */
+  pgRuntimeDir?: string | null
   pgPort: number
   pgUser: string
   pgDatabase: string
