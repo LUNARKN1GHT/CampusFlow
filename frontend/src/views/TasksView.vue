@@ -38,6 +38,9 @@ const editorOpen = ref(false)
 const editing = ref<Task | null>(null)
 const progressTask = ref<Task | null>(null)
 const history = ref<TaskProgressChange[]>([])
+const historyLoading = ref(false)
+const historyError = ref('')
+let historyRequestId = 0
 const progressSaving = ref(false)
 const progressError = ref('')
 const progressForm = reactive({ progress: 'in_progress' as TaskProgress, reason: '' })
@@ -168,16 +171,47 @@ function dueText(task: Task): string {
   return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
 }
 
+function closeProgress() {
+  // 关闭时让进行中的读取失效，避免请求返回后写回已关闭面板的数据。
+  historyRequestId += 1
+  progressTask.value = null
+  history.value = []
+  historyError.value = ''
+  historyLoading.value = false
+}
+
+// 读取调整历史前先清空旧数据，切换任务时不会残留上一个任务的记录。
+// 请求序号用于丢弃过期响应：快速切换任务时，先发后到的慢请求不会把旧任务历史写回面板。
+async function loadHistory(task: Task) {
+  const requestId = ++historyRequestId
+  history.value = []
+  historyError.value = ''
+  historyLoading.value = true
+  try {
+    const records = await tasksApi.progressHistory(task.id)
+    if (requestId !== historyRequestId) return
+    history.value = records
+  } catch (caught) {
+    if (requestId !== historyRequestId) return
+    history.value = []
+    historyError.value = errorMessage(caught)
+  } finally {
+    if (requestId === historyRequestId) historyLoading.value = false
+  }
+}
+
+// 打开新任务时先生成面板状态再读取历史，加载中与失败都不复用上一个任务的数据。
 async function openProgress(task: Task) {
   progressTask.value = task
   progressForm.progress = task.progress
   progressForm.reason = ''
   progressError.value = ''
-  try {
-    history.value = await tasksApi.progressHistory(task.id)
-  } catch (caught) {
-    progressError.value = errorMessage(caught)
-  }
+  await loadHistory(task)
+}
+
+function reloadHistory() {
+  if (!progressTask.value) return
+  void loadHistory(progressTask.value)
 }
 
 // 进度与核对状态相互独立；保存成功后重新读取历史，失败时保留当前状态和已填原因。
@@ -193,8 +227,8 @@ async function saveProgress() {
     )
     tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
     progressTask.value = updated
-    history.value = await tasksApi.progressHistory(updated.id)
     progressForm.reason = ''
+    await loadHistory(updated)
   } catch (caught) {
     progressError.value = errorMessage(caught)
   } finally {
@@ -214,22 +248,34 @@ async function refreshDependencyCheck() {
   }
 }
 
-async function openRelations(task: Task) {
-  selectedTask.value = task
-  relations.value = null
-  relationsError.value = ''
-  dependencyInput.value = ''
-  splitSuggestion.value = null
-  subtaskRows.value = []
-  subtaskError.value = ''
+// 读取关系与依赖；重试时保留原错误提示，直到请求返回前按钮都保持忙碌态。
+async function loadRelations(task: Task, keepError = false) {
+  if (!keepError) relationsError.value = ''
   relationsLoading.value = true
   try {
     relations.value = await tasksApi.relations(task.id)
+    relationsError.value = ''
   } catch (caught) {
     relationsError.value = errorMessage(caught)
   } finally {
     relationsLoading.value = false
   }
+}
+
+// 切换任务时清空上一个任务的关系与子任务编辑内容，再读取关系。
+async function openRelations(task: Task) {
+  selectedTask.value = task
+  relations.value = null
+  dependencyInput.value = ''
+  splitSuggestion.value = null
+  subtaskRows.value = []
+  subtaskError.value = ''
+  await loadRelations(task)
+}
+
+function retryRelations() {
+  if (!selectedTask.value || relationsLoading.value) return
+  void loadRelations(selectedTask.value, true)
 }
 
 // 后端校验空间、自依赖与成环；成功后重新读取关系并刷新全空间依赖检查。
@@ -385,7 +431,7 @@ onMounted(load)
       </section>
 
       <section v-if="progressTask" class="panel editor-panel">
-        <div class="section-heading"><div><p class="eyebrow">执行进度</p><h2>{{ progressTask.title }}</h2></div><button type="button" class="text-button" @click="progressTask = null">关闭</button></div>
+        <div class="section-heading"><div><p class="eyebrow">执行进度</p><h2>{{ progressTask.title }}</h2></div><button type="button" class="text-button" @click="closeProgress">关闭</button></div>
         <div class="progress-layout">
           <form class="stack-form" @submit.prevent="saveProgress">
             <label>新状态<select v-model="progressForm.progress"><option v-for="(label, value) in progressLabels" :key="value" :value="value">{{ label }}</option></select></label>
@@ -397,7 +443,12 @@ onMounted(load)
           </form>
           <div>
             <h3 class="subheading">调整历史</h3>
-            <ol v-if="history.length" class="history-list">
+            <p v-if="historyLoading" class="muted">正在读取调整历史…</p>
+            <template v-else-if="historyError">
+              <div class="compact-empty">{{ historyError }}</div>
+              <div class="page-actions"><button type="button" class="text-button" @click="reloadHistory">重新加载历史</button></div>
+            </template>
+            <ol v-else-if="history.length" class="history-list">
               <li v-for="change in history" :key="change.id"><div><strong>{{ progressLabels[change.from_progress] }} → {{ progressLabels[change.to_progress] }}</strong><time>{{ formatChangedAt(change.changed_at) }}</time></div><p>{{ change.reason || '未填写原因' }}</p><small>剩余耗时：{{ change.previous_remaining_minutes ?? '—' }} → {{ change.new_remaining_minutes ?? '—' }} 分钟</small></li>
             </ol>
             <div v-else class="compact-empty">还没有进度调整记录。</div>
@@ -409,7 +460,7 @@ onMounted(load)
           <div><p class="eyebrow">依赖与子任务</p><h2>{{ selectedTask.title }}</h2></div>
           <button type="button" class="text-button" @click="selectedTask = null">关闭</button>
         </div>
-        <ApiFeedback v-if="relationsError" :message="relationsError" title="关系操作未完成" />
+        <ApiFeedback v-if="relationsError" :message="relationsError" title="关系操作未完成" :busy="relationsLoading" @retry="retryRelations" />
         <p v-if="relationsLoading" class="muted">正在读取关系…</p>
         <template v-else-if="relations">
           <p class="form-help">
