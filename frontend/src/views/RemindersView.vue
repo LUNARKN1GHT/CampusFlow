@@ -4,7 +4,7 @@
  * 流程：读取列表时后端先同步生成提醒；修改规则后重算待发送记录，发送过或已忽略的历史保留。
  * 约束：提醒只用于提示，不改变任务 DDL、核对状态或计划；没有提醒也不代表没有待办或冲突。
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 import { remindersApi, tasksApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -71,38 +71,57 @@ const taskMap = computed(() => new Map(tasks.value.map((task) => [task.id, task]
 const tasksWithRule = computed(() => new Set(taskRules.value.map((rule) => rule.task_id)))
 const tasksWithoutRule = computed(() => tasks.value.filter((task) => !tasksWithRule.value.has(task.id)))
 
-function listFilter(): { unreadOnly?: boolean; status?: ReminderStatus } {
-  if (view.value === 'unread') return { unreadOnly: true }
-  if (view.value === 'read') return { status: 'sent' }
+// 列表请求序号：连续切换视图或动作刷新时，只有最后一次请求可以写回列表、汇总与错误。
+let listRequestId = 0
+let unmounted = false
+
+function beginListRequest(): number {
+  return ++listRequestId
+}
+
+function isCurrentListRequest(requestId: number): boolean {
+  return !unmounted && requestId === listRequestId
+}
+
+function listFilter(forView: ReminderView): { unreadOnly?: boolean; status?: ReminderStatus } {
+  if (forView === 'unread') return { unreadOnly: true }
+  if (forView === 'read') return { status: 'sent' }
   return {}
 }
 
 // 后端只有 unread_only 和 status 两种筛选；"已读"先取已发送记录，再前端排除未读，
 // 避免把待发送、已撤销等非发送状态误算成已读。
-function applyReminders(items: Reminder[]): void {
-  reminders.value = view.value === 'read'
+// 过滤必须使用发起请求时的视图，不能用响应返回时的当前视图，否则连续切换会错配。
+function applyReminders(items: Reminder[], requestedView: ReminderView): void {
+  reminders.value = requestedView === 'read'
     ? items.filter((item) => item.read_at !== null)
     : items
 }
 
 async function refreshReminders(): Promise<void> {
+  const requestId = beginListRequest()
+  const requestedView = view.value
   listLoading.value = true
   listError.value = ''
   try {
     const [items, overview] = await Promise.all([
-      remindersApi.list(listFilter()),
+      remindersApi.list(listFilter(requestedView)),
       remindersApi.summary(),
     ])
-    applyReminders(items)
+    if (!isCurrentListRequest(requestId)) return
+    applyReminders(items, requestedView)
     summary.value = overview
   } catch (caught) {
+    if (!isCurrentListRequest(requestId)) return
     listError.value = errorMessage(caught)
   } finally {
-    listLoading.value = false
+    if (!unmounted && requestId === listRequestId) listLoading.value = false
   }
 }
 
 async function load(): Promise<void> {
+  const requestId = beginListRequest()
+  const requestedView = view.value
   loading.value = true
   loadError.value = ''
   try {
@@ -112,21 +131,26 @@ async function load(): Promise<void> {
       remindersApi.listRules(),
       tasksApi.list(),
     ])
-    applyReminders(items)
-    summary.value = overview
+    if (unmounted) return
+    // 规则与任务不随视图变化，被更新的列表请求取代时仍然保留首次加载结果。
     rules.value = ruleItems
     tasks.value = taskItems
     syncDefaultForm()
+    if (requestId !== listRequestId) return
+    applyReminders(items, requestedView)
+    summary.value = overview
   } catch (caught) {
-    loadError.value = errorMessage(caught)
+    if (!unmounted) loadError.value = errorMessage(caught)
   } finally {
-    loading.value = false
+    if (!unmounted) loading.value = false
   }
 }
 
 function changeView(next: ReminderView): void {
   if (view.value === next) return
   view.value = next
+  // 旧视图的数据不属于新筛选，先清空；刷新失败时也不会把旧列表显示成当前结果。
+  reminders.value = []
   void refreshReminders()
 }
 
@@ -322,6 +346,12 @@ async function removeRule(rule: ReminderRule): Promise<void> {
 }
 
 onMounted(load)
+
+onBeforeUnmount(() => {
+  // 卸载后递增请求号：仍在途的列表响应不得写回已关闭的页面状态。
+  unmounted = true
+  listRequestId += 1
+})
 </script>
 
 <template>
@@ -337,9 +367,9 @@ onMounted(load)
     <template v-else>
       <section class="panel filter-bar" aria-label="提醒筛选">
         <div class="segmented" role="group" aria-label="提醒阅读状态">
-          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'all' }" :aria-pressed="view === 'all'" @click="changeView('all')">全部</button>
-          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'unread' }" :aria-pressed="view === 'unread'" @click="changeView('unread')">未读</button>
-          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'read' }" :aria-pressed="view === 'read'" @click="changeView('read')">已读</button>
+          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'all' }" :aria-pressed="view === 'all'" :disabled="loading || listLoading" @click="changeView('all')">全部</button>
+          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'unread' }" :aria-pressed="view === 'unread'" :disabled="loading || listLoading" @click="changeView('unread')">未读</button>
+          <button type="button" class="segmented-item" :class="{ 'is-active': view === 'read' }" :aria-pressed="view === 'read'" :disabled="loading || listLoading" @click="changeView('read')">已读</button>
         </div>
         <span class="count-badge">{{ reminders.length }} 条</span>
       </section>
@@ -347,7 +377,7 @@ onMounted(load)
       <section class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">近期提醒</p><h2>提醒列表</h2></div>
-          <button type="button" class="text-button" :disabled="listLoading" @click="refreshReminders">刷新</button>
+          <button type="button" class="text-button" :disabled="loading || listLoading" @click="refreshReminders">刷新</button>
         </div>
 
         <div v-if="summary" class="summary-row reminder-summary">
@@ -360,7 +390,7 @@ onMounted(load)
         <p class="inline-notice">{{ summary?.note || NO_REMINDER_NOTE }}</p>
 
         <p v-if="listError" class="form-error" role="alert">{{ listError }}</p>
-        <p v-if="loading" class="muted">正在加载提醒…</p>
+        <p v-if="loading || (listLoading && !reminders.length)" class="muted">正在加载提醒…</p>
         <div v-else-if="reminders.length" class="task-list">
           <article v-for="reminder in reminders" :key="reminder.id" class="task-row reminder-row">
             <div class="task-main">
@@ -396,7 +426,8 @@ onMounted(load)
             </div>
           </article>
         </div>
-        <div v-else class="compact-empty">当前筛选下没有提醒。没有提醒不代表没有待办或冲突，请以任务列表与冲突检查为准。</div>
+        <!-- 刷新失败时不展示“没有提醒”，避免把请求失败说成没有待办；错误文案已在上方给出。 -->
+        <div v-else-if="!listError" class="compact-empty">当前筛选下没有提醒。没有提醒不代表没有待办或冲突，请以任务列表与冲突检查为准。</div>
       </section>
 
       <section class="panel" aria-label="默认提醒规则">

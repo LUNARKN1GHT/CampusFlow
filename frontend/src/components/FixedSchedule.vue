@@ -3,7 +3,7 @@
  * 固定日程周视图：读取日程定义与按周展开的实例，编辑只作用于定义（每周重复由定义展开）。
  * 所有时刻按工作空间时区解释与展示；这里的时间块不可被计划移动，也不改写任务 DDL。
  */
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { coursesApi, scheduleApi } from '../api/business'
@@ -25,6 +25,9 @@ const formError = ref('')
 const timezone = ref('Asia/Shanghai')
 const weekStart = ref(startOfWeek(new Date()))
 let weekInitialized = false
+// 周切换、保存与删除都会触发 load：只有最后一次请求能写回日程与错误，旧响应直接丢弃。
+let loadRequestId = 0
+let unmounted = false
 const form = reactive({ course_id: '', title: '', starts_at: '', ends_at: '', location: '', recurrence: 'none' as 'none' | 'weekly', repeat_until: '' })
 
 // 周视图以周一为起点：getDay() 的周日为 0，换算成 (day + 6) % 7 的偏移。
@@ -90,27 +93,36 @@ async function scrollToHighlighted(): Promise<void> {
 }
 
 async function load() {
+  const requestId = ++loadRequestId
   loading.value = true
   error.value = ''
   try {
+    // 时区只用于展示与按日切分；同一工作空间内多次请求结果一致，先写入保证首周定位可用。
     timezone.value = (await settingsApi.get()).timezone
     // 只在首次加载时把本周定位到工作空间的"今天"，之后翻周或刷新不回到当周。
     if (!weekInitialized) {
       weekStart.value = startOfWeek(new Date(`${workspaceInput(new Date().toISOString()).slice(0, 10)}T12:00:00`))
       weekInitialized = true
     }
-    ;[definitions.value, occurrences.value, courses.value] = await Promise.all([
+    const [eventItems, occurrenceItems, courseItems] = await Promise.all([
       scheduleApi.listEvents(), scheduleApi.listOccurrences(dateKey(weekStart.value), weekEnd.value), coursesApi.list(),
     ])
+    // 连续翻周或保存期间已发起新请求：旧周的实例不得写回当前周。
+    if (unmounted || requestId !== loadRequestId) return
+    definitions.value = eventItems
+    occurrences.value = occurrenceItems
+    courses.value = courseItems
   } catch (caught) {
+    if (unmounted || requestId !== loadRequestId) return
     error.value = errorMessage(caught)
   } finally {
-    loading.value = false
+    if (!unmounted && requestId === loadRequestId) loading.value = false
   }
-  await scrollToHighlighted()
+  if (!unmounted && requestId === loadRequestId) await scrollToHighlighted()
 }
 
 function changeWeek(offset: number) {
+  if (loading.value) return
   // 以周为单位移动，随后按新起止日期重新拉取展开后的实例。
   const next = new Date(weekStart.value)
   next.setDate(next.getDate() + offset * 7)
@@ -176,13 +188,19 @@ function timeRange(item: FixedEventOccurrence, day: string): string {
 }
 
 onMounted(load)
+
+onBeforeUnmount(() => {
+  // 卸载后递增请求号：仍在途的周实例响应不得写回已关闭的组件。
+  unmounted = true
+  loadRequestId += 1
+})
 </script>
 
 <template>
   <section class="panel schedule-panel">
     <div class="section-heading">
       <div><p class="eyebrow">固定日程 · {{ timezone }}</p><h2>本周时间表</h2></div>
-      <div class="schedule-actions"><button type="button" class="button-secondary" @click="changeWeek(-1)">上一周</button><button type="button" class="button-secondary" @click="changeWeek(1)">下一周</button><button type="button" @click="openEditor()">添加日程</button></div>
+      <div class="schedule-actions"><button type="button" class="button-secondary" :disabled="loading" @click="changeWeek(-1)">上一周</button><button type="button" class="button-secondary" :disabled="loading" @click="changeWeek(1)">下一周</button><button type="button" @click="openEditor()">添加日程</button></div>
     </div>
     <p class="form-help schedule-note">这里展示不可移动的时间区间；任务 DDL 始终保留在上方任务列表，不会因编辑日程而改变。</p>
     <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="load" />
