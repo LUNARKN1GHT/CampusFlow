@@ -11,6 +11,14 @@ import { ApiError, errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { AdjustmentSummary, PlanBlock, PlanConflict, PlanDraft, PlanRangeType } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import {
+  formatZonedMonthDayWeekday,
+  formatZonedShortDateTime,
+  formatZonedTime,
+  zonedDayKey,
+  zonedInputValue,
+  zonedParts,
+} from '../utils/datetime'
 
 // draft 是当前预览对象（可能是草案或当前计划）；current 只保留最近一次已接受计划，用于计算保留块与回退查看。
 const draft = ref<PlanDraft | null>(null)
@@ -74,12 +82,7 @@ const blocksByDay = computed(() => {
   for (const block of draft.value?.blocks ?? []) {
     const key = dayKey(block.starts_at)
     const group = groups.get(key) ?? {
-      label: new Intl.DateTimeFormat('zh-CN', {
-        timeZone: planTimezone.value,
-        month: 'long',
-        day: 'numeric',
-        weekday: 'short',
-      }).format(new Date(block.starts_at)),
+      label: formatZonedMonthDayWeekday(block.starts_at, planTimezone.value),
       blocks: [],
     }
     group.blocks.push(block)
@@ -88,25 +91,7 @@ const blocksByDay = computed(() => {
   return [...groups.entries()]
 })
 
-function zonedParts(value: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: planTimezone.value,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date(value))
-  const values: Record<string, string> = {}
-  for (const part of parts) values[part.type] = part.value
-  return values
-}
-
-function dayKey(value: string): string {
-  const parts = zonedParts(value)
-  return `${parts.year}-${parts.month}-${parts.day}`
-}
+const dayKey = (value: string): string => zonedDayKey(value, planTimezone.value)
 
 /**
  * 把工作空间时区的墙上时间转成明确时间点，避免浏览器时区与工作空间不一致。
@@ -117,13 +102,13 @@ function zonedInputToIso(value: string): string {
   const [year, month, day] = datePart.split('-').map(Number)
   const [hour, minute] = timePart.split(':').map(Number)
   const asUtc = Date.UTC(year, month - 1, day, hour, minute)
-  const first = zonedParts(new Date(asUtc).toISOString())
+  const first = zonedParts(new Date(asUtc).toISOString(), planTimezone.value)
   const firstWall = Date.UTC(
     Number(first.year), Number(first.month) - 1, Number(first.day),
     Number(first.hour), Number(first.minute),
   )
   const offset = firstWall - asUtc
-  const second = zonedParts(new Date(asUtc - offset).toISOString())
+  const second = zonedParts(new Date(asUtc - offset).toISOString(), planTimezone.value)
   const secondWall = Date.UTC(
     Number(second.year), Number(second.month) - 1, Number(second.day),
     Number(second.hour), Number(second.minute),
@@ -154,26 +139,12 @@ const blockingConflicts = computed(() =>
 const risks = computed(() => (draft.value?.conflicts ?? []).filter((item) => item.severity === 'risk'))
 const adjustOptions = computed(() => draft.value?.coverage.adjustment_options ?? [])
 
-function timeText(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: planTimezone.value,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value))
-}
+const timeText = (value: string): string => formatZonedTime(value, planTimezone.value)
 
-function dateTimeText(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: planTimezone.value,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value))
-}
+const dateTimeText = (value: string): string => formatZonedShortDateTime(value, planTimezone.value)
 
 function toLocalInput(value: string): string {
-  const parts = zonedParts(value)
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+  return zonedInputValue(value, planTimezone.value)
 }
 
 function prepareMove(block: PlanBlock) {

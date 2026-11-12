@@ -1,6 +1,8 @@
 // 课程路径：培养方案版本、课程与三类关系、别名、修读记录，以及图／顺序／下一步／学期试排分析。
 // 分析接口都是只读计算结果，不落库；缺规则时返回 limitations 而不是伪造结论。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest } from './client'
 import type {
   AliasResolution,
@@ -19,15 +21,6 @@ import type {
   StudyStatus,
   SwitchPreview,
 } from './types'
-
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
 
 export type CurriculumPlanInput = {
   title: string

@@ -25,6 +25,8 @@ import type {
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
+import { priorityLabels, progressLabels } from '../constants/labels'
+import { formatDateTime } from '../utils/datetime'
 
 const route = useRoute()
 const tasks = ref<Task[]>([])
@@ -76,10 +78,6 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
   return true
 }))
 
-const progressLabels: Record<TaskProgress, string> = {
-  not_started: '未开始', in_progress: '进行中', blocked: '受阻', done: '已完成', cancelled: '已取消',
-}
-const priorityLabels: Record<TaskPriority, string> = { low: '低', medium: '中', high: '高' }
 const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
 function queryNumber(value: unknown): number | null {
@@ -237,7 +235,7 @@ async function saveProgress() {
 }
 
 function formatChangedAt(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+  return formatDateTime(value)
 }
 
 async function refreshDependencyCheck() {
