@@ -8,7 +8,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { semestersApi } from '../api/business'
-import { errorMessage } from '../api/client'
+import { ApiError, errorMessage } from '../api/client'
 import { pathsApi } from '../api/paths'
 import type {
   AliasResolution,
@@ -30,6 +30,7 @@ import type {
   StudyStatus,
   SwitchPreview,
 } from '../api/types'
+import ApiFeedback from '../components/ApiFeedback.vue'
 
 // 三类关系互斥；只有强制先修进入拓扑分层，并修只约束同修，建议先学仅提示。
 const relationLabels: Record<string, string> = {
@@ -77,6 +78,8 @@ const studyStatus = ref<CourseStudyStatusSummary | null>(null)
 const semesters = ref<Semester[]>([])
 const dataLoading = ref(false)
 const studyUnavailable = ref(false)
+const studyError = ref('')
+const studyRetrying = ref(false)
 
 const preview = ref<SwitchPreview | null>(null)
 const previewLoading = ref(false)
@@ -88,6 +91,8 @@ const planForm = reactive({
   version_label: '',
   credit_limit_per_term: null as number | null,
 })
+// 创建方案没有撤销入口，提交期间禁用按钮并忽略重复触发，避免生成字段相同的重复版本。
+const planSaving = ref(false)
 
 const courseForm = reactive({
   id: null as number | null,
@@ -118,6 +123,11 @@ const resolveClass = ref('')
 const resolveSemester = ref<number | null>(null)
 const resolution = ref<AliasResolution | null>(null)
 const resolving = ref(false)
+
+// 三类删除共用一组“正在删除的行”标记：点击后按钮显示忙碌并阻止重复提交。
+const removingRelationId = ref<number | null>(null)
+const removingAliasId = ref<number | null>(null)
+const removingStudyRecordId = ref<number | null>(null)
 
 const studyForm = reactive({
   curriculum_course_id: null as number | null,
@@ -351,9 +361,9 @@ function shortNodeName(name: string): string {
 
 // 默认查看档案中的当前方案；没有当前方案时只选中第一个版本供查看，
 // 真正写入档案仍需用户在切换预览中确认。
+// 失败信息保留到本次加载成功为止，重试期间由 ApiFeedback 的 busy 状态提示进行中。
 async function load() {
   loading.value = true
-  error.value = ''
   try {
     const [loadedProfile, loadedPlans, loadedSemesters] = await Promise.all([
       pathsApi.profile(),
@@ -374,11 +384,19 @@ async function load() {
         credit_limit_per_term: selectedPlan.value.credit_limit_per_term,
       })
     }
+    error.value = ''
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
     loading.value = false
   }
+}
+
+// 首屏失败后可就地重试：先重新读取方案与学期，成功后再加载方案数据。
+async function retryLoad() {
+  if (loading.value) return
+  await load()
+  if (!error.value) await loadPlanData()
 }
 
 // 方案切换后所有列表与分析都重新拉取；没有选中方案时清空并重置，
@@ -390,6 +408,8 @@ async function loadPlanData() {
     aliases.value = []
     studyRecords.value = []
     studyStatus.value = null
+    studyUnavailable.value = false
+    studyError.value = ''
     resetAnalysis()
     return
   }
@@ -493,10 +513,10 @@ async function generateSemesterPlan() {
   }
 }
 
-// 修读记录与汇总任一失败即整体标记不可用，避免把空数据展示成“未修”或“状态未知”。
+// 修读记录与汇总任一失败即整体不可用，避免把空数据展示成“未修”或“状态未知”。
+// 只有 404 才视为接口未接入；超时、网络或 5xx 视为本次读取失败，保留可读原因供重试。
 async function loadStudy() {
   if (selectedPlanId.value === null) return
-  studyUnavailable.value = false
   try {
     const [records, statuses] = await Promise.all([
       pathsApi.listStudyRecords(selectedPlanId.value),
@@ -504,11 +524,27 @@ async function loadStudy() {
     ])
     studyRecords.value = records
     studyStatus.value = statuses
-  } catch {
-    studyUnavailable.value = true
+    studyUnavailable.value = false
+    studyError.value = ''
+  } catch (caught) {
     studyRecords.value = []
     studyStatus.value = null
+    if (caught instanceof ApiError && caught.status === 404) {
+      studyUnavailable.value = true
+      studyError.value = ''
+    } else {
+      studyUnavailable.value = false
+      studyError.value = errorMessage(caught)
+    }
   }
+}
+
+// 修读状态读取失败后就地重试；失败原因保留到本次读取成功为止，便于按钮显示进行中。
+async function retryStudy() {
+  if (studyRetrying.value) return
+  studyRetrying.value = true
+  await loadStudy()
+  studyRetrying.value = false
 }
 
 // 查看版本与档案当前方案分离：仅当二者不同时读取切换影响预览，
@@ -556,9 +592,12 @@ async function applyCurrentPlan() {
   }
 }
 
+// 提交期间保持表单内容并禁用按钮；失败只显示原因，已填字段不丢失。
 async function createPlan() {
+  if (planSaving.value) return
   actionError.value = ''
   notice.value = ''
+  planSaving.value = true
   try {
     const created = await pathsApi.createPlan({
       title: planForm.title,
@@ -572,6 +611,8 @@ async function createPlan() {
     notice.value = '培养方案版本已创建；请确认无误后设为当前方案。'
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    planSaving.value = false
   }
 }
 
@@ -655,14 +696,25 @@ async function addRelation() {
   }
 }
 
+// 三类删除都没有撤销入口：先展示将删除的关系方向与条件、别名范围或修读记录字段，
+// 取消不发送请求；请求期间按钮禁用，失败保留原列表并显示原因。
 async function removeRelation(relation: CourseRelation) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingRelationId.value !== null) return
+  const typeLabel = relationLabels[relation.relation_type] ?? relation.relation_type
+  const condition = relation.condition_text ? `条件原文：${relation.condition_text}。` : ''
+  const confirmed = confirm(
+    `删除${typeLabel}关系“${relationName(relation.from_course_id)} → ${relationName(relation.to_course_id)}”？${condition}删除后该关系不再参与关系图、修读顺序与下一步判断，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingRelationId.value = relation.id
   try {
     await pathsApi.deleteRelation(selectedPlanId.value, relation.id)
     await loadPlanData()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingRelationId.value = null
   }
 }
 
@@ -688,13 +740,21 @@ async function addAlias() {
 }
 
 async function removeAlias(alias: CourseAlias) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingAliasId.value !== null) return
+  const scope = `${alias.class_name ? `教学班 ${alias.class_name}` : '不限教学班'}、${alias.semester_id ? semesterName(alias.semester_id) : '不限学期'}`
+  const confirmed = confirm(
+    `删除别名“${alias.alias}”（对应课程 ${relationName(alias.curriculum_course_id)}，${scope}）？删除后名称解析不再使用该别名，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingAliasId.value = alias.id
   try {
     await pathsApi.deleteAlias(selectedPlanId.value, alias.id)
     await loadPlanData()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingAliasId.value = null
   }
 }
 
@@ -742,13 +802,27 @@ async function addStudyRecord() {
 }
 
 async function removeStudyRecord(record: CourseStudyRecord) {
-  if (selectedPlanId.value === null) return
+  if (selectedPlanId.value === null || removingStudyRecordId.value !== null) return
+  const fields = [
+    `状态：${statusLabels[record.status] ?? record.status}`,
+    `学期：${semesterName(record.semester_id)}`,
+    `成绩：${record.grade ?? '未填写'}`,
+    `已获学分：${record.credits_earned ?? '未填写'}`,
+    `备注：${record.note ?? '未填写'}`,
+  ].join('；')
+  const confirmed = confirm(
+    `删除“${relationName(record.curriculum_course_id)}”的修读记录？将删除 ${fields}。删除后该课程回到状态未知，界面无法恢复。`,
+  )
+  if (!confirmed) return
   actionError.value = ''
+  removingStudyRecordId.value = record.id
   try {
     await pathsApi.deleteStudyRecord(selectedPlanId.value, record.id)
     await loadStudy()
   } catch (caught) {
     actionError.value = errorMessage(caught)
+  } finally {
+    removingStudyRecordId.value = null
   }
 }
 
@@ -773,9 +847,7 @@ onMounted(async () => {
       </p>
     </div>
 
-    <div v-if="error" class="status-banner failed" role="alert">
-      <div><strong>加载失败</strong><p>{{ error }}</p></div>
-    </div>
+    <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="retryLoad" />
     <p v-else-if="loading" class="muted">正在加载培养方案…</p>
 
     <template v-else>
@@ -839,7 +911,7 @@ onMounted(async () => {
               <label>版本标签<input v-model.trim="planForm.version_label" required maxlength="100" placeholder="例如：2024 版" /></label>
             </div>
             <label>每学期学分上限（未知留空）<input v-model.number="planForm.credit_limit_per_term" type="number" min="1" /></label>
-            <button type="submit">创建方案版本</button>
+            <button type="submit" :disabled="planSaving">{{ planSaving ? '创建中…' : '创建方案版本' }}</button>
           </form>
         </section>
       </div>
@@ -925,7 +997,11 @@ onMounted(async () => {
                     <RouterLink v-if="relation.source_candidate_id" :to="{ path: '/review', query: { candidate: relation.source_candidate_id } }">候选 #{{ relation.source_candidate_id }}</RouterLink>
                     <span v-else>手动</span>
                   </td>
-                  <td class="row-actions"><button type="button" class="text-button danger" @click="removeRelation(relation)">删除</button></td>
+                  <td class="row-actions">
+                    <button type="button" class="text-button danger" :disabled="removingRelationId !== null" @click="removeRelation(relation)">
+                      {{ removingRelationId === relation.id ? '删除中…' : '删除' }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -972,7 +1048,11 @@ onMounted(async () => {
                   <td>{{ relationName(alias.curriculum_course_id) }}</td>
                   <td>{{ alias.class_name ?? '不限' }}</td>
                   <td>{{ alias.semester_id ? semesterName(alias.semester_id) : '不限' }}</td>
-                  <td class="row-actions"><button type="button" class="text-button danger" @click="removeAlias(alias)">删除</button></td>
+                  <td class="row-actions">
+                    <button type="button" class="text-button danger" :disabled="removingAliasId !== null" @click="removeAlias(alias)">
+                      {{ removingAliasId === alias.id ? '删除中…' : '删除' }}
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -1028,7 +1108,15 @@ onMounted(async () => {
             <div><p class="eyebrow">个人修读</p><h2>已修、在修与待修</h2></div>
             <span class="count-badge">{{ studyRecords.length }} 条记录</span>
           </div>
-          <p v-if="studyUnavailable" class="status-banner failed">
+          <!-- 只有 404 才说明接口尚未接入；超时、网络或 5xx 属于本次读取失败，给出原因与原位重试。 -->
+          <ApiFeedback
+            v-if="studyError"
+            title="修读状态读取失败"
+            :message="studyError"
+            :busy="studyRetrying"
+            @retry="retryStudy"
+          />
+          <p v-else-if="studyUnavailable" class="status-banner failed">
             <span><strong>修读状态暂不可用</strong><p>后端修读记录接口尚未接入；当前不会伪造任何状态。</p></span>
           </p>
           <template v-else>
@@ -1043,7 +1131,11 @@ onMounted(async () => {
                     <td>{{ record.grade ?? '未填写' }}</td>
                     <td>{{ record.credits_earned ?? '未填写' }}</td>
                     <td>{{ record.note ?? '—' }}</td>
-                    <td class="row-actions"><button type="button" class="text-button danger" @click="removeStudyRecord(record)">删除</button></td>
+                    <td class="row-actions">
+                      <button type="button" class="text-button danger" :disabled="removingStudyRecordId !== null" @click="removeStudyRecord(record)">
+                        {{ removingStudyRecordId === record.id ? '删除中…' : '删除' }}
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>

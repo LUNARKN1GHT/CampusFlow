@@ -25,6 +25,8 @@ const slots = ref<AvailabilitySlot[]>([])
 const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
+const slotDeleteError = ref('')
+const removingSlotId = ref<number | null>(null)
 const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
 
 async function load() {
@@ -77,13 +79,20 @@ async function addSlot() {
 }
 
 // 服务端删除成功后才从本地列表移除；失败保留原时段并显示错误。
+// 删除前展示星期与时段范围并确认，取消不发送请求；请求期间按钮禁用，避免重复提交。
 async function deleteSlot(slot: AvailabilitySlot) {
-  slotError.value = ''
+  if (removingSlotId.value !== null) return
+  const range = `${weekdays[slot.day_of_week]} ${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`
+  if (!confirm(`移除可用时段“${range}”？移除后该时段不再参与后续排期，已生成计划中的时间块不会被改写。`)) return
+  slotDeleteError.value = ''
+  removingSlotId.value = slot.id
   try {
     await scheduleApi.deleteSlot(slot.id)
     slots.value = slots.value.filter((item) => item.id !== slot.id)
   } catch (caught) {
-    slotError.value = errorMessage(caught)
+    slotDeleteError.value = errorMessage(caught)
+  } finally {
+    removingSlotId.value = null
   }
 }
 
@@ -124,7 +133,8 @@ onMounted(load)
 
       <section class="panel editor-panel">
         <div class="section-heading"><div><p class="eyebrow">真实配置</p><h2>每周可用时间</h2></div><span class="count-badge">{{ slots.length }} 段</span></div>
-        <div v-if="slots.length" class="availability-grid"><article v-for="slot in slots" :key="slot.id"><span><strong>{{ weekdays[slot.day_of_week] }}</strong><small>{{ slot.start_time.slice(0, 5) }}–{{ slot.end_time.slice(0, 5) }}</small></span><button type="button" class="text-button" @click="deleteSlot(slot)">移除</button></article></div>
+        <p v-if="slotDeleteError" class="form-error" role="alert">{{ slotDeleteError }}</p>
+        <div v-if="slots.length" class="availability-grid"><article v-for="slot in slots" :key="slot.id"><span><strong>{{ weekdays[slot.day_of_week] }}</strong><small>{{ slot.start_time.slice(0, 5) }}–{{ slot.end_time.slice(0, 5) }}</small></span><button type="button" class="text-button" :disabled="removingSlotId !== null" @click="deleteSlot(slot)">{{ removingSlotId === slot.id ? '移除中…' : '移除' }}</button></article></div>
         <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排学习块。</div>
       </section>
     </template>
