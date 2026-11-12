@@ -84,6 +84,18 @@ let pollTimer: number | null = null
 let pollStartedAt: number | null = null
 // 标签页隐藏时暂停轮询，避免后台空转；恢复可见后立即补齐一次。
 let pageHidden = false
+// 列表请求序号：筛选、导入、轮询与显式刷新可能并发，只有最后一次请求可以写回列表与错误。
+let listRequestId = 0
+let unmounted = false
+
+/** 开始一次列表请求并取得序号；响应回来时用 isCurrentListRequest 判断是否仍有效。 */
+function beginListRequest(): number {
+  return ++listRequestId
+}
+
+function isCurrentListRequest(requestId: number): boolean {
+  return !unmounted && requestId === listRequestId
+}
 
 const sourceTypeLabels: Record<MaterialSourceType, string> = {
   pdf: 'PDF', image: '图片', text: '粘贴文本', word: 'Word', web: '网页',
@@ -315,52 +327,66 @@ async function loadDetails(list: Material[]) {
 
 /** 首次加载与用户显式刷新：资料、学期与课程一起读取，并重新核对每份资料的详情。 */
 async function load() {
+  const requestId = beginListRequest()
   loading.value = true
   error.value = ''
   try {
     const [materialList, semesterList, courseList] = await Promise.all([
       materialsApi.list(currentFilters()), semestersApi.list(true), coursesApi.list(),
     ])
-    materials.value = materialList
+    if (unmounted) return
+    // 学期与课程不随筛选变化：即使列表已被更新的请求取代，也保留已读取的基础数据。
     semesters.value = semesterList
     courses.value = courseList
+    // 期间筛选或刷新已发起新请求：旧列表（含错误）直接丢弃，不能覆盖新范围。
+    if (!isCurrentListRequest(requestId)) return
+    materials.value = materialList
     // 显式刷新会清空行内操作错误，并重新取一次全部详情。
     jobChecked.clear()
     recognitionChecked.clear()
     Object.keys(actionErrors).forEach((key) => delete actionErrors[Number(key)])
     await Promise.all(materialList.map(ensureJob))
+    if (!isCurrentListRequest(requestId)) return
     await Promise.all(materialList.map(ensureRecognition))
   } catch (caught) {
+    if (!isCurrentListRequest(requestId)) return
     error.value = errorMessage(caught)
   } finally {
-    loading.value = false
-    syncPolling()
+    if (!unmounted) {
+      loading.value = false
+      syncPolling()
+    }
   }
 }
 
 /** 只重新读取资料列表（筛选、导入、归档与删除后）；学期与课程沿用已加载的基础数据，不重复拉取。 */
 async function reloadMaterials() {
+  const requestId = beginListRequest()
   try {
     const materialList = await materialsApi.list(currentFilters())
+    if (!isCurrentListRequest(requestId)) return
     materials.value = materialList
     await loadDetails(materialList)
   } catch (caught) {
+    if (!isCurrentListRequest(requestId)) return
     error.value = errorMessage(caught)
   } finally {
-    syncPolling()
+    if (!unmounted) syncPolling()
   }
 }
 
 /** 轮询：重新读取列表并补查仍在处理的资料；偶发失败保留上一次结果，不打断用户。 */
 async function refresh() {
+  const requestId = beginListRequest()
   try {
     const materialList = await materialsApi.list(currentFilters())
+    if (!isCurrentListRequest(requestId)) return
     materials.value = materialList
     await loadDetails(materialList)
   } catch {
     // 轮询中的偶发失败保留上一次结果，不打断用户。
   } finally {
-    syncPolling()
+    if (!unmounted) syncPolling()
   }
 }
 
@@ -414,6 +440,8 @@ function stopPolling() {
 }
 
 async function manualRefresh() {
+  // 首次加载或手动刷新仍在进行时不重复发起，避免旧请求先返回后又显示一次加载中。
+  if (loading.value) return
   pollPaused.value = false
   // 用户显式刷新：连同学期与课程一起重新校准。
   await load()
@@ -677,6 +705,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  // 卸载后递增请求号：仍在途的列表响应不得写回已关闭的页面状态。
+  unmounted = true
+  listRequestId += 1
   stopPolling()
 })
 </script>
@@ -698,7 +729,7 @@ onBeforeUnmount(() => {
       <section v-if="importOpen" class="panel editor-panel">
         <div class="section-heading">
           <div><p class="eyebrow">导入资料</p><h2>粘贴文本、上传文件或读取网页</h2></div>
-          <div class="segmented" role="tablist" aria-label="导入方式">
+          <div class="segmented" role="group" aria-label="导入方式">
             <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'text' }" :aria-pressed="importMode === 'text'" @click="switchImportMode('text')">粘贴文本</button>
             <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'files' }" :aria-pressed="importMode === 'files'" @click="switchImportMode('files')">上传文件</button>
             <button type="button" class="segmented-item" :class="{ 'is-active': importMode === 'web' }" :aria-pressed="importMode === 'web'" @click="switchImportMode('web')">公开网页</button>
@@ -787,7 +818,7 @@ onBeforeUnmount(() => {
       <section class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">资料列表</p><h2>处理状态</h2></div>
-          <button type="button" class="text-button" @click="manualRefresh">刷新</button>
+          <button type="button" class="text-button" :disabled="loading" @click="manualRefresh">刷新</button>
         </div>
         <p v-if="pollPaused" class="inline-notice" role="status">自动刷新已暂停，请手动刷新查看最新处理状态。</p>
         <p v-if="recognitionNotice" class="inline-notice" role="status">{{ recognitionNotice }}</p>

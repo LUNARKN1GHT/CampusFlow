@@ -11,7 +11,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number | null,
-    public readonly kind: 'http' | 'validation' | 'network' | 'timeout' | 'invalid-response',
+    public readonly kind: 'http' | 'validation' | 'network' | 'timeout' | 'cancelled' | 'invalid-response',
   ) {
     super(message)
     this.name = 'ApiError'
@@ -59,7 +59,8 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
 
 /**
  * 发出请求并统一处理超时：GET 强制 no-store，避免浏览器缓存旧数据。
- * AbortError 归为超时，其余 fetch 异常归为网络不可达；两者都不会把请求伪装成成功。
+ * 调用方可通过 init.signal 取消请求：取消与超时、网络错误分开，旧响应由调用方丢弃。
+ * AbortError 归为超时或取消，其余 fetch 异常归为网络不可达；都不会把请求伪装成成功。
  */
 async function performRequest(
   path: string,
@@ -67,8 +68,16 @@ async function performRequest(
   headers: Headers,
   timeoutMs: number,
 ): Promise<Response> {
+  const externalSignal = init.signal ?? undefined
+  if (externalSignal?.aborted) throw new ApiError('请求已取消。', null, 'cancelled')
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const abortFromCaller = () => controller.abort()
+  externalSignal?.addEventListener('abort', abortFromCaller, { once: true })
+  const timeout = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
   try {
     const response = await fetch(`${API_PREFIX}${path}`, {
       ...init,
@@ -82,11 +91,16 @@ async function performRequest(
   } catch (error) {
     if (error instanceof ApiError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') {
+      // 调用方主动取消（切换筛选或关闭面板）不等于超时，不能提示“请求超时”。
+      if (externalSignal?.aborted && !timedOut) {
+        throw new ApiError('请求已取消。', null, 'cancelled')
+      }
       throw new ApiError('请求超时，请检查网络后重试。', null, 'timeout')
     }
     throw new ApiError('无法连接服务，请检查网络或确认后端已经启动。', null, 'network')
   } finally {
     window.clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', abortFromCaller)
   }
 }
 
