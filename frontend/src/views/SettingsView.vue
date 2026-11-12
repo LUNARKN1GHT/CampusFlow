@@ -26,7 +26,14 @@ const slots = ref<AvailabilitySlot[]>([])
 const form = reactive({ timezone: 'Asia/Shanghai', daily_capacity_minutes: 240, weekly_capacity_minutes: 1680, break_minutes: 15, buffer_minutes: 30 })
 const slotForm = reactive({ day_of_week: 0, start_time: '19:00', end_time: '21:00' })
 const slotError = ref('')
-const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
+const {
+  options: themeOptions,
+  paletteOptions,
+  mode: themeMode,
+  palette,
+  setThemeMode,
+  setColorPalette,
+} = useTheme()
 
 // AI 服务：后端只返回可用性；密钥输入框永远是空白，提交后立即清空本地副本。
 const providerLabels: Record<TextProvider, string> = { zhipu: '智谱 GLM（ZHIPU）', deepseek: 'DeepSeek' }
@@ -243,10 +250,15 @@ onMounted(() => {
 
     <section class="panel editor-panel">
       <div class="section-heading"><div><p class="eyebrow">显示</p><h2>界面主题</h2></div></div>
-      <div class="segmented" role="group" aria-label="界面主题">
-        <button v-for="option in themeOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': themeMode === option.value }" :aria-pressed="themeMode === option.value" @click="setThemeMode(option.value)">{{ option.label }}</button>
+      <div class="theme-stack">
+        <div class="segmented" role="group" aria-label="界面主题">
+          <button v-for="option in themeOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': themeMode === option.value }" :aria-pressed="themeMode === option.value" @click="setThemeMode(option.value)">{{ option.label }}</button>
+        </div>
+        <div class="segmented" role="group" aria-label="主题色系">
+          <button v-for="option in paletteOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': palette === option.value }" :aria-pressed="palette === option.value" @click="setColorPalette(option.value)">{{ option.label }}</button>
+        </div>
       </div>
-      <p class="form-help">选择立即生效，并保存在本机浏览器；“跟随系统”会随操作系统深浅色设置自动切换。主题只影响当前浏览器，不写入工作空间设置。</p>
+      <p class="form-help">深浅模式与色系互相独立：绿色为默认，蓝色和白色会替换侧栏、按钮和选中态的主色。选择立即生效，并保存在本机浏览器；“跟随系统”会随操作系统深浅色设置自动切换。主题只影响当前浏览器，不写入工作空间设置。</p>
     </section>
   </main>
 </template>
