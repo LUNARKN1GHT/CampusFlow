@@ -5,7 +5,7 @@
 - 本文件保存后续设计与开发需要复用的项目背景、业务约定和阶段边界。
 - [README.md](README.md) 是面向外部展示的完整项目计划书，包含详细场景、功能说明和验收标准；开展具体功能工作前应阅读相关章节。
 - [CONTRIBUTING.md](CONTRIBUTING.md) 保存任务认领、分支提交、MR／PR 评审、验证与资料管理约定；参与项目修改时应遵循。项目代码和项目自有文档采用 [Apache License 2.0](LICENSE)，第三方材料继续遵循各自授权条件。
-- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；集中核对列表、详情界面与逐字段修正／生成正式事项入口已在本整合分支接入（R008、R009），M3 端到端验收待 R010；M4 的检索排序、引用校验、来源失效、问答协议、有范围会话与问答页面已接入，Q018 验收记录见 docs/verification/Q018-acceptance.md（Q019 已用 DeepSeek 补跑真实模型生成侧）；M5 的两周排期核心、冲突检查、版本化接受、时间块移动／锁定、计划页面、自然语言入口与今日总览已接入，验收检查表见 docs/verification/M5-acceptance.md，v0.5.0 按作者决定放行发布（独立验收豁免、全新机器验证暂缓），V008 课程项目 PRE 最后收尾；M6 的 Word／公开网页、版本比较与合并已发布 v0.6.0；M7 的依赖任务与局部重排、应用内提醒、清单与日历文件导出已接入，第二阶段端到端验收与 v0.7.0 发布候选证据见 docs/verification/A022-second-stage-acceptance.md；M8 的培养方案版本、三类课程关系、别名与修读状态、课程图分析、成环／缺项阻塞、拓扑顺序、下一步建议与学期辅助及对应界面已接入，验收记录见 docs/verification/C017-course-path-acceptance.md 与 docs/verification/C015-C016-course-path-ui.md；M9 的外部日历授权、连接与凭据存储、写入草案与逐项确认、执行记录与幂等、新增／修改／删除适配器、超时对账、失败重试、同步差异与界面已接入，验收记录见 docs/verification/M9-external-calendar.md 与 docs/verification/K016-third-stage-acceptance.md，真实 Google 账户验证待项目组提供 OAuth 客户端与测试账户。具体任务负责人以 GitHub Issue 的 Assignee 为准。
+- 当前手动学习事务管理闭环已实现，MVP 开发中。已有本机单用户会话保护、Vue 业务页面、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好 API；跨工作空间授权与资料后端（上传、解析、定位、后台处理、删除）已在本整合分支接入；资料页面已接入并通过本地真实队列闭环验证（见 docs/verification/M2-integration-acceptance.md），M2 父组与里程碑状态以 GitHub 记录为准；集中核对列表、详情界面与逐字段修正／生成正式事项入口已在本整合分支接入（R008、R009），M3 端到端验收待 R010；M4 的检索排序、引用校验、来源失效、问答协议、有范围会话与问答页面已接入，Q018 验收记录见 docs/verification/Q018-acceptance.md（Q019 已用 DeepSeek 补跑真实模型生成侧）；M5 的两周排期核心、冲突检查、版本化接受、时间块移动／锁定、计划页面、自然语言入口与今日总览已接入，验收检查表见 docs/verification/M5-acceptance.md，v0.5.0 按作者决定放行发布（独立验收豁免、全新机器验证暂缓），V008 课程项目 PRE 最后收尾；M6 的 Word／公开网页、版本比较与合并已发布 v0.6.0；M7 的依赖任务与局部重排、应用内提醒、清单与日历文件导出已接入，第二阶段端到端验收与 v0.7.0 发布候选证据见 docs/verification/A022-second-stage-acceptance.md；M8 的培养方案版本、三类课程关系、别名与修读状态、课程图分析、成环／缺项阻塞、拓扑顺序、下一步建议与学期辅助及对应界面已接入，验收记录见 docs/verification/C017-course-path-acceptance.md 与 docs/verification/C015-C016-course-path-ui.md；M9 的外部日历授权、连接与凭据存储、写入草案与逐项确认、执行记录与幂等、新增／修改／删除适配器、超时对账、失败重试、同步差异与界面已接入，验收记录见 docs/verification/M9-external-calendar.md 与 docs/verification/K016-third-stage-acceptance.md，真实 Google 账户验证待项目组提供 OAuth 客户端与测试账户。2026-11-12 起智能问答与外部日历前端页面暂移除、课程路径移入设置页工具箱，后端能力保留，见下方调整记录。具体任务负责人以 GitHub Issue 的 Assignee 为准。
 - 工程设计见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，本地启动与检查见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
 - 开发里程碑、Issue 拆分、标签与版本规则见 [docs/planning/ROADMAP.md](docs/planning/ROADMAP.md)，任务索引见 [docs/planning/ISSUES.md](docs/planning/ISSUES.md)。GitHub 是发布后的认领与进度来源，本地清单只保存初始规划快照。
 - 后续业务范围、阶段安排或关键规则发生变化时，同步维护本文件与 README.md；对外功能状态必须以实际实现和验证结果为准。
@@ -100,7 +100,7 @@
 
 ## 页面与核心业务对象
 
-- 页面入口：总览、课程、资料库、待核对、智能问答、任务与计划、课程路径、设置。随功能阶段逐步开放，首期可合并页面；待核对事项必须集中可见，不能仅保留在聊天记录中。
+- 页面入口：总览、课程、资料库、待核对、版本对照、任务、学习计划、提醒、导出、设置；课程路径收在设置页进入的工具箱中，智能问答与外部日历前端页面暂不提供入口（后端能力保留）。随功能阶段逐步开放，首期可合并页面；待核对事项必须集中可见，不能仅保留在聊天记录中。
 - 核心对象：学期与个人配置、课程、资料与版本、事实与规则、任务、日程、计划与时间块、冲突与风险、外部操作记录。
 - 数据设计需保留对象之间的来源、适用范围、状态、版本和关联关系，为引用追溯、通知变更和计划调整提供依据。
 
@@ -261,6 +261,7 @@ Word 与公开网页导入、资料版本比较、重复事项合并、依赖任
 - P006 提供统一 sidecar CLI（serve／worker／migrate／backup／restore／doctor），退出码 0/1/2、结构化日志与脱敏；打包入口已改为调用该 CLI。P010 提供 `.campusflow` 全量导出/导入（manifest、校验和、凭据表排除、临时库恢复后原子切换），并在菜单「数据」中提供导出／导入入口（导入前暂停 API 与 Worker，成功后重启）；Windows 首启与 Windows↔macOS 双向归档互通已由 `desktop-archive-compat.yml` 验证（夹具含资料原文、任务、候选与证据、已接受计划与问答引用，导入后逐项核对），期间修复了 `*.exe` 解析、临时目录 ACL、Unix 套接字配置、`pg_ctl` 管道挂起、stdout 编码与 gzip 转储六个缺陷；P012 在桌面模式增加 Host/Origin 校验、CSP 与安全响应头。
 - P008 提供 Electron 外壳与进程监管（PG → migrate → API → Worker、崩溃重启、反向停止、单实例、contextIsolation／sandbox、导航与外链白名单、日志脱敏），Playwright 冒烟 8 项通过；macOS 上已用真实 sidecar + 内置 PostgreSQL 完成首启、自动登录、维护与升级联调，并从 CI 产出的 arm64／x64 DMG 复制安装后复跑维护流程（x64 经 Rosetta），arm64 另安装到 `~/Applications` 经 LaunchServices 启动并正常退出。P009 已落地 electron-builder 配置、`desktop-v*` 发布工作流与干净机器验收清单；macOS arm64／x64 DMG 已由 `desktop-macos-build.yml` 在 CI 构建并校验包内资源（Intel 任务改用 `macos-15-intel`，`electron-builder` 固定 26.15.3），但尚未产出签名安装包，也不能视为发布验收完成。
 - BUG-553–557 已合并（PR #558）：桌面「设置 → AI 服务」配置模型密钥（本机凭据存储、重启生效提示）、粘贴文本显式识别入口、资料「原文读取／问答索引」双状态、缺配置失败作业可人工恢复、父任务卡片与详情汇总一致；后端全量 1771 passed（8 skipped），PR CI 13 项通过。真实打包安装包内的配置与识别交互仍需验收。见 docs/verification/BUG-553-557-integration.md。
+- 2026-11-12 前端导航与外观调整（#563–#566）：新增绿色／蓝色／白色色系并与浅色／深色独立叠加；移除智能问答与外部日历前端页面及入口，后端问答检索与外部日历能力保留；课程路径移出主导航，改由设置页「工具箱」进入，原 `/course-paths` 仍可直接访问。前端 `npm run build` 通过，主题、响应式、已移除页面回退与工具箱入口的 Playwright 用例 6 passed；未验证真实用户视觉偏好与完整业务回归。见 frontend/tests/e2e/theme.spec.ts、calendar-removal.spec.ts、toolbox.spec.ts 与 responsive.spec.ts。
 - 2026-11-11 项目收尾：开放 Issue 全部关闭。#481–#484 完成关闭；#553–#557 修复合并后关闭；#478/#475/#466 按作者决定豁免未执行的 Windows 实机与签名验收；#400 按 EF1 决策以 not planned 关闭。上述豁免项不得表述为已验证。
 - 文件保存在后端私有存储，解析采用 pypdf 与可替换 OCR／多模态适配器；模型供应商和具体模型待样本评估，不将模型输出直接视为事实或执行授权。
 - API 统一前缀 `/api/v1`，当前包括健康检查、学期、课程、任务、固定日程、可用时间、资料、核对、规则与智能问答接口。健康检查只表示进程存活；业务草案、数据库就绪与外部执行结果不得用健康状态代替。
