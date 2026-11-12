@@ -18,6 +18,7 @@ import type {
   Task,
 } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { formatDate, formatDateTime } from '../utils/datetime'
 
 type ReminderView = 'all' | 'unread' | 'read'
 
@@ -170,10 +171,9 @@ async function act(reminder: Reminder, action: 'read' | 'dismiss'): Promise<void
 // scheduled_for 是提醒窗口时间，不一定是截止时刻；date_only 时只显示日期，
 // 避免把窗口计算或同步时刻误当成任务截止时刻。
 function formatScheduled(reminder: Reminder): string {
-  const dateOnly = reminder.payload?.date_only === true
-  return new Intl.DateTimeFormat('zh-CN', dateOnly
-    ? { dateStyle: 'medium' }
-    : { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(reminder.scheduled_for))
+  return reminder.payload?.date_only === true
+    ? formatDate(reminder.scheduled_for)
+    : formatDateTime(reminder.scheduled_for)
 }
 
 function formatMinutes(minutes: number): string {

@@ -26,6 +26,7 @@ import type {
 import ApiFeedback from '../components/ApiFeedback.vue'
 import MaterialLifecycle from '../components/MaterialLifecycle.vue'
 import MaterialSource from '../components/MaterialSource.vue'
+import { formatDateTime } from '../utils/datetime'
 
 const POLL_INTERVAL_MS = 3000
 // 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
@@ -294,10 +295,6 @@ function scopeText(material: Material): string {
   parts.push(semester?.name ?? '未指定学期')
   parts.push(course ? `${course.name}${material.class_name ? ` · ${material.class_name}` : ''}` : material.class_name || '未关联课程')
   return parts.join(' · ')
-}
-
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }
 
 async function ensureJob(material: Material) {

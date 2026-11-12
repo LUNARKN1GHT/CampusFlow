@@ -1,6 +1,8 @@
 // 资料库与后台处理作业：导入（文件／网页／粘贴文本）→ 版本与片段 → 归档／删除。
 // 文件上传走 multipart（归属范围放在查询参数里），删除必须先取影响预览再用其中的确认令牌。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest, apiRequestBlob } from './client'
 import type {
   JobAttempt,
@@ -20,15 +22,6 @@ import type {
   WebImportInput,
   WebImportResult,
 } from './types'
-
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
 
 export type MaterialFilters = {
   semesterId?: number | null

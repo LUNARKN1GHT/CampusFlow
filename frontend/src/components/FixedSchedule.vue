@@ -11,6 +11,7 @@ import { errorMessage } from '../api/client'
 import { settingsApi } from '../api/settings'
 import type { Course, FixedEvent, FixedEventInput, FixedEventOccurrence } from '../api/types'
 import ApiFeedback from './ApiFeedback.vue'
+import { formatWeekdayDate, localDateKey, zonedInputValue } from '../utils/datetime'
 
 const route = useRoute()
 const definitions = ref<FixedEvent[]>([])
@@ -38,22 +39,10 @@ function startOfWeek(value: Date): Date {
   return date
 }
 
-function dateKey(value: Date): string {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+const dateKey = localDateKey
 
 // 把接口返回的时间点换算成工作空间本地的 YYYY-MM-DDTHH:mm，供 datetime-local 与按日切分使用。
-function workspaceInput(value: string): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone.value, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date(value))
-  const get = (kind: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === kind)?.value
-  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
-}
+const workspaceInput = (value: string): string => zonedInputValue(value, timezone.value)
 
 const days = computed(() => Array.from({ length: 7 }, (_, index) => {
   const date = new Date(weekStart.value)
@@ -61,7 +50,7 @@ const days = computed(() => Array.from({ length: 7 }, (_, index) => {
   const key = dateKey(date)
   return {
     key,
-    label: new Intl.DateTimeFormat('zh-CN', { weekday: 'short', month: 'numeric', day: 'numeric' }).format(date),
+    label: formatWeekdayDate(date),
     events: occurrences.value.filter((item) => {
       const firstDay = workspaceInput(item.starts_at).slice(0, 10)
       // 结束边界不占用下一天；按空间日期比较，避免使用浏览器时区切分。

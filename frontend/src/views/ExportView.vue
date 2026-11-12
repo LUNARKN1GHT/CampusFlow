@@ -19,8 +19,9 @@ import type {
 } from '../api/exports'
 import { plansApi } from '../api/plans'
 import type { PlanDraft } from '../api/plans'
-import type { Course, Task, TaskProgress } from '../api/types'
+import type { Course, Task } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { progressLabels } from '../constants/labels'
 
 const mode = ref<ExportMode>('tasks')
 const format = ref<ExportFormat>('csv')
@@ -45,14 +46,6 @@ const downloadNotice = ref('')
 // 预览请求序号：范围、格式或选项变化会递增序号，仍在途的旧预览返回后必须丢弃。
 let previewRequestId = 0
 let unmounted = false
-
-const progressLabels: Record<TaskProgress, string> = {
-  not_started: '未开始',
-  in_progress: '进行中',
-  blocked: '受阻',
-  done: '已完成',
-  cancelled: '已取消',
-}
 
 /** 预览与导出支持的警告／排除代码；未知代码仍原样显示，不隐藏。 */
 const noticeLabels: Record<string, string> = {

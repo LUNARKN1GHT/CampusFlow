@@ -11,22 +11,15 @@ import { errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { PlanOverview } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { priorityLabels, progressLabels } from '../constants/labels'
+import { formatTime } from '../utils/datetime'
 
 const overview = ref<PlanOverview | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-const priorityLabels: Record<string, string> = { low: '低', medium: '中', high: '高' }
-const progressLabels: Record<string, string> = {
-  not_started: '未开始',
-  in_progress: '进行中',
-  blocked: '受阻',
-}
-
 // 时间按浏览器本地时区格式化；页面日期 overview.today 由服务端按工作空间时区计算。
-function timeText(value: string): string {
-  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
+const timeText = formatTime
 
 // 仅日期 DDL 只显示日期并标注，有时刻才追加 HH:mm，不补造时刻。
 function dueText(task: { due_date: string | null; due_time: string | null }): string {
