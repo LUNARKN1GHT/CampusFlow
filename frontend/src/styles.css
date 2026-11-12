@@ -60,19 +60,9 @@
   --priority-medium: #d59b42;
   --priority-high: #c75d3c;
   --focus-ring: #c9ddd1;
-  --topbar-bg: rgba(255, 254, 250, .82);
+  --header-bg: rgba(255, 254, 250, .82);
   --login-glow: #dfece4;
   --shadow-card: 0 12px 35px rgba(41, 62, 54, .05);
-
-  --sidebar-bg: #15392f;
-  --sidebar-ink: #eef6f1;
-  --sidebar-item: #dcebe5;
-  --sidebar-muted: #91ada2;
-  --sidebar-brand-sub: #abc2b9;
-  --sidebar-disabled: #78968a;
-  --sidebar-border: #83a597;
-  --sidebar-hover: rgba(255, 255, 255, .07);
-  --sidebar-active: rgba(255, 255, 255, .13);
 
   /* 以下 token 用于保留原本各自独立的少量色值，避免并入近似色后改变浅色观感。 */
   --brand-mark-border: #85a79a;
@@ -134,19 +124,9 @@
   --priority-medium: #c9922f;
   --priority-high: #d4674b;
   --focus-ring: #3c5a4c;
-  --topbar-bg: rgba(26, 32, 29, .82);
+  --header-bg: rgba(26, 32, 29, .82);
   --login-glow: #1c2b25;
   --shadow-card: 0 12px 35px rgba(0, 0, 0, .38);
-
-  --sidebar-bg: #0f1613;
-  --sidebar-ink: #e3eee8;
-  --sidebar-item: #cfe0d8;
-  --sidebar-muted: #8aa79a;
-  --sidebar-brand-sub: #a8c3b8;
-  --sidebar-disabled: #6a8579;
-  --sidebar-border: #3f5c50;
-  --sidebar-hover: rgba(255, 255, 255, .06);
-  --sidebar-active: rgba(255, 255, 255, .12);
 
   --brand-mark-border: #4e7a68;
   --surface-segmented: #232b27;
@@ -179,16 +159,8 @@
   --brand-selected: #eff6fd;
 
   --focus-ring: #c6dbee;
-  --topbar-bg: rgba(253, 254, 255, .82);
+  --header-bg: rgba(253, 254, 255, .82);
   --login-glow: #dce8f4;
-
-  --sidebar-bg: #14304a;
-  --sidebar-ink: #eef5fb;
-  --sidebar-item: #d8e6f3;
-  --sidebar-muted: #8ea9c2;
-  --sidebar-brand-sub: #a7bfd5;
-  --sidebar-disabled: #7793ab;
-  --sidebar-border: #7e9fbb;
 
   --brand-mark-border: #85a7c5;
   --surface-segmented: #f3f6fa;
@@ -216,17 +188,9 @@
   --brand-selected: #182838;
 
   --focus-ring: #35506a;
-  --topbar-bg: rgba(22, 30, 42, .82);
+  --header-bg: rgba(22, 30, 42, .82);
   --login-glow: #172435;
   --shadow-card: 0 12px 35px rgba(0, 0, 0, .4);
-
-  --sidebar-bg: #0b131d;
-  --sidebar-ink: #e2edf7;
-  --sidebar-item: #ccdcea;
-  --sidebar-muted: #87a3bc;
-  --sidebar-brand-sub: #a4bed3;
-  --sidebar-disabled: #668096;
-  --sidebar-border: #3d5a74;
 
   --brand-mark-border: #4d7394;
   --surface-segmented: #1f2936;
@@ -254,16 +218,8 @@
   --brand-selected: #f0f0ec;
 
   --focus-ring: #dbdbd5;
-  --topbar-bg: rgba(255, 255, 255, .82);
+  --header-bg: rgba(255, 255, 255, .82);
   --login-glow: #e9e9e5;
-
-  --sidebar-bg: #232321;
-  --sidebar-ink: #f4f4f1;
-  --sidebar-item: #e5e5e1;
-  --sidebar-muted: #a0a09a;
-  --sidebar-brand-sub: #bcbcb6;
-  --sidebar-disabled: #84847e;
-  --sidebar-border: #8e8e88;
 
   --brand-mark-border: #afafa8;
   --surface-segmented: #f2f2ef;
@@ -291,17 +247,9 @@
   --brand-selected: #242421;
 
   --focus-ring: #484842;
-  --topbar-bg: rgba(28, 28, 26, .82);
+  --header-bg: rgba(28, 28, 26, .82);
   --login-glow: #23231f;
   --shadow-card: 0 12px 35px rgba(0, 0, 0, .42);
-
-  --sidebar-bg: #0f0f0e;
-  --sidebar-ink: #f0f0ed;
-  --sidebar-item: #dededa;
-  --sidebar-muted: #a0a09a;
-  --sidebar-brand-sub: #babab4;
-  --sidebar-disabled: #7e7e78;
-  --sidebar-border: #4a4a45;
 
   --brand-mark-border: #5c5c56;
   --surface-segmented: #242421;
@@ -312,27 +260,27 @@ body { margin: 0; min-width: 320px; background: var(--page-bg); }
 button, input, select, textarea { font: inherit; }
 a { color: inherit; }
 
-.app-frame { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
-.sidebar { position: sticky; top: 0; height: 100vh; padding: 28px 20px; color: var(--sidebar-ink); background: var(--sidebar-bg); display: flex; flex-direction: column; }
-.brand { display: flex; gap: 12px; align-items: center; text-decoration: none; margin: 0 8px 40px; }
-.brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--sidebar-border); border-radius: 13px; font-weight: 800; color: var(--on-brand-fill); }
+/* 顶部单行导航：左侧品牌、中间横向导航、右侧深浅模式与账号操作；窄屏换行但导航自身横向滚动。 */
+.app-frame { min-height: 100vh; display: flex; flex-direction: column; }
+.app-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 20px; padding: 13px clamp(24px, 5vw, 72px); border-bottom: 1px solid var(--line); background: var(--header-bg); backdrop-filter: blur(12px); }
+.brand { display: flex; flex: none; gap: 10px; align-items: center; text-decoration: none; }
+.brand-mark { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--brand-mark-border); border-radius: 13px; color: var(--brand); font-weight: 800; }
+/* 顶部品牌标记用实心填充；登录页 .login-brand 仍使用描边样式。 */
+.brand .brand-mark { color: var(--on-brand-fill); background: var(--brand-fill); border-color: var(--brand-fill); }
 .brand strong, .brand small { display: block; }
-.brand small { color: var(--sidebar-brand-sub); font-size: 12px; }
-.nav-label { margin: 0 12px 8px; color: var(--sidebar-muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
-.nav-label-spaced { margin-top: 28px; }
-.nav-item { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0; padding: 9px 12px; border-radius: 10px; text-decoration: none; color: var(--sidebar-item); }
-.nav-item:hover { background: var(--sidebar-hover); }
-.nav-item.router-link-active { color: var(--on-brand-fill); background: var(--sidebar-active); font-weight: 700; }
-.nav-item-disabled { color: var(--sidebar-disabled); cursor: not-allowed; }
-.nav-item-disabled small { font-size: 10px; }
-.sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-.sidebar-note { margin: auto 8px 0; color: var(--sidebar-muted); font-size: 12px; line-height: 1.65; }
-.content-column { min-width: 0; }
-.topbar { min-height: 86px; display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 18px clamp(24px, 5vw, 72px); border-bottom: 1px solid var(--line); background: var(--topbar-bg); backdrop-filter: blur(12px); }
-.topbar p { margin: 0; }
-.topbar-title { font-weight: 700; }
-.stage-badge { flex: none; padding: 7px 12px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); font-size: 12px; font-weight: 800; }
-.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.brand strong { font-size: 15px; }
+.brand small { color: var(--muted); font-size: 12px; }
+.top-nav { display: flex; flex: 1 1 auto; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+.top-nav::-webkit-scrollbar { display: none; }
+.nav-item { flex: none; display: inline-flex; align-items: center; min-height: 38px; padding: 7px 13px; border-radius: 999px; color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.nav-item:hover { color: var(--ink); background: var(--surface-soft); }
+.nav-item.router-link-active { color: var(--brand); background: var(--brand-soft); font-weight: 800; }
+.header-actions { display: flex; flex: none; align-items: center; gap: 10px; margin-left: auto; }
+.theme-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-segmented); }
+.theme-switch-item { padding: 4px 10px; border-radius: 999px; color: var(--muted); background: transparent; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.theme-switch-item:hover { color: var(--ink); }
+.theme-switch-item.is-active { color: var(--on-brand-fill); background: var(--brand-fill); }
+.user-badge { flex: none; max-width: 140px; padding: 6px 11px; border-radius: 999px; overflow: hidden; background: var(--brand-soft); color: var(--brand); font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
 .text-button { padding: 7px 10px; color: var(--muted); background: transparent; }
 .page-content { max-width: 1120px; margin: 0 auto; padding: 56px clamp(24px, 5vw, 72px) 80px; }
 .page-heading { margin-bottom: 36px; }
@@ -495,7 +443,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .segmented { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-segmented); }
 .segmented-item { padding: 7px 14px; border-radius: 999px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 700; }
 .segmented-item.is-active { color: var(--on-brand-fill); background: var(--brand-fill); }
-.theme-stack { display: grid; gap: 12px; justify-items: start; }
 .upload-results { display: grid; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
 .upload-results li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
 .material-list { display: grid; }
@@ -616,15 +563,23 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .export-item p { margin: 0; color: var(--muted); font-size: 12px; word-break: break-word; }
 .export-quiet { margin: 0; color: var(--muted); font-size: 13px; }
 
+/* 中等宽度：品牌与账号操作占第一行，导航换到第二行并占满宽度。 */
+@media (max-width: 960px) {
+  .app-header { flex-wrap: wrap; row-gap: 8px; padding: 12px clamp(16px, 4vw, 40px); }
+  .top-nav { order: 3; flex: 1 0 100%; }
+}
+
 @media (max-width: 760px) {
-  .app-frame { display: block; }
-  .sidebar { position: static; width: 100%; height: auto; padding: 18px; }
-  .brand { margin: 0 0 16px; }
-  .sidebar nav { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 2px; }
-  .nav-label, .nav-item-disabled, .sidebar-note { display: none; }
-  .nav-item { flex: 0 0 auto; min-height: 36px; padding: 7px 10px; }
-  .topbar { min-height: 72px; }
-  .topbar-title { display: none; }
+  .app-header { gap: 8px; padding: 10px 14px; }
+  .brand small { display: none; }
+  .brand-mark { width: 36px; height: 36px; border-radius: 11px; font-size: 14px; }
+  .brand strong { font-size: 14px; }
+  .header-actions { gap: 6px; }
+  .theme-switch { padding: 2px; }
+  .theme-switch-item { padding: 4px 8px; font-size: 11px; }
+  .user-badge { max-width: 96px; padding: 4px 9px; font-size: 11px; }
+  .text-button { padding: 5px 6px; }
+  .nav-item { min-height: 34px; padding: 6px 11px; font-size: 13px; }
   .page-content { padding-top: 36px; }
   .page-heading-row { display: block; }
   .page-heading-row .switch-field { margin-top: 18px; }
