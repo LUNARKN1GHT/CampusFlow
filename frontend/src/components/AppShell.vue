@@ -14,7 +14,6 @@ const availableItems = [
   { label: '资料库', to: '/library' },
   { label: '待核对', to: '/review' },
   { label: '版本对照', to: '/review/changes' },
-  { label: '智能问答', to: '/qa' },
   { label: '任务', to: '/tasks' },
   { label: '学习计划', to: '/plan' },
   { label: '提醒', to: '/reminders' },
