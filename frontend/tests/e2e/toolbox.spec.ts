@@ -6,7 +6,7 @@ test('课程路径改为从设置进入工具箱，再进入课程路径页', as
   await page.getByLabel('密码').fill('campusflow-dev')
   await page.getByLabel('密码').press('Enter')
 
-  // 课程路径不再占用左侧主导航，也没有新增工具箱主导航项。
+  // 课程路径不再占用主导航，也没有新增工具箱主导航项。
   const nav = page.getByRole('navigation', { name: '主要导航' })
   await expect(nav.getByRole('link', { name: '总览', exact: true })).toBeVisible()
   await expect(nav.getByRole('link', { name: '课程路径', exact: true })).toHaveCount(0)
