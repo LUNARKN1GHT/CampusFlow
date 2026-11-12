@@ -11,14 +11,27 @@ import { ApiError, errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { AdjustmentSummary, PlanBlock, PlanConflict, PlanDraft, PlanRangeType } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import {
+  formatZonedMonthDayWeekday,
+  formatZonedShortDateTime,
+  formatZonedTime,
+  zonedDayKey,
+  zonedInputValue,
+  zonedParts,
+} from '../utils/datetime'
 
 // draft 是当前预览对象（可能是草案或当前计划）；current 只保留最近一次已接受计划，用于计算保留块与回退查看。
 const draft = ref<PlanDraft | null>(null)
 const current = ref<PlanDraft | null>(null)
 const loading = ref(true)
-const generating = ref(false)
+// 生成草案、保留锁定块重排与调整草案都会替换当前预览草案，共用一把互斥锁：
+// 同一时刻只允许一个写操作，后返回的草案不会覆盖另一个仍显示中的结果。
+const planningBusy = ref<null | 'generate' | 'reschedule' | 'adjustment'>(null)
+const planningLocked = computed(() => planningBusy.value !== null)
+const generating = computed(() => planningBusy.value === 'generate')
+const rescheduling = computed(() => planningBusy.value === 'reschedule')
+const adjustmentDrafting = computed(() => planningBusy.value === 'adjustment')
 const accepting = ref(false)
-const rescheduling = ref(false)
 const adjustmentLoading = ref(false)
 const adjustments = ref<AdjustmentSummary | null>(null)
 const acceptedNotice = ref('')
@@ -69,12 +82,7 @@ const blocksByDay = computed(() => {
   for (const block of draft.value?.blocks ?? []) {
     const key = dayKey(block.starts_at)
     const group = groups.get(key) ?? {
-      label: new Intl.DateTimeFormat('zh-CN', {
-        timeZone: planTimezone.value,
-        month: 'long',
-        day: 'numeric',
-        weekday: 'short',
-      }).format(new Date(block.starts_at)),
+      label: formatZonedMonthDayWeekday(block.starts_at, planTimezone.value),
       blocks: [],
     }
     group.blocks.push(block)
@@ -83,25 +91,7 @@ const blocksByDay = computed(() => {
   return [...groups.entries()]
 })
 
-function zonedParts(value: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: planTimezone.value,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(new Date(value))
-  const values: Record<string, string> = {}
-  for (const part of parts) values[part.type] = part.value
-  return values
-}
-
-function dayKey(value: string): string {
-  const parts = zonedParts(value)
-  return `${parts.year}-${parts.month}-${parts.day}`
-}
+const dayKey = (value: string): string => zonedDayKey(value, planTimezone.value)
 
 /**
  * 把工作空间时区的墙上时间转成明确时间点，避免浏览器时区与工作空间不一致。
@@ -112,13 +102,13 @@ function zonedInputToIso(value: string): string {
   const [year, month, day] = datePart.split('-').map(Number)
   const [hour, minute] = timePart.split(':').map(Number)
   const asUtc = Date.UTC(year, month - 1, day, hour, minute)
-  const first = zonedParts(new Date(asUtc).toISOString())
+  const first = zonedParts(new Date(asUtc).toISOString(), planTimezone.value)
   const firstWall = Date.UTC(
     Number(first.year), Number(first.month) - 1, Number(first.day),
     Number(first.hour), Number(first.minute),
   )
   const offset = firstWall - asUtc
-  const second = zonedParts(new Date(asUtc - offset).toISOString())
+  const second = zonedParts(new Date(asUtc - offset).toISOString(), planTimezone.value)
   const secondWall = Date.UTC(
     Number(second.year), Number(second.month) - 1, Number(second.day),
     Number(second.hour), Number(second.minute),
@@ -149,26 +139,12 @@ const blockingConflicts = computed(() =>
 const risks = computed(() => (draft.value?.conflicts ?? []).filter((item) => item.severity === 'risk'))
 const adjustOptions = computed(() => draft.value?.coverage.adjustment_options ?? [])
 
-function timeText(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: planTimezone.value,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value))
-}
+const timeText = (value: string): string => formatZonedTime(value, planTimezone.value)
 
-function dateTimeText(value: string): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    timeZone: planTimezone.value,
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value))
-}
+const dateTimeText = (value: string): string => formatZonedShortDateTime(value, planTimezone.value)
 
 function toLocalInput(value: string): string {
-  const parts = zonedParts(value)
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+  return zonedInputValue(value, planTimezone.value)
 }
 
 function prepareMove(block: PlanBlock) {
@@ -225,16 +201,17 @@ function assumptionsPayload() {
 }
 
 // 假设留空表示不假设缺失信息；自定义区间必须同时给起止，否则本地拦截、不请求后端。
+// 已有生成／重排／调整草案在进行时直接忽略重复触发，失败后按钮恢复且表单内容保留。
 async function generate() {
-  generating.value = true
+  if (planningLocked.value) return
   error.value = ''
   actionError.value = ''
   acceptedNotice.value = ''
   if (rangeForm.type === 'custom' && (!rangeForm.start || !rangeForm.end)) {
     actionError.value = '自定义区间需要同时选择开始和结束日期'
-    generating.value = false
     return
   }
+  planningBusy.value = 'generate'
   try {
     draft.value = await plansApi.generate({
       range_type: rangeForm.type,
@@ -245,13 +222,14 @@ async function generate() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    generating.value = false
+    planningBusy.value = null
   }
 }
 
 // 两者都基于当前已接受计划生成新的待接受草案，不直接改当前计划：前者按变化建议范围，后者保留锁定块整体重排。
 async function createAdjustmentDraft() {
-  rescheduling.value = true
+  if (planningLocked.value) return
+  planningBusy.value = 'adjustment'
   actionError.value = ''
   acceptedNotice.value = ''
   try {
@@ -260,13 +238,14 @@ async function createAdjustmentDraft() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    rescheduling.value = false
+    planningBusy.value = null
   }
 }
 
 // 局部重排只产出新草案；已锁定的块由服务端原样带回。
 async function reschedulePlan() {
-  rescheduling.value = true
+  if (planningLocked.value) return
+  planningBusy.value = 'reschedule'
   actionError.value = ''
   acceptedNotice.value = ''
   try {
@@ -275,7 +254,7 @@ async function reschedulePlan() {
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
-    rescheduling.value = false
+    planningBusy.value = null
   }
 }
 
@@ -360,14 +339,14 @@ onMounted(load)
         <p class="form-help">调整时间块不会改写任务原始 DDL。未接受前不会影响现有安排；锁定块会在局部重排时保留。</p>
       </div>
       <div class="page-actions">
-        <button type="button" :disabled="generating" @click="generate">
+        <button type="button" :disabled="planningLocked" @click="generate">
           {{ generating ? '生成中…' : '生成草案' }}
         </button>
-        <button v-if="current" type="button" class="button-secondary" :disabled="rescheduling" @click="reschedulePlan">
+        <button v-if="current" type="button" class="button-secondary" :disabled="planningLocked" @click="reschedulePlan">
           {{ rescheduling ? '重排中…' : '保留锁定块重排' }}
         </button>
         <!-- 预览草案与当前计划不同时提供一键回退，避免把未接受的草案误认为已生效。 -->
-        <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" @click="showCurrentPlan">
+        <button v-if="current && draft?.id !== current.id" type="button" class="button-secondary" :disabled="planningLocked" @click="showCurrentPlan">
           查看当前计划
         </button>
       </div>
@@ -428,7 +407,7 @@ onMounted(load)
         </p>
         <p v-if="acceptedNotice" class="inline-notice" role="status">{{ acceptedNotice }}</p>
         <div class="page-actions" v-if="draft.status === 'draft'">
-          <button type="button" :disabled="accepting" @click="accept">
+          <button type="button" :disabled="accepting || planningLocked" @click="accept">
             {{ accepting ? '接受中…' : '接受为当前计划' }}
           </button>
         </div>
@@ -448,10 +427,10 @@ onMounted(load)
           当前计划 v{{ adjustments.current_plan_version }} 尚未修改。
         </p>
         <div class="page-actions">
-          <button type="button" :disabled="rescheduling || adjustmentLoading" @click="createAdjustmentDraft">
-            {{ rescheduling ? '生成中…' : '生成本地调整草案' }}
+          <button type="button" :disabled="planningLocked || adjustmentLoading" @click="createAdjustmentDraft">
+            {{ adjustmentDrafting ? '生成中…' : '生成本地调整草案' }}
           </button>
-          <button type="button" class="text-button" :disabled="adjustmentLoading" @click="loadAdjustments">重新检查</button>
+          <button type="button" class="text-button" :disabled="adjustmentLoading || planningLocked" @click="loadAdjustments">重新检查</button>
         </div>
       </section>
 

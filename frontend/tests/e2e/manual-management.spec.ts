@@ -85,6 +85,7 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await expect(page.locator('.availability-grid article').filter({ hasText: '周六' })).toBeVisible()
 
   await page.getByRole('link', { name: '任务', exact: true }).click()
+  await expect(page).toHaveURL(/\/tasks$/)
   await page.reload()
   const persistedRow = page.locator('.task-row').filter({ hasText: taskName })
   await expect(persistedRow.getByText('受阻')).toBeVisible()

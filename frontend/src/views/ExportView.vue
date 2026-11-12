@@ -4,7 +4,7 @@
  * 流程：范围、格式或选项任何变化都会清空旧预览；下载返回 409 表示范围已变化，必须重新预览。
  * 约束：只导出用户显式选择的内容，不提供整空间导出；文件只落在本机，不写外部日历，也不含原文与备注。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 import { coursesApi, tasksApi } from '../api/business'
 import { ApiError, errorMessage } from '../api/client'
@@ -19,8 +19,9 @@ import type {
 } from '../api/exports'
 import { plansApi } from '../api/plans'
 import type { PlanDraft } from '../api/plans'
-import type { Course, Task, TaskProgress } from '../api/types'
+import type { Course, Task } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { progressLabels } from '../constants/labels'
 
 const mode = ref<ExportMode>('tasks')
 const format = ref<ExportFormat>('csv')
@@ -42,14 +43,9 @@ const fingerprint = ref('')
 const formError = ref('')
 const actionError = ref('')
 const downloadNotice = ref('')
-
-const progressLabels: Record<TaskProgress, string> = {
-  not_started: '未开始',
-  in_progress: '进行中',
-  blocked: '受阻',
-  done: '已完成',
-  cancelled: '已取消',
-}
+// 预览请求序号：范围、格式或选项变化会递增序号，仍在途的旧预览返回后必须丢弃。
+let previewRequestId = 0
+let unmounted = false
 
 /** 预览与导出支持的警告／排除代码；未知代码仍原样显示，不隐藏。 */
 const noticeLabels: Record<string, string> = {
@@ -166,8 +162,12 @@ function clearSelection(): void {
   selectedTaskIds.value = []
 }
 
-/** 任何范围或选项变化都使旧预览失效，避免下载超出当前展示的内容。 */
+/** 任何范围或选项变化都使旧预览失效，避免下载超出当前展示的内容。
+ * 同时递增预览序号：变化前发出、尚未返回的预览请求不能再写回预览与指纹。
+ */
 function resetPreview(): void {
+  previewRequestId += 1
+  previewing.value = false
   preview.value = null
   fingerprint.value = ''
   downloadNotice.value = ''
@@ -209,15 +209,19 @@ async function runPreview(): Promise<void> {
     formError.value = problem
     return
   }
+  const requestId = ++previewRequestId
   previewing.value = true
   try {
     const result = await exportsApi.preview(requestBody(false))
+    // 范围、格式或选项在请求期间已变化：旧响应直接丢弃，不能重新点亮过期预览。
+    if (unmounted || requestId !== previewRequestId) return
     preview.value = result
     fingerprint.value = result.scope_fingerprint
   } catch (caught) {
+    if (unmounted || requestId !== previewRequestId) return
     actionError.value = errorMessage(caught)
   } finally {
-    previewing.value = false
+    if (!unmounted && requestId === previewRequestId) previewing.value = false
   }
 }
 
@@ -255,22 +259,28 @@ async function download(): Promise<void> {
     return
   }
   downloading.value = true
+  // 记下本次下载使用的指纹：期间若范围变化或重新预览，旧响应的 409 不能清空新预览。
+  const usedFingerprint = fingerprint.value
   try {
     const file = await exportsApi.download(requestBody(true))
+    if (unmounted) return
     const filename = file.filename ?? fallbackFilename()
     saveFile(file.blob, filename)
     downloadNotice.value = `已开始下载 ${filename}。文件只保存到本机，服务端不保留导出文件。`
   } catch (caught) {
+    if (unmounted) return
     if (caught instanceof ApiError && caught.status === 409) {
       // 409 说明预览后范围已变化：旧指纹作废，清空预览强制重新确认，不能沿用旧条目下载。
-      preview.value = null
-      fingerprint.value = ''
-      actionError.value = '范围已变化，请重新预览。'
+      if (fingerprint.value === usedFingerprint) {
+        preview.value = null
+        fingerprint.value = ''
+        actionError.value = '范围已变化，请重新预览。'
+      }
     } else {
       actionError.value = errorMessage(caught)
     }
   } finally {
-    downloading.value = false
+    if (!unmounted) downloading.value = false
   }
 }
 
@@ -311,6 +321,12 @@ watch(mode, (value) => {
 })
 
 onMounted(load)
+
+onBeforeUnmount(() => {
+  // 卸载后递增预览序号：仍在途的预览或下载响应不得写回已关闭的页面状态。
+  unmounted = true
+  previewRequestId += 1
+})
 </script>
 
 <template>
