@@ -14,6 +14,7 @@ import RemindersView from './views/RemindersView.vue'
 import ReviewView from './views/ReviewView.vue'
 import SettingsView from './views/SettingsView.vue'
 import TasksView from './views/TasksView.vue'
+import ToolsView from './views/ToolsView.vue'
 import VersionChangeView from './views/VersionChangeView.vue'
 
 // 路由表与登录守卫：受保护页面统一挂在 AppShell 下，未登录跳登录页并保留 redirect 目标。
@@ -73,6 +74,12 @@ const router = createRouter({
           path: 'settings',
           name: 'settings',
           component: SettingsView,
+        },
+        {
+          // 低频工具集中入口：课程路径等不占用左侧主导航，原路由仍可直接访问。
+          path: 'tools',
+          name: 'tools',
+          component: ToolsView,
         },
       ],
     },

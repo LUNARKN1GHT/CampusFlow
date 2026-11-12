@@ -6,6 +6,7 @@
  * 保存后服务端会按新的工作空间时区重算提醒窗口；界面主题保存在本机浏览器，不写入工作空间。
  */
 import { onMounted, reactive, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { scheduleApi } from '../api/business'
 import { errorMessage } from '../api/client'
@@ -260,5 +261,16 @@ onMounted(() => {
       </div>
       <p class="form-help">深浅模式与色系互相独立：绿色为默认，蓝色和白色会替换侧栏、按钮和选中态的主色。选择立即生效，并保存在本机浏览器；“跟随系统”会随操作系统深浅色设置自动切换。主题只影响当前浏览器，不写入工作空间设置。</p>
     </section>
+
+    <section class="panel editor-panel">
+      <div class="section-heading"><div><p class="eyebrow">低频功能</p><h2>工具箱</h2></div></div>
+      <p class="form-help">课程路径等低频能力不在左侧主导航展示，集中放在工具箱里按需进入；入口位置调整不影响已保存的培养方案、课程关系与计划。</p>
+      <RouterLink class="toolbox-link" to="/tools">进入工具箱</RouterLink>
+    </section>
   </main>
 </template>
+
+<style scoped>
+.toolbox-link { display: inline-flex; margin-top: 14px; padding: 9px 14px; border: 1px solid var(--brand-border); border-radius: 10px; color: var(--brand); background: var(--brand-soft); font-size: 13px; font-weight: 800; text-decoration: none; }
+.toolbox-link:hover { border-color: var(--brand); }
+</style>
