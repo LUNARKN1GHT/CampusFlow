@@ -667,6 +667,11 @@ class UploadOut(BaseModel):
     results: list[UploadItemOut]
 
 
+# multipart 边界与表单字段的固定开销容许值。Content-Length 只用于提前拒绝
+# 明显超限的请求；逐文件是否超限仍按读取到的实际字节判断。
+_MULTIPART_OVERHEAD_ALLOWANCE = 1024 * 1024
+
+
 @router.post("/upload", response_model=UploadOut, status_code=201)
 def upload_files(
     workspace: CurrentWorkspace,
@@ -684,25 +689,40 @@ def upload_files(
     """多文件逐项返回成功、重复与失败；单个文件失败不影响其他文件。
 
     默认拒绝内容完全重复的上传并返回既有资料；只有显式 allow_duplicate
-    才会重复建档。
+    才会重复建档。声明长度明显超过整包上限时直接拒绝，不读取文件内容；
+    每个文件最多读取 max_bytes + 1 字节，超限仍走逐文件失败结果。
     """
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
-        from campusflow.domain.errors import DomainError
-
         raise DomainError(f"一次最多上传 {settings.upload_max_files} 个文件")
+
+    max_bytes = settings.upload_max_bytes
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            declared_bytes = int(declared_length)
+        except ValueError:
+            declared_bytes = 0
+        request_limit = settings.upload_max_files * max_bytes + _MULTIPART_OVERHEAD_ALLOWANCE
+        if declared_bytes > request_limit:
+            limit_mb = max_bytes // (1024 * 1024)
+            raise DomainError(
+                f"上传内容总大小超过上限（最多 {settings.upload_max_files} 个文件，"
+                f"单文件不超过 {limit_mb} MB），请减少文件数量或分批上传"
+            )
 
     results = use_cases.import_uploaded_files(
         repos,
         storage,
         workspace.id,
-        files=[(f.filename or "未命名", f.file.read()) for f in files],
+        # 上限加 1 字节只为让超限文件继续进入逐文件校验，不把整个超大文件读进内存。
+        files=[(f.filename or "未命名", f.file.read(max_bytes + 1)) for f in files],
         publisher=publisher,
         published_at=None,
         semester_id=semester_id,
         course_id=course_id,
         class_name=class_name,
-        max_bytes=settings.upload_max_bytes,
+        max_bytes=max_bytes,
         allow_duplicate=allow_duplicate,
         queue=queue,
     )

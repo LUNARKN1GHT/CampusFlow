@@ -11,9 +11,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from campusflow.application import schedule as schedule_use_cases
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.reminders import sync_reminders
+from campusflow.application.scope import require_semester_in_workspace
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
@@ -429,6 +429,8 @@ def accept_draft(
     重新收集输入并比对指纹，拒绝过期草案；expected_version 防止并发覆盖。
     较新的已接受计划不会被旧草案覆盖；接受后才重算提醒，任务 DDL 始终不变。
     """
+    # #599：先锁工作空间行，串行化同空间的接受，避免两个草案并发都成为当前计划。
+    repos.plans.lock_workspace(workspace_id)
     draft = get_draft(repos, workspace_id, draft_id)
     if draft.status != "draft":
         raise ConflictError("只有待接受状态的草案可以接受")

@@ -27,6 +27,7 @@ import ApiFeedback from '../components/ApiFeedback.vue'
 import MaterialLifecycle from '../components/MaterialLifecycle.vue'
 import MaterialSource from '../components/MaterialSource.vue'
 import { formatDateTime } from '../utils/datetime'
+import { parsePositiveInt } from '../utils/query'
 
 const POLL_INTERVAL_MS = 3000
 // 处理中状态的自动刷新上限：超过后停止轮询，改为手动刷新，避免后台长时间不推进时空转。
@@ -115,19 +116,16 @@ const indexStateLabels: Record<IndexState, string> = {
 }
 const semesterMap = computed(() => new Map(semesters.value.map((item) => [item.id, item])))
 const courseMap = computed(() => new Map(courses.value.map((item) => [item.id, item])))
-const filteredCourses = computed(() => filters.semesterId
-  ? courses.value.filter((course) => course.semester_id === Number(filters.semesterId))
-  : courses.value)
-const uploadCourses = computed(() => uploadForm.semester_id
-  ? courses.value.filter((course) => course.semester_id === Number(uploadForm.semester_id))
-  : courses.value)
-const textCourses = computed(() => textForm.semester_id
-  ? courses.value.filter((course) => course.semester_id === Number(textForm.semester_id))
-  : courses.value)
-const webCourses = computed(() => webForm.semester_id
-  ? courses.value.filter((course) => course.semester_id === Number(webForm.semester_id))
-  : courses.value)
-const visibleMaterials = computed(() => materials.value)
+
+/** 按学期过滤课程：未选学期（空串）时列出全部课程，筛选与三个导入表单共用。 */
+function coursesInSemester(list: Course[], semesterId: string): Course[] {
+  return semesterId ? list.filter((course) => course.semester_id === Number(semesterId)) : list
+}
+
+const filteredCourses = computed(() => coursesInSemester(courses.value, filters.semesterId))
+const uploadCourses = computed(() => coursesInSemester(courses.value, uploadForm.semester_id))
+const textCourses = computed(() => coursesInSemester(courses.value, textForm.semester_id))
+const webCourses = computed(() => coursesInSemester(courses.value, webForm.semester_id))
 const uploadSummary = computed(() => {
   if (!uploadResults.value) return ''
   const succeeded = uploadResults.value.filter((item) => item.material).length
@@ -516,14 +514,9 @@ function openSource(material: Material) {
   sourceMaterial.value = material
 }
 
-function queryNumber(value: unknown): number | null {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 /** 核对界面的「定位原文」带上引用所属版本与片段，避免把旧版本的摘录定位到最新版本上。 */
 async function openReferencedSource() {
-  const materialId = queryNumber(route.query.material)
+  const materialId = parsePositiveInt(route.query.material)
   if (materialId === null) return
   try {
     sourceMaterial.value = await materialsApi.get(materialId)
@@ -531,8 +524,8 @@ async function openReferencedSource() {
     // 资料已删除或不属于本空间时跳过定位，列表仍可正常查看。
     return
   }
-  sourceVersionNo.value = queryNumber(route.query.version)
-  sourceChunkId.value = queryNumber(route.query.chunk)
+  sourceVersionNo.value = parsePositiveInt(route.query.version)
+  sourceChunkId.value = parsePositiveInt(route.query.chunk)
 }
 
 function onFilesChosen(event: Event) {
@@ -809,7 +802,7 @@ onBeforeUnmount(() => {
         <label>来源<select v-model="filters.sourceType" @change="reloadMaterials"><option value="">全部来源</option><option v-for="(label, value) in sourceTypeLabels" :key="value" :value="value">{{ label }}</option></select></label>
         <label>原文状态<select v-model="filters.status" @change="reloadMaterials"><option value="">全部原文状态</option><option v-for="(label, value) in statusLabels" :key="value" :value="value">{{ label }}</option></select></label>
         <label class="switch-field"><input v-model="filters.includeArchived" type="checkbox" @change="reloadMaterials" />包含已归档</label>
-        <span class="count-badge">{{ visibleMaterials.length }} 份</span>
+        <span class="count-badge">{{ materials.length }} 份</span>
       </section>
 
       <section class="panel">
@@ -820,8 +813,8 @@ onBeforeUnmount(() => {
         <p v-if="pollPaused" class="inline-notice" role="status">自动刷新已暂停，请手动刷新查看最新处理状态。</p>
         <p v-if="recognitionNotice" class="inline-notice" role="status">{{ recognitionNotice }}</p>
         <p v-if="loading" class="muted">正在加载资料…</p>
-        <div v-else-if="visibleMaterials.length" class="material-list">
-          <article v-for="material in visibleMaterials" :key="material.id" class="material-row">
+        <div v-else-if="materials.length" class="material-list">
+          <article v-for="material in materials" :key="material.id" class="material-row">
             <div class="material-main">
               <div class="task-title-line">
                 <h3>{{ material.title }}</h3>

@@ -5,7 +5,7 @@
  * 约束：核对状态来自候选事项，与执行进度分开维护；完成／取消会把剩余耗时归零，重开按原始估计恢复并保留历史。
  * 写操作失败只在当前面板显示错误并保留已填内容，不关闭面板，也不显示成功提示。
  */
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
@@ -26,7 +26,8 @@ import type {
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 import { priorityLabels, progressLabels } from '../constants/labels'
-import { formatDateTime } from '../utils/datetime'
+import { formatDateTime, formatDueDate } from '../utils/datetime'
+import { parsePositiveInt } from '../utils/query'
 
 const route = useRoute()
 const tasks = ref<Task[]>([])
@@ -57,6 +58,7 @@ const subtaskRows = ref<Array<{ title: string; remaining_minutes: number | null 
 const subtaskError = ref('')
 const subtaskSaving = ref(false)
 const filters = reactive({ semesterId: '', courseId: '', progress: '' })
+const listNotice = ref('')
 const form = reactive({
   title: '', description: '', course_id: '', due_date: '', due_time: '',
   target_date: '', due_source: 'user' as DueSourceType, due_note: '',
@@ -77,16 +79,15 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
   }
   return true
 }))
+// 调整筛选后“不在当前筛选结果中”的提示不再成立，立即清除。
+watch(filters, () => {
+  listNotice.value = ''
+})
 
 const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
-function queryNumber(value: unknown): number | null {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 /** 核对界面确认后生成的正式事项由此参数直达并高亮。 */
-const highlightedTaskId = computed(() => queryNumber(route.query.task))
+const highlightedTaskId = computed(() => parsePositiveInt(route.query.task))
 
 async function scrollToHighlighted(): Promise<void> {
   await nextTick()
@@ -144,6 +145,19 @@ function payload(): TaskInput {
   }
 }
 
+// 更新结果可能不在当前列表里（筛选变化或另一标签页新建）；找不到时不写入 -1 属性，改为重新读取列表并说明原因。
+async function replaceTask(updated: Task) {
+  const index = tasks.value.findIndex((task) => task.id === updated.id)
+  if (index === -1) {
+    await load()
+    if (!error.value) {
+      listNotice.value = '任务已保存，但不在当前筛选结果中；已重新加载任务列表，请调整筛选查看。'
+    }
+    return
+  }
+  tasks.value[index] = updated
+}
+
 // 编辑成功替换列表中的同一项，新建成功追加到列表；失败不关闭面板，避免输入丢失。
 async function saveTask() {
   saving.value = true
@@ -152,7 +166,7 @@ async function saveTask() {
     const values = payload()
     if (editing.value) {
       const updated = await tasksApi.update(editing.value.id, values)
-      tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
+      await replaceTask(updated)
     } else {
       tasks.value.push(await tasksApi.create(values))
     }
@@ -162,11 +176,6 @@ async function saveTask() {
   } finally {
     saving.value = false
   }
-}
-
-function dueText(task: Task): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
 }
 
 function closeProgress() {
@@ -223,7 +232,7 @@ async function saveProgress() {
       progressForm.progress,
       progressForm.reason || null,
     )
-    tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
+    await replaceTask(updated)
     progressTask.value = updated
     progressForm.reason = ''
     await loadHistory(updated)
@@ -280,7 +289,7 @@ function retryRelations() {
 async function addDependency() {
   const task = selectedTask.value
   if (!task) return
-  const dependsOn = queryNumber(dependencyInput.value)
+  const dependsOn = parsePositiveInt(dependencyInput.value)
   if (dependsOn === null) {
     relationsError.value = '请输入有效的任务编号'
     return
@@ -376,6 +385,8 @@ onMounted(load)
         <span class="count-badge">{{ visibleTasks.length }} 项</span>
       </section>
 
+      <p v-if="listNotice" class="inline-notice" role="status">{{ listNotice }}</p>
+
       <section v-if="dependencyCheck" class="panel" aria-label="依赖检查">
         <div class="section-heading">
           <div><p class="eyebrow">依赖检查</p><h2>任务先后关系</h2></div>
@@ -400,7 +411,7 @@ onMounted(load)
             <div class="priority-marker" :data-priority="task.priority"></div>
             <div class="task-main">
               <div class="task-title-line"><h3>{{ task.title }}</h3><span class="status-pill">{{ progressLabels[task.progress] }}</span><span v-if="task.overdue" class="status-pill overdue-pill">已逾期</span></div>
-              <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ dueText(task) }}</p>
+              <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ formatDueDate(task.due_date, task.due_time) }}</p>
               <p v-if="task.target_date">个人目标：{{ task.target_date }}（不改变正式 DDL）</p>
               <p>截止来源：{{ dueSourceLabels[task.due_source] }}{{ task.due_note ? ` · ${task.due_note}` : '' }}</p>
               <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>

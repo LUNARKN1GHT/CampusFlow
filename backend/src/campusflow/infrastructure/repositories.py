@@ -36,7 +36,7 @@ from campusflow.application.ports.repositories import (
     TaskProgressChangeData,
     WorkspaceData,
 )
-from campusflow.domain.errors import DomainError
+from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import (
     DueSourceType,
     EventRecurrence,
@@ -1714,6 +1714,16 @@ class SqlAlchemyPlanRepository:
         self._session.add(row)
         self._session.flush()
         return _plan_draft_to_data(row)
+
+    def lock_workspace(self, workspace_id: int) -> None:
+        """锁工作空间行，串行化同空间的计划接受（#599）。"""
+        if (
+            self._session.scalar(
+                select(Workspace.id).where(Workspace.id == workspace_id).with_for_update()
+            )
+            is None
+        ):
+            raise NotFoundError("工作空间不存在")
 
     def get_draft(self, draft_id: int) -> PlanDraftData | None:
         row = self._session.get(PlanDraft, draft_id)

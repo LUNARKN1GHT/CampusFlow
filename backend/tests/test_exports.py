@@ -8,11 +8,12 @@
 import csv
 import io
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
 from fastapi.testclient import TestClient
 from index_helpers import open_session
 
+from campusflow.application.exports import ExportItem, render_tasks_csv
 from campusflow.infrastructure.db.models import PlanBlock
 
 HEADER = [
@@ -796,3 +797,68 @@ def test_ics_never_contains_description_notes_or_raw_text(client: TestClient) ->
         assert due_note not in text
         assert "DESCRIPTION" not in text
         assert "VALARM" not in text
+
+
+def _export_item(**overrides: object) -> ExportItem:
+    fields: dict[str, object] = {
+        "task_id": 1,
+        "title": "任务",
+        "course_id": None,
+        "course_name": None,
+        "due_date": None,
+        "due_time": None,
+        "due_precision": "none",
+        "due_source": "manual",
+        "target_date": None,
+        "priority": "medium",
+        "progress": "not_started",
+        "estimated_minutes": None,
+        "remaining_minutes": None,
+        "source_state": "manual",
+    }
+    fields.update(overrides)
+    return ExportItem(**fields)  # type: ignore[arg-type]
+
+
+def test_csv_neutralizes_formula_prefixes() -> None:
+    dangerous = ["=cmd", "+1+1", "@SUM(A1)", "-2+3", "\tTAB", "\rCR"]
+    items = [
+        _export_item(task_id=index, title=title, source_title=title)
+        for index, title in enumerate(dangerous, start=1)
+    ]
+
+    header, rows = _parse_csv(render_tasks_csv(items))
+
+    assert header == HEADER
+    assert [row["title"] for row in rows] == ["'" + title for title in dangerous]
+    assert [row["source_title"] for row in rows] == ["'" + title for title in dangerous]
+
+
+def test_csv_keeps_plain_text_and_dates_unchanged() -> None:
+    item = _export_item(
+        title="数据结构作业",
+        course_name="数据结构",
+        due_date=date(2026, 10, 15),
+        due_time=time(9, 5),
+        estimated_minutes=90,
+        source_title="课程通知",
+        source_locator="第 2 页",
+    )
+    negative = _export_item(task_id=2, title="负数耗时", estimated_minutes=-5)
+
+    content = render_tasks_csv([item, negative])
+
+    assert content.startswith(b"\xef\xbb\xbf"), "CSV 必须带 UTF-8 BOM"
+    assert b"\r\n" in content
+    assert b"\n" not in content.replace(b"\r\n", b""), "CSV 只能使用 CRLF 换行"
+
+    header, rows = _parse_csv(content)
+    assert header == HEADER
+    assert rows[0]["title"] == "数据结构作业"
+    assert rows[0]["source_title"] == "课程通知"
+    assert rows[0]["course_name"] == "数据结构"
+    assert rows[0]["due_date"] == "2026-10-15"
+    assert rows[0]["due_time"] == "09:05"
+    assert rows[0]["estimated_minutes"] == "90"
+    assert rows[1]["title"] == "负数耗时"
+    assert rows[1]["estimated_minutes"] == "-5"

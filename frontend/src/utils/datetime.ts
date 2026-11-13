@@ -103,6 +103,15 @@ export function formatZonedMonthDayWeekday(value: string | Date, timeZone: strin
   return formatter.format(new Date(value))
 }
 
+/**
+ * DDL 展示：有时刻 → `YYYY-MM-DD HH:mm`；仅日期 → 标注（仅日期）；无日期 → 未设置 DDL。
+ * 不补造时刻，几处页面共用同一文案。
+ */
+export function formatDueDate(dueDate: string | null, dueTime: string | null): string {
+  if (!dueDate) return '未设置 DDL'
+  return dueTime ? `${dueDate} ${dueTime.slice(0, 5)}` : `${dueDate}（仅日期）`
+}
+
 /** 本地日期键 YYYY-MM-DD，用于周视图按天切分。 */
 export function localDateKey(value: Date): string {
   const year = value.getFullYear()

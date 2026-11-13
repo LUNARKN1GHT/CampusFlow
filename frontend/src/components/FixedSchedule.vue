@@ -12,6 +12,7 @@ import { settingsApi } from '../api/settings'
 import type { Course, FixedEvent, FixedEventInput, FixedEventOccurrence } from '../api/types'
 import ApiFeedback from './ApiFeedback.vue'
 import { formatWeekdayDate, localDateKey, zonedInputValue } from '../utils/datetime'
+import { parsePositiveInt } from '../utils/query'
 
 const route = useRoute()
 const definitions = ref<FixedEvent[]>([])
@@ -64,13 +65,8 @@ const weekEnd = computed(() => days.value[6]?.key ?? dateKey(weekStart.value))
 const courseMap = computed(() => new Map(courses.value.map((course) => [course.id, course])))
 let highlightScrolled = false
 
-function queryNumber(value: unknown): number | null {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 /** 核对界面确认后生成的固定日程由此参数直达并高亮，只在首次加载后滚动一次。 */
-const highlightedEventId = computed(() => queryNumber(route.query.event))
+const highlightedEventId = computed(() => parsePositiveInt(route.query.event))
 
 async function scrollToHighlighted(): Promise<void> {
   if (highlightScrolled || highlightedEventId.value === null) return
