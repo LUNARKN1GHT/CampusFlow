@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
+import { login } from './support'
+
 test('深浅模式可在页面右上角切换、跨刷新保持并覆盖业务页面', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
+  await login(page)
 
   const root = page.locator('html')
 
@@ -37,10 +36,7 @@ test('深浅模式可在页面右上角切换、跨刷新保持并覆盖业务�
 })
 
 test('色系可独立切换、跨刷新保持且与深浅模式叠加', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
+  await login(page)
 
   const root = page.locator('html')
   await page.getByRole('link', { name: '设置' }).click()
@@ -94,10 +90,7 @@ async function expectDayEmptyContrast(page: Page) {
 // 空状态文字在浅色与深色的三套色系下都要达到 WCAG AA 的 4.5:1。
 for (const mode of ['浅色', '深色']) {
   test(`${mode}模式下各色系次要文本保持可读对比度`, async ({ page }) => {
-    await page.goto('/')
-    await page.getByLabel('用户名').fill('student')
-    await page.getByLabel('密码').fill('campusflow-dev')
-    await page.getByLabel('密码').press('Enter')
+    await login(page)
     await page.getByRole('button', { name: mode, exact: true }).click()
 
     for (const palette of ['绿色', '蓝色', '白色']) {

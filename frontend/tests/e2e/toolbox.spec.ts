@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+import { login } from './support'
+
 test('课程路径改为从设置进入工具箱，再进入课程路径页', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
+  await login(page)
 
   // 课程路径不再占用主导航，也没有新增工具箱主导航项。
   const nav = page.getByRole('navigation', { name: '主要导航' })

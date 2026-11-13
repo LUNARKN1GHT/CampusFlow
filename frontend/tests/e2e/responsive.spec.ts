@@ -1,15 +1,8 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+
+import { login } from './support'
 
 const navLabels = ['总览', '课程', '资料库', '任务', '学习计划', '提醒', '导出', '设置']
-
-async function signIn(page: Page) {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
-}
 
 // 320px 与 375px 都要能看见并到达全部入口：导航换行而不是隐藏滚动条，账号与主题操作允许换行。
 for (const width of [375, 320]) {
@@ -18,7 +11,7 @@ for (const width of [375, 320]) {
     const pageErrors: string[] = []
     page.on('pageerror', (error) => pageErrors.push(error.message))
 
-    await signIn(page)
+    await login(page)
 
     const nav = page.getByRole('navigation', { name: '主要导航' })
     await expect(nav).toBeVisible()

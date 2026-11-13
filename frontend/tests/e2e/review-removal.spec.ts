@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test'
 
+import { login } from './support'
+
 test('待核对与版本对照页面已移除并回退到总览', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await login(page)
 
   const nav = page.getByRole('navigation', { name: '主要导航' })
   await expect(nav.getByRole('link', { name: '待核对', exact: true })).toHaveCount(0)
