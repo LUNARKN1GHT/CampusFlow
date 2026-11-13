@@ -5,7 +5,7 @@
  * 任何环、类型矛盾、缺项或未转换候选都会阻塞结论；页面只展示原因，不自行补出顺序。
  * 切换查看版本不影响档案中的当前方案，旧方案数据保留且不会迁移到新版本。
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 import { semestersApi } from '../api/business'
 import { ApiError, errorMessage } from '../api/client'
@@ -285,8 +285,15 @@ async function retryLoad() {
 
 // 方案切换后所有列表与分析都重新拉取；没有选中方案时清空并重置，
 // 避免上一个方案的图或顺序残留在页面上。
+// 每次调用递增请求序号并记下方案：只有最新请求可以写回列表、错误与加载态，
+// 快速切换时丢弃旧方案的迟到响应，避免旧数据覆盖新方案。
+let planDataRequestId = 0
+
 async function loadPlanData() {
-  if (selectedPlanId.value === null) {
+  const requestId = ++planDataRequestId
+  const planId = selectedPlanId.value
+  if (planId === null) {
+    dataLoading.value = false
     courses.value = []
     relations.value = []
     aliases.value = []
@@ -301,18 +308,20 @@ async function loadPlanData() {
   actionError.value = ''
   try {
     const [loadedCourses, loadedRelations, loadedAliases] = await Promise.all([
-      pathsApi.listCourses(selectedPlanId.value),
-      pathsApi.listRelations(selectedPlanId.value),
-      pathsApi.listAliases(selectedPlanId.value),
+      pathsApi.listCourses(planId),
+      pathsApi.listRelations(planId),
+      pathsApi.listAliases(planId),
     ])
+    if (requestId !== planDataRequestId || selectedPlanId.value !== planId) return
     courses.value = loadedCourses
     relations.value = loadedRelations
     aliases.value = loadedAliases
     await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
+    if (requestId !== planDataRequestId || selectedPlanId.value !== planId) return
     actionError.value = errorMessage(caught)
   } finally {
-    dataLoading.value = false
+    if (requestId === planDataRequestId) dataLoading.value = false
   }
 }
 
@@ -433,6 +442,8 @@ async function retryStudy() {
 
 // 查看版本与档案当前方案分离：仅当二者不同时读取切换影响预览，
 // 预览里的计数属于当前方案，切换不会删除旧方案数据。
+// 方案数据在这里显式重载（唯一随选择变化的入口），不再用 watch 监听，
+// 避免首次进入时 load() 赋值与挂载调用各触发一次相同请求。
 async function selectPlan(planId: number) {
   selectedPlanId.value = planId
   preview.value = null
@@ -446,6 +457,7 @@ async function selectPlan(planId: number) {
       credit_limit_per_term: plan.credit_limit_per_term,
     })
   }
+  await loadPlanData()
   if (profile.value?.curriculum_plan_id !== planId) {
     previewLoading.value = true
     try {
@@ -710,8 +722,8 @@ async function removeStudyRecord(record: CourseStudyRecord) {
   }
 }
 
-// 方案切换由 watch 全量重载；挂载时先等 load() 选出默认版本再加载，避免用空方案请求分析。
-watch(selectedPlanId, loadPlanData)
+// 初始加载只在这里触发一次：load() 选出默认版本后再显式读取其数据；
+// 方案切换由 selectPlan 重载，路径中不存在监听 selectedPlanId 的第二条入口。
 onMounted(async () => {
   await load()
   await loadPlanData()
