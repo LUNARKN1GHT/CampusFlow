@@ -5,10 +5,8 @@ import { queryString } from '../utils/query'
 
 import { apiRequest, apiRequestBlob } from './client'
 import type {
-  JobAttempt,
   Material,
   MaterialDeleteImpact,
-  MaterialMetadataInput,
   MaterialRecognition,
   MaterialRecognitionStart,
   MaterialSourceType,
@@ -33,7 +31,6 @@ export type MaterialFilters = {
 
 export type TextImportResult = { material: Material; chunks: SourceChunk[] }
 export type UploadResult = { results: MaterialUploadItem[] }
-export type DeleteResult = { delivered: number; failed: number }
 
 export const materialsApi = {
   list: (filters: MaterialFilters = {}) => apiRequest<Material[]>(`/materials${queryString({
@@ -69,10 +66,6 @@ export const materialsApi = {
       allow_duplicate: params.allow_duplicate,
     })}`, { method: 'POST', body: form })
   },
-  update: (id: number, input: MaterialMetadataInput) => apiRequest<Material>(`/materials/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  }),
   // 归档与恢复只切换标记：归档后退出检索与问答，原有片段与引用保留。
   archive: (id: number) => apiRequest<Material>(`/materials/${id}/archive`, { method: 'POST' }),
   restore: (id: number) => apiRequest<Material>(`/materials/${id}/restore`, { method: 'POST' }),
@@ -90,9 +83,5 @@ export const materialsApi = {
 
 export const jobsApi = {
   forMaterial: (id: number) => apiRequest<ProcessingJob[]>(`/jobs?material_id=${id}`),
-  get: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}`),
-  attempts: (id: number) => apiRequest<JobAttempt[]>(`/jobs/${id}/attempts`),
   retry: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}/retry`, { method: 'POST' }),
-  // 队列曾不可用时的补救入口：重投本空间所有待投递作业，返回成功与失败数量。
-  redeliver: () => apiRequest<DeleteResult>('/jobs/redeliver', { method: 'POST' }),
 }
