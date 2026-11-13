@@ -125,6 +125,18 @@ Windows：
   （后者为可填写的模板），逐项附命令与截图。
 - 记录完成后由维护者核对并关闭阶段 Issue；未执行的项保持未勾选。
 
+#### 当前候选（2026-11-11）
+
+- 源码提交：`e0d903a`（PR #558，已合并为 `ed89d3a`）。
+- macOS arm64：`desktop-macos-arm64-ci`（约 176 MB），来源
+  `Desktop macOS build` run 42958413522。
+- macOS x64：`desktop-macos-x64-ci`（约 183 MB），来源同上。
+- Windows x64：`desktop-windows-x64-ci`（约 194 MB），来源
+  `Desktop Windows build` run 42958413556。
+- 三个包均为**未签名**构建；artifact 含安装包与 `SHA256SUMS.txt`，默认 90 天后过期。
+- 下载后先在干净机器核对校验和，再按本页清单验收；真实 Windows 11 实机、
+  Gatekeeper／SmartScreen 放行与跨版本升级实装仍未执行，不得写成已验证。
+
 ## 与服务端部署的关系
 
 - 桌面改动只在 `CAMPUSFLOW_DEPLOYMENT_MODE=desktop` 下生效；服务端模式不注册 Host／Origin

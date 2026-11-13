@@ -2,7 +2,7 @@
 
 import re
 
-from campusflow.domain.errors import TransientError
+from campusflow.domain.errors import ConfigurationError, TransientError
 from campusflow.domain.states import JobStatus
 
 MAX_ERROR_REASON_LENGTH = 300
@@ -18,6 +18,10 @@ DEFAULT_JOB_TIMEOUT_SECONDS = 900
 DEFAULT_EMBED_JOB_TIMEOUT_SECONDS = 300
 # 索引作业自动重投上限：超过之后只保留人工重试入口（Q004）
 DEFAULT_EMBED_MAX_AUTO_RETRIES = 3
+
+# 超时原因的固定前缀：#555 据此把超时从其它失败原因中识别出来，
+# 不依赖完整文案，也不把超时误报为模型或来源故障。
+TIMEOUT_REASON_PREFIX = "处理超时"
 
 # 密钥/令牌/隐私内容模式：Bearer 令牌、sk- 密钥、key= 参数、身份证/手机号等长数字串
 _SENSITIVE_PATTERNS = [
@@ -45,19 +49,20 @@ def sanitize_error_reason(raw: str | None) -> str | None:
 
 
 def is_retryable(error: BaseException) -> bool:
-    """区分可重试与永久失败（J005）。
+    """区分可重试与永久失败（J005/J006）。
 
-    只有显式标记为临时故障的错误（上游限流、超时、5xx、连接中断）才可重试；
-    格式不支持、来源已删除这类永久失败重试也不会成功，不得反复重投。
+    临时故障（上游限流、超时、5xx、连接中断）可重试；缺少模型密钥属于
+    “配置修正后可恢复”，也允许人工重试，但调用方仍受自动重投上限约束，
+    不会在配置不变时无限重试。格式不支持、来源已删除等永久失败不可重试。
     """
-    return isinstance(error, TransientError)
+    return isinstance(error, (TransientError, ConfigurationError))
 
 
 def timeout_reason(timeout_seconds: int) -> str:
     """超时回收说明：让"处理中"变成长时间停留的情况可见（J005）。"""
     # 不足一分钟也显示 1 分钟，避免写出"超过 0 分钟"这种无法理解的说明。
     minutes = max(1, timeout_seconds // 60)
-    return f"处理超时：超过 {minutes} 分钟未完成，已标记为可重试失败"
+    return f"{TIMEOUT_REASON_PREFIX}：超过 {minutes} 分钟未完成，已标记为可重试失败"
 
 
 def is_terminal(status: str) -> bool:

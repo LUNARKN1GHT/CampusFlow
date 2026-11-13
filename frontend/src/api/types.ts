@@ -18,7 +18,7 @@ export type Course = {
   class_name: string | null
 }
 
-// 任务执行进度；与候选核对状态（ReviewStatus）是两条独立状态轴，不可互相写入。
+// 任务执行进度；与后端候选核对状态是两条独立状态轴，不可互相写入。
 export type TaskProgress = 'not_started' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high'
 export type DueSourceType = 'user' | 'document' | 'inferred'
@@ -43,6 +43,8 @@ export type Task = {
   estimated_minutes: number | null
   remaining_minutes: number | null
   parent_task_id: number | null
+  // 列表接口只对有子任务的父任务返回汇总；卡片与详情共用这一口径。
+  subtask_rollup?: TaskRollup | null
   created_at: string
   updated_at: string
 }
@@ -394,9 +396,44 @@ export type WorkspaceSettings = {
   buffer_minutes: number
 }
 
+// 桌面 AI 服务配置：只描述可用性与存储后端，后端不返回密钥明文或片段。
+export type TextProvider = 'zhipu' | 'deepseek'
+
+export type AiSettingsStatus = {
+  editable: boolean
+  text_provider: TextProvider
+  zhipu_configured: boolean
+  deepseek_configured: boolean
+  text_available: boolean
+  vision_available: boolean
+  embedding_available: boolean
+  // environment 表示服务器模式由环境变量配置；桌面模式为实际凭据后端名。
+  secret_backend: string
+  restart_required: boolean
+  warnings: string[]
+}
+
 export type MaterialSourceType = 'pdf' | 'image' | 'text' | 'word' | 'web'
 // partial 表示部分解析／索引成功，未覆盖范围必须显式提示，不能当作完整可用。
 export type MaterialStatus = 'pending' | 'processing' | 'done' | 'partial' | 'failed'
+
+// 原文读取与问答索引是两条独立状态轴（#555）：解析完成不代表可以问答。
+export type TextReadState = 'queued' | 'reading' | 'ready' | 'partial' | 'failed'
+export type IndexState = 'not_started' | 'preparing' | 'ready' | 'partial' | 'failed' | 'unknown'
+export type MaterialIndexStatus = {
+  state: IndexState
+  // reason_code 是稳定协议值；message／detail／error 为后端已脱敏的可读说明。
+  reason_code: string
+  message: string
+  detail: string | null
+  error: string | null
+  job_id: number | null
+  retryable: boolean
+}
+export type MaterialProcessing = {
+  text_state: TextReadState
+  index: MaterialIndexStatus
+}
 
 export type Material = {
   id: number
@@ -411,6 +448,7 @@ export type Material = {
   status: MaterialStatus
   archived: boolean
   imported_at: string
+  processing: MaterialProcessing
 }
 
 export type MaterialVersion = {
@@ -454,16 +492,6 @@ export type ProcessingJob = {
   started_at: string | null
   created_at: string
   updated_at: string
-}
-
-export type JobAttempt = {
-  attempt_no: number
-  stage: JobStage
-  status: JobStatus
-  scope: string | null
-  error_reason: string | null
-  retryable: boolean
-  created_at: string
 }
 
 export type MaterialUploadItem = {
@@ -515,16 +543,6 @@ export type TextImportInput = {
   class_name: string | null
 }
 
-export type MaterialMetadataInput = {
-  title: string
-  publisher: string | null
-  published_at: string | null
-  source_url: string | null
-  semester_id: number | null
-  course_id: number | null
-  class_name: string | null
-}
-
 export type MaterialUploadParams = {
   semester_id: number | null
   course_id: number | null
@@ -532,274 +550,42 @@ export type MaterialUploadParams = {
   allow_duplicate: boolean
 }
 
-// 候选核对状态：superseded 是被新版本取代而失效，不是用户主动忽略；已失效只能退回待核对。
-export type ReviewStatus = 'pending' | 'confirmed' | 'ignored' | 'superseded'
-export type CandidateKind = 'task' | 'event' | 'rule'
+// 粘贴文本的显式识别状态：原文保存完成不代表问答索引或事项提取已经完成。
+export type RecognitionIndexState = 'not_started' | 'queued' | 'running' | 'done' | 'partial' | 'failed'
+export type RecognitionExtractionState = 'not_started' | 'running' | 'done' | 'empty' | 'failed'
 
-export type CandidateReason = {
-  code: string
-  message: string
-  field: string | null
-}
-
-export type CandidateSummary = {
-  id: number
-  kind: CandidateKind
-  review_status: ReviewStatus
-  title: string | null
-  course_id: number | null
-  semester_id: number | null
-  class_name: string | null
-  source_material_id: number
-  source_version_id: number
-  version_no: number
-  review_reasons: CandidateReason[]
-  created_at: string
-}
-
-// 字段出处：document 原文规定、user 用户补充、inferred 系统推断、suggestion 规划建议。
-export type FieldOrigin = 'document' | 'user' | 'inferred' | 'suggestion'
-
-export type CandidateEvidence = {
-  chunk_id: number
-  quote: string
-  locator_type: string
-  locator_value: string
-  verifiable: boolean
-}
-
-export type CandidateFieldView = {
-  name: string
-  value: unknown
-  origin: FieldOrigin
-  // effective_* 是叠加用户修正后的生效值；verifiable 只表示引用仍能定位到原文，不代表语义正确。
-  effective_value: unknown
-  effective_origin: FieldOrigin
-  explanation: string | null
-  missing_reason: string | null
-  verifiable: boolean
-  evidence: CandidateEvidence[]
-}
-
-export type CandidateRevision = {
-  id: number
-  field_name: string
-  previous_value: unknown
-  new_value: unknown
-  previous_origin: FieldOrigin
-  new_origin: FieldOrigin
-  operator: string
-  note: string | null
-  created_at: string
-}
-
-export type CandidateReviewChange = {
-  id: number
-  from_status: ReviewStatus
-  to_status: ReviewStatus
-  operator: string
+export type MaterialRecognitionIndex = {
+  state: RecognitionIndexState
+  job_id: number | null
+  searchable: boolean
   reason: string | null
-  changed_at: string
+  updated_at: string | null
 }
 
-export type CandidateConversion = { kind: CandidateKind; object_id: number; title: string }
-export type CandidateConversionResult = CandidateConversion & { created: boolean }
-
-export type CandidateReviewDetail = {
-  id: number
-  kind: CandidateKind
-  review_status: ReviewStatus
-  created_at: string
-  scope: {
-    course_id: number | null
-    semester_id: number | null
-    class_name: string | null
-    course_name: string | null
-    semester_name: string | null
-  }
-  source: {
-    material_id: number
-    material_title: string
-    version_id: number
-    version_no: number
-  }
-  fields: CandidateFieldView[]
-  revisions: CandidateRevision[]
-  review_reasons: CandidateReason[]
-  review_changes: CandidateReviewChange[]
-  missing_required_fields: string[]
-  // 由后端按当前核对状态给出；界面只渲染这里的操作，不要自行推断可转换状态。
-  allowed_transitions: ReviewStatus[]
-  converted: CandidateConversion | null
+export type MaterialRecognitionExtraction = {
+  state: RecognitionExtractionState
+  candidate_count: number
+  pending_count: number
+  reason: string | null
+  extracted_at: string | null
 }
 
-export type DiffEvidence = {
-  chunk_id: number
-  quote: string
-  locator_type: string
-  locator_value: string
-  verifiable: boolean
-}
-
-export type DiffFieldSide = {
-  candidate_id: number
-  source_version_id: number
-  present: boolean
-  value: unknown
-  effective_value: unknown
-  origin: FieldOrigin | null
-  effective_origin: FieldOrigin | null
-  verifiable: boolean
-  evidence: DiffEvidence[]
-}
-
-export type DiffField = {
-  name: string
-  category: string
-  // explicitly_removed 是新侧确认删除；missing 只是新侧没有该值，不能当作已删除。
-  status: 'unchanged' | 'changed' | 'added' | 'missing' | 'explicitly_removed'
-  left: DiffFieldSide
-  right: DiffFieldSide
-}
-
-export type DiffScope = {
-  semester_id: number | null
-  semester_name: string | null
-  course_id: number | null
-  course_name: string | null
-  class_name: string | null
-}
-
-export type DiffSource = {
-  candidate_id: number
-  source_version_id: number
+export type MaterialRecognition = {
   material_id: number
-  material_title: string
-  version_no: number
-  material_archived: boolean
-  kind: CandidateKind
-  review_status: ReviewStatus
-  scope: DiffScope
+  version_no: number | null
+  chunk_count: number
+  source_type: MaterialSourceType
+  archived: boolean
+  supported: boolean
+  can_start: boolean
+  blocked_reason: string | null
+  index: MaterialRecognitionIndex
+  extraction: MaterialRecognitionExtraction
 }
 
-export type CandidateDiff = {
-  left: DiffSource
-  right: DiffSource
-  scope: { left: DiffScope; right: DiffScope; differences: { component: string; status: string }[] }
-  fields: DiffField[]
-  summary: { total: number; unchanged: number; changed: number; added: number; missing: number; explicitly_removed: number }
-}
-
-export type VersionApplicability = {
-  status: 'applicable' | 'conflict' | 'requires_review'
-  recommended_candidate_id: number | null
-  review_required: boolean
-  // 适用性判定是只读的，永远不落库；接受变更仍需显式调用 accept。
-  applied: false
-  relation_id: number | null
-  relation_kind: string | null
-  scope_comparison: 'same' | 'different' | 'unknown'
-  publication: Record<string, { material_id: number; version_id: number; publisher: string | null; published_at: string | null; published_text: string | null }>
-  reasons: { code: string; message: string }[]
-  diff: CandidateDiff
-}
-
-export type ImpactedBlock = {
-  id: number
-  draft_id: number
-  draft_status: string
-  title: string
-  starts_at: string
-  ends_at: string
-  locked: boolean
-}
-
-export type ChangeImpact = {
-  summary: Record<string, number>
-  unsupported: { code: string; message: string }[]
-  tasks: { id: number; title: string; progress: string; completed: boolean; due_date: string | null; source_state: string; plan_blocks: ImpactedBlock[] }[]
-  fixed_events: { id: number; title: string; starts_at: string; ends_at: string; location: string | null }[]
-  rules: { id: number; title: string }[]
-}
-
-export type VersionAcceptance = {
-  id: number
-  baseline_candidate_id: number
-  comparison_candidate_id: number
-  baseline_version_id: number
-  comparison_version_id: number
-  accepted_fields: string[]
-  reason: string
-  operator: string
-  evidence_snapshot: { name: string; status: string; left: DiffFieldSide; right: DiffFieldSide }[]
-  previous_review_status: string
-  created_at: string
-  baseline_review_status: string
-  created: boolean
-}
-
-export type DuplicateSuggestion = {
-  candidate_id: number
-  source_version_id: number
-  title: string | null
-  score: number
-  reasons: string[]
-  matched_fields: string[]
-  review_status: ReviewStatus
-  scope_same: boolean
-}
-
-export type DuplicateReport = {
-  candidate_id: number
-  kind: CandidateKind
-  suggestions: DuplicateSuggestion[]
-  excluded: { candidate_id: number; code: string; message: string }[]
-  // 始终 false：建议不自动合并，需用户预览后显式确认。
-  auto_merge: false
-}
-
-export type MergeSource = {
-  candidate_id: number
-  version_id: number
-  title: string | null
-  review_status: ReviewStatus
-  formal_kind: string
-  formal_id: number | null
-  progress: string | null
-  plan_block_count: number
-}
-
-export type MergePreview = {
-  target_candidate_id: number
-  kind: CandidateKind
-  target_title: string | null
-  target_formal_id: number | null
-  target_progress: string | null
-  kept_fields: Record<string, unknown>
-  sources: MergeSource[]
-  // 预览令牌：合并请求必须回传，令牌限定本次展示过的合并范围。
-  token: string
-  auto_merge: false
-}
-
-export type MergeRecord = {
-  id: number
-  target_candidate_id: number
-  source_candidate_id: number
-  target_formal_kind: string | null
-  target_formal_id: number | null
-  source_formal_id: number | null
-  preserved_progress: Record<string, unknown>
-  source_snapshot: Record<string, unknown>
-  reason: string
-  operator: string
-  created_at: string
-}
-
-export type MergeResult = {
-  records: MergeRecord[]
-  created: boolean
-  preview: MergePreview
+export type MaterialRecognitionStart = MaterialRecognition & {
+  started: boolean
+  message: string
 }
 
 export type ReminderKind = 'deadline' | 'review'

@@ -1,5 +1,7 @@
 """Q004 编排用例：领取、模型调用、写回、失败与中断恢复（真实 PostgreSQL）。"""
 
+import threading
+
 from index_helpers import (
     DEFAULT_TEXTS,
     FakeEmbedder,
@@ -13,7 +15,12 @@ from index_helpers import (
 )
 from sqlalchemy import delete, select
 
-from campusflow.domain.errors import NotFoundError, PermanentError, TransientError
+from campusflow.domain.errors import (
+    ConfigurationError,
+    NotFoundError,
+    PermanentError,
+    TransientError,
+)
 from campusflow.domain.states import JobStatus, MaterialStatus
 from campusflow.infrastructure.db.models import Material, MaterialVersion, SourceChunk
 from campusflow.infrastructure.repositories import build_repositories
@@ -75,6 +82,92 @@ def test_transient_failure_is_retried_until_success(client):
     assert summary.status == JobStatus.DONE and summary.fully_searchable
     assert len(embedder.calls) == 4  # 同一块重试两次，另一块一次
     assert [row["attempts"] for row in block_rows(job_id)] == [3, 1]
+
+
+def test_configuration_failure_is_manually_retryable_after_config_fixed(client):
+    """缺向量配置不自动重试；配置补齐后可人工重试，且不重做已成功块。"""
+    embedder = FakeEmbedder()
+    embedder.fail_next(ConfigurationError("缺少向量模型密钥"))
+    job_id, _, _ = create_embed_job(client)
+
+    summary = run_index(job_id, embedder)
+
+    assert summary.status == JobStatus.PARTIAL
+    assert summary.configuration_failed == 1
+    assert summary.retryable_failed == 0
+    job = get_job(job_id)
+    assert job.status == JobStatus.PARTIAL and job.retryable is True
+    before = {row["block_id"]: row for row in block_rows(job_id)}
+    failed = [row for row in before.values() if row["state"] == "failed"]
+    done = [row for row in before.values() if row["state"] == "done"]
+    assert failed[0]["failure_code"] == "configuration_missing"
+    assert failed[0]["retryable"] is False
+    assert len(done) == 1
+
+    with open_session() as session, session.begin():
+        repos = build_repositories(session)
+        assert repos.jobs.prepare_retry(job_id) is not None
+
+    recovered = FakeEmbedder()
+    summary = run_index(job_id, recovered)
+
+    assert summary is not None and summary.fully_searchable
+    # 只补缺配置的那一块，已成功块不重复调用模型
+    assert len(recovered.calls) == 1
+    after = {row["block_id"]: row for row in block_rows(job_id)}
+    assert all(row["state"] == "done" for row in after.values())
+    assert after[done[0]["block_id"]]["attempts"] == done[0]["attempts"]
+
+
+def test_all_blocks_configuration_failure_allows_manual_retry(client):
+    embedder = FakeEmbedder()
+    embedder.fail_next(ConfigurationError("缺少向量模型密钥"))
+    embedder.fail_next(ConfigurationError("缺少向量模型密钥"))
+    job_id, _, _ = create_embed_job(client)
+
+    summary = run_index(job_id, embedder)
+
+    assert summary.status == JobStatus.FAILED
+    assert summary.configuration_failed == 2
+    job = get_job(job_id)
+    assert job.status == JobStatus.FAILED and job.retryable is True
+
+    with open_session() as session, session.begin():
+        assert build_repositories(session).jobs.prepare_retry(job_id) is not None
+    summary = run_index(job_id, FakeEmbedder())
+    assert summary is not None and summary.fully_searchable
+
+
+def test_concurrent_retry_only_one_request_wins(client):
+    """并发点击重试只允许一个请求重置作业，避免同一版本被重复投递（#556）。"""
+    job_id, _, _ = create_embed_job(client)
+    with open_session() as session, session.begin():
+        build_repositories(session).jobs.record_attempt(
+            job_id,
+            status=JobStatus.FAILED,
+            scope=None,
+            error_reason="缺少模型配置",
+            retryable=True,
+        )
+
+    barrier = threading.Barrier(2)
+    outcomes: list[bool] = []
+
+    def attempt() -> None:
+        with open_session() as session:
+            repos = build_repositories(session)
+            barrier.wait()
+            outcomes.append(repos.jobs.prepare_retry(job_id) is not None)
+            session.commit()
+
+    threads = [threading.Thread(target=attempt) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(outcomes) == [False, True]
+    assert get_job(job_id).status == JobStatus.PENDING
 
 
 def test_attempts_exhausted_stops_calling_model(client):

@@ -343,7 +343,8 @@ Electron 45.0.0 经 npmmirror 下载，本机无 Developer ID，electron-builder
 - **macOS 钥匙串**：本轮自动化显式使用 `CAMPUSFLOW_SECRET_BACKEND=file`；打包应用默认 `auto` 走钥匙串的路径沿用 P007 源码验证，未在打包应用中复跑。
 - **自动登录失败提示**：真实运行中未制造失败，只由单元测试覆盖；页面内提示条的实际样式未截图。
 - **`.campusflow` 与升级命令**：菜单「数据」已接入导出／导入／升级检查，导入前暂停 API 与 Worker、成功后重启；`packaged-maintenance.spec.ts` 已在打包／安装后的应用上经菜单触发导出、升级检查与导入（原生对话框以脚本结果替代），Windows CI 同样执行。跨机器迁移由 `desktop-archive-compat.yml` 覆盖 Windows↔macOS 双向（见 DESKTOP-P010-transfer.md）；跨系统的“安装后应用之间”菜单级迁移未单独执行。
-- **打包应用端到端用例**：`packaged-maintenance.spec.ts` 现含四条——菜单导出／升级检查／导入、13 个页面导航、创建任务并在重启后保留、上传 PDF 资料。Windows CI 已在静默安装后的应用上顺序跑通（`4 passed`，13.0 分钟，run `39828326855`）；本机 arm64 打包应用（`release/mac-arm64`，2026-10-23 复跑）四条全部通过：7.1 s / 9.9 s / 15.8 s / 9.4 s，合计 `4 passed (42.5s)`。macOS 构建工作流只构建 DMG，不执行这四条。
+- **打包应用端到端用例**：`packaged-maintenance.spec.ts` 现含四条——菜单导出／升级检查／导入、13 个页面导航、创建任务并在重启后保留、上传 PDF 资料。Windows CI 已在静默安装后的应用上顺序跑通（`4 passed`，13.0 分钟，run `39828326855`）；本机 arm64 打包应用（`release/mac-arm64`，2026-10-23 复跑）四条全部通过：7.1 s / 9.9 s / 15.8 s / 9.4 s，合计 `4 passed (42.5s)`；从 DMG 安装到 `~/Applications` 后用包内 sidecar 与 PostgreSQL 复跑同样 `4 passed (45.1s)`。macOS 构建工作流自 2026-10-23 起在打包后对 `release/mac-<arch>/CampusFlow.app` 执行这四条（arm64／x64 均通过）。
+- **矮窗口侧栏**：首次在 macOS CI 执行时，arm64 导航用例暴露侧栏在高度不足的窗口中不可滚动，「外部日历」「设置」位于视口外且无法到达。已在 `styles.css` 给侧栏 `nav` 加 `overflow-y: auto` 修复；重新打包后 1000×620 窗口可点击「设置」进入 `/settings`，Windows CI 安装后应用同样通过。
 - **Windows 产物完整性**：2026-10-23 从 run `39828326855` 下载 `desktop-windows-x64-ci`，安装包 185 MB，实测 SHA-256 与 `SHA256SUMS.txt` 一致（`45d36e96…`）；该产物仍未在实机验收，见 `DESKTOP-E2E-windows.md`。
 - **Windows**：已由 `desktop-windows-build.yml` 在 windows-2022 构建并校验安装包内容、运行首启测试和上述四条打包用例；未在 Windows 11 实机安装运行。
 - **干净机器**：本机安装有 Python、Node、Homebrew PostgreSQL；未在真正空白的 macOS 上验证。

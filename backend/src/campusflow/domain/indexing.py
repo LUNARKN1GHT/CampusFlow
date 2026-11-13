@@ -25,12 +25,26 @@ DEFAULT_BLOCK_LEASE_SECONDS = 180
 MAX_BLOCK_LEASE_SECONDS = 900
 
 # 调用方可以写入的块失败码；只允许安全代码，不能写异常原文或密钥。
-BLOCK_FAILURE_CODES = frozenset({"upstream_transient", "invalid_response", "source_unavailable"})
+# configuration_missing 表示缺少模型配置：不自动重试，但配置修正后允许人工重试。
+BLOCK_FAILURE_CODES = frozenset(
+    {"upstream_transient", "invalid_response", "source_unavailable", "configuration_missing"}
+)
 
 # 由系统在领取/恢复时写入的终态失败码，调用方不能自行指定。
 ATTEMPTS_EXHAUSTED_CODE = "attempts_exhausted"
 LEASE_EXPIRED_CODE = "lease_expired"
 TERMINAL_FAILURE_CODES = frozenset({ATTEMPTS_EXHAUSTED_CODE, LEASE_EXPIRED_CODE})
+
+# 索引作业的固定失败原因（#555）：作业只保存这一份文案，资料状态据此映射
+# 稳定原因代码；集中定义避免应用层与状态派生各自复制字符串。
+INDEX_SOURCE_CHANGED_REASON = "索引来源在运行中变化，需要重新生成清单"
+INDEX_SOURCE_UNAVAILABLE_REASON = "索引来源不可用或已归档"
+INDEX_PROFILE_MISMATCH_REASON = "向量配置未登记或与调用模型不一致"
+INDEX_ALL_BLOCKS_FAILED_REASON = "索引全部块失败"
+INDEX_PARTIAL_BLOCKS_FAILED_REASON = "部分索引块失败，结果不完整"
+INDEX_CONFIGURATION_MISSING_REASON = (
+    "缺少模型配置，问答索引未完成；请在设置 → AI 服务配置向量模型密钥后重试"
+)
 
 
 @dataclass(frozen=True)
@@ -102,6 +116,7 @@ class IndexProgressSummary:
     failed: int
     skipped: int
     retryable_failed: int
+    configuration_failed: int
     source_coverage_known: bool
     uncovered_source_count: int
     fully_searchable: bool
@@ -149,11 +164,15 @@ def summarize_index_progress(
     by_id = _progress_by_id(expected_block_ids, records)
     counts = dict.fromkeys(BlockIndexState, 0)
     retryable_failed = 0
+    configuration_failed = 0
     for key in expected_block_ids:
         record = by_id.get(key)
         state = record.state if record is not None else BlockIndexState.PENDING
         counts[state] += 1
         retryable_failed += int(record is not None and record.retryable)
+        configuration_failed += int(
+            record is not None and record.failure_code == "configuration_missing"
+        )
     indexed = counts[BlockIndexState.DONE]
     fully_searchable = (
         bool(expected_block_ids)
@@ -185,6 +204,7 @@ def summarize_index_progress(
         failed=counts[BlockIndexState.FAILED],
         skipped=counts[BlockIndexState.SKIPPED],
         retryable_failed=retryable_failed,
+        configuration_failed=configuration_failed,
         source_coverage_known=source_coverage_known,
         uncovered_source_count=uncovered_source_count,
         fully_searchable=fully_searchable,

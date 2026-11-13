@@ -11,9 +11,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from campusflow.application import schedule as schedule_use_cases
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.reminders import sync_reminders
+from campusflow.application.scope import require_semester_in_workspace
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
@@ -34,6 +34,7 @@ from campusflow.domain.planning import (
     input_fingerprint,
     input_snapshot,
     resolve_assumptions,
+    validate_planning_range,
 )
 from campusflow.domain.states import TaskProgress
 from campusflow.domain.timezones import in_workspace_timezone
@@ -87,6 +88,8 @@ def collect_inputs(
     只读：未开始、进行中与受阻任务进入排期；已完成、已取消及作为容器的父任务列入排除项。
     只有日期的截止以当天结束为上限并标记，耗时缺失保留为待补充，不按 0 分钟计算。
     """
+    # #625：固定日程 occurrences 按天展开，超长区间会生成海量实例，先拒绝。
+    validate_planning_range(range_start, range_end)
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
     settings = get_settings(repos, workspace_id)
@@ -316,8 +319,7 @@ def generate_draft(
     A005：preserved_blocks 原样带入并占用可用时间，对应任务只排剩余分钟；
     未排入任务、缺口与冲突写入草案，接受前可逐项核对。
     """
-    if range_end < range_start:
-        raise DomainError("规划结束日期不得早于开始日期")
+    validate_planning_range(range_start, range_end)
     collected = collect_inputs(
         repos,
         workspace_id,
@@ -429,6 +431,8 @@ def accept_draft(
     重新收集输入并比对指纹，拒绝过期草案；expected_version 防止并发覆盖。
     较新的已接受计划不会被旧草案覆盖；接受后才重算提醒，任务 DDL 始终不变。
     """
+    # #599：先锁工作空间行，串行化同空间的接受，避免两个草案并发都成为当前计划。
+    repos.plans.lock_workspace(workspace_id)
     draft = get_draft(repos, workspace_id, draft_id)
     if draft.status != "draft":
         raise ConflictError("只有待接受状态的草案可以接受")
@@ -503,8 +507,7 @@ def reschedule_plan(
         raise NotFoundError("当前没有已接受的计划，无法局部重排")
     effective_start = range_start or current.range_start
     effective_end = range_end or current.range_end
-    if effective_end < effective_start:
-        raise DomainError("规划结束日期不得早于开始日期")
+    validate_planning_range(effective_start, effective_end)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     scope: set[int] | None = None
     if task_ids is not None:

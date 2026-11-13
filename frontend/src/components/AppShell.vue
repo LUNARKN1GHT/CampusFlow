@@ -1,29 +1,25 @@
 <script setup lang="ts">
-// 受保护页面主布局：侧边导航＋顶栏；导航只列已实现入口，未开放能力不显示为可点击项。
+// 受保护页面主布局：顶部单行导航（品牌／横向导航／主题与账号操作）；导航只列已实现入口，未开放能力不显示为可点击项。
 import { useRouter } from 'vue-router'
 
 import { useAuth } from '../composables/useAuth'
+import { useTheme } from '../composables/useTheme'
 
 const router = useRouter()
 const { state, logout } = useAuth()
+// 深浅模式只在顶部切换；设置页只保留色系选择，避免两处重复入口。
+const { options: themeOptions, mode: themeMode, setThemeMode } = useTheme()
 // active-class 置空、只用 exact-active-class：子路径页不会同时高亮父级入口。
 const availableItems = [
   { label: '总览', to: '/' },
   { label: '课程', to: '/courses' },
-  { label: '课程路径', to: '/course-paths' },
   { label: '资料库', to: '/library' },
-  { label: '待核对', to: '/review' },
-  { label: '版本对照', to: '/review/changes' },
-  { label: '智能问答', to: '/qa' },
   { label: '任务', to: '/tasks' },
   { label: '学习计划', to: '/plan' },
   { label: '提醒', to: '/reminders' },
   { label: '导出', to: '/export' },
-  { label: '外部日历', to: '/calendar' },
   { label: '设置', to: '/settings' },
 ]
-
-const futureItems: string[] = []
 
 async function signOut() {
   // logout 即使请求失败也会清空本地会话；replace 避免回退到受保护页面。
@@ -34,40 +30,37 @@ async function signOut() {
 
 <template>
   <div class="app-frame">
-    <aside class="sidebar">
+    <header class="app-header">
       <RouterLink class="brand" to="/" aria-label="CampusFlow 总览">
         <span class="brand-mark">CF</span>
         <span><strong>CampusFlow</strong><small>学习事务工作台</small></span>
       </RouterLink>
 
-      <nav aria-label="主要导航">
-        <p class="nav-label">当前阶段</p>
+      <nav class="top-nav" aria-label="主要导航">
         <RouterLink v-for="item in availableItems" :key="item.to" class="nav-item" :to="item.to" active-class="" exact-active-class="router-link-active">
           {{ item.label }}
         </RouterLink>
-        <template v-if="futureItems.length">
-          <p class="nav-label nav-label-spaced">后续阶段</p>
-          <span v-for="item in futureItems" :key="item" class="nav-item nav-item-disabled">
-            {{ item }}<small>尚未开放</small>
-          </span>
-        </template>
       </nav>
 
-      <p class="sidebar-note">所有业务数据均来自真实 API；尚未实现的能力不会展示为可用入口。</p>
-    </aside>
+      <div class="header-actions">
+        <div class="theme-switch" role="group" aria-label="深浅模式">
+          <button
+            v-for="option in themeOptions"
+            :key="option.value"
+            type="button"
+            class="theme-switch-item"
+            :class="{ 'is-active': themeMode === option.value }"
+            :aria-pressed="themeMode === option.value"
+            @click="setThemeMode(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+        <span class="user-badge">{{ state.session?.username }}</span>
+        <button type="button" class="text-button" @click="signOut">退出</button>
+      </div>
+    </header>
 
-    <div class="content-column">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">个人工作空间</p>
-          <p class="topbar-title">把重要的学习事项放在一处</p>
-        </div>
-        <div class="topbar-actions">
-          <span class="stage-badge">{{ state.session?.username }}</span>
-          <button type="button" class="text-button" @click="signOut">退出</button>
-        </div>
-      </header>
-      <RouterView />
-    </div>
+    <RouterView />
   </div>
 </template>

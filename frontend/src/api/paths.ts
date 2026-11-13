@@ -1,6 +1,8 @@
 // 课程路径：培养方案版本、课程与三类关系、别名、修读记录，以及图／顺序／下一步／学期试排分析。
 // 分析接口都是只读计算结果，不落库；缺规则时返回 limitations 而不是伪造结论。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest } from './client'
 import type {
   AliasResolution,
@@ -19,15 +21,6 @@ import type {
   StudyStatus,
   SwitchPreview,
 } from './types'
-
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
 
 export type CurriculumPlanInput = {
   title: string
@@ -57,8 +50,6 @@ export const pathsApi = {
   listPlans: () => apiRequest<CurriculumPlan[]>('/curriculum-plans'),
   createPlan: (input: CurriculumPlanInput) =>
     apiRequest<CurriculumPlan>('/curriculum-plans', { method: 'POST', body: JSON.stringify(input) }),
-  updatePlan: (id: number, input: CurriculumPlanInput) =>
-    apiRequest<CurriculumPlan>(`/curriculum-plans/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   profile: () => apiRequest<LearnerProfile>('/learning-profile'),
   updateProfile: (input: { major: string | null; grade_year: number | null; curriculum_plan_id: number | null }) =>
     apiRequest<LearnerProfile>('/learning-profile', { method: 'PUT', body: JSON.stringify(input) }),
@@ -92,8 +83,6 @@ export const pathsApi = {
     apiRequest<CourseStudyRecord[]>(`/curriculum-plans/${planId}/study-records`),
   createStudyRecord: (planId: number, input: StudyRecordInput) =>
     apiRequest<CourseStudyRecord>(`/curriculum-plans/${planId}/study-records`, { method: 'POST', body: JSON.stringify(input) }),
-  updateStudyRecord: (planId: number, recordId: number, input: Partial<StudyRecordInput>) =>
-    apiRequest<CourseStudyRecord>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteStudyRecord: (planId: number, recordId: number) =>
     apiRequest<void>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'DELETE' }),
   studyStatus: (planId: number) =>

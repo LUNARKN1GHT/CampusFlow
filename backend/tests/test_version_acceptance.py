@@ -3,6 +3,7 @@
 from datetime import date
 
 from campusflow.application.candidates import save_candidates
+from campusflow.application.version_acceptance import accept_change
 from campusflow.domain.candidates import (
     CandidateDraft,
     CandidateField,
@@ -13,6 +14,7 @@ from campusflow.domain.candidates import (
 )
 from campusflow.infrastructure.db.models import Course, Semester
 from campusflow.infrastructure.repositories import build_repositories
+from campusflow.infrastructure.version_relations import SqlVersionRelations
 
 OLD_CONTENT = "实验报告下周五前提交。"
 NEW_CONTENT = "实验报告下周三前提交。"
@@ -171,3 +173,99 @@ def test_confirmed_old_candidate_can_be_superseded(client):
     response = accept(client, left, right, ["due_text"])
     assert response.status_code == 201, response.text
     assert client.get(f"/api/v1/candidates/{left.id}").json()["review_status"] == "superseded"
+
+
+def _workspace_id(client) -> int:
+    return client.get("/api/v1/settings").json()["workspace_id"]
+
+
+class _LaggingAcceptanceStore:
+    """模拟并发请求在锁外读到的旧快照：前 skip 次查不到接受记录。"""
+
+    def __init__(self, inner, skip: int) -> None:
+        self.inner = inner
+        self.skip = skip
+        self.calls = 0
+
+    def find_acceptance(self, *args):
+        self.calls += 1
+        if self.calls <= self.skip:
+            return None
+        return self.inner.find_acceptance(*args)
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
+def _accept_in_session(client, store, left, right):
+    with client.app.state.session_factory() as session:
+        repos = build_repositories(session)
+        return accept_change(
+            repos,
+            store(SqlVersionRelations(session)),
+            _workspace_id(client),
+            baseline_candidate_id=left.id,
+            comparison_candidate_id=right.id,
+            field_names=("due_text",),
+            reason="并发接受截止时间",
+            operator="student",
+        )
+
+
+def test_repeat_acceptance_returns_candidate_current_status(client):
+    left, right = pair(client)
+    first = accept(client, left, right, ["due_text"])
+    assert first.status_code == 201, first.text
+    second = accept(client, left, right, ["due_text"])
+    assert second.status_code == 200, second.text
+    body = second.json()
+    # #624：幂等响应应显示候选当前状态（已失效），旧值另用 previous_review_status 保留。
+    assert body["baseline_review_status"] == "superseded"
+    assert body["previous_review_status"] == "pending"
+    history = client.get(f"/api/v1/candidates/{left.id}/acceptances").json()
+    assert len(history) == 1
+    assert history[0]["baseline_review_status"] == "superseded"
+    assert history[0]["previous_review_status"] == "pending"
+    assert client.get(f"/api/v1/candidates/{left.id}").json()["review_status"] == "superseded"
+
+
+def test_locked_recheck_returns_record_written_by_other_request(client):
+    left, right = pair(client)
+    first = accept(client, left, right, ["due_text"])
+    assert first.status_code == 201, first.text
+    # 锁前查到 None、取锁后重新查询命中既有记录，说明并发第二个请求不会重复写入。
+    result = _accept_in_session(
+        client, lambda store: _LaggingAcceptanceStore(store, skip=1), left, right
+    )
+    assert result.created is False
+    assert result.record.id == first.json()["id"]
+    assert result.baseline_review_status == "superseded"
+    assert len(client.get(f"/api/v1/candidates/{left.id}/acceptances").json()) == 1
+
+
+def test_unique_conflict_returns_existing_acceptance(client):
+    left, right = pair(client)
+    workspace_id = _workspace_id(client)
+    # 并发请求已完成写入但候选状态尚未被本请求看到；唯一约束兜底后应返回既有记录。
+    with client.app.state.session_factory() as other:
+        winner = SqlVersionRelations(other).create_acceptance(
+            workspace_id,
+            baseline_candidate_id=left.id,
+            comparison_candidate_id=right.id,
+            baseline_version_id=left.source_version_id,
+            comparison_version_id=right.source_version_id,
+            accepted_fields=("due_text",),
+            reason="并发请求先写入",
+            operator="student",
+            evidence_snapshot=(),
+            previous_review_status="pending",
+        )
+        other.commit()
+    result = _accept_in_session(
+        client, lambda store: _LaggingAcceptanceStore(store, skip=2), left, right
+    )
+    assert result.created is False
+    assert result.record.id == winner.id
+    history = client.get(f"/api/v1/candidates/{left.id}/acceptances").json()
+    assert len(history) == 1
+    assert history[0]["id"] == winner.id
