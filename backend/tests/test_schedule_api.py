@@ -97,6 +97,17 @@ def test_weekly_event_occurrences_respect_query_and_repeat_end(client: TestClien
     assert {item["source_event_id"] for item in occurrences} == {event["id"]}
 
 
+def test_occurrence_range_over_limit_is_rejected(client: TestClient) -> None:
+    """#625：直连展开接口与排期共用 366 天上限，避免超长区间产生海量实例。"""
+    _create_event(client, recurrence="weekly", repeat_until="2026-10-12")
+    response = client.get(
+        "/api/v1/fixed-events/occurrences",
+        params={"start_date": "2026-01-01", "end_date": "2027-01-02"},
+    )
+    assert response.status_code == 400
+    assert "366" in response.json()["detail"]
+
+
 def test_weekly_occurrences_are_not_duplicated_or_missed_at_window_edges(
     client: TestClient,
 ) -> None:

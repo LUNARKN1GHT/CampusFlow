@@ -21,6 +21,7 @@ from campusflow.application.scope import (
 )
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.planning import MAX_PLANNING_RANGE_DAYS
 from campusflow.domain.schedule import validate_availability_slot, validate_fixed_event
 from campusflow.domain.states import EventRecurrence
 from campusflow.domain.timezones import in_workspace_timezone
@@ -61,6 +62,9 @@ def list_fixed_event_occurrences(
     """
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
+    # #625：直连展开同样限制区间，避免超长区间按周展开大量实例。
+    if (end_date - start_date).days + 1 > MAX_PLANNING_RANGE_DAYS:
+        raise DomainError(f"查询区间不能超过 {MAX_PLANNING_RANGE_DAYS} 天")
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     range_start = datetime.combine(start_date, time.min, tzinfo=timezone).astimezone(UTC)
     range_end = datetime.combine(
