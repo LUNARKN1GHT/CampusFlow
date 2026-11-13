@@ -38,8 +38,12 @@ const saving = ref(false)
 const error = ref('')
 const formError = ref('')
 const editorOpen = ref(false)
+const editorPanel = ref<HTMLElement | null>(null)
+const editorTrigger = ref<HTMLElement | null>(null)
 const editing = ref<Task | null>(null)
 const progressTask = ref<Task | null>(null)
+const progressPanel = ref<HTMLElement | null>(null)
+const progressTrigger = ref<HTMLElement | null>(null)
 const history = ref<TaskProgressChange[]>([])
 const historyLoading = ref(false)
 const historyError = ref('')
@@ -51,9 +55,12 @@ const selectedTask = ref<Task | null>(null)
 const relations = ref<TaskRelations | null>(null)
 const relationsLoading = ref(false)
 const relationsError = ref('')
+let relationsRequestId = 0
 const dependencyCheck = ref<DependencyCheck | null>(null)
 const dependencyInput = ref('')
 const splitSuggestion = ref<SplitSuggestion | null>(null)
+let splitSuggestionRequestId = 0
+let splitSourceTaskId: number | null = null
 const subtaskRows = ref<Array<{ title: string; remaining_minutes: number | null }>>([])
 const subtaskError = ref('')
 const subtaskSaving = ref(false)
@@ -70,7 +77,8 @@ const filteredCourses = computed(() => filters.semesterId
   ? courses.value.filter((course) => course.semester_id === Number(filters.semesterId))
   : courses.value)
 // 学期筛选按任务的课程归属判断；未关联课程的任务在选定学期时一律隐藏，需切回“全部学期”。
-const visibleTasks = computed(() => tasks.value.filter((task) => {
+// 新建成功后也用它判断是否命中当前筛选，未命中时给出提示而不是静默隐藏。
+function matchesFilters(task: Task): boolean {
   if (filters.courseId && task.course_id !== Number(filters.courseId)) return false
   if (filters.progress && task.progress !== filters.progress) return false
   if (filters.semesterId) {
@@ -78,7 +86,8 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
     if (courseMap.value.get(task.course_id)?.semester_id !== Number(filters.semesterId)) return false
   }
   return true
-}))
+}
+const visibleTasks = computed(() => tasks.value.filter(matchesFilters))
 // 调整筛选后“不在当前筛选结果中”的提示不再成立，立即清除。
 watch(filters, () => {
   listNotice.value = ''
@@ -116,7 +125,30 @@ async function load() {
   await scrollToHighlighted()
 }
 
-function openEditor(task?: Task) {
+// 面板渲染在列表末尾：打开后滚动进入视口并聚焦首个表单控件，关闭时把焦点交还触发按钮。
+function triggerElement(event?: MouseEvent): HTMLElement | null {
+  return event?.currentTarget instanceof HTMLElement ? event.currentTarget : null
+}
+
+function focusPanel(panel: HTMLElement | null) {
+  if (!panel) return
+  panel.scrollIntoView({ block: 'nearest' })
+  const first = panel.querySelector<HTMLElement>('input, select, textarea') ?? panel.querySelector<HTMLElement>('button')
+  first?.focus()
+}
+
+function restoreFocus(trigger: HTMLElement | null) {
+  if (trigger && document.contains(trigger)) trigger.focus()
+}
+
+function closeEditor() {
+  editorOpen.value = false
+  restoreFocus(editorTrigger.value)
+  editorTrigger.value = null
+}
+
+async function openEditor(task?: Task, event?: MouseEvent) {
+  editorTrigger.value = triggerElement(event)
   editing.value = task ?? null
   editorOpen.value = true
   formError.value = ''
@@ -126,6 +158,8 @@ function openEditor(task?: Task) {
     target_date: task?.target_date ?? '', due_source: task?.due_source ?? 'user', due_note: task?.due_note ?? '',
     estimated_minutes: task?.estimated_minutes?.toString() ?? '', remaining_minutes: task?.remaining_minutes?.toString() ?? '',
   })
+  await nextTick()
+  focusPanel(editorPanel.value)
 }
 
 // 只有填写了 DDL 日期才提交时刻；仅日期任务保持原精度，不补 00:00 或 23:59。
@@ -168,9 +202,16 @@ async function saveTask() {
       const updated = await tasksApi.update(editing.value.id, values)
       await replaceTask(updated)
     } else {
-      tasks.value.push(await tasksApi.create(values))
+      const created = await tasksApi.create(values)
+      tasks.value.push(created)
+      // 新建的任务可能不命中当前筛选，静默隐藏会让用户以为创建失败而重复创建。
+      if (matchesFilters(created)) {
+        listNotice.value = ''
+      } else {
+        listNotice.value = '任务已创建，但不在当前筛选结果中；请调整筛选查看'
+      }
     }
-    editorOpen.value = false
+    closeEditor()
   } catch (caught) {
     formError.value = errorMessage(caught)
   } finally {
@@ -185,6 +226,8 @@ function closeProgress() {
   history.value = []
   historyError.value = ''
   historyLoading.value = false
+  restoreFocus(progressTrigger.value)
+  progressTrigger.value = null
 }
 
 // 读取调整历史前先清空旧数据，切换任务时不会残留上一个任务的记录。
@@ -208,11 +251,14 @@ async function loadHistory(task: Task) {
 }
 
 // 打开新任务时先生成面板状态再读取历史，加载中与失败都不复用上一个任务的数据。
-async function openProgress(task: Task) {
+async function openProgress(task: Task, event?: MouseEvent) {
+  progressTrigger.value = triggerElement(event)
   progressTask.value = task
   progressForm.progress = task.progress
   progressForm.reason = ''
   progressError.value = ''
+  await nextTick()
+  focusPanel(progressPanel.value)
   await loadHistory(task)
 }
 
@@ -256,16 +302,22 @@ async function refreshDependencyCheck() {
 }
 
 // 读取关系与依赖；重试时保留原错误提示，直到请求返回前按钮都保持忙碌态。
+// 请求序号与发起任务双重校验：快速从 A 切到 B 时，先发后到的慢请求不会把 A 的关系写进 B 面板。
 async function loadRelations(task: Task, keepError = false) {
+  const requestId = ++relationsRequestId
   if (!keepError) relationsError.value = ''
   relationsLoading.value = true
   try {
-    relations.value = await tasksApi.relations(task.id)
+    const result = await tasksApi.relations(task.id)
+    if (requestId !== relationsRequestId || selectedTask.value?.id !== task.id) return
+    relations.value = result
     relationsError.value = ''
   } catch (caught) {
+    if (requestId !== relationsRequestId || selectedTask.value?.id !== task.id) return
     relationsError.value = errorMessage(caught)
   } finally {
-    relationsLoading.value = false
+    // 加载态只允许最新请求复位，旧请求不能提前熄灭 B 的“正在读取关系”。
+    if (requestId === relationsRequestId) relationsLoading.value = false
   }
 }
 
@@ -277,6 +329,7 @@ async function openRelations(task: Task) {
   splitSuggestion.value = null
   subtaskRows.value = []
   subtaskError.value = ''
+  splitSourceTaskId = null
   await loadRelations(task)
 }
 
@@ -319,16 +372,23 @@ async function removeDependency(dependsOn: number) {
 }
 
 // 拆分建议只读且可编辑：加载后填入表单，用户可修改标题和剩余耗时后再创建。
+// 与关系请求一致，用序号和任务校验丢弃过期响应，并记录来源任务供创建前核对。
 async function loadSplitSuggestion() {
-  if (!selectedTask.value) return
+  const task = selectedTask.value
+  if (!task) return
+  const requestId = ++splitSuggestionRequestId
   subtaskError.value = ''
   try {
-    splitSuggestion.value = await tasksApi.splitSuggestions(selectedTask.value.id)
-    subtaskRows.value = splitSuggestion.value.items.map((item) => ({
+    const suggestion = await tasksApi.splitSuggestions(task.id)
+    if (requestId !== splitSuggestionRequestId || selectedTask.value?.id !== task.id) return
+    splitSuggestion.value = suggestion
+    splitSourceTaskId = task.id
+    subtaskRows.value = suggestion.items.map((item) => ({
       title: item.title,
       remaining_minutes: item.remaining_minutes,
     }))
   } catch (caught) {
+    if (requestId !== splitSuggestionRequestId || selectedTask.value?.id !== task.id) return
     subtaskError.value = errorMessage(caught)
   }
 }
@@ -341,6 +401,10 @@ function addSubtaskRow() {
 async function saveSubtasks() {
   const task = selectedTask.value
   if (!task) return
+  if (splitSourceTaskId !== null && splitSourceTaskId !== task.id) {
+    subtaskError.value = '拆分建议来自其他任务，请重新生成后再创建'
+    return
+  }
   const items = subtaskRows.value.filter((row) => row.title.trim())
   if (!items.length) {
     subtaskError.value = '至少需要一项子任务标题'
@@ -373,7 +437,7 @@ onMounted(load)
   <main class="page-content">
     <div class="page-heading page-heading-row">
       <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p><p class="form-help">全部学期包含归档记录，归档不会隐藏待办。可按学期查看当前或历史任务；未关联课程的任务仅在全部学期中显示。</p></div>
-      <button type="button" @click="openEditor()">添加任务</button>
+      <button type="button" @click="openEditor(undefined, $event)">添加任务</button>
     </div>
 
     <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="load" />
@@ -424,14 +488,14 @@ onMounted(load)
               </template>
               <strong v-else>{{ task.remaining_minutes ?? '—' }}<small> 分钟剩余</small></strong>
             </div>
-            <div class="task-actions"><button type="button" class="button-secondary" @click="openRelations(task)">依赖与子任务</button><button type="button" class="button-secondary" @click="openProgress(task)">进度</button><button type="button" class="text-button" @click="openEditor(task)">编辑</button></div>
+            <div class="task-actions"><button type="button" class="button-secondary" @click="openRelations(task)">依赖与子任务</button><button type="button" class="button-secondary" @click="openProgress(task, $event)">进度</button><button type="button" class="text-button" @click="openEditor(task, $event)">编辑</button></div>
           </article>
         </div>
         <div v-else class="compact-empty">{{ tasks.length ? '没有符合当前筛选的任务。' : '还没有任务，先添加第一项。' }}</div>
       </section>
 
-      <section v-if="editorOpen" class="panel editor-panel">
-        <div class="section-heading"><div><p class="eyebrow">{{ editing ? '编辑任务' : '新建任务' }}</p><h2>{{ editing?.title || '添加手动任务' }}</h2></div><button type="button" class="text-button" @click="editorOpen = false">取消</button></div>
+      <section v-if="editorOpen" ref="editorPanel" class="panel editor-panel">
+        <div class="section-heading"><div><p class="eyebrow">{{ editing ? '编辑任务' : '新建任务' }}</p><h2>{{ editing?.title || '添加手动任务' }}</h2></div><button type="button" class="text-button" @click="closeEditor">取消</button></div>
         <form class="stack-form" @submit.prevent="saveTask">
           <div class="form-grid"><label>任务标题<input v-model.trim="form.title" required maxlength="300" /></label><label>关联课程<select v-model="form.course_id"><option value="">不关联课程</option><option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }} · {{ course.class_name || '未分班' }}</option></select></label></div>
           <label>说明<textarea v-model.trim="form.description" rows="3"></textarea></label>
@@ -446,7 +510,7 @@ onMounted(load)
         </form>
       </section>
 
-      <section v-if="progressTask" class="panel editor-panel">
+      <section v-if="progressTask" ref="progressPanel" class="panel editor-panel">
         <div class="section-heading"><div><p class="eyebrow">执行进度</p><h2>{{ progressTask.title }}</h2></div><button type="button" class="text-button" @click="closeProgress">关闭</button></div>
         <div class="progress-layout">
           <form class="stack-form" @submit.prevent="saveProgress">
