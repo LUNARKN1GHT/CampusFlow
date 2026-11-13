@@ -429,6 +429,8 @@ def accept_draft(
     重新收集输入并比对指纹，拒绝过期草案；expected_version 防止并发覆盖。
     较新的已接受计划不会被旧草案覆盖；接受后才重算提醒，任务 DDL 始终不变。
     """
+    # #599：先锁工作空间行，串行化同空间的接受，避免两个草案并发都成为当前计划。
+    repos.plans.lock_workspace(workspace_id)
     draft = get_draft(repos, workspace_id, draft_id)
     if draft.status != "draft":
         raise ConflictError("只有待接受状态的草案可以接受")
