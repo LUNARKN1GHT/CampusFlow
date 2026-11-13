@@ -316,6 +316,11 @@ async function loadPlanData() {
     courses.value = loadedCourses
     relations.value = loadedRelations
     aliases.value = loadedAliases
+    // 新方案的修读数据尚未返回前先清空，避免短暂显示上一方案的记录。
+    studyRecords.value = []
+    studyStatus.value = null
+    studyUnavailable.value = false
+    studyError.value = ''
     await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     if (requestId !== planDataRequestId || selectedPlanId.value !== planId) return
@@ -408,18 +413,25 @@ async function generateSemesterPlan() {
 
 // 修读记录与汇总任一失败即整体不可用，避免把空数据展示成“未修”或“状态未知”。
 // 只有 404 才视为接口未接入；超时、网络或 5xx 视为本次读取失败，保留可读原因供重试。
+// 请求序号与方案校验保证快速切换时旧方案的迟到响应不会覆盖当前方案。
+let studyRequestId = 0
+
 async function loadStudy() {
-  if (selectedPlanId.value === null) return
+  const requestId = ++studyRequestId
+  const planId = selectedPlanId.value
+  if (planId === null) return
   try {
     const [records, statuses] = await Promise.all([
-      pathsApi.listStudyRecords(selectedPlanId.value),
-      pathsApi.studyStatus(selectedPlanId.value),
+      pathsApi.listStudyRecords(planId),
+      pathsApi.studyStatus(planId),
     ])
+    if (requestId !== studyRequestId || selectedPlanId.value !== planId) return
     studyRecords.value = records
     studyStatus.value = statuses
     studyUnavailable.value = false
     studyError.value = ''
   } catch (caught) {
+    if (requestId !== studyRequestId || selectedPlanId.value !== planId) return
     studyRecords.value = []
     studyStatus.value = null
     if (caught instanceof ApiError && caught.status === 404) {
@@ -444,9 +456,14 @@ async function retryStudy() {
 // 预览里的计数属于当前方案，切换不会删除旧方案数据。
 // 方案数据在这里显式重载（唯一随选择变化的入口），不再用 watch 监听，
 // 避免首次进入时 load() 赋值与挂载调用各触发一次相同请求。
+// 预览也按请求序号与当前方案校验，迟到的旧方案响应不会写回。
+let previewRequestId = 0
+
 async function selectPlan(planId: number) {
   selectedPlanId.value = planId
   preview.value = null
+  previewLoading.value = false
+  const requestId = ++previewRequestId
   const plan = plans.value.find((item) => item.id === planId)
   if (plan) {
     Object.assign(planForm, {
@@ -458,14 +475,18 @@ async function selectPlan(planId: number) {
     })
   }
   await loadPlanData()
+  if (selectedPlanId.value !== planId || requestId !== previewRequestId) return
   if (profile.value?.curriculum_plan_id !== planId) {
     previewLoading.value = true
     try {
-      preview.value = await pathsApi.switchPreview(planId)
+      const loaded = await pathsApi.switchPreview(planId)
+      if (requestId === previewRequestId && selectedPlanId.value === planId) preview.value = loaded
     } catch (caught) {
-      actionError.value = errorMessage(caught)
+      if (requestId === previewRequestId && selectedPlanId.value === planId) {
+        actionError.value = errorMessage(caught)
+      }
     } finally {
-      previewLoading.value = false
+      if (requestId === previewRequestId) previewLoading.value = false
     }
   }
 }

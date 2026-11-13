@@ -90,6 +90,13 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
   const delayedListsDone = new Promise<void>((resolve) => {
     resolveDelayedLists = resolve
   })
+  // 修读记录与切换预览的迟到场景分别验证各自的竞态保护。
+  let plan1StudyDelayMs = 0
+  let delayedStudyDone = Promise.resolve()
+  let resolveDelayedStudy: (() => void) | null = null
+  let previewDelayMs = 0
+  let delayedPreviewDone = Promise.resolve()
+  let resolveDelayedPreview: (() => void) | null = null
 
   await page.route('**/api/v1/**', async (route) => {
     const { pathname } = new URL(route.request().url())
@@ -113,6 +120,10 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
     }
     if (pathname === '/api/v1/learning-profile/switch-preview') {
       hits.push('switch-preview')
+      if (previewDelayMs > 0) {
+        await delay(previewDelayMs)
+        resolveDelayedPreview?.()
+      }
       const target = plans[2]
       await json(route, {
         current_plan: plans[1],
@@ -145,6 +156,10 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
       hits.push(label)
 
       const listResources = ['courses', 'relations', 'aliases']
+      if (planId === 1 && resource === 'study-records' && plan1StudyDelayMs > 0) {
+        await delay(plan1StudyDelayMs)
+        resolveDelayedStudy?.()
+      }
       if (planId === 1 && plan1ListDelayMs > 0 && listResources.includes(resource)) {
         await delay(plan1ListDelayMs)
         await json(route, payloadFor(resource, planId))
@@ -170,13 +185,47 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
         return courses[planId]
       case 'relations':
       case 'aliases':
-      case 'study-records':
         return []
+      case 'study-records':
+        // 方案 2 有一条修读记录，方案 1 为空；修读摘要据此显示 0 或 1。
+        return planId === 2
+          ? [
+              {
+                id: 2101,
+                curriculum_plan_id: 2,
+                curriculum_course_id: 21,
+                semester_id: null,
+                semester_name: null,
+                status: 'completed',
+                grade: '90',
+                credits_earned: 3,
+                note: null,
+                created_at: '2026-01-05T00:00:00Z',
+                updated_at: '2026-01-05T00:00:00Z',
+              },
+            ]
+          : []
       case 'study-status':
         return {
           plan_id: planId,
-          courses: [],
-          completed_count: 0,
+          courses:
+            planId === 2
+              ? [
+                  {
+                    curriculum_course_id: 21,
+                    course_name: '操作系统',
+                    course_code: 'CS201',
+                    status: 'completed',
+                    record_count: 1,
+                    repeat_record_count: 0,
+                    completed_semester_ids: [],
+                    in_progress_semester_ids: [],
+                    planned_semester_ids: [],
+                    note: '',
+                  },
+                ]
+              : [],
+          completed_count: planId === 2 ? 1 : 0,
           in_progress_count: 0,
           planned_count: 0,
           unknown_count: 0,
@@ -249,11 +298,14 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
   expect(count('next:1')).toBe(1)
 
   const planButton = (label: string) => page.locator('.plan-choice', { hasText: label })
+  const studyRecordCount = page.locator('.plan-facts div', { hasText: '修读记录' }).locator('dd')
+  await expect(studyRecordCount).toHaveText('0')
 
   // 先切到方案 2 并等它完整渲染，确认切换路径本身正常。
   await planButton('2025 版').click()
   await expect(page.locator('.level-card li').first()).toHaveText('操作系统')
   await expect(page.locator('.next-list strong').first()).toHaveText('编译原理')
+  await expect(studyRecordCount).toHaveText('1')
 
   // 方案 1 的响应延迟返回：点击方案 1 后立刻再点方案 2，
   // 最后选中仍是方案 2，迟到的方案 1 列表必须被丢弃。
@@ -275,4 +327,33 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
   // 快速切换期间两个方案各至少拉取过一次列表，说明这次测试确实覆盖了并发响应。
   expect(count('courses:1')).toBeGreaterThanOrEqual(2)
   expect(count('courses:2')).toBeGreaterThanOrEqual(2)
+
+  // 旧方案的修读记录迟到：切回方案 2 后，方案 1 的空记录不得覆盖方案 2 的修读摘要。
+  plan1ListDelayMs = 0
+  plan1StudyDelayMs = 600
+  delayedStudyDone = new Promise<void>((resolve) => {
+    resolveDelayedStudy = resolve
+  })
+  const studyHitsBefore = count('study-records:1')
+  await planButton('2024 版').click()
+  await expect.poll(() => count('study-records:1')).toBeGreaterThan(studyHitsBefore)
+  await planButton('2025 版').click()
+  await delayedStudyDone
+  await page.waitForTimeout(100)
+  await expect(studyRecordCount).toHaveText('1')
+  await expect(page.locator('.level-card li').first()).toHaveText('操作系统')
+
+  // 旧方案的切换预览迟到：切回当前方案 1 后，不得再显示方案 2 的预览卡片。
+  plan1StudyDelayMs = 0
+  previewDelayMs = 600
+  delayedPreviewDone = new Promise<void>((resolve) => {
+    resolveDelayedPreview = resolve
+  })
+  const previewHitsBefore = count('switch-preview')
+  await planButton('2025 版').click()
+  await expect.poll(() => count('switch-preview')).toBeGreaterThan(previewHitsBefore)
+  await planButton('2024 版').click()
+  await delayedPreviewDone
+  await page.waitForTimeout(100)
+  await expect(page.locator('.switch-preview')).toHaveCount(0)
 })
