@@ -10,3 +10,9 @@ export function queryString(params: Record<string, string | number | boolean | n
   const text = query.toString()
   return text ? `?${text}` : ''
 }
+
+/** 正整数解析：路由参数与数字输入共用；非整数、0、负数与非数字文本都返回 null。 */
+export function parsePositiveInt(value: unknown): number | null {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+}

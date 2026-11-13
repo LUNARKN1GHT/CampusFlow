@@ -26,7 +26,8 @@ import type {
 import ApiFeedback from '../components/ApiFeedback.vue'
 import FixedSchedule from '../components/FixedSchedule.vue'
 import { priorityLabels, progressLabels } from '../constants/labels'
-import { formatDateTime } from '../utils/datetime'
+import { formatDateTime, formatDueDate } from '../utils/datetime'
+import { parsePositiveInt } from '../utils/query'
 
 const route = useRoute()
 const tasks = ref<Task[]>([])
@@ -80,13 +81,8 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
 
 const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
-function queryNumber(value: unknown): number | null {
-  const parsed = Number(value)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
-}
-
 /** 核对界面确认后生成的正式事项由此参数直达并高亮。 */
-const highlightedTaskId = computed(() => queryNumber(route.query.task))
+const highlightedTaskId = computed(() => parsePositiveInt(route.query.task))
 
 async function scrollToHighlighted(): Promise<void> {
   await nextTick()
@@ -172,11 +168,6 @@ async function saveTask() {
   } finally {
     saving.value = false
   }
-}
-
-function dueText(task: Task): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
 }
 
 function closeProgress() {
@@ -290,7 +281,7 @@ function retryRelations() {
 async function addDependency() {
   const task = selectedTask.value
   if (!task) return
-  const dependsOn = queryNumber(dependencyInput.value)
+  const dependsOn = parsePositiveInt(dependencyInput.value)
   if (dependsOn === null) {
     relationsError.value = '请输入有效的任务编号'
     return
@@ -410,7 +401,7 @@ onMounted(load)
             <div class="priority-marker" :data-priority="task.priority"></div>
             <div class="task-main">
               <div class="task-title-line"><h3>{{ task.title }}</h3><span class="status-pill">{{ progressLabels[task.progress] }}</span><span v-if="task.overdue" class="status-pill overdue-pill">已逾期</span></div>
-              <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ dueText(task) }}</p>
+              <p>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ formatDueDate(task.due_date, task.due_time) }}</p>
               <p v-if="task.target_date">个人目标：{{ task.target_date }}（不改变正式 DDL）</p>
               <p>截止来源：{{ dueSourceLabels[task.due_source] }}{{ task.due_note ? ` · ${task.due_note}` : '' }}</p>
               <p v-if="task.source_state === 'invalidated'" class="inline-notice">{{ task.source_invalidated_note ?? '来源资料已删除，引用不可验证；个人任务仍保留。' }}</p>
