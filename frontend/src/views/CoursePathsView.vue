@@ -1083,7 +1083,7 @@ onMounted(async () => {
 
       <section class="panel graph-panel">
         <div class="section-heading">
-          <div><p class="eyebrow">C015 课程关系图</p><h2>依赖图与来源证据</h2></div>
+          <div><p class="eyebrow">关系图与证据</p><h2>依赖图与来源证据</h2></div>
           <span v-if="graph" :class="['status-pill', graph.complete ? 'graph-complete' : 'graph-incomplete']">
             {{ graph.complete ? '图完整' : '图不完整' }}
           </span>
@@ -1198,7 +1198,7 @@ onMounted(async () => {
       <div class="two-column-layout">
         <section class="panel">
           <div class="section-heading">
-            <div><p class="eyebrow">C016 修读顺序</p><h2>强制先修层次</h2></div>
+            <div><p class="eyebrow">先修层次</p><h2>强制先修层次</h2></div>
             <span v-if="order" class="count-badge">{{ order.levels.length }} 层</span>
           </div>
           <p class="form-help">只按强制先修分层；并修与建议先学不参与层次计算。</p>
@@ -1244,7 +1244,7 @@ onMounted(async () => {
 
         <section class="panel">
           <div class="section-heading">
-            <div><p class="eyebrow">C016 下一步</p><h2>可学与待满足条件</h2></div>
+            <div><p class="eyebrow">下一步建议</p><h2>可学与待满足条件</h2></div>
             <span v-if="nextCourses" class="count-badge">{{ nextAvailable.length }} 门可进入</span>
           </div>
           <p v-if="nextLoading" class="muted">正在判断下一步可学课程…</p>
@@ -1294,11 +1294,11 @@ onMounted(async () => {
 
       <section class="panel">
         <div class="section-heading">
-          <div><p class="eyebrow">C016 学期辅助</p><h2>按学分上限与开课季节试排</h2></div>
+          <div><p class="eyebrow">学期试排</p><h2>按学分上限与开课季节试排</h2></div>
           <span class="status-pill">仅作参考</span>
         </div>
         <p class="form-help">
-          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核（graduation_audit=false）。
+          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核。
         </p>
         <form class="stack-form semester-form" @submit.prevent="generateSemesterPlan">
           <div class="form-grid">
@@ -1333,7 +1333,7 @@ onMounted(async () => {
           </div>
           <!-- 有结果时始终展示审核边界；学分上限未知等降级说明由后端 limitations／assumptions 给出。 -->
           <p class="status-banner warn">
-            <span><strong>不构成选课或毕业资格审核</strong><p>graduation_audit=false；请以学校正式培养方案和选课系统为准。</p></span>
+            <span><strong>不构成选课或毕业资格审核</strong><p>这里只依据依赖关系与学分上限试排；请以学校正式培养方案和选课系统为准。</p></span>
           </p>
           <div v-if="semesterPlan.terms.length" class="term-grid">
             <div v-for="term in semesterPlan.terms" :key="`term-${term.index}`" class="term-card">
