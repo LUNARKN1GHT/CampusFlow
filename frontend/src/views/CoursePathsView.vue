@@ -160,6 +160,9 @@ const semesterForm = reactive({
 const semesterPlan = ref<SemesterPlan | null>(null)
 const semesterLoading = ref(false)
 const semesterError = ref('')
+// 试排结果只属于发起时的方案：序号在切换方案或重载方案数据时递增，
+// 迟到的旧响应既不能写回结果，也不能结束当前方案的“生成中…”状态。
+let semesterRequestId = 0
 
 const selectedPlan = computed(() => plans.value.find((plan) => plan.id === selectedPlanId.value) ?? null)
 const currentPlan = computed(() => profile.value?.current_plan ?? null)
@@ -292,6 +295,8 @@ let planDataRequestId = 0
 async function loadPlanData() {
   const requestId = ++planDataRequestId
   const planId = selectedPlanId.value
+  // 切换方案或重载方案数据后，上一次试排的结论与加载态都不再属于当前方案。
+  resetSemesterPlan()
   if (planId === null) {
     dataLoading.value = false
     courses.value = []
@@ -395,23 +400,38 @@ async function loadAnalysis() {
   }
 }
 
+// 复位试排区块并作废仍在飞行的请求：方案切换后不复用旧方案的结论，
+// 也不让按钮停在“生成中…”。
+function resetSemesterPlan() {
+  semesterRequestId += 1
+  semesterPlan.value = null
+  semesterError.value = ''
+  semesterLoading.value = false
+}
+
 // 留空表示交给后端：学分上限回落到方案设置，最多学期数自动；
 // 页面不把空字符串当作 0，也不在本地预判可排性。
 async function generateSemesterPlan() {
-  if (selectedPlanId.value === null) return
+  const planId = selectedPlanId.value
+  if (planId === null) return
+  const requestId = ++semesterRequestId
   semesterLoading.value = true
   semesterError.value = ''
   try {
-    semesterPlan.value = await pathsApi.semesterPlan(selectedPlanId.value, {
+    const result = await pathsApi.semesterPlan(planId, {
       credit_limit: semesterForm.credit_limit.trim() === '' ? null : Number(semesterForm.credit_limit),
       start_season: semesterForm.start_season,
       max_terms: semesterForm.max_terms.trim() === '' ? null : Number(semesterForm.max_terms),
     })
+    // 只有最新一次请求且方案未变时才写回；切换方案后旧响应直接丢弃。
+    if (requestId !== semesterRequestId || selectedPlanId.value !== planId) return
+    semesterPlan.value = result
   } catch (caught) {
+    if (requestId !== semesterRequestId || selectedPlanId.value !== planId) return
     semesterPlan.value = null
     semesterError.value = errorMessage(caught)
   } finally {
-    semesterLoading.value = false
+    if (requestId === semesterRequestId) semesterLoading.value = false
   }
 }
 
@@ -714,7 +734,8 @@ async function addStudyRecord() {
     studyForm.credits_earned = ''
     studyForm.note = ''
     notice.value = '修读记录已保存；成绩与已获学分只采用你填写的值。'
-    await loadStudy()
+    // 图节点的修读状态与“下一步”都读修读记录，保存后与分析并行刷新。
+    await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
@@ -739,7 +760,8 @@ async function removeStudyRecord(record: CourseStudyRecord) {
   removingStudyRecordId.value = record.id
   try {
     await pathsApi.deleteStudyRecord(selectedPlanId.value, record.id)
-    await loadStudy()
+    // 删除后课程回到未知状态，图节点与“下一步”需一并重算。
+    await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
