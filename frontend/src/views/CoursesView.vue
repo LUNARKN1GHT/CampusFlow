@@ -17,6 +17,7 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const formError = ref('')
+const listNotice = ref('')
 const showHistory = ref(false)
 const selectedId = ref<number | null>(null)
 const form = reactive({ name: '', start_date: '', end_date: '' })
@@ -86,6 +87,12 @@ async function toggleArchived(semester: Semester) {
   try {
     const updated = await semestersApi.setArchived(semester.id, !semester.archived)
     const index = semesters.value.findIndex((item) => item.id === semester.id)
+    if (index === -1) {
+      // 列表已被重新加载且不含该学期时，不写入 -1 属性；重新读取并说明原因。
+      await load()
+      if (!error.value) listNotice.value = '学期已更新，但不在当前列表中；已重新加载学期列表。'
+      return
+    }
     semesters.value[index] = updated
     if (updated.archived && selectedId.value === updated.id) {
       selectedId.value = semesters.value.find((item) => !item.archived)?.id ?? null
@@ -144,7 +151,10 @@ async function saveCourse() {
 }
 
 // 快速切换学期时会连续触发；composable 只让最后一次请求写回课程与错误。
-watch(selectedId, () => { void loadCourses() })
+watch(selectedId, () => {
+  listNotice.value = ''
+  void loadCourses()
+})
 // 关闭历史视图时，如当前仍在已归档学期，自动退回进行中学期。
 watch(showHistory, (visible) => {
   if (!visible && selectedSemester.value?.archived) {
@@ -247,5 +257,6 @@ onMounted(load)
         <button type="submit" :disabled="courseSaving">{{ courseSaving ? '正在保存…' : '保存课程' }}</button>
       </form>
     </section>
+    <p v-if="listNotice" class="inline-notice" role="status">{{ listNotice }}</p>
   </main>
 </template>
