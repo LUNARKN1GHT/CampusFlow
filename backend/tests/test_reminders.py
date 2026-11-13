@@ -5,6 +5,9 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
+from campusflow.application.reminders import MAX_DEADLINE_WINDOWS
+from campusflow.infrastructure.repositories import SqlAlchemyReminderRepository
+
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 # 截止日期必须相对测试运行日生成：固定过去日期会让提醒窗口永远不生成。
 DUE_DAY = date.today() + timedelta(days=30)
@@ -186,3 +189,41 @@ def test_delete_task_rule_falls_back_to_default(client: TestClient) -> None:
     pending = _reminders(client, status="pending")
     assert len(pending) == 1
     assert _instant(pending[0]["scheduled_for"]) == _at(DUE_DAY - timedelta(days=1), 10, 0)
+
+
+def test_high_frequency_repeat_is_capped(client: TestClient) -> None:
+    """#626：repeat_minutes=1 也只生成有界数量的未来窗口。"""
+    task = _task(client)
+    _rule(client, task_id=task["id"], advance_minutes=1440, repeat_minutes=1)
+
+    pending = _reminders(client, status="pending")
+    assert len(pending) == MAX_DEADLINE_WINDOWS
+    scheduled = sorted(_instant(item["scheduled_for"]) for item in pending)
+    due_at = _at(DUE_DAY, 10, 0)
+    assert scheduled[-1] == due_at
+    assert scheduled[0] == due_at - timedelta(minutes=MAX_DEADLINE_WINDOWS - 1)
+    assert len({item["id"] for item in pending}) == MAX_DEADLINE_WINDOWS
+
+    # 重复读取不会新增窗口，记录数保持有界。
+    again = _reminders(client, status="pending")
+    assert len(again) == MAX_DEADLINE_WINDOWS
+    assert [item["id"] for item in again] == [item["id"] for item in pending]
+
+
+def test_read_path_skips_unchanged_upserts(client: TestClient, monkeypatch) -> None:
+    """#626：读取路径在状态未变化时不重复 upsert 提醒。"""
+    task = _task(client)
+    _rule(client, task_id=task["id"], advance_minutes=1440, repeat_minutes=1)
+    first = _reminders(client, status="pending")
+    assert len(first) == MAX_DEADLINE_WINDOWS
+
+    def forbidden_upsert(self, rows):
+        raise AssertionError("读取路径不应重复 upsert 未变化的提醒")
+
+    monkeypatch.setattr(SqlAlchemyReminderRepository, "upsert_triggers", forbidden_upsert)
+    second = _reminders(client, status="pending")
+    assert [item["id"] for item in second] == [item["id"] for item in first]
+
+    summary = client.get("/api/v1/reminders/summary")
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["pending"] == MAX_DEADLINE_WINDOWS

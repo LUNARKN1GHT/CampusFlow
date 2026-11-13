@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
@@ -45,14 +45,41 @@ from campusflow.domain.retrieval import RetrievalScope
 from campusflow.infrastructure.citation_sources import SqlCitationSources
 from campusflow.infrastructure.conversations import SqlConversations
 from campusflow.infrastructure.retrieval import SqlRetrievalCandidates
+from campusflow.workers.embeddings import profile_from_settings
 
 router = APIRouter(tags=["qa"])
 
 CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
 SessionDep = Annotated[Session, Depends(get_session)]
-EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 GeneratorDep = Annotated[TextGenerator, Depends(get_text_generator)]
+
+
+def _embedder_for_mode(mode: RankingMode, request: Request) -> Embedder | None:
+    """关键词排序只读候选原文，不装配也不调用向量模型（#627）。
+
+    混合/向量模式保持原有契约：未配置模型时仍由 get_embedder 给出明确业务错误。
+    测试或部署通过 get_embedder 注入的替身继续生效，不影响既有覆盖方式。
+    """
+    if mode is RankingMode.KEYWORD:
+        return None
+    override = request.app.dependency_overrides.get(get_embedder)
+    if override is not None:
+        return override()
+    return get_embedder(request)
+
+
+def _profile_id(request: Request, embedder: Embedder | None) -> str:
+    """索引按向量配置隔离；关键词模式只需要配置身份，不需要模型调用。
+
+    优先沿用注入替身的配置身份（不调用 embed），否则按已保存设置推导；两者都不联网。
+    """
+    if embedder is not None:
+        return embedder.profile.id
+    override = request.app.dependency_overrides.get(get_embedder)
+    if override is not None:
+        return override().profile.id
+    return profile_from_settings(request.app.state.settings).id
 
 
 class ScopeFields(BaseModel):
@@ -317,14 +344,14 @@ def _prepare(
     workspace: WorkspaceData,
     scope: RetrievalScope,
     question: str,
-    embedder: Embedder,
+    profile_id: str,
 ):
     return use_cases.prepare_question(
         repos,
         SqlRetrievalCandidates(session),
         workspace.id,
         scope,
-        embedder.profile.id,
+        profile_id,
         question,
     )
 
@@ -335,14 +362,23 @@ def query(
     workspace: CurrentWorkspace,
     repos: Repos,
     session: SessionDep,
-    embedder: EmbedderDep,
+    request: Request,
     generator: GeneratorDep,
 ):
     """单次问答：先校验范围并读取候选，结束读取事务后再调用模型。
 
     没有候选或模型判定资料不足时返回固定文案与覆盖提示，不生成引用。
+    关键词模式不依赖向量模型；混合/向量模式仍需已配置的向量模型。
     """
-    prepared = _prepare(repos, session, workspace, payload.to_scope(), payload.question, embedder)
+    embedder = _embedder_for_mode(payload.mode, request)
+    prepared = _prepare(
+        repos,
+        session,
+        workspace,
+        payload.to_scope(),
+        payload.question,
+        _profile_id(request, embedder),
+    )
     # Q005：读取事务在外部模型调用前结束，不能持锁等待生成。
     session.commit()
     try:
@@ -464,23 +500,30 @@ def ask_in_conversation(
     workspace: CurrentWorkspace,
     repos: Repos,
     session: SessionDep,
-    embedder: EmbedderDep,
+    request: Request,
     generator: GeneratorDep,
 ):
-    """沿用会话既有范围与排序方式；模型失败时不记录这一轮，避免污染历史。"""
+    """沿用会话既有范围与排序方式；模型失败时不记录这一轮，避免污染历史。
+
+    关键词会话同样不要求向量模型，混合/向量会话保持原有配置校验。
+    """
     conversation = conversation_use_cases.get_conversation(
         SqlConversations(session), workspace.id, conversation_id
     )
+    mode = RankingMode(conversation.mode)
+    embedder = _embedder_for_mode(mode, request)
     # 引用由服务端在会话范围内派生，调用方无法提交引用，因此这里不再单独校验引用子集。
-    prepared = _prepare(repos, session, workspace, conversation.scope, payload.question, embedder)
+    prepared = _prepare(
+        repos,
+        session,
+        workspace,
+        conversation.scope,
+        payload.question,
+        _profile_id(request, embedder),
+    )
     session.commit()
     try:
-        answer = use_cases.answer_prepared(
-            prepared,
-            embedder,
-            generator,
-            mode=RankingMode(conversation.mode),
-        )
+        answer = use_cases.answer_prepared(prepared, embedder, generator, mode=mode)
     except DomainError as error:
         return _failure_response(error)
     conversation_use_cases.record_turn(

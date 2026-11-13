@@ -218,7 +218,7 @@ def _source_payload(
 
 def answer_prepared(
     prepared: PreparedQuestion,
-    embedder: Embedder,
+    embedder: Embedder | None,
     generator: TextGenerator,
     *,
     mode: RankingMode = RankingMode.HYBRID,
@@ -226,19 +226,26 @@ def answer_prepared(
 ) -> QaAnswer:
     """在读取事务结束后调用；本函数只发起显式向量/生成请求。
 
-    候选为空、排序为空或关键词模式零命中时直接返回资料不足，不调用生成模型；
-    模型返回的引用编号必须全部属于本次候选集，否则按模型输出错误拒绝整条回答。
+    关键词模式只读候选原文，既不要求也不调用向量模型（#627）；向量/混合模式仍必须
+    提供同一配置的查询向量。候选为空、排序为空或关键词模式零命中时直接返回资料不足，
+    不调用生成模型；模型返回的引用编号必须全部属于本次候选集，否则按模型输出错误拒绝。
     """
     if not prepared.candidates.candidates:
         return _insufficient(prepared)
-    query_embedding = embedder.embed(prepared.question)
+    query_embedding = None
+    profile = None
+    if mode is not RankingMode.KEYWORD:
+        if embedder is None:
+            raise DomainError("未配置向量模型，不能使用向量或混合排序；可改用关键词模式")
+        query_embedding = embedder.embed(prepared.question)
+        profile = embedder.profile
     ranked = rank_candidates(
         prepared.candidates.candidates,
         prepared.question,
         mode=mode,
         limit=top_k,
         query_embedding=query_embedding,
-        profile=embedder.profile,
+        profile=profile,
     )
     if not ranked:
         return _insufficient(prepared)
