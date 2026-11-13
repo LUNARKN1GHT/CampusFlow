@@ -144,6 +144,16 @@ function payload(): TaskInput {
   }
 }
 
+// 更新结果可能不在当前列表里（筛选变化或另一标签页新建）；找不到时不写入 -1 属性，改为重新读取列表。
+async function replaceTask(updated: Task) {
+  const index = tasks.value.findIndex((task) => task.id === updated.id)
+  if (index === -1) {
+    await load()
+    return
+  }
+  tasks.value[index] = updated
+}
+
 // 编辑成功替换列表中的同一项，新建成功追加到列表；失败不关闭面板，避免输入丢失。
 async function saveTask() {
   saving.value = true
@@ -152,7 +162,7 @@ async function saveTask() {
     const values = payload()
     if (editing.value) {
       const updated = await tasksApi.update(editing.value.id, values)
-      tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
+      await replaceTask(updated)
     } else {
       tasks.value.push(await tasksApi.create(values))
     }
@@ -223,7 +233,7 @@ async function saveProgress() {
       progressForm.progress,
       progressForm.reason || null,
     )
-    tasks.value[tasks.value.findIndex((task) => task.id === updated.id)] = updated
+    await replaceTask(updated)
     progressTask.value = updated
     progressForm.reason = ''
     await loadHistory(updated)
