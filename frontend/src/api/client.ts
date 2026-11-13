@@ -27,7 +27,7 @@ function validationMessage(issues: ValidationIssue[]): string {
 }
 
 /**
- * 把非 2xx 响应转成 ApiError：优先使用后端 detail 文案，非 JSON 错误页不泄露原始正文。
+ * 把非 2xx 响应转成 ApiError：4xx 优先使用后端 detail 文案，5xx 与非 JSON 错误页不泄露原始正文。
  * 401 只在 notifySessionExpiry 时广播会话失效事件；/auth/ 路径的 401 按登录失败提示。
  */
 async function toApiError(response: Response, notifySessionExpiry: boolean): Promise<ApiError> {
@@ -49,7 +49,14 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
   if (response.status === 422 && Array.isArray(payload?.detail)) {
     return new ApiError(validationMessage(payload.detail), 422, 'validation')
   }
-  if (typeof payload?.detail === 'string' && [400, 404, 409, 422].includes(response.status)) {
+  // 4xx 且后端给出字符串 detail 时优先展示后端文案（例如 403 的具体拒绝原因），
+  // 5xx 与非 JSON 错误页仍使用下面的固定文案，避免泄露内部实现；401 已在上面单独处理。
+  if (
+    typeof payload?.detail === 'string'
+    && payload.detail.trim() !== ''
+    && response.status >= 400
+    && response.status < 500
+  ) {
     return new ApiError(payload.detail, response.status, response.status === 422 ? 'validation' : 'http')
   }
   if (response.status === 404) return new ApiError('没有找到请求的内容，它可能已被删除。', 404, 'http')

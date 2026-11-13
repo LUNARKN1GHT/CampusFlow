@@ -5,11 +5,12 @@
  * 轮询只补查仍在处理或尚未取到详情的资料，学期与课程只在首次加载和显式刷新时读取，标签页隐藏时暂停轮询。
  * 约束：状态与未覆盖范围只取自后端作业，不做本地推断；归档与删除分别处理，删除前必须先看影响预览。
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import type { Ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi } from '../api/business'
-import { errorMessage } from '../api/client'
+import { ApiError, errorMessage } from '../api/client'
 import { jobsApi, materialsApi, type MaterialFilters } from '../api/library'
 import type {
   Course,
@@ -79,6 +80,13 @@ const sourceMaterial = ref<Material | null>(null)
 const sourceVersionNo = ref<number | null>(null)
 const sourceChunkId = ref<number | null>(null)
 const lifecycleMaterial = ref<Material | null>(null)
+// 原文／归档删除面板的组件实例：只用于取根元素做滚动与聚焦，不参与业务状态。
+type PanelInstance = { $el?: unknown }
+const sourcePanel = ref<PanelInstance | null>(null)
+const lifecyclePanel = ref<PanelInstance | null>(null)
+// 打开面板前记住触发按钮，关闭后把焦点还回去，键盘与读屏用户不丢失所在位置。
+let sourceTrigger: HTMLElement | null = null
+let lifecycleTrigger: HTMLElement | null = null
 const route = useRoute()
 
 const pollPaused = ref(false)
@@ -503,15 +511,61 @@ async function onMaterialDeleted(id: number) {
   delete actionErrors[id]
   jobChecked.delete(id)
   recognitionChecked.delete(id)
-  if (sourceMaterial.value?.id === id) sourceMaterial.value = null
+  if (sourceMaterial.value?.id === id) closeSource()
   // 保持生命周期面板打开，让用户看到“删除完成”的结果；列表在后台同步移除该资料。
   await refresh()
 }
 
-function openSource(material: Material) {
+// 面板里的首个可交互元素：优先按钮／链接／表单控件，summary 也让键盘用户可以直接展开详情。
+const PANEL_INTERACTIVE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
+
+function panelElement(instance: PanelInstance | null): HTMLElement | null {
+  const element = instance?.$el
+  return element instanceof HTMLElement ? element : null
+}
+
+/** 长列表里面板渲染在视口之外：打开后滚动进视口并聚焦首个可交互元素，避免看起来“按钮无效”。 */
+async function focusPanel(panel: Ref<PanelInstance | null>) {
+  await nextTick()
+  const element = panelElement(panel.value)
+  if (!element) return
+  element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  element.querySelector<HTMLElement>(PANEL_INTERACTIVE_SELECTOR)?.focus({ preventScroll: true })
+}
+
+/** 面板关闭后把焦点归还触发按钮；按钮已被列表刷新移除时不做任何事，不把焦点丢到文档开头。 */
+function restoreFocus(trigger: HTMLElement | null) {
+  if (trigger?.isConnected) trigger.focus()
+}
+
+function triggerElement(event?: Event): HTMLElement | null {
+  return event?.currentTarget instanceof HTMLElement ? event.currentTarget : null
+}
+
+function openSource(material: Material, event?: Event) {
+  sourceTrigger = triggerElement(event)
   sourceVersionNo.value = null
   sourceChunkId.value = null
   sourceMaterial.value = material
+  void focusPanel(sourcePanel)
+}
+
+function closeSource() {
+  sourceMaterial.value = null
+  restoreFocus(sourceTrigger)
+  sourceTrigger = null
+}
+
+function openLifecycle(material: Material, event?: Event) {
+  lifecycleTrigger = triggerElement(event)
+  lifecycleMaterial.value = material
+  void focusPanel(lifecyclePanel)
+}
+
+function closeLifecycle() {
+  lifecycleMaterial.value = null
+  restoreFocus(lifecycleTrigger)
+  lifecycleTrigger = null
 }
 
 /** 核对界面的「定位原文」带上引用所属版本与片段，避免把旧版本的摘录定位到最新版本上。 */
@@ -526,6 +580,9 @@ async function openReferencedSource() {
   }
   sourceVersionNo.value = parsePositiveInt(route.query.version)
   sourceChunkId.value = parsePositiveInt(route.query.chunk)
+  // 由链接进入而非按钮触发：没有可归还焦点的触发按钮，只把面板滚动进视口。
+  sourceTrigger = null
+  void focusPanel(sourcePanel)
 }
 
 function onFilesChosen(event: Event) {
@@ -562,6 +619,10 @@ async function submitUpload() {
     await refresh()
   } catch (caught) {
     importError.value = errorMessage(caught)
+    if (caught instanceof ApiError && caught.kind === 'timeout') {
+      // 上传超时也只是前端先放弃等待：逐文件结果未知，先刷新确认，不能直接重传造成重复建档。
+      fallbackNotice.value = '上传超时：结果未知，请先刷新资料列表确认文件是否已经建档，不要直接重新上传相同文件。'
+    }
   } finally {
     importing.value = false
   }
@@ -626,8 +687,13 @@ async function submitWeb() {
     await refresh()
   } catch (caught) {
     importError.value = errorMessage(caught)
-    // 失败时后端不会保存网页快照；明确未覆盖范围，并提供粘贴/上传入口。
-    fallbackNotice.value = `网页正文未导入：${importError.value}。可粘贴可访问的原文或上传已保存的文件；未覆盖内容不会被当作“没有要求”。`
+    if (caught instanceof ApiError && caught.kind === 'timeout') {
+      // 超时只表示前端先放弃等待：后端可能仍在抓取或已经建档，不能据此断言正文未导入。
+      fallbackNotice.value = `读取超时：结果未知，请先刷新资料列表确认「${webForm.title.trim()}」是否已经导入，不要直接重试以免重复建档。如确认未导入，可粘贴可访问的原文或上传已保存的文件；未覆盖内容不会被当作“没有要求”。`
+    } else {
+      // 非超时失败时后端不会保存网页快照；明确未覆盖范围，并提供粘贴/上传入口。
+      fallbackNotice.value = `网页正文未导入：${importError.value}。可粘贴可访问的原文或上传已保存的文件；未覆盖内容不会被当作“没有要求”。`
+    }
   } finally {
     importing.value = false
   }
@@ -927,8 +993,8 @@ onBeforeUnmount(() => {
                 :disabled="retryingIndexId === material.id"
                 @click="retryIndex(material)"
               >{{ retryingIndexId === material.id ? '正在重试索引…' : '重试索引' }}</button>
-              <button type="button" class="text-button" @click="openSource(material)">查看原文</button>
-              <button type="button" class="text-button" @click="lifecycleMaterial = material">归档 / 删除</button>
+              <button type="button" class="text-button" @click="openSource(material, $event)">查看原文</button>
+              <button type="button" class="text-button" @click="openLifecycle(material, $event)">归档 / 删除</button>
             </div>
           </article>
         </div>
@@ -938,19 +1004,21 @@ onBeforeUnmount(() => {
       <MaterialSource
         v-if="sourceMaterial"
         :key="`${sourceMaterial.id}-${sourceVersionNo ?? 'latest'}-${sourceChunkId ?? 'first'}`"
+        ref="sourcePanel"
         :material="sourceMaterial"
         :scope="scopeText(sourceMaterial)"
         :initial-version-no="sourceVersionNo"
         :initial-chunk-id="sourceChunkId"
-        @close="sourceMaterial = null"
+        @close="closeSource"
       />
 
       <!-- 删除影响预览与确认令牌在子组件内完成；确认只覆盖预览展示过的范围，内容变化需重新预览。 -->
       <MaterialLifecycle
         v-if="lifecycleMaterial"
         :key="lifecycleMaterial.id"
+        ref="lifecyclePanel"
         :material="lifecycleMaterial"
-        @close="lifecycleMaterial = null"
+        @close="closeLifecycle"
         @archive-changed="onArchiveChanged"
         @deleted="onMaterialDeleted"
       />

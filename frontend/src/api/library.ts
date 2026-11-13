@@ -51,11 +51,14 @@ export const materialsApi = {
   startRecognition: (id: number) => apiRequest<MaterialRecognitionStart>(`/materials/${id}/recognition`, {
     method: 'POST',
   }, 130000),
+  // 网页抓取在后端最长可等 15 秒；前端至少放宽到 30 秒，避免正常慢页面被 8 秒默认超时误判。
+  // 超时只表示前端先放弃等待，后端可能仍会建档，界面据此提示“结果未知”。
   importWeb: (input: WebImportInput) => apiRequest<WebImportResult>('/materials/web', {
     method: 'POST',
     body: JSON.stringify(input),
-  }),
+  }, 30000),
   // 多文件一次提交，逐项返回成功、重复或失败；allow_duplicate 决定重复文件是否仍导入。
+  // 单文件上限 20 MB，读取与解析可能远超 8 秒，这里至少放宽到 60 秒。
   upload: (files: File[], params: MaterialUploadParams) => {
     const form = new FormData()
     files.forEach((file) => form.append('files', file, file.name))
@@ -64,7 +67,7 @@ export const materialsApi = {
       course_id: params.course_id,
       class_name: params.class_name,
       allow_duplicate: params.allow_duplicate,
-    })}`, { method: 'POST', body: form })
+    })}`, { method: 'POST', body: form }, 60000)
   },
   // 归档与恢复只切换标记：归档后退出检索与问答，原有片段与引用保留。
   archive: (id: number) => apiRequest<Material>(`/materials/${id}/archive`, { method: 'POST' }),
