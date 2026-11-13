@@ -5,7 +5,7 @@
  * 约束：核对状态来自候选事项，与执行进度分开维护；完成／取消会把剩余耗时归零，重开按原始估计恢复并保留历史。
  * 写操作失败只在当前面板显示错误并保留已填内容，不关闭面板，也不显示成功提示。
  */
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { coursesApi, semestersApi, tasksApi } from '../api/business'
@@ -58,6 +58,7 @@ const subtaskRows = ref<Array<{ title: string; remaining_minutes: number | null 
 const subtaskError = ref('')
 const subtaskSaving = ref(false)
 const filters = reactive({ semesterId: '', courseId: '', progress: '' })
+const listNotice = ref('')
 const form = reactive({
   title: '', description: '', course_id: '', due_date: '', due_time: '',
   target_date: '', due_source: 'user' as DueSourceType, due_note: '',
@@ -78,6 +79,10 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
   }
   return true
 }))
+// 调整筛选后“不在当前筛选结果中”的提示不再成立，立即清除。
+watch(filters, () => {
+  listNotice.value = ''
+})
 
 const dueSourceLabels: Record<DueSourceType, string> = { user: '用户补充', document: '原文规定', inferred: '系统推断' }
 
@@ -140,11 +145,14 @@ function payload(): TaskInput {
   }
 }
 
-// 更新结果可能不在当前列表里（筛选变化或另一标签页新建）；找不到时不写入 -1 属性，改为重新读取列表。
+// 更新结果可能不在当前列表里（筛选变化或另一标签页新建）；找不到时不写入 -1 属性，改为重新读取列表并说明原因。
 async function replaceTask(updated: Task) {
   const index = tasks.value.findIndex((task) => task.id === updated.id)
   if (index === -1) {
     await load()
+    if (!error.value) {
+      listNotice.value = '任务已保存，但不在当前筛选结果中；已重新加载任务列表，请调整筛选查看。'
+    }
     return
   }
   tasks.value[index] = updated
@@ -376,6 +384,8 @@ onMounted(load)
         <label>进度<select v-model="filters.progress"><option value="">全部进度</option><option v-for="(label, value) in progressLabels" :key="value" :value="value">{{ label }}</option></select></label>
         <span class="count-badge">{{ visibleTasks.length }} 项</span>
       </section>
+
+      <p v-if="listNotice" class="inline-notice" role="status">{{ listNotice }}</p>
 
       <section v-if="dependencyCheck" class="panel" aria-label="依赖检查">
         <div class="section-heading">
