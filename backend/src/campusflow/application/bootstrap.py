@@ -746,10 +746,10 @@ def _install_secrets(
     preferred: str | None = None,
     allow_fallback: bool | None = None,
 ) -> tuple[SecretStore, list[str]]:
-    """写入并读回校验；密钥链不可用时可降级到 0600 文件并给出警告。
+    """写入并读回校验；Windows 加密存储失败不降级为明文文件。
 
     `preferred` 用于已有数据目录时沿用 state.json 记录的后端，避免读写落到不同
-    存储；`allow_fallback` 决定不可用时是否降级（初始化的 auto 模式与恢复总是降级）。
+    存储；`allow_fallback` 控制其它后端不可用时的文件降级，不覆盖 Windows 保护规则。
     """
     backend = preferred or settings.secret_backend
     fallback_allowed = allow_fallback if allow_fallback is not None else backend == "auto"
@@ -767,6 +767,12 @@ def _install_secrets(
         _write_and_verify(backend_store, values)
         return backend_store, warnings
     except Exception as exc:
+        if backend_store is not None and backend_store.backend == "windows-dpapi":
+            # Windows 临时文件占用已在加密存储内部有限重试；持续失败不能降级为明文。
+            # 已存在的加密条目保留，避免恢复流程失败时删除仍可用的旧凭据。
+            raise BootstrapError(
+                "Windows 加密凭据保存或校验失败，请稍后重试；未改用明文保存"
+            ) from exc
         # 只清理本次写入的条目；初始化失败不会留下任何可用凭据。
         _discard_secrets(backend_store)
         if not fallback_allowed:

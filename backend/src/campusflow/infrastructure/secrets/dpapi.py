@@ -2,7 +2,7 @@
 
 用 ctypes 调用 CryptProtectData／CryptUnprotectData，不新增依赖；密文绑定当前
 Windows 用户，文件被复制到其它用户或机器上无法解密。0600 在 Windows 上只影响
-只读位，访问控制实际由 DPAPI 提供。本实现尚未在真实 Windows 机器上验证。
+只读位，访问控制实际由 DPAPI 提供。真实 Windows 验证见桌面修复验收记录。
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from ctypes import wintypes
 from pathlib import Path
 
@@ -29,6 +30,22 @@ class _DataBlob(ctypes.Structure):
 
 class DpapiError(RuntimeError):
     """DPAPI 加解密失败；消息只含错误码，不含凭据内容。"""
+
+
+def _replace_with_retry(source: Path, target: Path) -> None:
+    """Windows 文件短暂占用时最多等待一秒；始终原子替换密文文件。"""
+    for attempt in range(6):
+        try:
+            os.replace(source, target)
+            return
+        except OSError as exc:
+            if getattr(exc, "winerror", None) not in (5, 32, 33):
+                raise
+            if attempt == 5:
+                raise DpapiError(
+                    "Windows 加密文件暂时无法更新，已有限重试；请稍后重试，未改用明文保存"
+                ) from exc
+            time.sleep(0.2)
 
 
 def _crypt32() -> object:
@@ -123,9 +140,13 @@ class WindowsDpapiSecretStore:
             with os.fdopen(handle, "w", encoding="utf-8") as stream:
                 json.dump(data, stream, ensure_ascii=False, sort_keys=True)
             os.chmod(temp_path, 0o600)
-            os.replace(temp_path, self._path)
+            _replace_with_retry(temp_path, self._path)
         except BaseException:
-            temp_path.unlink(missing_ok=True)
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                # 临时文件仍是密文；占用时保留，不能掩盖原始保存错误。
+                pass
             raise
 
     def get(self, account: str) -> str | None:
