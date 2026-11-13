@@ -1,14 +1,20 @@
 import { expect, test } from '@playwright/test'
 
-function dateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+import {
+  availabilityEntry,
+  cancelTaskByTitle,
+  dateKey,
+  deleteFixedEventsByTitle,
+  ensureTimezone,
+  loginViaApi,
+  selectSemester,
+  setSemesterArchivedByName,
+  signIn,
+  uniqueSuffix,
+} from './support'
 
 test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作', async ({ page }) => {
-  const unique = Date.now().toString().slice(-6)
+  const unique = uniqueSuffix()
   const semesterName = `验收学期 ${unique}`
   const courseName = `软件工程 ${unique}`
   const taskName = `完成迭代报告 ${unique}`
@@ -19,18 +25,20 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
 
   await page.goto('/')
   await expect(page).toHaveURL(/\/login/)
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await signIn(page)
+  // 时区可能在之前的运行里被改成 Asia/Tokyo；先固定基线，后面“改成东京后 +1 小时”才可重复。
+  await ensureTimezone(page, 'Asia/Shanghai')
 
+  // 共享数据库里可能已有其它学期：直接创建唯一命名的学期，之后只对这张学期卡片操作。
   await page.getByRole('link', { name: '课程', exact: true }).click()
-  await expect(page.getByText('没有进行中的学期')).toBeVisible()
   await page.getByLabel('学期名称').fill(semesterName)
   await page.getByLabel('开始日期').fill(dateKey(new Date(today.getFullYear(), 8, 1)))
   await page.getByLabel('结束日期').fill(dateKey(new Date(today.getFullYear() + 1, 0, 31)))
   await page.getByRole('button', { name: '保存学期' }).click()
   await expect(page.getByText(semesterName, { exact: true }).first()).toBeVisible()
+
+  const semesterCard = page.locator('.semester-card').filter({ hasText: semesterName })
+  await expect(semesterCard).toBeVisible()
 
   await page.getByLabel('课程名称').fill(courseName)
   await page.getByLabel('课程代码').fill(`SE${unique}`)
@@ -39,10 +47,12 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByRole('button', { name: '保存课程' }).click()
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
   await page.reload()
+  // 刷新后课程页会默认选中第一个进行中学期，这里按唯一名称重新选中本学期再看课程。
+  await selectSemester(page, semesterName)
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
 
+  // 不再要求全库没有任务：标题带唯一后缀，后续断言都限定在本行内。
   await page.getByRole('link', { name: '任务', exact: true }).click()
-  await expect(page.getByText('还没有任务')).toBeVisible()
   await page.getByRole('button', { name: '添加任务' }).click()
   await page.getByLabel('任务标题').fill(taskName)
   await page.getByLabel('关联课程').first().selectOption({ label: `${courseName} · 2 班` })
@@ -51,8 +61,9 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByLabel('原始预计分钟').fill('120')
   await page.getByLabel('当前剩余分钟').fill('90')
   await page.getByRole('button', { name: '保存任务' }).click()
-  await expect(page.getByText(`${dueDate}（仅日期）`)).toBeVisible()
-  await expect(page.locator('.task-row').filter({ hasText: taskName }).locator('.task-meta strong')).toContainText('90')
+  const taskRow = page.locator('.task-row').filter({ hasText: taskName })
+  await expect(taskRow.getByText(`${dueDate}（仅日期）`)).toBeVisible()
+  await expect(taskRow.locator('.task-meta strong')).toContainText('90')
 
   await page.getByRole('button', { name: '添加日程' }).click()
   await page.getByLabel('标题').fill(eventName)
@@ -62,12 +73,11 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByRole('button', { name: '保存日程' }).click()
   await expect(page.getByText(eventName).first()).toBeVisible()
 
-  const taskRow = page.locator('.task-row').filter({ hasText: taskName })
   await taskRow.getByRole('button', { name: '进度' }).click()
   await page.getByLabel('新状态').selectOption('blocked')
   await page.getByLabel('调整原因').fill('等待小组数据')
   await page.getByRole('button', { name: '更新进度' }).click()
-  await expect(page.getByText('等待小组数据')).toBeVisible()
+  await expect(page.locator('.history-list')).toContainText('等待小组数据')
 
   await page.getByRole('link', { name: '设置' }).click()
   await page.getByLabel('每日可学习容量（分钟）').fill('210')
@@ -82,7 +92,8 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await page.getByLabel('开始').fill('09:00')
   await page.getByLabel('结束').fill('11:00')
   await page.getByRole('button', { name: '添加时段' }).click()
-  await expect(page.locator('.availability-grid article').filter({ hasText: '周六' })).toBeVisible()
+  // 再次运行时该时段已存在，服务端会拒绝重复；断言只看时段在列表中可见，不依赖创建次数。
+  await expect(availabilityEntry(page, 5, '09:00–11:00')).toBeVisible()
 
   await page.getByRole('link', { name: '任务', exact: true }).click()
   await expect(page).toHaveURL(/\/tasks$/)
@@ -104,24 +115,39 @@ test('手动管理流程使用真实 API 持久化并覆盖失败与键盘操作
   await expect(page.getByRole('alert')).toContainText('服务暂时不可用')
   await page.unroute('**/api/v1/semesters?**')
   await page.getByRole('button', { name: '重新加载' }).click()
+  // 重新加载会退回第一个进行中学期；再次按名称选中本学期，课程列表与归档按钮才对应。
+  await selectSemester(page, semesterName)
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
 
-  await page.getByRole('button', { name: '归档', exact: true }).click()
-  await expect(page.getByText('没有进行中的学期')).toBeVisible()
+  // 归档只点本学期卡片上的按钮：共享库里可能还有其它进行中学期。
+  await semesterCard.getByRole('button', { name: '归档', exact: true }).click()
+  // 其它学期可能仍在进行中，所以归档后只断言本学期默认隐藏，而不是“全库没有进行中学期”。
+  await expect(page.locator('.semester-card').filter({ hasText: semesterName })).toHaveCount(0)
   await page.getByLabel('显示历史学期').check()
-  await page.getByRole('button', { name: new RegExp(semesterName) }).click()
+  const archivedCard = page.locator('.semester-card').filter({ hasText: semesterName })
+  await expect(archivedCard).toBeVisible()
+  await selectSemester(page, semesterName)
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
   await expect(page.getByText('正在查看已归档学期')).toBeVisible()
   await page.getByLabel('显示历史学期').uncheck()
-  await expect(page.getByRole('heading', { name: courseName })).not.toBeVisible()
+  // 关闭历史视图会退回进行中学期：本学期课程不再显示，也不再提示正在查看归档学期。
+  await expect(page.locator('.semester-card').filter({ hasText: semesterName })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: courseName })).toHaveCount(0)
+  await expect(page.getByText('正在查看已归档学期')).toHaveCount(0)
   await page.getByRole('link', { name: '任务', exact: true }).click()
   await page.locator('.filter-bar').getByRole('combobox').first().selectOption({ label: `${semesterName}（已归档）` })
   await expect(page.locator('.task-row').filter({ hasText: taskName }).getByText('受阻')).toBeVisible()
   await page.getByRole('link', { name: '课程', exact: true }).click()
   await page.getByLabel('显示历史学期').check()
-  await page.getByRole('button', { name: '恢复', exact: true }).click()
-  await page.getByRole('button', { name: new RegExp(semesterName) }).click()
+  const restoreCard = page.locator('.semester-card').filter({ hasText: semesterName })
+  await restoreCard.getByRole('button', { name: '恢复', exact: true }).click()
+  await selectSemester(page, semesterName)
   await expect(page.getByRole('heading', { name: courseName })).toBeVisible()
+
+  // 清理本次数据：取消任务与删除日程可逆，不删除课程或学期；学期恢复归档态避免进行中列表继续增长。
+  await cancelTaskByTitle(page, taskName)
+  await deleteFixedEventsByTitle(page, eventName)
+  await setSemesterArchivedByName(page, semesterName)
 
   await page.getByRole('button', { name: '退出' }).click()
   await expect(page).toHaveURL(/\/login/)
@@ -135,11 +161,11 @@ test.describe('M1 发布边界回归', () => {
 
   test('跨日跨周日程按实际占用显示，午夜结束不占用次日', async ({ page }) => {
     await page.clock.install({ time: new Date('2026-10-12T12:00:00+09:00') })
-    await page.request.post('/api/v1/auth/login', { data: { username: 'student', password: 'campusflow-dev' } })
+    await loginViaApi(page)
     const previousSettings = await (await page.request.get('/api/v1/settings')).json()
     await page.request.put('/api/v1/settings', { data: { ...previousSettings, timezone: 'Asia/Tokyo' } })
     const ids: number[] = []
-    const suffix = Date.now()
+    const suffix = uniqueSuffix()
     const events = [
       { title: `跨周 ${suffix}`, starts_at: '2026-10-11T23:00:00', ends_at: '2026-10-12T01:00:00', recurrence: 'weekly', repeat_until: '2026-10-18' },
       { title: `多日 ${suffix}`, starts_at: '2026-10-13T23:00:00', ends_at: '2026-10-15T01:00:00' },
@@ -172,8 +198,8 @@ test.describe('M1 发布边界回归', () => {
   })
 
   test('目标与来源可保存刷新，逾期不覆盖进度，完成后取消逾期', async ({ page }) => {
-    await page.request.post('/api/v1/auth/login', { data: { username: 'student', password: 'campusflow-dev' } })
-    const title = `目标与逾期回归 ${Date.now()}`
+    await loginViaApi(page)
+    const title = `目标与逾期回归 ${uniqueSuffix()}`
     await page.goto('/tasks')
     await page.getByRole('button', { name: '添加任务' }).click()
     await page.getByLabel('任务标题').fill(title)

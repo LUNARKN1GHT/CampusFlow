@@ -494,16 +494,6 @@ export type ProcessingJob = {
   updated_at: string
 }
 
-export type JobAttempt = {
-  attempt_no: number
-  stage: JobStage
-  status: JobStatus
-  scope: string | null
-  error_reason: string | null
-  retryable: boolean
-  created_at: string
-}
-
 export type MaterialUploadItem = {
   filename: string
   material: Material | null
@@ -548,16 +538,6 @@ export type TextImportInput = {
   content: string
   publisher: string | null
   published_at: string | null
-  semester_id: number | null
-  course_id: number | null
-  class_name: string | null
-}
-
-export type MaterialMetadataInput = {
-  title: string
-  publisher: string | null
-  published_at: string | null
-  source_url: string | null
   semester_id: number | null
   course_id: number | null
   class_name: string | null

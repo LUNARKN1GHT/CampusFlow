@@ -4,7 +4,7 @@
  * 数据来自最近一次已接受计划与任务统计；没有已接受计划时提示先生成并接受草案。
  * 页面不提供写操作，各入口只跳转到任务或计划页。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { errorMessage } from '../api/client'
@@ -12,19 +12,18 @@ import { plansApi } from '../api/plans'
 import type { PlanOverview } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import { priorityLabels, progressLabels } from '../constants/labels'
-import { formatTime } from '../utils/datetime'
+import { formatDueDate, formatTime, formatZonedTime } from '../utils/datetime'
 
 const overview = ref<PlanOverview | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-// 时间按浏览器本地时区格式化；页面日期 overview.today 由服务端按工作空间时区计算。
-const timeText = formatTime
+// 时间块按工作空间时区展示，与“今日”分区（overview.today）保持同一时区；
+// 后端未给出时区时才退回浏览器本地时区，并在页面上说明该限制。
+const timezone = computed(() => overview.value?.timezone ?? '')
 
-// 仅日期 DDL 只显示日期并标注，有时刻才追加 HH:mm，不补造时刻。
-function dueText(task: { due_date: string | null; due_time: string | null }): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
+function timeText(value: string): string {
+  return timezone.value ? formatZonedTime(value, timezone.value) : formatTime(value)
 }
 
 async function load() {
@@ -84,6 +83,10 @@ onMounted(load)
             尚无已接受计划。先到<RouterLink to="/plan">学习计划</RouterLink>生成并接受两周草案。
           </p>
           <template v-else>
+            <p class="form-help">
+              <template v-if="timezone">时间按工作空间时区 {{ timezone }} 显示。</template>
+              <template v-else>未取得工作空间时区，时间按浏览器本地时区显示，可能与“今日”日期错位。</template>
+            </p>
             <p v-if="overview.next_block" class="next-block">
               下一段：<strong>{{ timeText(overview.next_block.starts_at) }}–{{ timeText(overview.next_block.ends_at) }}</strong>
               {{ overview.next_block.title }}
@@ -112,7 +115,7 @@ onMounted(load)
           <ul class="plain-list">
             <li v-for="task in overview.upcoming_tasks" :key="task.id" class="overview-item">
               <div class="task-title-line">
-                <strong>{{ dueText(task) }}</strong>
+                <strong>{{ formatDueDate(task.due_date, task.due_time) }}</strong>
                 <span v-if="task.overdue" class="status-pill overdue-pill">逾期</span>
               </div>
               <p><RouterLink class="item-link" :to="`/tasks?task=${task.id}`">{{ task.title }}</RouterLink></p>

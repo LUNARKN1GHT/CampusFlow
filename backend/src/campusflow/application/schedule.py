@@ -9,15 +9,19 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import (
     AvailabilitySlotData,
     FixedEventData,
     Repositories,
 )
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import (
+    require_course_in_workspace,
+    require_in_workspace,
+    require_semester_in_workspace,
+)
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import DomainError, NotFoundError
+from campusflow.domain.planning import MAX_PLANNING_RANGE_DAYS
 from campusflow.domain.schedule import validate_availability_slot, validate_fixed_event
 from campusflow.domain.states import EventRecurrence
 from campusflow.domain.timezones import in_workspace_timezone
@@ -58,6 +62,9 @@ def list_fixed_event_occurrences(
     """
     if end_date < start_date:
         raise DomainError("查询结束日期不得早于开始日期")
+    # #625：直连展开同样限制区间，避免超长区间按周展开大量实例。
+    if (end_date - start_date).days + 1 > MAX_PLANNING_RANGE_DAYS:
+        raise DomainError(f"查询区间不能超过 {MAX_PLANNING_RANGE_DAYS} 天")
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     range_start = datetime.combine(start_date, time.min, tzinfo=timezone).astimezone(UTC)
     range_end = datetime.combine(
@@ -114,13 +121,6 @@ def _require_event_in_workspace(
     return event
 
 
-def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
-    course = repos.courses.get(course_id)
-    if course is None:
-        raise NotFoundError("课程不存在")
-    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
-
-
 def create_fixed_event(
     repos: Repositories,
     workspace_id: int,
@@ -144,7 +144,7 @@ def create_fixed_event(
     if error:
         raise DomainError(error)
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     event = repos.schedule.create_fixed_event(
         workspace_id, course_id, title, starts_at, ends_at, location, recurrence, repeat_until
     )
@@ -174,7 +174,7 @@ def update_fixed_event(
     if error:
         raise DomainError(error)
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     updated = repos.schedule.update_fixed_event(
         event_id,
         course_id=course_id,

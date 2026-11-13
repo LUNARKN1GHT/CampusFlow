@@ -22,6 +22,7 @@ import type { PlanDraft } from '../api/plans'
 import type { Course, Task } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import { progressLabels } from '../constants/labels'
+import { formatDueDate } from '../utils/datetime'
 
 const mode = ref<ExportMode>('tasks')
 const format = ref<ExportFormat>('csv')
@@ -133,16 +134,6 @@ const downloadDisabledReason = computed(() => {
   if (!fingerprint.value) return '导出范围已变化，请重新预览。'
   return ''
 })
-
-function taskDueText(task: Task): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
-}
-
-function itemDueText(item: ExportItem): string {
-  if (!item.due_date) return '未设置 DDL'
-  return item.due_time ? `${item.due_date} ${item.due_time.slice(0, 5)}` : `${item.due_date}（仅日期）`
-}
 
 function noticeLabel(code: string): string {
   return noticeLabels[code] ?? code
@@ -377,7 +368,7 @@ onBeforeUnmount(() => {
                   <span class="status-pill">{{ progressLabels[task.progress] }}</span>
                   <span v-if="task.overdue" class="status-pill overdue-pill">已逾期</span>
                 </span>
-                <small>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ taskDueText(task) }}</small>
+                <small>{{ courseMap.get(task.course_id ?? -1)?.name ?? '未关联课程' }} · {{ formatDueDate(task.due_date, task.due_time) }}</small>
                 <small v-if="task.source_state === 'invalidated'">来源资料已失效；任务仍可导出，但来源提示会被省略。</small>
               </span>
             </label>
@@ -522,7 +513,7 @@ onBeforeUnmount(() => {
                   <span v-if="!item.included" class="status-pill failed-pill">已排除</span>
                   <span v-if="item.source_state === 'invalidated'" class="status-pill stale-pill">来源失效</span>
                 </div>
-                <p>{{ item.course_name ?? '未关联课程' }} · {{ itemDueText(item) }}</p>
+                <p>{{ item.course_name ?? '未关联课程' }} · {{ formatDueDate(item.due_date, item.due_time) }}</p>
                 <p v-if="!item.included && item.exclusion_reason">排除原因：{{ noticeLabel(item.exclusion_reason) }}</p>
                 <p v-if="item.source_title">来源提示：{{ item.source_title }} · v{{ item.source_version_no ?? '—' }} · {{ item.source_locator ?? '未提供定位' }}</p>
               </li>

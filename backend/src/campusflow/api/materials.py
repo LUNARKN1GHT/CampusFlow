@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from campusflow.api.auth import require_session
 from campusflow.api.deps import (
@@ -191,7 +191,11 @@ class TextImportOut(BaseModel):
 
 
 class MaterialMetadataUpdate(BaseModel):
-    """元数据修订（D005）：全部字段可选；传入 null 表示清空该字段。"""
+    """元数据修订（D005）：全部字段可选；可选字段传 null 表示清空。
+
+    标题是资料的非空列：省略表示保持不变，显式 null 直接拒绝，
+    不进入写库路径（与课程、任务的 PATCH 守卫一致）。
+    """
 
     title: str | None = Field(default=None, min_length=1, max_length=300)
     publisher: str | None = Field(default=None, max_length=200)
@@ -200,6 +204,13 @@ class MaterialMetadataUpdate(BaseModel):
     semester_id: int | None = None
     course_id: int | None = None
     class_name: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "MaterialMetadataUpdate":
+        # 资料标题不能为空：显式 null 会违反非空列，返回校验错误而不是 500。
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title 不能为 null")
+        return self
 
     @field_validator("published_at")
     @classmethod
@@ -632,9 +643,10 @@ def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos
 def update_material(
     material_id: int, payload: MaterialMetadataUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> MaterialOut:
-    """修订发布方、发布时间与适用范围；传 null 表示清空可选字段。
+    """修订发布方、发布时间与适用范围；可选字段传 null 表示清空。
 
-    已导入的原文与历史版本不会被改写；范围变化影响后续检索与筛选。
+    标题不可清空（请求校验阶段拒绝），省略则保持原值。已导入的原文与历史
+    版本不会被改写；范围变化影响后续检索与筛选。
     """
     current = use_cases.get_material(repos, workspace.id, material_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
@@ -667,6 +679,11 @@ class UploadOut(BaseModel):
     results: list[UploadItemOut]
 
 
+# multipart 边界与表单字段的固定开销容许值。Content-Length 只用于提前拒绝
+# 明显超限的请求；逐文件是否超限仍按读取到的实际字节判断。
+_MULTIPART_OVERHEAD_ALLOWANCE = 1024 * 1024
+
+
 @router.post("/upload", response_model=UploadOut, status_code=201)
 def upload_files(
     workspace: CurrentWorkspace,
@@ -684,25 +701,40 @@ def upload_files(
     """多文件逐项返回成功、重复与失败；单个文件失败不影响其他文件。
 
     默认拒绝内容完全重复的上传并返回既有资料；只有显式 allow_duplicate
-    才会重复建档。
+    才会重复建档。声明长度明显超过整包上限时直接拒绝，不读取文件内容；
+    每个文件最多读取 max_bytes + 1 字节，超限仍走逐文件失败结果。
     """
     settings = request.app.state.settings
     if len(files) > settings.upload_max_files:
-        from campusflow.domain.errors import DomainError
-
         raise DomainError(f"一次最多上传 {settings.upload_max_files} 个文件")
+
+    max_bytes = settings.upload_max_bytes
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None:
+        try:
+            declared_bytes = int(declared_length)
+        except ValueError:
+            declared_bytes = 0
+        request_limit = settings.upload_max_files * max_bytes + _MULTIPART_OVERHEAD_ALLOWANCE
+        if declared_bytes > request_limit:
+            limit_mb = max_bytes // (1024 * 1024)
+            raise DomainError(
+                f"上传内容总大小超过上限（最多 {settings.upload_max_files} 个文件，"
+                f"单文件不超过 {limit_mb} MB），请减少文件数量或分批上传"
+            )
 
     results = use_cases.import_uploaded_files(
         repos,
         storage,
         workspace.id,
-        files=[(f.filename or "未命名", f.file.read()) for f in files],
+        # 上限加 1 字节只为让超限文件继续进入逐文件校验，不把整个超大文件读进内存。
+        files=[(f.filename or "未命名", f.file.read(max_bytes + 1)) for f in files],
         publisher=publisher,
         published_at=None,
         semester_id=semester_id,
         course_id=course_id,
         class_name=class_name,
-        max_bytes=settings.upload_max_bytes,
+        max_bytes=max_bytes,
         allow_duplicate=allow_duplicate,
         queue=queue,
     )

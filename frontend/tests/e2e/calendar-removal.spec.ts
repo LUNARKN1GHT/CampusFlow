@@ -1,12 +1,10 @@
 import { expect, test } from '@playwright/test'
 
+import { login } from './support'
+
 // 外部日历前端页面与入口已移除：/calendar 由 catch-all 回退到总览，导航不再出现该入口。
 test('访问 /calendar 回退到总览且不渲染外部日历页面', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await login(page)
 
   // 导航不再提供外部日历入口。
   await expect(

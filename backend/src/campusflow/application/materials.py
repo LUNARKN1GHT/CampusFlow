@@ -26,7 +26,11 @@ from campusflow.application.ports.repositories import (
 )
 from campusflow.application.ports.storage import FileStorage
 from campusflow.application.processing import coverage_metadata
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import (
+    require_course_in_workspace,
+    require_in_workspace,
+    require_semester_in_workspace,
+)
 from campusflow.application.source_uncertainty import COVERAGE_KEY
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.jobs import is_terminal
@@ -38,22 +42,6 @@ from campusflow.domain.materials import (
 )
 from campusflow.domain.states import MaterialSourceType, MaterialStatus
 from campusflow.domain.upload import validate_upload
-
-
-def _require_semester_in_workspace(
-    repos: Repositories, workspace_id: int, semester_id: int
-) -> None:
-    semester = repos.semesters.get(semester_id)
-    if semester is None:
-        raise NotFoundError("学期不存在")
-    require_in_workspace(semester.workspace_id, workspace_id, "学期不存在")
-
-
-def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
-    course = repos.courses.get(course_id)
-    if course is None:
-        raise NotFoundError("课程不存在")
-    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
 
 
 def _require_associations(
@@ -68,9 +56,9 @@ def _require_associations(
     不允许出现"课程在 A 学期、资料标为 B 学期"的矛盾适用范围（README §4.2）。
     """
     if semester_id is not None:
-        _require_semester_in_workspace(repos, workspace_id, semester_id)
+        require_semester_in_workspace(repos, workspace_id, semester_id)
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
         if semester_id is not None:
             course = repos.courses.get(course_id)
             if course is not None and course.semester_id != semester_id:

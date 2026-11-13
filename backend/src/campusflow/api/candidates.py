@@ -563,7 +563,7 @@ class ImpactedRuleOut(BaseModel):
 
 class ChangeImpactOut(BaseModel):
     summary: dict
-    unsupported: list[dict]
+    notes: list[dict]
     tasks: list[ImpactedTaskOut]
     fixed_events: list[ImpactedEventOut]
     rules: list[ImpactedRuleOut]
@@ -608,12 +608,13 @@ def get_candidate_change_impact(
 ) -> ChangeImpactOut:
     """N013：只读列出旧候选已转换的任务、日程、规则及计划时间块。
 
-    已完成任务与锁定时间块照常列出；提醒与外部日历未接入，放在 unsupported。
+    已完成任务与锁定时间块照常列出；notes 说明提醒与外部日历在
+    接受变更后的实际行为，本查询本身不调整提醒、不写入外部日历。
     """
     result = change_impact.collect_impact(repos, workspace.id, candidate_id, other_candidate_id)
     return ChangeImpactOut(
         summary=result.summary,
-        unsupported=result.unsupported,
+        notes=result.notes,
         tasks=[
             ImpactedTaskOut(
                 id=item.id,
@@ -748,8 +749,16 @@ class VersionAcceptanceOut(BaseModel):
     created: bool
 
 
-def _acceptance_out(result, *, created: bool) -> VersionAcceptanceOut:
+def _acceptance_out(
+    result, *, created: bool, baseline_review_status: str | None = None
+) -> VersionAcceptanceOut:
     record = result.record
+    # #624：历史与幂等响应返回候选当前状态；previous_review_status 仍保留接受前的旧值。
+    current_status = (
+        baseline_review_status
+        if baseline_review_status is not None
+        else ("superseded" if created else result.baseline_review_status)
+    )
     return VersionAcceptanceOut(
         id=record.id,
         baseline_candidate_id=record.baseline_candidate_id,
@@ -762,7 +771,7 @@ def _acceptance_out(result, *, created: bool) -> VersionAcceptanceOut:
         evidence_snapshot=list(record.evidence_snapshot),
         previous_review_status=record.previous_review_status,
         created_at=record.created_at,
-        baseline_review_status="superseded" if created else result.baseline_review_status,
+        baseline_review_status=current_status,
         created=created,
     )
 
@@ -813,11 +822,14 @@ def get_version_acceptances(
     relations: Relations,
 ) -> list[VersionAcceptanceOut]:
     """只读历史：旧候选、接受字段、原因与逐字段证据快照。"""
-    use_cases.get_candidate(repos, workspace.id, candidate_id)
+    candidate = use_cases.get_candidate(repos, workspace.id, candidate_id)
+    # 历史记录的 baseline_review_status 展示候选当前状态，避免已失效仍显示 pending。
+    current_status = candidate.review_status.value
     return [
         _acceptance_out(
             version_acceptance.AcceptanceResult(record, False, record.previous_review_status),
             created=False,
+            baseline_review_status=current_status,
         )
         for record in version_acceptance.list_acceptances(relations, workspace.id, candidate_id)
     ]

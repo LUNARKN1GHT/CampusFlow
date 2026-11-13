@@ -1,6 +1,7 @@
 /*
  * 主题通过 :root[data-theme] 切换；浅色值为原有配色，深色覆盖同名的语义 token。
- * 变量由 frontend/src/composables/useTheme.ts（含 index.html 的首屏内联脚本）写入。
+ * 首屏由 public/theme-boot.js 在样式生效前写入 data-theme 与 data-palette，之后由
+ * frontend/src/composables/useTheme.ts 接管手动切换与本地持久化。
  */
 :root {
   color-scheme: light;
@@ -302,9 +303,6 @@ button:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outlin
 .api-feedback { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 16px 18px; border: 1px solid var(--danger-border); border-radius: 12px; color: var(--danger-ink); background: var(--danger-bg); }
 .api-feedback p { margin: 3px 0 0; color: var(--danger-ink-soft); }
 .note { color: var(--muted); font-size: 14px; margin-top: 28px; }
-.empty-state { display: flex; gap: 18px; align-items: flex-start; }
-.empty-state p { color: var(--muted); margin-bottom: 0; }
-.empty-icon { display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 13px; background: var(--brand-soft); color: var(--brand); font-weight: 800; }
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 15% 15%, var(--login-glow) 0, transparent 35%), var(--page-bg); }
 .login-card { width: min(100%, 460px); margin: 0; padding: 40px; }
 .login-card h1 { font-size: 42px; margin-bottom: 8px; }

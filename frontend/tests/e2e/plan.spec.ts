@@ -1,14 +1,18 @@
 import { expect, test } from '@playwright/test'
 
-function dateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+import {
+  availabilityEntry,
+  cancelLeftoverTestTasks,
+  cancelTaskByTitle,
+  dateKey,
+  hasAvailabilitySlot,
+  listAvailabilitySlots,
+  login,
+  uniqueSuffix,
+} from './support'
 
 test('两周计划可生成、接受、锁定并移动，且总览读取当前计划', async ({ page }) => {
-  const unique = Date.now().toString().slice(-6)
+  const unique = uniqueSuffix()
   const taskName = `计划验收任务 ${unique}`
   const today = new Date()
   const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
@@ -18,18 +22,20 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
   const pageErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
 
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await login(page)
+  // 历史运行留下的本套件任务会抢占更早的排期窗口，先取消，保证本用例任务能完整排入一段。
+  await cancelLeftoverTestTasks(page)
 
+  // 可用时段跨运行保留：先用接口判断是否已有同一时段，避免重复创建被服务端拒绝。
+  const existingSlots = await listAvailabilitySlots(page)
   await page.getByRole('link', { name: '设置' }).click()
-  await page.getByLabel('星期').selectOption(String(weekday))
-  await page.getByLabel('开始').fill('18:00')
-  await page.getByLabel('结束').fill('22:00')
-  await page.getByRole('button', { name: '添加时段' }).click()
-  await expect(page.getByText('18:00–22:00')).toBeVisible()
+  if (!hasAvailabilitySlot(existingSlots, weekday, '18:00', '22:00')) {
+    await page.getByLabel('星期').selectOption(String(weekday))
+    await page.getByLabel('开始').fill('18:00')
+    await page.getByLabel('结束').fill('22:00')
+    await page.getByRole('button', { name: '添加时段' }).click()
+  }
+  await expect(availabilityEntry(page, weekday, '18:00–22:00')).toBeVisible()
 
   await page.getByRole('link', { name: '任务', exact: true }).click()
   await page.getByRole('button', { name: '添加任务' }).click()
@@ -65,35 +71,31 @@ test('两周计划可生成、接受、锁定并移动，且总览读取当前�
   await expect(block).toContainText('用户手动移动')
 
   await page.getByRole('link', { name: '总览', exact: true }).click()
-  await expect(page.getByText(taskName)).toBeVisible()
+  await expect(page.getByText(taskName).first()).toBeVisible()
   await page.getByRole('link', { name: taskName }).first().click()
   await expect(page).toHaveURL(/\/tasks\?task=\d+/)
   await expect(page.locator('.task-row.is-highlighted')).toContainText(taskName)
   expect(pageErrors).toEqual([])
+
+  // 取消本用例任务：取消态不参与排期，避免下一次运行被历史任务挤占可用时间。
+  await cancelTaskByTitle(page, taskName)
 })
 
 test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) => {
-  const unique = Date.now().toString().slice(-6)
+  const unique = uniqueSuffix()
   const taskName = `过期草案任务 ${unique}`
   const today = new Date()
   const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
   const dueDate = dateKey(due)
   const weekday = (due.getDay() + 6) % 7
 
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await login(page)
+  // 单独运行本用例时也要先清掉历史测试任务，避免草案被旧任务挤占。
+  await cancelLeftoverTestTasks(page)
 
-  const slots = await page.request.get('/api/v1/availability-slots')
-  expect(slots.ok()).toBeTruthy()
-  const slotList = (await slots.json()) as Array<{ day_of_week: number; start_time: string; end_time: string }>
+  const slots = await listAvailabilitySlots(page)
   // manual-management 在周六固定创建 09:00–11:00；同日再建 10:00–11:00 会因重叠被拒。
-  const hasWindow = slotList.some(
-    (slot) => slot.day_of_week === weekday && slot.start_time.slice(0, 5) === '12:00' && slot.end_time.slice(0, 5) === '13:00',
-  )
-  if (!hasWindow) {
+  if (!hasAvailabilitySlot(slots, weekday, '12:00', '13:00')) {
     const created = await page.request.post('/api/v1/availability-slots', {
       data: { day_of_week: weekday, start_time: '12:00', end_time: '13:00' },
     })
@@ -129,14 +131,13 @@ test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) 
 
   await page.getByRole('button', { name: '重新加载' }).click()
   await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
+
+  // 取消本用例任务，避免历史任务在下一次运行中占用排期容量。
+  await cancelTaskByTitle(page, taskName)
 })
 
 test('计划加载失败后可点击重试恢复', async ({ page }) => {
-  await page.goto('/')
-  await page.getByLabel('用户名').fill('student')
-  await page.getByLabel('密码').fill('campusflow-dev')
-  await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await login(page)
 
   await page.route('**/api/v1/plans/current', (route) => route.abort('failed'))
   await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()

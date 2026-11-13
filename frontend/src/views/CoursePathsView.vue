@@ -5,7 +5,7 @@
  * 任何环、类型矛盾、缺项或未转换候选都会阻塞结论；页面只展示原因，不自行补出顺序。
  * 切换查看版本不影响档案中的当前方案，旧方案数据保留且不会迁移到新版本。
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 
 import { semestersApi } from '../api/business'
 import { ApiError, errorMessage } from '../api/client'
@@ -160,6 +160,9 @@ const semesterForm = reactive({
 const semesterPlan = ref<SemesterPlan | null>(null)
 const semesterLoading = ref(false)
 const semesterError = ref('')
+// 试排结果只属于发起时的方案：序号在切换方案或重载方案数据时递增，
+// 迟到的旧响应既不能写回结果，也不能结束当前方案的“生成中…”状态。
+let semesterRequestId = 0
 
 const selectedPlan = computed(() => plans.value.find((plan) => plan.id === selectedPlanId.value) ?? null)
 const currentPlan = computed(() => profile.value?.current_plan ?? null)
@@ -285,8 +288,17 @@ async function retryLoad() {
 
 // 方案切换后所有列表与分析都重新拉取；没有选中方案时清空并重置，
 // 避免上一个方案的图或顺序残留在页面上。
+// 每次调用递增请求序号并记下方案：只有最新请求可以写回列表、错误与加载态，
+// 快速切换时丢弃旧方案的迟到响应，避免旧数据覆盖新方案。
+let planDataRequestId = 0
+
 async function loadPlanData() {
-  if (selectedPlanId.value === null) {
+  const requestId = ++planDataRequestId
+  const planId = selectedPlanId.value
+  // 切换方案或重载方案数据后，上一次试排的结论与加载态都不再属于当前方案。
+  resetSemesterPlan()
+  if (planId === null) {
+    dataLoading.value = false
     courses.value = []
     relations.value = []
     aliases.value = []
@@ -301,18 +313,25 @@ async function loadPlanData() {
   actionError.value = ''
   try {
     const [loadedCourses, loadedRelations, loadedAliases] = await Promise.all([
-      pathsApi.listCourses(selectedPlanId.value),
-      pathsApi.listRelations(selectedPlanId.value),
-      pathsApi.listAliases(selectedPlanId.value),
+      pathsApi.listCourses(planId),
+      pathsApi.listRelations(planId),
+      pathsApi.listAliases(planId),
     ])
+    if (requestId !== planDataRequestId || selectedPlanId.value !== planId) return
     courses.value = loadedCourses
     relations.value = loadedRelations
     aliases.value = loadedAliases
+    // 新方案的修读数据尚未返回前先清空，避免短暂显示上一方案的记录。
+    studyRecords.value = []
+    studyStatus.value = null
+    studyUnavailable.value = false
+    studyError.value = ''
     await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
+    if (requestId !== planDataRequestId || selectedPlanId.value !== planId) return
     actionError.value = errorMessage(caught)
   } finally {
-    dataLoading.value = false
+    if (requestId === planDataRequestId) dataLoading.value = false
   }
 }
 
@@ -329,7 +348,11 @@ function resetAnalysis() {
   semesterError.value = ''
 }
 
+// 分析请求同样按序号判定：A→B→A 快速回切时，只有最后一次请求可以写回结果与加载态。
+let analysisRequestId = 0
+
 async function loadAnalysis() {
+  const requestId = ++analysisRequestId
   const planId = selectedPlanId.value
   selectedNodeId.value = null
   selectedEdgeId.value = null
@@ -349,7 +372,7 @@ async function loadAnalysis() {
     pathsApi.order(planId),
     pathsApi.nextCourses(planId),
   ])
-  if (selectedPlanId.value === planId) {
+  if (requestId === analysisRequestId && selectedPlanId.value === planId) {
     if (graphResult.status === 'fulfilled') {
       graph.value = graphResult.value
       graphError.value = ''
@@ -377,40 +400,62 @@ async function loadAnalysis() {
   }
 }
 
+// 复位试排区块并作废仍在飞行的请求：方案切换后不复用旧方案的结论，
+// 也不让按钮停在“生成中…”。
+function resetSemesterPlan() {
+  semesterRequestId += 1
+  semesterPlan.value = null
+  semesterError.value = ''
+  semesterLoading.value = false
+}
+
 // 留空表示交给后端：学分上限回落到方案设置，最多学期数自动；
 // 页面不把空字符串当作 0，也不在本地预判可排性。
 async function generateSemesterPlan() {
-  if (selectedPlanId.value === null) return
+  const planId = selectedPlanId.value
+  if (planId === null) return
+  const requestId = ++semesterRequestId
   semesterLoading.value = true
   semesterError.value = ''
   try {
-    semesterPlan.value = await pathsApi.semesterPlan(selectedPlanId.value, {
+    const result = await pathsApi.semesterPlan(planId, {
       credit_limit: semesterForm.credit_limit.trim() === '' ? null : Number(semesterForm.credit_limit),
       start_season: semesterForm.start_season,
       max_terms: semesterForm.max_terms.trim() === '' ? null : Number(semesterForm.max_terms),
     })
+    // 只有最新一次请求且方案未变时才写回；切换方案后旧响应直接丢弃。
+    if (requestId !== semesterRequestId || selectedPlanId.value !== planId) return
+    semesterPlan.value = result
   } catch (caught) {
+    if (requestId !== semesterRequestId || selectedPlanId.value !== planId) return
     semesterPlan.value = null
     semesterError.value = errorMessage(caught)
   } finally {
-    semesterLoading.value = false
+    if (requestId === semesterRequestId) semesterLoading.value = false
   }
 }
 
 // 修读记录与汇总任一失败即整体不可用，避免把空数据展示成“未修”或“状态未知”。
 // 只有 404 才视为接口未接入；超时、网络或 5xx 视为本次读取失败，保留可读原因供重试。
+// 请求序号与方案校验保证快速切换时旧方案的迟到响应不会覆盖当前方案。
+let studyRequestId = 0
+
 async function loadStudy() {
-  if (selectedPlanId.value === null) return
+  const requestId = ++studyRequestId
+  const planId = selectedPlanId.value
+  if (planId === null) return
   try {
     const [records, statuses] = await Promise.all([
-      pathsApi.listStudyRecords(selectedPlanId.value),
-      pathsApi.studyStatus(selectedPlanId.value),
+      pathsApi.listStudyRecords(planId),
+      pathsApi.studyStatus(planId),
     ])
+    if (requestId !== studyRequestId || selectedPlanId.value !== planId) return
     studyRecords.value = records
     studyStatus.value = statuses
     studyUnavailable.value = false
     studyError.value = ''
   } catch (caught) {
+    if (requestId !== studyRequestId || selectedPlanId.value !== planId) return
     studyRecords.value = []
     studyStatus.value = null
     if (caught instanceof ApiError && caught.status === 404) {
@@ -433,9 +478,16 @@ async function retryStudy() {
 
 // 查看版本与档案当前方案分离：仅当二者不同时读取切换影响预览，
 // 预览里的计数属于当前方案，切换不会删除旧方案数据。
+// 方案数据在这里显式重载（唯一随选择变化的入口），不再用 watch 监听，
+// 避免首次进入时 load() 赋值与挂载调用各触发一次相同请求。
+// 预览也按请求序号与当前方案校验，迟到的旧方案响应不会写回。
+let previewRequestId = 0
+
 async function selectPlan(planId: number) {
   selectedPlanId.value = planId
   preview.value = null
+  previewLoading.value = false
+  const requestId = ++previewRequestId
   const plan = plans.value.find((item) => item.id === planId)
   if (plan) {
     Object.assign(planForm, {
@@ -446,14 +498,19 @@ async function selectPlan(planId: number) {
       credit_limit_per_term: plan.credit_limit_per_term,
     })
   }
+  await loadPlanData()
+  if (selectedPlanId.value !== planId || requestId !== previewRequestId) return
   if (profile.value?.curriculum_plan_id !== planId) {
     previewLoading.value = true
     try {
-      preview.value = await pathsApi.switchPreview(planId)
+      const loaded = await pathsApi.switchPreview(planId)
+      if (requestId === previewRequestId && selectedPlanId.value === planId) preview.value = loaded
     } catch (caught) {
-      actionError.value = errorMessage(caught)
+      if (requestId === previewRequestId && selectedPlanId.value === planId) {
+        actionError.value = errorMessage(caught)
+      }
     } finally {
-      previewLoading.value = false
+      if (requestId === previewRequestId) previewLoading.value = false
     }
   }
 }
@@ -677,7 +734,8 @@ async function addStudyRecord() {
     studyForm.credits_earned = ''
     studyForm.note = ''
     notice.value = '修读记录已保存；成绩与已获学分只采用你填写的值。'
-    await loadStudy()
+    // 图节点的修读状态与“下一步”都读修读记录，保存后与分析并行刷新。
+    await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
@@ -702,7 +760,8 @@ async function removeStudyRecord(record: CourseStudyRecord) {
   removingStudyRecordId.value = record.id
   try {
     await pathsApi.deleteStudyRecord(selectedPlanId.value, record.id)
-    await loadStudy()
+    // 删除后课程回到未知状态，图节点与“下一步”需一并重算。
+    await Promise.all([loadStudy(), loadAnalysis()])
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
@@ -710,8 +769,8 @@ async function removeStudyRecord(record: CourseStudyRecord) {
   }
 }
 
-// 方案切换由 watch 全量重载；挂载时先等 load() 选出默认版本再加载，避免用空方案请求分析。
-watch(selectedPlanId, loadPlanData)
+// 初始加载只在这里触发一次：load() 选出默认版本后再显式读取其数据；
+// 方案切换由 selectPlan 重载，路径中不存在监听 selectedPlanId 的第二条入口。
 onMounted(async () => {
   await load()
   await loadPlanData()
@@ -1083,7 +1142,7 @@ onMounted(async () => {
 
       <section class="panel graph-panel">
         <div class="section-heading">
-          <div><p class="eyebrow">C015 课程关系图</p><h2>依赖图与来源证据</h2></div>
+          <div><p class="eyebrow">关系图与证据</p><h2>依赖图与来源证据</h2></div>
           <span v-if="graph" :class="['status-pill', graph.complete ? 'graph-complete' : 'graph-incomplete']">
             {{ graph.complete ? '图完整' : '图不完整' }}
           </span>
@@ -1198,7 +1257,7 @@ onMounted(async () => {
       <div class="two-column-layout">
         <section class="panel">
           <div class="section-heading">
-            <div><p class="eyebrow">C016 修读顺序</p><h2>强制先修层次</h2></div>
+            <div><p class="eyebrow">先修层次</p><h2>强制先修层次</h2></div>
             <span v-if="order" class="count-badge">{{ order.levels.length }} 层</span>
           </div>
           <p class="form-help">只按强制先修分层；并修与建议先学不参与层次计算。</p>
@@ -1244,7 +1303,7 @@ onMounted(async () => {
 
         <section class="panel">
           <div class="section-heading">
-            <div><p class="eyebrow">C016 下一步</p><h2>可学与待满足条件</h2></div>
+            <div><p class="eyebrow">下一步建议</p><h2>可学与待满足条件</h2></div>
             <span v-if="nextCourses" class="count-badge">{{ nextAvailable.length }} 门可进入</span>
           </div>
           <p v-if="nextLoading" class="muted">正在判断下一步可学课程…</p>
@@ -1294,11 +1353,11 @@ onMounted(async () => {
 
       <section class="panel">
         <div class="section-heading">
-          <div><p class="eyebrow">C016 学期辅助</p><h2>按学分上限与开课季节试排</h2></div>
+          <div><p class="eyebrow">学期试排</p><h2>按学分上限与开课季节试排</h2></div>
           <span class="status-pill">仅作参考</span>
         </div>
         <p class="form-help">
-          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核（graduation_audit=false）。
+          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核。
         </p>
         <form class="stack-form semester-form" @submit.prevent="generateSemesterPlan">
           <div class="form-grid">
@@ -1333,7 +1392,7 @@ onMounted(async () => {
           </div>
           <!-- 有结果时始终展示审核边界；学分上限未知等降级说明由后端 limitations／assumptions 给出。 -->
           <p class="status-banner warn">
-            <span><strong>不构成选课或毕业资格审核</strong><p>graduation_audit=false；请以学校正式培养方案和选课系统为准。</p></span>
+            <span><strong>不构成选课或毕业资格审核</strong><p>这里只依据依赖关系与学分上限试排；请以学校正式培养方案和选课系统为准。</p></span>
           </p>
           <div v-if="semesterPlan.terms.length" class="term-grid">
             <div v-for="term in semesterPlan.terms" :key="`term-${term.index}`" class="term-card">

@@ -5,7 +5,6 @@
 混合排序使用倒数排名融合（RRF），不把两种不可比的分数量纲直接相加。
 """
 
-import math
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -153,13 +152,3 @@ def rank_candidates(
         )
         for rank, item in enumerate(ordered[:limit], 1)
     )
-
-
-def normalized_relevance(score: float, scores: list[float]) -> float:
-    """把排序分数映射到 0..1，仅用于展示和评估，不跨模式比较。"""
-    if not scores or not math.isfinite(score):
-        return 0.0
-    low, high = min(scores), max(scores)
-    if high == low:
-        return 1.0
-    return (score - low) / (high - low)

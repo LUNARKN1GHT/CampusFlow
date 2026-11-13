@@ -1124,6 +1124,10 @@ class PlanRepository(Protocol):
         coverage: dict,
     ) -> PlanDraftData: ...
 
+    def lock_workspace(self, workspace_id: int) -> None:
+        """锁工作空间行，串行化同空间的接受提交（#599），避免双当前计划。"""
+        ...
+
     def get_draft(self, draft_id: int) -> PlanDraftData | None:
         """只按 ID 读取；调用方必须自行校验空间归属。"""
         ...

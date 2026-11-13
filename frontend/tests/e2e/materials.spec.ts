@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
 
+import { login, uniqueSuffix } from './support'
+
 const root = path.resolve('..')
 const python = path.join(root, 'backend/.venv/bin/python')
 const helper = path.join(root, 'scripts/m2_browser_fixtures.py')
@@ -26,13 +28,10 @@ test.describe('M2 资料库真实队列闭环', () => {
 
   test('文本、PDF、图片、部分失败恢复、归档和确认删除', async ({ page, browser }) => {
     test.setTimeout(120_000)
-    await page.goto('/login')
-    await page.getByLabel('用户名').fill('student')
-    await page.getByLabel('密码').fill('campusflow-dev')
-    await page.getByLabel('密码').press('Enter')
+    await login(page)
     await page.getByRole('link', { name: '资料库' }).click()
     await page.getByRole('button', { name: '导入资料', exact: true }).click()
-    const title = `M2 text ${Date.now()}`
+    const title = `M2 text ${uniqueSuffix()}`
     await page.getByLabel('标题', { exact: true }).fill(title)
     await page.getByLabel('正文', { exact: true }).fill('课程通知第一段\n\n课程通知第二段\n\n课程通知第一段')
     await page.getByRole('button', { name: '导入文本', exact: true }).click()
@@ -75,10 +74,7 @@ test.describe('M2 资料库真实队列闭环', () => {
     // 全新浏览器上下文没有本地作业映射，仍须从服务端恢复范围和重试入口。
     const context = await browser.newContext()
     const fresh = await context.newPage()
-    await fresh.goto('/login')
-    await fresh.getByLabel('用户名').fill('student')
-    await fresh.getByLabel('密码').fill('campusflow-dev')
-    await fresh.getByLabel('密码').press('Enter')
+    await login(fresh)
     await fresh.getByRole('link', { name: '资料库' }).click()
     const recovered = fresh.locator('.material-row').filter({ hasText: 'm2-image.png' })
     await expect(recovered).toContainText('下半区暂时未识别')
@@ -131,10 +127,7 @@ test.describe('M2 资料库真实队列闭环', () => {
 
 test.describe('M6 网页不可访问时的替代输入', () => {
   test('失败原因与未覆盖范围可见，并可改用粘贴原文', async ({ page }) => {
-    await page.goto('/login')
-    await page.getByLabel('用户名').fill('student')
-    await page.getByLabel('密码').fill('campusflow-dev')
-    await page.getByLabel('密码').press('Enter')
+    await login(page)
     await page.getByRole('link', { name: '资料库' }).click()
     await page.getByRole('button', { name: '导入资料', exact: true }).click()
     await page.getByRole('button', { name: '公开网页' }).click()
@@ -158,23 +151,24 @@ test.describe('M6 网页不可访问时的替代输入', () => {
 
 test.describe('M6 Word 与逐文件导入结果', () => {
   test('Word 入口可用，单个格式失败不会标记全部成功', async ({ page }) => {
-    await page.goto('/login')
-    await page.getByLabel('用户名').fill('student')
-    await page.getByLabel('密码').fill('campusflow-dev')
-    await page.getByLabel('密码').press('Enter')
+    await login(page)
     await page.getByRole('link', { name: '资料库' }).click()
     await page.getByRole('button', { name: '导入资料', exact: true }).click()
     await page.getByRole('button', { name: '上传文件' }).click()
     const input = page.getByLabel('选择文件')
     await expect(input).toHaveAttribute('accept', /\.docx/)
+    // 文件名带唯一后缀：允许重复导入时每次都会新建资料，避免同名行被上一次运行命中。
+    const suffix = uniqueSuffix()
+    const brokenName = `broken-${suffix}.docx`
+    const wordName = `word-notice-paragraph-${suffix}.docx`
     await input.setInputFiles([
       {
-        name: 'broken.docx',
+        name: brokenName,
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         buffer: Buffer.from('not a zip package'),
       },
       {
-        name: 'word-notice-paragraph.docx',
+        name: wordName,
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         buffer: readFileSync(path.join(root, 'samples/synthetic/n001/word-notice-paragraph.docx')),
       },
@@ -184,10 +178,10 @@ test.describe('M6 Word 与逐文件导入结果', () => {
     await expect(page.getByText(/本次导入：成功 1 份，失败 1 份/)).toBeVisible()
     await expect(page.getByText(/失败文件未建档，不影响其它文件/)).toBeVisible()
     const results = page.locator('.upload-results')
-    await expect(results.getByText('broken.docx')).toBeVisible()
+    await expect(results.getByText(brokenName)).toBeVisible()
     await expect(results.locator('.failed-pill')).toBeVisible()
     await expect(results.locator('.status-pill').filter({ hasText: '已建档' })).toBeVisible()
-    const wordRow = page.locator('.material-row').filter({ hasText: 'word-notice-paragraph.docx' })
+    const wordRow = page.locator('.material-row').filter({ hasText: wordName })
     await expect(wordRow).toBeVisible()
     await expect(wordRow).toContainText('Word')
   })
