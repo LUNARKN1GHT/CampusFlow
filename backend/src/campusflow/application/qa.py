@@ -16,11 +16,9 @@ from campusflow.domain.citations import Citation, build_citation_set, validate_c
 from campusflow.domain.errors import DomainError, ModelOutputError
 from campusflow.domain.model_failures import INSUFFICIENT_MATERIALS_MESSAGE
 from campusflow.domain.qa import (
-    ConflictNotice,
     CoverageNotice,
     QaAnswer,
     QaIntent,
-    QaIntentKind,
     build_comparisons,
     detect_date_conflicts,
     incomplete_date_notes,
@@ -311,19 +309,3 @@ def detect_intent(generator: TextGenerator, question: str, scope: RetrievalScope
             )
         )
     )
-
-
-def conflict_summary(conflicts: tuple[ConflictNotice, ...]) -> str | None:
-    """返回首条冲突提示供单值展示；多条冲突不在这里合并或择一。"""
-    return conflicts[0].message if conflicts else None
-
-
-def capability_for(intent: QaIntent) -> dict:
-    """把意图与能力边界转为只读响应；不执行工具，executed 恒为 False。"""
-    return {
-        "intent": intent.kind.value,
-        "available": intent.available,
-        "boundary": intent.boundary,
-        "executed": False,
-        "query_kind": QaIntentKind.QUERY.value,
-    }
