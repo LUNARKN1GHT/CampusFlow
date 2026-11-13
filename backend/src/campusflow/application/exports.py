@@ -914,11 +914,17 @@ def preview_export(repos: Repositories, workspace_id: int, request: ExportReques
     return _preview_plan(repos, workspace_id, request)
 
 
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
 def _csv_cell(value: object | None) -> str:
+    """空值留空；字符串按 OWASP 建议中和公式前缀，数字与时间保持原样。"""
     if value is None:
         return ""
     if isinstance(value, time):
         return _format_due_time(value)
+    if isinstance(value, str):
+        return f"'{value}" if value.startswith(_CSV_FORMULA_PREFIXES) else value
     return str(value)
 
 
@@ -934,7 +940,7 @@ def render_tasks_csv(items: list[ExportItem]) -> bytes:
                 _csv_cell(item.task_id),
                 _csv_cell(item.course_id),
                 _csv_cell(item.course_name),
-                item.title,
+                _csv_cell(item.title),
                 _csv_cell(item.due_date),
                 _csv_cell(item.due_time),
                 item.due_precision,
