@@ -343,7 +343,11 @@ function resetAnalysis() {
   semesterError.value = ''
 }
 
+// 分析请求同样按序号判定：A→B→A 快速回切时，只有最后一次请求可以写回结果与加载态。
+let analysisRequestId = 0
+
 async function loadAnalysis() {
+  const requestId = ++analysisRequestId
   const planId = selectedPlanId.value
   selectedNodeId.value = null
   selectedEdgeId.value = null
@@ -363,7 +367,7 @@ async function loadAnalysis() {
     pathsApi.order(planId),
     pathsApi.nextCourses(planId),
   ])
-  if (selectedPlanId.value === planId) {
+  if (requestId === analysisRequestId && selectedPlanId.value === planId) {
     if (graphResult.status === 'fulfilled') {
       graph.value = graphResult.value
       graphError.value = ''
