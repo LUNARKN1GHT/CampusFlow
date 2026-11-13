@@ -1,7 +1,9 @@
 """N016：候选合并、进度与来源保留、时间块迁移和幂等重试。"""
 
+from dataclasses import replace
 from datetime import UTC, date, datetime
 
+from campusflow.application.candidate_merge import execute_merge
 from campusflow.application.candidates import save_candidates
 from campusflow.domain.candidates import (
     CandidateDraft,
@@ -179,3 +181,58 @@ def test_retry_is_idempotent_and_stale_preview_is_rejected(client):
         from campusflow.infrastructure.db.models import Task
 
         assert session.get(Task, source_task).progress == "cancelled"
+
+
+class _LaggingMergeRepository:
+    """模拟并发请求在锁外读到的旧快照：前 skip 次查不到合并记录。"""
+
+    def __init__(self, inner, skip: int) -> None:
+        self.inner = inner
+        self.skip = skip
+        self.calls = 0
+
+    def find_merge(self, *args):
+        self.calls += 1
+        if self.calls <= self.skip:
+            return None
+        return self.inner.find_merge(*args)
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
+def test_concurrent_merge_unique_conflict_returns_existing_record(client):
+    target, source, _, _, _ = setup_pair(client)
+    body = preview(client, target, source)
+    workspace_id = client.get("/api/v1/settings").json()["workspace_id"]
+    # 并发请求已完成合并并提交；本请求的两次前置查询都看不到它。
+    with client.app.state.session_factory() as other:
+        winner = build_repositories(other).candidates.create_merge(
+            workspace_id,
+            target_candidate_id=target.id,
+            source_candidate_id=source.id,
+            target_formal_kind="task",
+            target_formal_id=None,
+            source_formal_id=None,
+            preserved_progress={},
+            source_snapshot={},
+            reason="并发请求先合并",
+            operator="student",
+        )
+        other.commit()
+    with client.app.state.session_factory() as session:
+        repos = build_repositories(session)
+        racing = replace(repos, candidates=_LaggingMergeRepository(repos.candidates, skip=2))
+        result = execute_merge(
+            racing,
+            workspace_id,
+            target_candidate_id=target.id,
+            source_ids=(source.id,),
+            preview_token=body["token"],
+            reason="合并重复事项",
+            operator="student",
+        )
+    assert result.created is False
+    assert [record.id for record in result.records] == [winner.id]
+    history = client.get(f"/api/v1/candidates/{target.id}/merges").json()
+    assert len(history) == 1 and history[0]["id"] == winner.id

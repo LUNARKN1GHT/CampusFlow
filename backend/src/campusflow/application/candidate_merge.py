@@ -257,8 +257,25 @@ def execute_merge(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 唯一约束兜底：并发请求可能已完成同一组合并，返回既有记录而不是 500（#623）。
+        existing = _existing_merges(repos, workspace_id, target_candidate_id, source_ids)
+        if existing is not None:
+            return MergeResult(existing, False, preview)
         raise
     return MergeResult(tuple(records), created, preview)
+
+
+def _existing_merges(
+    repos: Repositories, workspace_id: int, target_candidate_id: int, source_ids: tuple[int, ...]
+) -> tuple[MergeRecordData, ...] | None:
+    """按来源集合查询既有合并记录；只有全部来源都有记录时才视为重试。"""
+    found = [
+        repos.candidates.find_merge(workspace_id, target_candidate_id, source_id)
+        for source_id in source_ids
+    ]
+    if any(record is None for record in found):
+        return None
+    return tuple(found)
 
 
 def list_merges(repos: Repositories, workspace_id: int, candidate_id: int) -> list[MergeRecordData]:

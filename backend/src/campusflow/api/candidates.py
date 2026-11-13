@@ -749,8 +749,16 @@ class VersionAcceptanceOut(BaseModel):
     created: bool
 
 
-def _acceptance_out(result, *, created: bool) -> VersionAcceptanceOut:
+def _acceptance_out(
+    result, *, created: bool, baseline_review_status: str | None = None
+) -> VersionAcceptanceOut:
     record = result.record
+    # #624：历史与幂等响应返回候选当前状态；previous_review_status 仍保留接受前的旧值。
+    current_status = (
+        baseline_review_status
+        if baseline_review_status is not None
+        else ("superseded" if created else result.baseline_review_status)
+    )
     return VersionAcceptanceOut(
         id=record.id,
         baseline_candidate_id=record.baseline_candidate_id,
@@ -763,7 +771,7 @@ def _acceptance_out(result, *, created: bool) -> VersionAcceptanceOut:
         evidence_snapshot=list(record.evidence_snapshot),
         previous_review_status=record.previous_review_status,
         created_at=record.created_at,
-        baseline_review_status="superseded" if created else result.baseline_review_status,
+        baseline_review_status=current_status,
         created=created,
     )
 
@@ -814,11 +822,14 @@ def get_version_acceptances(
     relations: Relations,
 ) -> list[VersionAcceptanceOut]:
     """只读历史：旧候选、接受字段、原因与逐字段证据快照。"""
-    use_cases.get_candidate(repos, workspace.id, candidate_id)
+    candidate = use_cases.get_candidate(repos, workspace.id, candidate_id)
+    # 历史记录的 baseline_review_status 展示候选当前状态，避免已失效仍显示 pending。
+    current_status = candidate.review_status.value
     return [
         _acceptance_out(
             version_acceptance.AcceptanceResult(record, False, record.previous_review_status),
             created=False,
+            baseline_review_status=current_status,
         )
         for record in version_acceptance.list_acceptances(relations, workspace.id, candidate_id)
     ]

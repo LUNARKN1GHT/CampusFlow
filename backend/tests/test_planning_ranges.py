@@ -3,9 +3,13 @@
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import pytest
 from fastapi.testclient import TestClient
 
+from campusflow.application.planning import collect_inputs
+from campusflow.domain.errors import DomainError
 from campusflow.domain.planning import resolve_planning_range
+from campusflow.infrastructure.repositories import build_repositories
 
 
 def _task(client: TestClient, title: str, **overrides) -> dict:
@@ -169,3 +173,106 @@ def test_reschedule_subrange_keeps_blocks_outside_range(
         json={"expected_version": draft["version"]},
     )
     assert accepted_new.status_code == 200, accepted_new.text
+
+
+def test_planning_range_limit_is_inclusive_and_bounded() -> None:
+    start = date(2026, 1, 1)
+    # 含首尾 366 天允许，再增加一天即拒绝（#625）。
+    assert resolve_planning_range(
+        "custom", start, start=start, end=start + timedelta(days=365)
+    ) == (start, start + timedelta(days=365))
+    with pytest.raises(DomainError, match="366"):
+        resolve_planning_range("custom", start, start=start, end=start + timedelta(days=366))
+
+
+def test_occurrence_expansion_rejects_range_over_limit(client: TestClient) -> None:
+    """固定日程 occurrences 在排期输入收集前就按同一上限拒绝，不展开数百万天。"""
+    workspace_id = client.get("/api/v1/settings").json()["workspace_id"]
+    with client.app.state.session_factory() as session:
+        with pytest.raises(DomainError, match="366"):
+            collect_inputs(
+                build_repositories(session),
+                workspace_id,
+                semester_id=None,
+                range_start=date(1, 1, 1),
+                range_end=date(9999, 12, 31),
+            )
+
+
+def test_custom_range_longer_than_limit_returns_400_without_draft(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/plans/drafts",
+        json={
+            "range_type": "custom",
+            "start_date": "0001-01-01",
+            "end_date": "9999-12-31",
+        },
+    )
+    assert response.status_code == 400
+    assert "366" in response.json()["detail"]
+    # 拒绝发生在展开可用时间与固定日程之前，不留下草案或时间块。
+    assert client.get("/api/v1/plans/drafts").json() == []
+
+
+def test_reschedule_range_longer_than_limit_returns_400(
+    client: TestClient, fixed_planning_clock
+) -> None:
+    _task(client, "今天任务")
+    _availability(client)
+    created = client.post(
+        "/api/v1/plans/drafts",
+        json={
+            "start_date": "2026-10-19",
+            "end_date": "2026-10-20",
+            "assumptions": {"buffer_minutes": 0},
+        },
+    ).json()
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{created['id']}/accept",
+        json={"expected_version": created["version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    response = client.post(
+        "/api/v1/plans/reschedule",
+        json={"start_date": "2026-10-19", "end_date": "2027-10-20"},
+    )
+    assert response.status_code == 400
+    assert "366" in response.json()["detail"]
+    assert len(client.get("/api/v1/plans/drafts").json()) == 1
+
+
+def test_overview_blocks_match_frontend_contract(client: TestClient, fixed_planning_clock) -> None:
+    _task(client, "今天任务")
+    _availability(client)
+    draft = client.post(
+        "/api/v1/plans/drafts",
+        json={
+            "start_date": "2026-10-19",
+            "end_date": "2026-10-20",
+            "assumptions": {"buffer_minutes": 0},
+        },
+    ).json()
+    accepted = client.post(
+        f"/api/v1/plans/drafts/{draft['id']}/accept",
+        json={"expected_version": draft["version"]},
+    )
+    assert accepted.status_code == 200, accepted.text
+
+    body = client.get("/api/v1/plans/overview").json()
+    assert body["today_blocks"], body
+    # #629：总览时间块只含 OverviewBlock 字段，不含草案的 draft_id/kind/seq/constraint_source。
+    expected = {
+        "id",
+        "task_id",
+        "title",
+        "starts_at",
+        "ends_at",
+        "minutes",
+        "locked",
+        "reason",
+    }
+    for item in body["today_blocks"]:
+        assert set(item) == expected
+    if body["next_block"] is not None:
+        assert set(body["next_block"]) == expected
