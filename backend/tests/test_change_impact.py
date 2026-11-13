@@ -97,7 +97,7 @@ def add_formal_links(client, candidate_id):
         return task.id
 
 
-def test_completed_task_and_locked_block_are_listed_with_unsupported_boundaries(client):
+def test_completed_task_and_locked_block_are_listed_with_accurate_notes(client):
     old = upload(client)
     new = upload(client, "新通知")
     left = save_candidate(client, old)
@@ -119,10 +119,13 @@ def test_completed_task_and_locked_block_are_listed_with_unsupported_boundaries(
     assert task["progress"] == "done" and task["completed"] is True
     assert task["plan_blocks"][0]["locked"] is True
     assert task["plan_blocks"][0]["draft_status"] == "draft"
-    assert {item["code"] for item in body["unsupported"]} == {
-        "reminders",
-        "external_calendar",
-    }
+    assert "unsupported" not in body
+    notes = {item["code"]: item["message"] for item in body["notes"]}
+    assert set(notes) == {"reminders", "external_calendar"}
+    assert "尚未接入" not in notes["reminders"] + notes["external_calendar"]
+    assert "重算提醒" in notes["reminders"] and "本查询只读" in notes["reminders"]
+    assert "不会自动写入" in notes["external_calendar"]
+    assert "确认" in notes["external_calendar"]
     assert client.get(f"/api/v1/candidates/{left.id}").json()["review_status"] == "pending"
 
 

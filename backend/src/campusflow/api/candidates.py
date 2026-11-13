@@ -563,7 +563,7 @@ class ImpactedRuleOut(BaseModel):
 
 class ChangeImpactOut(BaseModel):
     summary: dict
-    unsupported: list[dict]
+    notes: list[dict]
     tasks: list[ImpactedTaskOut]
     fixed_events: list[ImpactedEventOut]
     rules: list[ImpactedRuleOut]
@@ -608,12 +608,13 @@ def get_candidate_change_impact(
 ) -> ChangeImpactOut:
     """N013：只读列出旧候选已转换的任务、日程、规则及计划时间块。
 
-    已完成任务与锁定时间块照常列出；提醒与外部日历未接入，放在 unsupported。
+    已完成任务与锁定时间块照常列出；notes 说明提醒与外部日历在
+    接受变更后的实际行为，本查询本身不调整提醒、不写入外部日历。
     """
     result = change_impact.collect_impact(repos, workspace.id, candidate_id, other_candidate_id)
     return ChangeImpactOut(
         summary=result.summary,
-        unsupported=result.unsupported,
+        notes=result.notes,
         tasks=[
             ImpactedTaskOut(
                 id=item.id,
