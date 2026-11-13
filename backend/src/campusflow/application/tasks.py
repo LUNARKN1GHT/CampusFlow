@@ -11,10 +11,13 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData, TaskDependencyData
 from campusflow.application.reminders import sync_reminders
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import (
+    require_course_in_workspace,
+    require_in_workspace,
+    require_semester_in_workspace,
+)
 from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
@@ -82,13 +85,6 @@ def _require_task_in_workspace(repos: Repositories, workspace_id: int, task_id: 
     return task
 
 
-def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
-    course = repos.courses.get(course_id)
-    if course is None:
-        raise NotFoundError("课程不存在")
-    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
-
-
 def get_task(repos: Repositories, workspace_id: int, task_id: int) -> TaskData:
     task = _require_task_in_workspace(repos, workspace_id, task_id)
     return _apply_overdue(repos, workspace_id, [task])[0]
@@ -126,7 +122,7 @@ def create_task(
         if course_id is None:
             course_id = parent.course_id
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     task = repos.tasks.create(
         workspace_id,
         course_id,
@@ -170,7 +166,7 @@ def update_task(
     if error:
         raise DomainError(error)
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     updated = repos.tasks.update(
         task_id,
         course_id=course_id,

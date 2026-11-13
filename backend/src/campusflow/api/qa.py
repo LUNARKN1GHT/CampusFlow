@@ -471,6 +471,7 @@ def ask_in_conversation(
     conversation = conversation_use_cases.get_conversation(
         SqlConversations(session), workspace.id, conversation_id
     )
+    # 引用由服务端在会话范围内派生，调用方无法提交引用，因此这里不再单独校验引用子集。
     prepared = _prepare(repos, session, workspace, conversation.scope, payload.question, embedder)
     session.commit()
     try:

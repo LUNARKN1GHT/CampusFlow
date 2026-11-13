@@ -11,9 +11,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from campusflow.application import schedule as schedule_use_cases
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData
 from campusflow.application.reminders import sync_reminders
+from campusflow.application.scope import require_semester_in_workspace
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
