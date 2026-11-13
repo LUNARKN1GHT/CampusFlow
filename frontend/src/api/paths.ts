@@ -50,8 +50,6 @@ export const pathsApi = {
   listPlans: () => apiRequest<CurriculumPlan[]>('/curriculum-plans'),
   createPlan: (input: CurriculumPlanInput) =>
     apiRequest<CurriculumPlan>('/curriculum-plans', { method: 'POST', body: JSON.stringify(input) }),
-  updatePlan: (id: number, input: CurriculumPlanInput) =>
-    apiRequest<CurriculumPlan>(`/curriculum-plans/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
   profile: () => apiRequest<LearnerProfile>('/learning-profile'),
   updateProfile: (input: { major: string | null; grade_year: number | null; curriculum_plan_id: number | null }) =>
     apiRequest<LearnerProfile>('/learning-profile', { method: 'PUT', body: JSON.stringify(input) }),
@@ -85,8 +83,6 @@ export const pathsApi = {
     apiRequest<CourseStudyRecord[]>(`/curriculum-plans/${planId}/study-records`),
   createStudyRecord: (planId: number, input: StudyRecordInput) =>
     apiRequest<CourseStudyRecord>(`/curriculum-plans/${planId}/study-records`, { method: 'POST', body: JSON.stringify(input) }),
-  updateStudyRecord: (planId: number, recordId: number, input: Partial<StudyRecordInput>) =>
-    apiRequest<CourseStudyRecord>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   deleteStudyRecord: (planId: number, recordId: number) =>
     apiRequest<void>(`/curriculum-plans/${planId}/study-records/${recordId}`, { method: 'DELETE' }),
   studyStatus: (planId: number) =>
