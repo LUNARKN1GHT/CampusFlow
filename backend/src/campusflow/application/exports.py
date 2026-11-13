@@ -66,6 +66,9 @@ _ICS_PRODID = "-//CampusFlow//Calendar Export 1//ZH"
 # 带时刻的截止只写 15 分钟显示窗口，不表示耗时，也不延长截止（A017 §3.4）。
 _DUE_DISPLAY_MINUTES = 15
 _ICS_MAX_OCTETS = 75
+# 单次导出的任务数上限：范围本身必须显式给出，超限直接拒绝，不逐条查询，
+# 避免数千次 SQL 把一次请求拖成连接与 CPU 的放大面（预览与下载共用）。
+MAX_EXPORT_TASKS = 500
 
 
 @dataclass(frozen=True)
@@ -265,6 +268,18 @@ def _source_hint_text(hint: _SourceHint) -> str | None:
     return text
 
 
+def _validate_task_ids(task_ids: tuple[int, ...]) -> None:
+    """范围校验：只接受正整数，重复标识先去重再判数量上限。
+
+    重复项不会被重复查询（``_load_tasks`` 也去重），所以上限按去重后的数量
+    计算；全部检查都在读取仓储之前完成，超限请求不会触发逐条查询。
+    """
+    if any(task_id <= 0 for task_id in task_ids):
+        raise DomainError("导出任务标识必须为正整数")
+    if len(set(task_ids)) > MAX_EXPORT_TASKS:
+        raise DomainError(f"一次最多导出 {MAX_EXPORT_TASKS} 个任务，请缩小范围后重试")
+
+
 def _validate_supported(request: ExportRequest) -> None:
     """校验模式与格式的组合，并强制显式范围。
 
@@ -276,6 +291,7 @@ def _validate_supported(request: ExportRequest) -> None:
             raise DomainError("任务清单导出不接受计划标识")
         if not request.task_ids:
             raise DomainError("请显式选择要导出的任务，不提供整空间导出")
+        _validate_task_ids(request.task_ids)
         if request.format not in {"csv", "ics"}:
             raise DomainError("当前仅支持 CSV 任务清单与 ICS 日历导出")
         return
@@ -1069,6 +1085,7 @@ def export_file(repos: Repositories, workspace_id: int, request: ExportRequest) 
 __all__ = [
     "CSV_COLUMNS",
     "EXPORT_VERSION",
+    "MAX_EXPORT_TASKS",
     "ExportEvent",
     "ExportFile",
     "ExportItem",

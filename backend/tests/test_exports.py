@@ -9,11 +9,23 @@ import csv
 import io
 import re
 from datetime import UTC, date, datetime, time
+from types import SimpleNamespace
+from typing import cast
 
+import pytest
 from fastapi.testclient import TestClient
 from index_helpers import open_session
 
-from campusflow.application.exports import ExportItem, render_tasks_csv
+from campusflow.application.exports import (
+    MAX_EXPORT_TASKS,
+    ExportItem,
+    ExportRequest,
+    export_file,
+    preview_export,
+    render_tasks_csv,
+)
+from campusflow.application.ports.repositories import Repositories
+from campusflow.domain.errors import DomainError
 from campusflow.infrastructure.db.models import PlanBlock
 
 HEADER = [
@@ -191,6 +203,65 @@ def test_duplicate_task_ids_are_deduplicated(client: TestClient) -> None:
     assert preview["item_count"] == 1
     assert preview["row_count"] == 1
     assert preview["scope"]["task_ids"] == [task["id"]]
+
+
+def test_oversized_task_scope_is_rejected(client: TestClient) -> None:
+    """超过单次上限的范围直接 400，预览与下载同一校验（#628）。"""
+    selected = _create_task(client, "范围内任务")
+    oversized = list(range(1, MAX_EXPORT_TASKS + 2))
+    assert len(oversized) > MAX_EXPORT_TASKS
+
+    preview = _preview(client, oversized)
+    assert preview.status_code == 400, preview.text
+    assert f"一次最多导出 {MAX_EXPORT_TASKS} 个任务" in preview.json()["detail"]
+
+    # 下载没有独立入口：同样在读取仓储与比对指纹之前被拒绝。
+    download = _download(client, oversized, "whatever-fingerprint")
+    assert download.status_code == 400, download.text
+    assert f"一次最多导出 {MAX_EXPORT_TASKS} 个任务" in download.json()["detail"]
+
+    # 非法标识（非正数）同样拒绝，不等同于“任务不存在”的 404。
+    for invalid in (0, -1):
+        response = _preview(client, [selected["id"], invalid])
+        assert response.status_code == 400, response.text
+        assert "正整数" in response.json()["detail"]
+
+    # 合法范围与范围指纹不受新增校验影响。
+    first = _preview(client, [selected["id"]])
+    second = _preview(client, [selected["id"]])
+    assert first.status_code == 200, first.text
+    assert first.json()["scope"]["task_ids"] == [selected["id"]]
+    assert first.json()["scope_fingerprint"] == second.json()["scope_fingerprint"]
+
+    # 重复标识按去重后的数量计算，不会因为重复被误判超限。
+    repeated = _preview(client, [selected["id"]] * (MAX_EXPORT_TASKS + 100))
+    assert repeated.status_code == 200, repeated.text
+    assert repeated.json()["item_count"] == 1
+    assert repeated.json()["scope_fingerprint"] == first.json()["scope_fingerprint"]
+
+
+def test_oversized_task_scope_does_not_query_tasks() -> None:
+    """超限范围在读取仓储之前拒绝：逐条查询一次都不发生（#628）。"""
+    looked_up: list[int] = []
+
+    def _record_lookup(task_id: int) -> None:
+        looked_up.append(task_id)
+        raise AssertionError("超限范围不应逐条查询任务")
+
+    repos = SimpleNamespace(tasks=SimpleNamespace(get=_record_lookup))
+    request = ExportRequest(
+        mode="tasks",
+        format="csv",
+        task_ids=tuple(range(1, MAX_EXPORT_TASKS + 2)),
+    )
+    with pytest.raises(DomainError) as preview_error:
+        preview_export(cast(Repositories, repos), 1, request)
+    assert f"一次最多导出 {MAX_EXPORT_TASKS} 个任务" in str(preview_error.value)
+
+    with pytest.raises(DomainError) as download_error:
+        export_file(cast(Repositories, repos), 1, request)
+    assert f"一次最多导出 {MAX_EXPORT_TASKS} 个任务" in str(download_error.value)
+    assert looked_up == []
 
 
 def test_date_only_and_missing_due_keep_precision(client: TestClient) -> None:

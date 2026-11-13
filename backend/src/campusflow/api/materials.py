@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from campusflow.api.auth import require_session
 from campusflow.api.deps import (
@@ -191,7 +191,11 @@ class TextImportOut(BaseModel):
 
 
 class MaterialMetadataUpdate(BaseModel):
-    """元数据修订（D005）：全部字段可选；传入 null 表示清空该字段。"""
+    """元数据修订（D005）：全部字段可选；可选字段传 null 表示清空。
+
+    标题是资料的非空列：省略表示保持不变，显式 null 直接拒绝，
+    不进入写库路径（与课程、任务的 PATCH 守卫一致）。
+    """
 
     title: str | None = Field(default=None, min_length=1, max_length=300)
     publisher: str | None = Field(default=None, max_length=200)
@@ -200,6 +204,13 @@ class MaterialMetadataUpdate(BaseModel):
     semester_id: int | None = None
     course_id: int | None = None
     class_name: str | None = Field(default=None, max_length=100)
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "MaterialMetadataUpdate":
+        # 资料标题不能为空：显式 null 会违反非空列，返回校验错误而不是 500。
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title 不能为 null")
+        return self
 
     @field_validator("published_at")
     @classmethod
@@ -632,9 +643,10 @@ def restore_material(material_id: int, workspace: CurrentWorkspace, repos: Repos
 def update_material(
     material_id: int, payload: MaterialMetadataUpdate, workspace: CurrentWorkspace, repos: Repos
 ) -> MaterialOut:
-    """修订发布方、发布时间与适用范围；传 null 表示清空可选字段。
+    """修订发布方、发布时间与适用范围；可选字段传 null 表示清空。
 
-    已导入的原文与历史版本不会被改写；范围变化影响后续检索与筛选。
+    标题不可清空（请求校验阶段拒绝），省略则保持原值。已导入的原文与历史
+    版本不会被改写；范围变化影响后续检索与筛选。
     """
     current = use_cases.get_material(repos, workspace.id, material_id)
     merged = replace(current, **payload.model_dump(exclude_unset=True))
