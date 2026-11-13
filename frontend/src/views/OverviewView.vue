@@ -12,7 +12,7 @@ import { plansApi } from '../api/plans'
 import type { PlanOverview } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
 import { priorityLabels, progressLabels } from '../constants/labels'
-import { formatTime } from '../utils/datetime'
+import { formatDueDate, formatTime } from '../utils/datetime'
 
 const overview = ref<PlanOverview | null>(null)
 const loading = ref(true)
@@ -20,12 +20,6 @@ const error = ref('')
 
 // 时间按浏览器本地时区格式化；页面日期 overview.today 由服务端按工作空间时区计算。
 const timeText = formatTime
-
-// 仅日期 DDL 只显示日期并标注，有时刻才追加 HH:mm，不补造时刻。
-function dueText(task: { due_date: string | null; due_time: string | null }): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
-}
 
 async function load() {
   loading.value = true
@@ -112,7 +106,7 @@ onMounted(load)
           <ul class="plain-list">
             <li v-for="task in overview.upcoming_tasks" :key="task.id" class="overview-item">
               <div class="task-title-line">
-                <strong>{{ dueText(task) }}</strong>
+                <strong>{{ formatDueDate(task.due_date, task.due_time) }}</strong>
                 <span v-if="task.overdue" class="status-pill overdue-pill">逾期</span>
               </div>
               <p><RouterLink class="item-link" :to="`/tasks?task=${task.id}`">{{ task.title }}</RouterLink></p>
