@@ -93,6 +93,8 @@ def convert_candidate(
 
     未确认候选直接拒绝；重复点击或请求重试命中既有的来源候选关联，返回同一
     事项并把 created 置为 false，界面据此提示「已存在」而不是再造一条。
+    created 由转换实现给出：唯一约束兜底命中并发请求已建好的事项时同样是 false，
+    不能因为进入了创建分支就报告新建成功。
     """
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
@@ -100,40 +102,47 @@ def convert_candidate(
     if existing is not None:
         return existing, False
     if candidate.draft.kind is CandidateKind.TASK:
-        task = convert_candidate_to_task(repos, workspace_id, candidate_id)
-        return CandidateConversion(CandidateKind.TASK, task.id, task.title), True
+        task, created = _convert_task(repos, workspace_id, candidate_id)
+        return CandidateConversion(CandidateKind.TASK, task.id, task.title), created
     if candidate.draft.kind is CandidateKind.EVENT:
-        event = convert_candidate_to_event(repos, workspace_id, candidate_id)
-        return CandidateConversion(CandidateKind.EVENT, event.id, event.title), True
+        event, created = _convert_event(repos, workspace_id, candidate_id)
+        return CandidateConversion(CandidateKind.EVENT, event.id, event.title), created
     if candidate.draft.kind is CandidateKind.CURRICULUM_COURSE:
-        course = convert_candidate_to_curriculum_course(repos, workspace_id, candidate_id)
+        course, created = _convert_curriculum_course(repos, workspace_id, candidate_id)
         return (
             CandidateConversion(CandidateKind.CURRICULUM_COURSE, course.id, course.name),
-            True,
+            created,
         )
     if candidate.draft.kind is CandidateKind.COURSE_RELATION:
-        relation = convert_candidate_to_course_relation(repos, workspace_id, candidate_id)
+        relation, created = _convert_course_relation(repos, workspace_id, candidate_id)
         return (
             CandidateConversion(
                 CandidateKind.COURSE_RELATION,
                 relation.id,
                 f"{relation.from_course_id} → {relation.to_course_id}",
             ),
-            True,
+            created,
         )
-    rule = convert_candidate_to_rule(repos, workspace_id, candidate_id)
-    return CandidateConversion(CandidateKind.RULE, rule.id, rule.title), True
+    rule, created = _convert_rule(repos, workspace_id, candidate_id)
+    return CandidateConversion(CandidateKind.RULE, rule.id, rule.title), created
 
 
 def convert_candidate_to_task(
     repos: Repositories, workspace_id: int, candidate_id: int
 ) -> TaskData:
     """转换已确认的任务候选；重复调用返回既有任务，不重复创建。"""
+    return _convert_task(repos, workspace_id, candidate_id)[0]
+
+
+def _convert_task(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[TaskData, bool]:
+    """创建任务并返回 (任务, 本次是否新建)；并发兜底命中既有记录时 created 为 False。"""
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
     existing = repos.tasks.get_by_source_candidate(candidate.id)
     if existing is not None:
-        return existing
+        return existing, False
     course_id = candidate.draft.scope.course_id
     require_course_in_workspace(repos, workspace_id, course_id)
     version = repos.materials.get_version(candidate.source_version_id)
@@ -164,20 +173,27 @@ def convert_candidate_to_task(
         # 唯一约束兜底：并发请求可能已为同一候选建了任务，返回既有记录而不是 500（#623）。
         existing = repos.tasks.get_by_source_candidate(candidate.id)
         if existing is not None:
-            return existing
+            return existing, False
         raise
-    return task
+    return task, True
 
 
 def convert_candidate_to_event(
     repos: Repositories, workspace_id: int, candidate_id: int
 ) -> FixedEventData:
     """转换已确认的日程候选；起止不可确定时拒绝，重复调用返回既有日程。"""
+    return _convert_event(repos, workspace_id, candidate_id)[0]
+
+
+def _convert_event(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[FixedEventData, bool]:
+    """创建固定日程并返回 (日程, 本次是否新建)；并发兜底命中既有记录时 created 为 False。"""
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
     existing = repos.schedule.get_fixed_event_by_source_candidate(candidate.id)
     if existing is not None:
-        return existing
+        return existing, False
     course_id = candidate.draft.scope.course_id
     require_course_in_workspace(repos, workspace_id, course_id)
     conversion = build_event_conversion(candidate.draft.kind, candidate.effective_draft().fields)
@@ -206,9 +222,9 @@ def convert_candidate_to_event(
         # 并发请求可能已建同一来源的固定日程；唯一约束兜底后返回既有记录（#623）。
         existing = repos.schedule.get_fixed_event_by_source_candidate(candidate.id)
         if existing is not None:
-            return existing
+            return existing, False
         raise
-    return event
+    return event, True
 
 
 def _plan_scope(repos: Repositories, workspace_id: int, candidate) -> int:
@@ -226,11 +242,18 @@ def convert_candidate_to_curriculum_course(
     repos: Repositories, workspace_id: int, candidate_id: int
 ) -> CurriculumCourseData:
     """把已确认的课程候选写入方案课程；重复调用返回既有行。"""
+    return _convert_curriculum_course(repos, workspace_id, candidate_id)[0]
+
+
+def _convert_curriculum_course(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[CurriculumCourseData, bool]:
+    """创建方案课程并返回 (课程, 本次是否新建)；并发兜底命中既有行时 created 为 False。"""
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
     existing = repos.paths.get_course_by_source_candidate(candidate.id)
     if existing is not None:
-        return existing
+        return existing, False
     plan_id = _plan_scope(repos, workspace_id, candidate)
     fields = {field.name: field for field in candidate.effective_draft().fields}
     name = fields["course_name"].value
@@ -269,9 +292,9 @@ def convert_candidate_to_curriculum_course(
         # 并发请求可能已建同一来源的方案课程；唯一约束兜底后返回既有记录（#623）。
         existing = repos.paths.get_course_by_source_candidate(candidate.id)
         if existing is not None:
-            return existing
+            return existing, False
         raise
-    return course
+    return course, True
 
 
 def _match_course(
@@ -305,11 +328,18 @@ def convert_candidate_to_course_relation(
     repos: Repositories, workspace_id: int, candidate_id: int
 ) -> CourseRelationData:
     """把已确认的关系候选写入正式关系；课程无法唯一匹配时拒绝，保留候选待核对。"""
+    return _convert_course_relation(repos, workspace_id, candidate_id)[0]
+
+
+def _convert_course_relation(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[CourseRelationData, bool]:
+    """创建课程关系并返回 (关系, 本次是否新建)；并发兜底命中既有行时 created 为 False。"""
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
     existing = repos.paths.get_relation_by_source_candidate(candidate.id)
     if existing is not None:
-        return existing
+        return existing, False
     plan_id = _plan_scope(repos, workspace_id, candidate)
     fields = {field.name: field for field in candidate.effective_draft().fields}
     relation = parse_relation_type_text(fields["relation_type"].value)
@@ -343,9 +373,9 @@ def convert_candidate_to_course_relation(
         # 并发请求可能已建同一来源的课程关系；唯一约束兜底后返回既有记录（#623）。
         existing = repos.paths.get_relation_by_source_candidate(candidate.id)
         if existing is not None:
-            return existing
+            return existing, False
         raise
-    return created
+    return created, True
 
 
 def convert_candidate_to_rule(
@@ -356,11 +386,18 @@ def convert_candidate_to_rule(
     未确认（待核对/已忽略/已失效）的候选不能当作正式要求；
     条件、范围与生效声明只保留原文，不做日期换算。
     """
+    return _convert_rule(repos, workspace_id, candidate_id)[0]
+
+
+def _convert_rule(
+    repos: Repositories, workspace_id: int, candidate_id: int
+) -> tuple[RuleData, bool]:
+    """创建课程规则并返回 (规则, 本次是否新建)；并发兜底命中既有记录时 created 为 False。"""
     candidate = get_candidate(repos, workspace_id, candidate_id)
     require_confirmed_for_conversion(candidate.review_status)
     existing = repos.rules.get_by_source_candidate(candidate.id)
     if existing is not None:
-        return existing
+        return existing, False
     scope = candidate.draft.scope
     require_course_in_workspace(repos, workspace_id, scope.course_id)
     require_semester_in_workspace(repos, workspace_id, scope.semester_id)
@@ -387,6 +424,6 @@ def convert_candidate_to_rule(
         # 并发请求可能已建同一来源的课程规则；唯一约束兜底后返回既有记录（#623）。
         existing = repos.rules.get_by_source_candidate(candidate.id)
         if existing is not None:
-            return existing
+            return existing, False
         raise
-    return rule
+    return rule, True

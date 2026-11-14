@@ -192,6 +192,20 @@ async function replaceTask(updated: Task) {
   tasks.value[index] = updated
 }
 
+// 子任务保存后父任务卡片的汇总不会随子任务响应返回：subtask_rollup 只在列表接口里带出。
+// 因此按 parent_task_id 重新读取列表并单独替换父任务那一行；读取失败只做提示，
+// 不回滚已经成功的保存，也不能抛错让进度面板误报“保存失败”。
+async function refreshParentRollup(child: Task) {
+  if (child.parent_task_id === null) return
+  try {
+    const latest = await tasksApi.list()
+    const parent = latest.find((task) => task.id === child.parent_task_id)
+    if (parent) await replaceTask(parent)
+  } catch {
+    listNotice.value = '子任务改动已保存，但父任务汇总暂时无法刷新；刷新页面后可看到最新汇总。'
+  }
+}
+
 // 编辑成功替换列表中的同一项，新建成功追加到列表；失败不关闭面板，避免输入丢失。
 async function saveTask() {
   saving.value = true
@@ -201,6 +215,8 @@ async function saveTask() {
     if (editing.value) {
       const updated = await tasksApi.update(editing.value.id, values)
       await replaceTask(updated)
+      // 编辑的若是子任务，父任务的剩余耗时与完成度也会变，卡片需要同步刷新。
+      await refreshParentRollup(updated)
     } else {
       const created = await tasksApi.create(values)
       tasks.value.push(created)
@@ -279,6 +295,8 @@ async function saveProgress() {
       progressForm.reason || null,
     )
     await replaceTask(updated)
+    // 子任务进度变化会改变父任务汇总，父卡片不能等刷新页面才更新。
+    await refreshParentRollup(updated)
     progressTask.value = updated
     progressForm.reason = ''
     await loadHistory(updated)

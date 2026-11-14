@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import and_, func, or_, select, text, update
+from sqlalchemy import and_, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -1742,6 +1742,22 @@ class SqlAlchemyPlanRepository:
         stmt = stmt.order_by(PlanDraft.created_at.desc(), PlanDraft.id.desc())
         return [_plan_draft_to_data(row) for row in self._session.scalars(stmt)]
 
+    def delete_draft(self, workspace_id: int, draft_id: int) -> bool:
+        """只删除该空间下待接受的草案。
+
+        条件里同时限定空间与 status='draft'：已接受或被替代的计划即使 ID 正确也不删。
+        plan_blocks 与 plan_versions 由外键 ON DELETE CASCADE 一并清理。
+        """
+        result = self._session.execute(
+            delete(PlanDraft).where(
+                PlanDraft.id == draft_id,
+                PlanDraft.workspace_id == workspace_id,
+                PlanDraft.status == "draft",
+            )
+        )
+        self._session.flush()
+        return bool(result.rowcount)
+
     def get_current(
         self, workspace_id: int, *, semester_id: int | None = None
     ) -> PlanDraftData | None:
@@ -2011,7 +2027,11 @@ class SqlAlchemyReminderRepository:
         return _reminder_trigger_to_data(row) if row is not None else None
 
     def upsert_triggers(self, rows: list[dict]) -> list[ReminderTriggerData]:
-        """按 dedupe_key 幂等写入提醒：重试、重复周期与并发同步只保留一条。"""
+        """按 dedupe_key 幂等写入提醒：重试、重复周期与并发同步只保留一条。
+
+        冲突时只改写待发送或已撤消的记录：待发送的更新正文与载荷（任务改名、
+        待核对数量变化），已撤消的恢复为待发送；已发送、已读与已忽略的绝不重新激活。
+        """
         if not rows:
             return []
         insert_stmt = pg_insert(ReminderTrigger).values(rows)
@@ -2023,8 +2043,8 @@ class SqlAlchemyReminderRepository:
                 "payload": insert_stmt.excluded.payload,
                 "updated_at": func.now(),
             },
-            # 仍需要的触发恢复为待发送；已读或已忽略的不重新弹出
-            where=ReminderTrigger.status == "cancelled",
+            # 待发送的记录允许刷新正文；已发送/已读/已忽略的不重新弹出
+            where=ReminderTrigger.status.in_(["cancelled", "pending"]),
         ).returning(ReminderTrigger.id)
         created_ids = list(self._session.scalars(statement))
         self._session.flush()

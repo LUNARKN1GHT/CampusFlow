@@ -291,14 +291,19 @@ async function retryLoad() {
 // 每次调用递增请求序号并记下方案：只有最新请求可以写回列表、错误与加载态，
 // 快速切换时丢弃旧方案的迟到响应，避免旧数据覆盖新方案。
 let planDataRequestId = 0
+// 上一轮已展示数据的方案编号：只有方案变化时才先清空列表与分析。
+// 同一方案内的保存后重载保留原数据直到新数据返回，避免列表空闪。
+let displayedPlanId: number | null = null
 
 async function loadPlanData() {
   const requestId = ++planDataRequestId
   const planId = selectedPlanId.value
   // 切换方案或重载方案数据后，上一次试排的结论与加载态都不再属于当前方案。
   resetSemesterPlan()
-  if (planId === null) {
-    dataLoading.value = false
+  // 切到另一方案时在请求发出前就清空上一方案的课程、关系、别名、修读与分析结论：
+  // 新方案请求失败时页面停在空态并显示错误，不能在新方案标题下继续展示旧方案的数据。
+  if (planId !== displayedPlanId) {
+    displayedPlanId = planId
     courses.value = []
     relations.value = []
     aliases.value = []
@@ -307,6 +312,9 @@ async function loadPlanData() {
     studyUnavailable.value = false
     studyError.value = ''
     resetAnalysis()
+  }
+  if (planId === null) {
+    dataLoading.value = false
     return
   }
   dataLoading.value = true
@@ -342,6 +350,10 @@ function resetAnalysis() {
   orderError.value = ''
   nextCourses.value = null
   nextError.value = ''
+  // 清空时一并结束上一方案的“加载中”：列表请求失败后不会再有分析请求来复位这些状态。
+  graphLoading.value = false
+  orderLoading.value = false
+  nextLoading.value = false
   selectedNodeId.value = null
   selectedEdgeId.value = null
   semesterPlan.value = null

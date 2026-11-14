@@ -1,6 +1,6 @@
 """A011：按截止精度与核对状态生成提醒。"""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
@@ -178,3 +178,38 @@ def test_pending_review_reminder_tracks_review_state(client: TestClient) -> None
     [history] = _reminders(client)
     assert history["id"] == review["id"]
     assert history["status"] == "sent"
+
+
+def test_pending_review_count_change_refreshes_same_day_record(client: TestClient) -> None:
+    """待核对数量变化时，同一天的待发送提醒更新正文与载荷，不新增记录。"""
+    material = _import_text(client)
+    workspace_id, version_id = _source_ids(material["id"])
+    candidates = [_insert_candidate(workspace_id, version_id) for _ in range(3)]
+
+    [review] = _reminders(client)
+    assert review["kind"] == "review"
+    assert review["payload"]["pending_review_count"] == 3
+    assert "有 3 项待核对事项" in review["message"]
+
+    # 恢复成尚未到期的待发送提醒，模拟数量变化发生在发送之前。
+    engine = create_engine(TEST_DATABASE_URL)
+    with engine.connect() as connection:
+        connection.execute(
+            text(
+                "UPDATE reminder_triggers SET status = 'pending', sent_at = NULL, "
+                "scheduled_for = :later WHERE id = :id"
+            ),
+            {"later": datetime.now(UTC) + timedelta(days=1), "id": review["id"]},
+        )
+        connection.execute(
+            text("DELETE FROM extracted_items WHERE id = :id"), {"id": candidates[-1]}
+        )
+        connection.commit()
+
+    [updated] = _reminders(client, status="pending")
+    assert updated["id"] == review["id"]
+    assert updated["status"] == "pending"
+    assert updated["payload"]["pending_review_count"] == 2
+    assert "有 2 项待核对事项" in updated["message"]
+    assert "有 3 项" not in updated["message"]
+    assert len(_reminders(client)) == 1

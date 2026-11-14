@@ -17,6 +17,7 @@ from campusflow.application.scope import require_semester_in_workspace
 from campusflow.application.settings import get_settings
 from campusflow.domain.errors import ConflictError, DomainError, NotFoundError
 from campusflow.domain.planning import (
+    MAX_PLANNING_RANGE_DAYS,
     AssumptionOptions,
     AvailabilityRule,
     BlockSuggestion,
@@ -44,6 +45,23 @@ PLANNABLE_PROGRESS = (
     TaskProgress.IN_PROGRESS,
     TaskProgress.BLOCKED,
 )
+
+# #625 后续：上限保留，但拒绝时给出可操作的下一步——超长草案多半是限制上线前保存的。
+PLANNING_RANGE_TOO_LONG_MESSAGE = (
+    f"规划区间不能超过 {MAX_PLANNING_RANGE_DAYS} 天；"
+    f"请新建不超过 {MAX_PLANNING_RANGE_DAYS} 天的草案，旧草案可丢弃后重新生成；"
+    "已接受的长区间计划请生成新草案并接受以替换"
+)
+
+
+def validate_planning_range_with_hint(start: date, end: date) -> None:
+    """校验规划区间，超长时使用可操作文案（#625 的 366 天上限不变）。
+
+    生成、接受、局部重排与固定日程导出都会经过这里；只改提示，不放宽限制。
+    """
+    if start <= end and (end - start).days + 1 > MAX_PLANNING_RANGE_DAYS:
+        raise DomainError(PLANNING_RANGE_TOO_LONG_MESSAGE)
+    validate_planning_range(start, end)
 
 
 @dataclass
@@ -89,7 +107,7 @@ def collect_inputs(
     只有日期的截止以当天结束为上限并标记，耗时缺失保留为待补充，不按 0 分钟计算。
     """
     # #625：固定日程 occurrences 按天展开，超长区间会生成海量实例，先拒绝。
-    validate_planning_range(range_start, range_end)
+    validate_planning_range_with_hint(range_start, range_end)
     if semester_id is not None:
         require_semester_in_workspace(repos, workspace_id, semester_id)
     settings = get_settings(repos, workspace_id)
@@ -319,7 +337,7 @@ def generate_draft(
     A005：preserved_blocks 原样带入并占用可用时间，对应任务只排剩余分钟；
     未排入任务、缺口与冲突写入草案，接受前可逐项核对。
     """
-    validate_planning_range(range_start, range_end)
+    validate_planning_range_with_hint(range_start, range_end)
     collected = collect_inputs(
         repos,
         workspace_id,
@@ -401,6 +419,22 @@ def get_draft(repos: Repositories, workspace_id: int, draft_id: int):
     if draft is None or draft.workspace_id != workspace_id:
         raise NotFoundError("计划草案不存在")
     return draft
+
+
+def discard_draft(repos: Repositories, workspace_id: int, draft_id: int) -> None:
+    """丢弃待接受草案（#625 后续）：只删草案，不动当前已接受计划。
+
+    366 天上限上线前保存的超长草案无法再接受或重排，用户需要一个明确出口；
+    删除范围限定在本空间且状态为 draft，时间块与版本随级联清理。
+    """
+    # 与接受共用工作空间行锁，避免丢弃与接受并发时删掉刚被接受的计划。
+    repos.plans.lock_workspace(workspace_id)
+    draft = get_draft(repos, workspace_id, draft_id)
+    if draft.status != "draft":
+        raise ConflictError("只有待接受草案可以丢弃")
+    if not repos.plans.delete_draft(workspace_id, draft_id):
+        raise NotFoundError("计划草案不存在")
+    repos.uow.commit()
 
 
 def _preserved_blocks_from_snapshot(snapshot: dict) -> tuple[PreservedBlock, ...]:
@@ -507,7 +541,7 @@ def reschedule_plan(
         raise NotFoundError("当前没有已接受的计划，无法局部重排")
     effective_start = range_start or current.range_start
     effective_end = range_end or current.range_end
-    validate_planning_range(effective_start, effective_end)
+    validate_planning_range_with_hint(effective_start, effective_end)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
     scope: set[int] | None = None
     if task_ids is not None:

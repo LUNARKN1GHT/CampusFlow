@@ -78,6 +78,106 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
 
+/** 各方案数据接口的确定性夹具；两个用例共用，避免复制同一份响应结构。 */
+function payloadFor(resource: string, planId: PlanId): unknown {
+  switch (resource) {
+    case 'courses':
+      return courses[planId]
+    case 'relations':
+    case 'aliases':
+      return []
+    case 'study-records':
+      // 方案 2 有一条修读记录，方案 1 为空；修读摘要据此显示 0 或 1。
+      return planId === 2
+        ? [
+            {
+              id: 2101,
+              curriculum_plan_id: 2,
+              curriculum_course_id: 21,
+              semester_id: null,
+              semester_name: null,
+              status: 'completed',
+              grade: '90',
+              credits_earned: 3,
+              note: null,
+              created_at: '2026-01-05T00:00:00Z',
+              updated_at: '2026-01-05T00:00:00Z',
+            },
+          ]
+        : []
+    case 'study-status':
+      return {
+        plan_id: planId,
+        courses:
+          planId === 2
+            ? [
+                {
+                  curriculum_course_id: 21,
+                  course_name: '操作系统',
+                  course_code: 'CS201',
+                  status: 'completed',
+                  record_count: 1,
+                  repeat_record_count: 0,
+                  completed_semester_ids: [],
+                  in_progress_semester_ids: [],
+                  planned_semester_ids: [],
+                  note: '',
+                },
+              ]
+            : [],
+        completed_count: planId === 2 ? 1 : 0,
+        in_progress_count: 0,
+        planned_count: 0,
+        unknown_count: 0,
+        note: '',
+      }
+    case 'graph':
+      return {
+        plan_id: planId,
+        plan_version: plans[planId].version_label,
+        nodes: [],
+        edges: [],
+        cycles: [],
+        conflicts: [],
+        missing: [],
+        pending: [],
+        complete: true,
+        limitations: [graphLimitations[planId]],
+      }
+    case 'order':
+      return {
+        plan_id: planId,
+        plan_version: plans[planId].version_label,
+        complete: true,
+        blocked: false,
+        levels: [orderCourseIds[planId]],
+        alternatives: false,
+        problems: [],
+        limitations: [],
+      }
+    case 'next':
+      return {
+        plan_id: planId,
+        plan_version: plans[planId].version_label,
+        complete: true,
+        blocked: false,
+        courses: [
+          {
+            course_id: orderCourseIds[planId][0],
+            name: nextCourseNames[planId],
+            study_status: 'unknown',
+            available: true,
+            unmet: [],
+            recommended: [],
+          },
+        ],
+        limitations: [],
+      }
+    default:
+      return {}
+  }
+}
+
 test('课程路径首次进入只请求一次，快速切换方案后保留最后方案数据', async ({ page }) => {
   // 命中记录形如 `courses:1`、`next:2`，用来断言每个方案接口的请求次数。
   const hits: string[] = []
@@ -179,105 +279,6 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
     })
   })
 
-  function payloadFor(resource: string, planId: PlanId): unknown {
-    switch (resource) {
-      case 'courses':
-        return courses[planId]
-      case 'relations':
-      case 'aliases':
-        return []
-      case 'study-records':
-        // 方案 2 有一条修读记录，方案 1 为空；修读摘要据此显示 0 或 1。
-        return planId === 2
-          ? [
-              {
-                id: 2101,
-                curriculum_plan_id: 2,
-                curriculum_course_id: 21,
-                semester_id: null,
-                semester_name: null,
-                status: 'completed',
-                grade: '90',
-                credits_earned: 3,
-                note: null,
-                created_at: '2026-01-05T00:00:00Z',
-                updated_at: '2026-01-05T00:00:00Z',
-              },
-            ]
-          : []
-      case 'study-status':
-        return {
-          plan_id: planId,
-          courses:
-            planId === 2
-              ? [
-                  {
-                    curriculum_course_id: 21,
-                    course_name: '操作系统',
-                    course_code: 'CS201',
-                    status: 'completed',
-                    record_count: 1,
-                    repeat_record_count: 0,
-                    completed_semester_ids: [],
-                    in_progress_semester_ids: [],
-                    planned_semester_ids: [],
-                    note: '',
-                  },
-                ]
-              : [],
-          completed_count: planId === 2 ? 1 : 0,
-          in_progress_count: 0,
-          planned_count: 0,
-          unknown_count: 0,
-          note: '',
-        }
-      case 'graph':
-        return {
-          plan_id: planId,
-          plan_version: plans[planId].version_label,
-          nodes: [],
-          edges: [],
-          cycles: [],
-          conflicts: [],
-          missing: [],
-          pending: [],
-          complete: true,
-          limitations: [graphLimitations[planId]],
-        }
-      case 'order':
-        return {
-          plan_id: planId,
-          plan_version: plans[planId].version_label,
-          complete: true,
-          blocked: false,
-          levels: [orderCourseIds[planId]],
-          alternatives: false,
-          problems: [],
-          limitations: [],
-        }
-      case 'next':
-        return {
-          plan_id: planId,
-          plan_version: plans[planId].version_label,
-          complete: true,
-          blocked: false,
-          courses: [
-            {
-              course_id: orderCourseIds[planId][0],
-              name: nextCourseNames[planId],
-              study_status: 'unknown',
-              available: true,
-              unmet: [],
-              recommended: [],
-            },
-          ],
-          limitations: [],
-        }
-      default:
-        return {}
-    }
-  }
-
   await page.goto('/course-paths')
   await expect(page.getByRole('heading', { name: '课程路径', level: 1 })).toBeVisible()
 
@@ -356,4 +357,86 @@ test('课程路径首次进入只请求一次，快速切换方案后保留最�
   await delayedPreviewDone
   await page.waitForTimeout(100)
   await expect(page.locator('.switch-preview')).toHaveCount(0)
+})
+
+test('切换方案后课程请求失败时清空上一方案数据并显示错误', async ({ page }) => {
+  // 置为本方案编号后，该方案的课程列表返回 500，其余接口保持正常。
+  let failingCoursesPlan: PlanId | null = null
+
+  await page.route('**/api/v1/**', async (route) => {
+    const { pathname } = new URL(route.request().url())
+
+    if (pathname === '/api/v1/auth/session') {
+      await json(route, { username: 'student' })
+      return
+    }
+    if (pathname === '/api/v1/learning-profile') {
+      await json(route, {
+        workspace_id: 1,
+        major: '计算机科学与技术',
+        grade_year: 2024,
+        curriculum_plan_id: 1,
+        missing_fields: [],
+        current_plan: plans[1],
+      })
+      return
+    }
+    if (pathname === '/api/v1/learning-profile/switch-preview') {
+      await json(route, {
+        current_plan: plans[1],
+        target_plan: plans[2],
+        relation_count: 0,
+        course_count: 1,
+        study_record_count: 0,
+        note: '切换预览',
+      })
+      return
+    }
+    if (pathname === '/api/v1/curriculum-plans') {
+      await json(route, [plans[1], plans[2]])
+      return
+    }
+    if (pathname === '/api/v1/semesters') {
+      await json(route, [])
+      return
+    }
+
+    const nested = /^\/api\/v1\/curriculum-plans\/(\d+)\/(courses|relations|aliases|study-records|study-status|graph|order|next)$/.exec(
+      pathname,
+    )
+    if (nested) {
+      const planId = Number(nested[1]) as PlanId
+      const resource = nested[2]
+      if (resource === 'courses' && planId === failingCoursesPlan) {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: '模拟课程列表读取失败' }),
+        })
+        return
+      }
+      await json(route, payloadFor(resource, planId))
+      return
+    }
+
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: `测试未模拟的接口：${pathname}` }),
+    })
+  })
+
+  await page.goto('/course-paths')
+  await expect(page.getByRole('heading', { name: '课程路径', level: 1 })).toBeVisible()
+
+  const courseTable = page.locator('.data-table').first()
+  await expect(courseTable.locator('tbody tr').first()).toContainText('数据结构')
+
+  // 切到方案 2 时课程请求失败：必须清空方案 1 的课程，并在页面上显示读取错误。
+  failingCoursesPlan = 2
+  await page.locator('.plan-choice', { hasText: '2025 版' }).click()
+  await expect(page.getByText('服务暂时不可用，请稍后重试。')).toBeVisible()
+  await expect(courseTable).not.toContainText('数据结构')
+  await expect(courseTable.getByText('方案还没有课程。可从资料提取候选，或手动添加。')).toBeVisible()
+  await expect(page.getByText('正在加载方案数据…')).toHaveCount(0)
 })
