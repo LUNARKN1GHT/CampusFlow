@@ -4,6 +4,8 @@
 PostgreSQL 17 与 pgvector，不需要另装 Docker、Python、Node、PostgreSQL 或 Redis。
 Docker 服务端部署见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 
+页面功能、任务与计划操作、提醒和导出的完整说明见 [用户使用手册](../USER-GUIDE.md)。
+
 > 当前安装包尚未签名与公证；Gatekeeper／SmartScreen 的实际表现见“安装”一节。
 > 干净机器验收尚未执行，本指南不构成发布验收结论。
 
