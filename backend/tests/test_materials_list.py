@@ -107,6 +107,33 @@ def test_metadata_revision_rejects_foreign_scope(client: TestClient) -> None:
     assert response.json() == {"detail": "课程不存在"}
 
 
+def test_metadata_update_rejects_null_title(client: TestClient) -> None:
+    """标题是非空列：显式 null 返回 4xx 且元数据保持不变（#622）。"""
+    imported = _import(client, "原标题", TEXT_A)
+    material_id = imported["material"]["id"]
+
+    response = client.patch(f"/api/v1/materials/{material_id}", json={"title": None})
+    assert 400 <= response.status_code < 500, response.text
+    assert "title 不能为 null" in response.text
+
+    detail = client.get(f"/api/v1/materials/{material_id}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["title"] == "原标题"
+
+    # 显式空字符串同样被拒绝，不写出空标题。
+    blank = client.patch(f"/api/v1/materials/{material_id}", json={"title": ""})
+    assert 400 <= blank.status_code < 500, blank.text
+    assert client.get(f"/api/v1/materials/{material_id}").json()["title"] == "原标题"
+
+    # 正常更新仍生效，可选字段仍可清空。
+    updated = client.patch(
+        f"/api/v1/materials/{material_id}", json={"title": "新标题", "publisher": None}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["title"] == "新标题"
+    assert updated.json()["publisher"] is None
+
+
 def test_material_detail_and_unknown_material(client: TestClient) -> None:
     imported = _import(client, "详情测试", TEXT_A)
     detail = client.get(f"/api/v1/materials/{imported['material']['id']}").json()

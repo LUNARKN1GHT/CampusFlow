@@ -1,6 +1,8 @@
 // 学期、课程、任务、固定日程／可用时间与提醒的业务接口。
 // 所有读写都由后端按当前会话工作空间隔离，前端不传 workspace 标识。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest } from './client'
 import type {
   AvailabilitySlot,
@@ -25,18 +27,7 @@ import type {
   TaskProgress,
   TaskProgressChange,
   TaskRelations,
-  TaskRollup,
 } from './types'
-
-/** 只省略 null／undefined／空串；false 与 0 仍会编码（例如 include_archived=false 也会发送）。 */
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
 
 // 归档只切换学期标记，不删除或改写课程、任务、进度与日程。
 export const semestersApi = {
@@ -53,15 +44,12 @@ export const coursesApi = {
 
 export const tasksApi = {
   list: (filters: { semesterId?: number; courseId?: number; progress?: TaskProgress } = {}) => apiRequest<Task[]>(`/tasks${queryString({ semester_id: filters.semesterId, course_id: filters.courseId, progress: filters.progress })}`),
-  get: (id: number) => apiRequest<Task>(`/tasks/${id}`),
   create: (input: TaskInput) => apiRequest<Task>('/tasks', { method: 'POST', body: JSON.stringify(input) }),
   update: (id: number, input: Partial<TaskInput>) => apiRequest<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
   // 进度与核对状态是两套独立状态；reason 写入进度历史，逾期由截止时间与完成情况计算。
   setProgress: (id: number, progress: TaskProgress, reason: string | null) => apiRequest<Task>(`/tasks/${id}/progress`, { method: 'PATCH', body: JSON.stringify({ progress, reason }) }),
   progressHistory: (id: number) => apiRequest<TaskProgressChange[]>(`/tasks/${id}/progress-history`),
   relations: (id: number) => apiRequest<TaskRelations>(`/tasks/${id}/relations`),
-  rollup: (id: number) => apiRequest<TaskRollup>(`/tasks/${id}/rollup`),
-  subtasks: (id: number) => apiRequest<Task[]>(`/tasks/${id}/subtasks`),
   createSubtasks: (id: number, items: SubtaskInput[]) => apiRequest<Task[]>(`/tasks/${id}/subtasks`, { method: 'POST', body: JSON.stringify({ items }) }),
   // POST 但只读：返回可编辑的拆分建议，不创建任务；需用户确认后再调 createSubtasks。
   splitSuggestions: (id: number) => apiRequest<SplitSuggestion>(`/tasks/${id}/split-suggestions`, { method: 'POST', body: JSON.stringify({}) }),

@@ -3,6 +3,7 @@
 from campusflow.application.ports.embeddings import Embedder, EmbeddingProfiles
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
 from campusflow.domain.errors import DomainError
+from campusflow.domain.indexing import INDEX_PROFILE_MISMATCH_REASON
 
 
 def embed_registered_text(
@@ -14,7 +15,7 @@ def embed_registered_text(
     """
     profile = profiles.get(profile_id)
     if profile is None or profile != embedder.profile:
-        raise DomainError("向量配置未登记或与调用模型不一致")
+        raise DomainError(INDEX_PROFILE_MISMATCH_REASON)
     profile.validate_text(text)
     result = embedder.embed(text)
     result.validate_for(profile)
@@ -30,5 +31,5 @@ def register_embedder_profile(profiles: EmbeddingProfiles, embedder: Embedder) -
     profiles.register(profile)
     stored = profiles.get(profile.id)
     if stored is None or stored != profile:
-        raise DomainError("向量配置未登记或与调用模型不一致")
+        raise DomainError(INDEX_PROFILE_MISMATCH_REASON)
     return profile

@@ -11,10 +11,13 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
-from campusflow.application.courses import require_semester_in_workspace
 from campusflow.application.ports.repositories import Repositories, TaskData, TaskDependencyData
 from campusflow.application.reminders import sync_reminders
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import (
+    require_course_in_workspace,
+    require_in_workspace,
+    require_semester_in_workspace,
+)
 from campusflow.domain.dates import is_overdue, validate_due
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.states import DueSourceType, TaskPriority, TaskProgress
@@ -82,13 +85,6 @@ def _require_task_in_workspace(repos: Repositories, workspace_id: int, task_id: 
     return task
 
 
-def _require_course_in_workspace(repos: Repositories, workspace_id: int, course_id: int) -> None:
-    course = repos.courses.get(course_id)
-    if course is None:
-        raise NotFoundError("课程不存在")
-    require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
-
-
 def get_task(repos: Repositories, workspace_id: int, task_id: int) -> TaskData:
     task = _require_task_in_workspace(repos, workspace_id, task_id)
     return _apply_overdue(repos, workspace_id, [task])[0]
@@ -126,7 +122,7 @@ def create_task(
         if course_id is None:
             course_id = parent.course_id
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     task = repos.tasks.create(
         workspace_id,
         course_id,
@@ -170,7 +166,7 @@ def update_task(
     if error:
         raise DomainError(error)
     if course_id is not None:
-        _require_course_in_workspace(repos, workspace_id, course_id)
+        require_course_in_workspace(repos, workspace_id, course_id)
     updated = repos.tasks.update(
         task_id,
         course_id=course_id,
@@ -267,13 +263,7 @@ def task_relations(repos: Repositories, workspace_id: int, task_id: int) -> dict
     }
 
 
-def subtask_rollup(repos: Repositories, workspace_id: int, task_id: int) -> dict:
-    """父任务直接子任务的进度与耗时汇总（A004）。
-
-    只读取子任务，不写回父任务，也不把汇总值当成新的耗时事实。
-    """
-    _require_task_in_workspace(repos, workspace_id, task_id)
-    children = repos.tasks.list_subtasks(task_id)
+def _rollup_from_children(children: list[TaskData]) -> dict:
     estimated = sum(
         child.estimated_minutes
         if child.estimated_minutes is not None
@@ -300,6 +290,50 @@ def subtask_rollup(repos: Repositories, workspace_id: int, task_id: int) -> dict
         "progress_counts": progress_counts,
         "percent_complete": percent_complete,
     }
+
+
+def subtask_rollup(repos: Repositories, workspace_id: int, task_id: int) -> dict:
+    """父任务直接子任务的进度与耗时汇总（A004）。
+
+    只读取子任务，不写回父任务，也不把汇总值当成新的耗时事实。
+    """
+    _require_task_in_workspace(repos, workspace_id, task_id)
+    return _rollup_from_children(repos.tasks.list_subtasks(task_id))
+
+
+def list_tasks_with_rollups(
+    repos: Repositories,
+    workspace_id: int,
+    *,
+    course_id: int | None = None,
+    progress: TaskProgress | None = None,
+    semester_id: int | None = None,
+    due_from: date | None = None,
+    due_to: date | None = None,
+) -> list[tuple[TaskData, dict | None]]:
+    """任务列表附带父任务汇总，卡片与详情使用同一口径（#557）。
+
+    只为有直接子任务的任务附带汇总；子任务本身和普通任务返回 None。
+    汇总沿用 A004 规则，不写回父任务，也不影响排期只安排子任务。
+    """
+    tasks = list_tasks(
+        repos,
+        workspace_id,
+        course_id=course_id,
+        progress=progress,
+        semester_id=semester_id,
+        due_from=due_from,
+        due_to=due_to,
+    )
+    children_by_parent: dict[int, list[TaskData]] = {}
+    for item in repos.tasks.list(workspace_id):
+        if item.parent_task_id is not None:
+            children_by_parent.setdefault(item.parent_task_id, []).append(item)
+    result: list[tuple[TaskData, dict | None]] = []
+    for task in tasks:
+        children = children_by_parent.get(task.id)
+        result.append((task, _rollup_from_children(children) if children else None))
+    return result
 
 
 def create_subtasks(

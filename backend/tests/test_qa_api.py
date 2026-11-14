@@ -394,3 +394,90 @@ def test_conversation_detail_exposes_pending_conflict_count(client, qa_models):
     response = client.get(f"/api/v1/qa/conversations/{conversation_id}")
     assert response.status_code == 200
     assert response.json()["pending_conflict_count"] == 0
+
+
+class ExplodingEmbedder(FakeEmbedder):
+    """被调用即失败的向量替身，用于断言关键词模式不发起向量调用。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.embed_calls = 0
+
+    def embed(self, text):
+        self.embed_calls += 1
+        raise AssertionError("关键词模式不应调用向量模型")
+
+
+def test_keyword_mode_works_without_vector_configuration(client, monkeypatch):
+    """#627：未配置向量模型时关键词问答仍可用，混合模式保留原有错误契约。"""
+    # 固定为真实装配路径且无密钥，避免其它用例遗留的演示向量工厂影响断言。
+    monkeypatch.setattr("campusflow.workers.embeddings._FACTORY", None)
+    client.app.state.settings.zhipu_api_key = None
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post(
+            "/api/v1/qa/query",
+            json=query_body(scope, mode="keyword", question="CS101 作业截止"),
+        )
+        hybrid = client.post("/api/v1/qa/query", json=query_body(scope))
+    finally:
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["insufficient"] is False
+    assert len(body["citations"]) == 1
+    # 未配置密钥时混合模式仍是明确的 400 业务错误，而不是 500。
+    assert hybrid.status_code == 400, hybrid.text
+    assert "ZHIPU_API_KEY" in hybrid.json()["detail"]
+
+
+def test_keyword_mode_never_calls_configured_embedder(client):
+    """#627：即使向量模型可用，关键词模式也不发起向量调用。"""
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    embedder = ExplodingEmbedder()
+    client.app.dependency_overrides[get_embedder] = lambda: embedder
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post(
+            "/api/v1/qa/query",
+            json=query_body(scope, mode="keyword", question="CS101 作业截止"),
+        )
+    finally:
+        client.app.dependency_overrides.pop(get_embedder, None)
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["insufficient"] is False
+    assert embedder.embed_calls == 0
+
+
+def test_keyword_conversation_works_without_vector_configuration(client):
+    """#627：会话保存的关键词排序同样不要求向量模型。"""
+    client.app.state.settings.zhipu_api_key = None
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    created = client.post(
+        "/api/v1/qa/conversations",
+        json={**conversation_body(scope), "mode": "keyword"},
+    )
+    assert created.status_code == 200, created.text
+    conversation_id = created.json()["id"]
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post(
+            f"/api/v1/qa/conversations/{conversation_id}/messages",
+            json={"question": "CS101 作业截止"},
+        )
+    finally:
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["insufficient"] is False
+    assert len(response.json()["citations"]) == 1

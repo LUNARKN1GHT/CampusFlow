@@ -21,6 +21,7 @@ from contextlib import contextmanager
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from campusflow.application.ai_settings import apply_stored_ai_settings
 from campusflow.application.jobs import RecoveryResult, run_recovery_sweep
 from campusflow.application.ports.repositories import Repositories
 from campusflow.core.config import Settings
@@ -221,6 +222,9 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     try:
         settings = Settings()
+        # 桌面模式从本机凭据存储补齐模型密钥与供应方（环境变量优先）；
+        # 必须在 configure_worker 之前完成，解析器与向量模型装配才会用上新配置。
+        apply_stored_ai_settings(settings)
         configure_worker(settings, demo=args.demo)
     except ValueError:
         raise SystemExit("桌面 Worker 配置无效，请检查数据库与模型配置") from None

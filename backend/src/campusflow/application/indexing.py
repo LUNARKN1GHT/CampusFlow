@@ -14,9 +14,21 @@ from campusflow.application.ports.embeddings import Embedder, EmbeddingProfiles
 from campusflow.application.ports.indexing import IndexManifests
 from campusflow.application.ports.repositories import Repositories
 from campusflow.application.processing import abandon_write, blocked_write_reason
-from campusflow.domain.errors import DomainError, NotFoundError, PermanentError, TransientError
+from campusflow.domain.errors import (
+    ConfigurationError,
+    DomainError,
+    NotFoundError,
+    PermanentError,
+    TransientError,
+)
 from campusflow.domain.indexing import (
     DEFAULT_BLOCK_LEASE_SECONDS,
+    INDEX_ALL_BLOCKS_FAILED_REASON,
+    INDEX_CONFIGURATION_MISSING_REASON,
+    INDEX_PARTIAL_BLOCKS_FAILED_REASON,
+    INDEX_PROFILE_MISMATCH_REASON,
+    INDEX_SOURCE_CHANGED_REASON,
+    INDEX_SOURCE_UNAVAILABLE_REASON,
     MAX_BLOCK_ATTEMPTS,
     IndexProgressSummary,
 )
@@ -24,9 +36,9 @@ from campusflow.domain.states import JobStage, JobStatus
 
 logger = logging.getLogger(__name__)
 
-_SOURCE_CHANGED_REASON = "索引来源在运行中变化，需要重新生成清单"
-_SOURCE_UNAVAILABLE_REASON = "索引来源不可用或已归档"
-_PROFILE_MISMATCH_REASON = "向量配置未登记或与调用模型不一致"
+_SOURCE_CHANGED_REASON = INDEX_SOURCE_CHANGED_REASON
+_SOURCE_UNAVAILABLE_REASON = INDEX_SOURCE_UNAVAILABLE_REASON
+_PROFILE_MISMATCH_REASON = INDEX_PROFILE_MISMATCH_REASON
 _STAGE_MISMATCH_REASON = "作业阶段与索引用例不匹配"
 
 
@@ -116,12 +128,14 @@ def index_version(
         logger.info("索引作业 %s 尚有未完成块，保留处理中状态", job_id)
         return None
 
+    # 缺少模型配置的失败允许人工重试（配置修正后重建清单补齐），
+    # 其余失败不重投；块级自动重试仍只认 upstream_transient。
     repos.jobs.record_attempt(
         job_id,
         status=summary.status,
         scope=_scope_text(summary),
         error_reason=_error_reason(summary),
-        retryable=False,
+        retryable=summary.configuration_failed > 0,
     )
     repos.uow.commit()
     return summary
@@ -190,6 +204,9 @@ def _failure_code(exc: BaseException) -> str:
         return "source_unavailable"
     if isinstance(exc, TransientError):
         return "upstream_transient"
+    if isinstance(exc, ConfigurationError):
+        # 不自动重试；配置补齐后人工重试会把这类块恢复为待处理。
+        return "configuration_missing"
     if isinstance(exc, (PermanentError, DomainError)):
         return "invalid_response"
     # 未预期异常按临时失败处理：仍受每块次数上限约束，不会无限重试。
@@ -231,8 +248,10 @@ def _scope_text(summary: IndexProgressSummary) -> str:
 
 
 def _error_reason(summary: IndexProgressSummary) -> str | None:
+    if summary.configuration_failed:
+        return INDEX_CONFIGURATION_MISSING_REASON
     if summary.status == JobStatus.FAILED:
-        return "索引全部块失败"
+        return INDEX_ALL_BLOCKS_FAILED_REASON
     if summary.status == JobStatus.PARTIAL:
-        return "部分索引块失败，结果不完整"
+        return INDEX_PARTIAL_BLOCKS_FAILED_REASON
     return None

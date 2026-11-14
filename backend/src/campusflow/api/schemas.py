@@ -160,6 +160,15 @@ class TaskRollupOut(BaseModel):
     percent_complete: int | None
 
 
+class TaskListItemOut(TaskOut):
+    """任务列表额外返回父任务汇总，卡片与详情共用同一口径（#557）。
+
+    非父任务为 None，原有字段与语义不变。
+    """
+
+    subtask_rollup: TaskRollupOut | None = None
+
+
 class TaskRelationsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
     task_id: int

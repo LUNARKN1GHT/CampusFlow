@@ -10,6 +10,7 @@ from campusflow.application.ports.embeddings import Embedder
 from campusflow.core.config import Settings
 from campusflow.domain.embeddings import EmbeddedText, EmbeddingProfile
 from campusflow.infrastructure.llm.embeddings import ZhipuEmbedder
+from campusflow.workers.model_hints import missing_model_key_hint
 
 _FACTORY = None
 
@@ -26,7 +27,8 @@ def profile_from_settings(settings: Settings) -> EmbeddingProfile:
 def build_embedder(settings: Settings) -> ZhipuEmbedder:
     """缺密钥直接失败，不退回假向量；构造适配器本身不联网。"""
     if not settings.zhipu_api_key:
-        raise ValueError("缺少 ZHIPU_API_KEY，不能调用真实向量模型")
+        hint = missing_model_key_hint(settings, env_name="ZHIPU_API_KEY", next_step="建立索引")
+        raise ValueError(f"缺少 ZHIPU_API_KEY，不能调用真实向量模型；{hint}")
     return ZhipuEmbedder(
         settings.zhipu_api_key,
         profile=profile_from_settings(settings),

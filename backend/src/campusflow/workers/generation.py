@@ -7,6 +7,7 @@
 from campusflow.application.ports.generation import TextGenerator
 from campusflow.core.config import Settings
 from campusflow.infrastructure.llm.text import DeepSeekTextGenerator, ZhipuTextGenerator
+from campusflow.workers.model_hints import missing_model_key_hint
 
 
 def build_text_generator(settings: Settings) -> TextGenerator:
@@ -14,7 +15,8 @@ def build_text_generator(settings: Settings) -> TextGenerator:
     provider = settings.text_provider
     if provider == "deepseek":
         if not settings.deepseek_api_key:
-            raise ValueError("缺少 DEEPSEEK_API_KEY，不能调用真实文字模型")
+            hint = missing_model_key_hint(settings, env_name="DEEPSEEK_API_KEY", next_step="重试")
+            raise ValueError(f"缺少 DEEPSEEK_API_KEY，不能调用真实文字模型；{hint}")
         return DeepSeekTextGenerator(
             settings.deepseek_api_key,
             model=settings.text_model,
@@ -24,7 +26,8 @@ def build_text_generator(settings: Settings) -> TextGenerator:
     if provider != "zhipu":
         raise ValueError(f"未知的文字模型供应方：{provider}")
     if not settings.zhipu_api_key:
-        raise ValueError("缺少 ZHIPU_API_KEY，不能调用真实文字模型")
+        hint = missing_model_key_hint(settings, env_name="ZHIPU_API_KEY", next_step="重试")
+        raise ValueError(f"缺少 ZHIPU_API_KEY，不能调用真实文字模型；{hint}")
     return ZhipuTextGenerator(
         settings.zhipu_api_key,
         model=settings.text_model,

@@ -1,37 +1,29 @@
 <script setup lang="ts">
 /*
- * 今日总览：只读汇总当日时间块、下一段安排、未来 7 天截止、待核对数量、未排入与冲突风险。
- * 数据来自最近一次已接受计划与任务／候选统计；没有已接受计划时提示先生成并接受草案。
- * 页面不提供写操作，各入口只跳转到任务、计划、待核对或问答页。
+ * 今日总览：只读汇总当日时间块、下一段安排、未来 7 天截止、未排入与冲突风险。
+ * 数据来自最近一次已接受计划与任务统计；没有已接受计划时提示先生成并接受草案。
+ * 页面不提供写操作，各入口只跳转到任务或计划页。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { errorMessage } from '../api/client'
 import { plansApi } from '../api/plans'
 import type { PlanOverview } from '../api/plans'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { priorityLabels, progressLabels } from '../constants/labels'
+import { formatDueDate, formatTime, formatZonedTime } from '../utils/datetime'
 
 const overview = ref<PlanOverview | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-const priorityLabels: Record<string, string> = { low: '低', medium: '中', high: '高' }
-const progressLabels: Record<string, string> = {
-  not_started: '未开始',
-  in_progress: '进行中',
-  blocked: '受阻',
-}
+// 时间块按工作空间时区展示，与“今日”分区（overview.today）保持同一时区；
+// 后端未给出时区时才退回浏览器本地时区，并在页面上说明该限制。
+const timezone = computed(() => overview.value?.timezone ?? '')
 
-// 时间按浏览器本地时区格式化；页面日期 overview.today 由服务端按工作空间时区计算。
 function timeText(value: string): string {
-  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
-// 仅日期 DDL 只显示日期并标注，有时刻才追加 HH:mm，不补造时刻。
-function dueText(task: { due_date: string | null; due_time: string | null }): string {
-  if (!task.due_date) return '未设置 DDL'
-  return task.due_time ? `${task.due_date} ${task.due_time.slice(0, 5)}` : `${task.due_date}（仅日期）`
+  return timezone.value ? formatZonedTime(value, timezone.value) : formatTime(value)
 }
 
 async function load() {
@@ -54,7 +46,7 @@ onMounted(load)
     <div class="page-heading">
       <p class="eyebrow">今日总览</p>
       <h1>今天先做什么，<br />一眼看清。</h1>
-      <p class="intro">今日安排、近期截止和待核对事项集中展示；总览只读取数据，不修改计划。</p>
+      <p class="intro">今日安排、近期截止和计划风险集中展示；总览只读取数据，不修改计划。</p>
     </div>
 
     <ApiFeedback v-if="error" :message="error" @retry="load" />
@@ -70,10 +62,6 @@ onMounted(load)
         <div>
           <span>近期截止任务</span>
           <strong>{{ overview.upcoming_tasks.length }}</strong>
-        </div>
-        <div>
-          <span>待核对事项</span>
-          <strong>{{ overview.pending_review_count }}</strong>
         </div>
         <div>
           <span>未完整排入</span>
@@ -95,6 +83,10 @@ onMounted(load)
             尚无已接受计划。先到<RouterLink to="/plan">学习计划</RouterLink>生成并接受两周草案。
           </p>
           <template v-else>
+            <p class="form-help">
+              <template v-if="timezone">时间按工作空间时区 {{ timezone }} 显示。</template>
+              <template v-else>未取得工作空间时区，时间按浏览器本地时区显示，可能与“今日”日期错位。</template>
+            </p>
             <p v-if="overview.next_block" class="next-block">
               下一段：<strong>{{ timeText(overview.next_block.starts_at) }}–{{ timeText(overview.next_block.ends_at) }}</strong>
               {{ overview.next_block.title }}
@@ -123,7 +115,7 @@ onMounted(load)
           <ul class="plain-list">
             <li v-for="task in overview.upcoming_tasks" :key="task.id" class="overview-item">
               <div class="task-title-line">
-                <strong>{{ dueText(task) }}</strong>
+                <strong>{{ formatDueDate(task.due_date, task.due_time) }}</strong>
                 <span v-if="task.overdue" class="status-pill overdue-pill">逾期</span>
               </div>
               <p><RouterLink class="item-link" :to="`/tasks?task=${task.id}`">{{ task.title }}</RouterLink></p>
@@ -137,9 +129,7 @@ onMounted(load)
       <section class="panel quick-links" aria-label="下一步">
         <h2>下一步</h2>
         <div class="page-actions">
-          <RouterLink class="button-link" to="/review">处理待核对事项（{{ overview.pending_review_count }}）</RouterLink>
           <RouterLink class="button-link" to="/plan">调整两周计划</RouterLink>
-          <RouterLink class="button-link" to="/qa">带引用提问</RouterLink>
         </div>
       </section>
     </template>

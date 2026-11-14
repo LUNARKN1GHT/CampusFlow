@@ -11,7 +11,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number | null,
-    public readonly kind: 'http' | 'validation' | 'network' | 'timeout' | 'invalid-response',
+    public readonly kind: 'http' | 'validation' | 'network' | 'timeout' | 'cancelled' | 'invalid-response',
   ) {
     super(message)
     this.name = 'ApiError'
@@ -27,7 +27,7 @@ function validationMessage(issues: ValidationIssue[]): string {
 }
 
 /**
- * 把非 2xx 响应转成 ApiError：优先使用后端 detail 文案，非 JSON 错误页不泄露原始正文。
+ * 把非 2xx 响应转成 ApiError：4xx 优先使用后端 detail 文案，5xx 与非 JSON 错误页不泄露原始正文。
  * 401 只在 notifySessionExpiry 时广播会话失效事件；/auth/ 路径的 401 按登录失败提示。
  */
 async function toApiError(response: Response, notifySessionExpiry: boolean): Promise<ApiError> {
@@ -49,7 +49,14 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
   if (response.status === 422 && Array.isArray(payload?.detail)) {
     return new ApiError(validationMessage(payload.detail), 422, 'validation')
   }
-  if (typeof payload?.detail === 'string' && [400, 404, 409, 422].includes(response.status)) {
+  // 4xx 且后端给出字符串 detail 时优先展示后端文案（例如 403 的具体拒绝原因），
+  // 5xx 与非 JSON 错误页仍使用下面的固定文案，避免泄露内部实现；401 已在上面单独处理。
+  if (
+    typeof payload?.detail === 'string'
+    && payload.detail.trim() !== ''
+    && response.status >= 400
+    && response.status < 500
+  ) {
     return new ApiError(payload.detail, response.status, response.status === 422 ? 'validation' : 'http')
   }
   if (response.status === 404) return new ApiError('没有找到请求的内容，它可能已被删除。', 404, 'http')
@@ -59,7 +66,8 @@ async function toApiError(response: Response, notifySessionExpiry: boolean): Pro
 
 /**
  * 发出请求并统一处理超时：GET 强制 no-store，避免浏览器缓存旧数据。
- * AbortError 归为超时，其余 fetch 异常归为网络不可达；两者都不会把请求伪装成成功。
+ * 调用方可通过 init.signal 取消请求：取消与超时、网络错误分开，旧响应由调用方丢弃。
+ * AbortError 归为超时或取消，其余 fetch 异常归为网络不可达；都不会把请求伪装成成功。
  */
 async function performRequest(
   path: string,
@@ -67,8 +75,16 @@ async function performRequest(
   headers: Headers,
   timeoutMs: number,
 ): Promise<Response> {
+  const externalSignal = init.signal ?? undefined
+  if (externalSignal?.aborted) throw new ApiError('请求已取消。', null, 'cancelled')
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const abortFromCaller = () => controller.abort()
+  externalSignal?.addEventListener('abort', abortFromCaller, { once: true })
+  const timeout = window.setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
   try {
     const response = await fetch(`${API_PREFIX}${path}`, {
       ...init,
@@ -82,16 +98,23 @@ async function performRequest(
   } catch (error) {
     if (error instanceof ApiError) throw error
     if (error instanceof DOMException && error.name === 'AbortError') {
+      // 调用方主动取消（切换筛选或关闭面板）不等于超时，不能提示“请求超时”。
+      if (externalSignal?.aborted && !timedOut) {
+        throw new ApiError('请求已取消。', null, 'cancelled')
+      }
       throw new ApiError('请求超时，请检查网络后重试。', null, 'timeout')
     }
     throw new ApiError('无法连接服务，请检查网络或确认后端已经启动。', null, 'network')
   } finally {
     window.clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', abortFromCaller)
   }
 }
 
-/** 普通 JSON 接口：204 返回 undefined，响应不是 JSON 时报 invalid-response 而不是当作成功。 */
-export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** 普通 JSON 接口：204 返回 undefined，响应不是 JSON 时报 invalid-response 而不是当作成功。
+ * timeoutMs 默认 8 秒；显式识别等可能同步调用模型的入口需要单独放宽。
+ */
+export async function apiRequest<T>(path: string, init: RequestInit = {}, timeoutMs = 8000): Promise<T> {
   const headers = new Headers(init.headers)
   headers.set('Accept', 'application/json')
   // FormData 由浏览器自行设置 multipart 边界，不能强制覆盖为 JSON。
@@ -99,7 +122,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await performRequest(path, init, headers, 8000)
+  const response = await performRequest(path, init, headers, timeoutMs)
   if (response.status === 204) return undefined as T
   try {
     return await response.json() as T

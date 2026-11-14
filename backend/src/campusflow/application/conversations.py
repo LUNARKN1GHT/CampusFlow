@@ -11,7 +11,7 @@ from campusflow.application.ports.conversations import ConversationStore
 from campusflow.application.ports.repositories import Repositories
 from campusflow.application.ports.retrieval import CitationSources
 from campusflow.application.retrieval import validate_retrieval_scope
-from campusflow.domain.citations import Citation, RevalidatedCitation
+from campusflow.domain.citations import RevalidatedCitation
 from campusflow.domain.conversation import (
     NewQaTurn,
     QaConversationData,
@@ -150,17 +150,3 @@ def read_conversation(
         coverage=tuple(coverage),
         pending_conflict_count=_pending_conflict_count(repos, conversation),
     )
-
-
-def require_citations_subset(
-    workspace_id: int, conversation: QaConversationData, citations: tuple[Citation, ...]
-) -> None:
-    """后续追问不能把其他空间或范围的引用带进当前会话。"""
-    if conversation.workspace_id != workspace_id:
-        raise NotFoundError("问答会话不存在")
-    for citation in citations:
-        # 未标范围的引用按当前会话范围接受；明确标了其他学期或课程则拒绝。
-        if citation.semester_id not in (None, conversation.scope.semester_id):
-            raise DomainError("引用不属于当前会话的学期范围")
-        if citation.course_id not in (None, conversation.scope.course_id):
-            raise DomainError("引用不属于当前会话的课程范围")

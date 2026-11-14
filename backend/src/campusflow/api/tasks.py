@@ -18,6 +18,7 @@ from campusflow.api.schemas import (
     TaskCreate,
     TaskDependencyIn,
     TaskDependencyOut,
+    TaskListItemOut,
     TaskOut,
     TaskParentIn,
     TaskProgressChangeOut,
@@ -37,7 +38,7 @@ CurrentWorkspace = Annotated[WorkspaceData, Depends(get_current_workspace)]
 Repos = Annotated[Repositories, Depends(get_repositories)]
 
 
-@router.get("/tasks", response_model=list[TaskOut])
+@router.get("/tasks", response_model=list[TaskListItemOut])
 def list_tasks(
     workspace: CurrentWorkspace,
     repos: Repos,
@@ -48,22 +49,26 @@ def list_tasks(
         date | None, Query(description="截止日期区间起点（含）；未关联课程的任务不属于任何学期")
     ] = None,
     due_to: Annotated[date | None, Query(description="截止日期区间终点（含）")] = None,
-) -> list[TaskOut]:
+) -> list[TaskListItemOut]:
     """progress 是任务执行进度，不是候选核对状态；两套枚举不能混传。
 
     按学期过滤时，未关联课程的任务不属于任何学期，不会命中。
+    父任务附带子任务汇总，避免卡片与详情各算一套剩余耗时。
     """
+    items = use_cases.list_tasks_with_rollups(
+        repos,
+        workspace.id,
+        course_id=course_id,
+        progress=progress,
+        semester_id=semester_id,
+        due_from=due_from,
+        due_to=due_to,
+    )
     return [
-        TaskOut.model_validate(t)
-        for t in use_cases.list_tasks(
-            repos,
-            workspace.id,
-            course_id=course_id,
-            progress=progress,
-            semester_id=semester_id,
-            due_from=due_from,
-            due_to=due_to,
+        TaskListItemOut.model_validate(
+            {**TaskOut.model_validate(task).model_dump(), "subtask_rollup": rollup}
         )
+        for task, rollup in items
     ]
 
 

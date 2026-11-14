@@ -1,6 +1,6 @@
 # CampusFlow 技术方案与项目架构
 
-本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前已实现工程骨架、本机单用户会话、PostgreSQL 迁移，以及学期／课程／手动任务与进度历史／固定日程／可用时间／学习偏好的前后端闭环；本整合分支已接入跨工作空间授权、资料上传/解析/定位及 RQ Worker；事项核对、问答与排期尚待实现。** 已合并实现的独立复验与后续任务见 [开发路线](planning/ROADMAP.md)，不以代码存在代替验收通过。
+本文确定首期开发基线，业务范围以 [README](../README.md) 和 [AGENTS](../AGENTS.md) 为准。**当前实现状态：M1 手动管理闭环（本机单用户会话、学期／课程／任务／固定日程／可用时间）、M2–M3 资料导入解析定位与集中核对、M4 带引用问答、M5 两周计划与冲突检查、M6–M7 扩展导入／通知变更／依赖与局部重排／提醒／导出、M8 课程路径、M9 外部日历均已接入后端与迁移；前端现有 12 个路由页面（11 个受保护页面加登录页，另有 1 个未挂载的占位页）与 5 个共享组件，后端有 49 个 Alembic 迁移。** 2026-11-12 起智能问答、外部日历、待核对与版本对照的前端页面暂不提供入口（后端接口与数据保留），课程路径移入设置页「工具箱」；真实 Google 账户、生产身份系统等未验证项在对应验收记录中单独标注，不以代码存在代替验收通过，已合并实现的独立复验与后续任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 1. 总体决策
 
@@ -20,18 +20,18 @@ N004 的公开网页抓取使用 Python 标准库：应用层定义抓取结果�
 
 | 层面 | 选择 | 原因与引入时机 |
 | --- | --- | --- |
-| 前端 | Vue 3 + TypeScript + Vite | 页面、组件与 API 调用分开，类型检查帮助维护接口；本次建立最小页面。多页时加 Vue Router，有共享状态需求时加 Pinia |
-| Python 运行环境 | Python 3.12 + uv | 小组统一解释器小版本，使用 `pyproject.toml` 和 `uv.lock` 管理依赖；本次落地 |
-| HTTP API | FastAPI + Uvicorn | Pydantic 校验、OpenAPI 与路由拆分；已注册健康及手动管理接口 |
-| 配置 | pydantic-settings | 环境变量与本地 `.env` 注入，配置集中定义；本次落地 |
-| 持久化 | PostgreSQL 17 + SQLAlchemy 2 + psycopg 3 + Alembic | 已接入六张基础业务表及迁移；资料、引用和计划模型随功能扩展。默认同步 Session，HTTP 同步数据库路径使用 `def`，不得在 `async def` 中直接执行阻塞 I/O |
-| 向量检索 | PostgreSQL 的 pgvector 扩展 | Compose 初始化已启用扩展；向量模型、索引及实际检索在 RAG 阶段实现 |
+| 前端 | Vue 3 + TypeScript + Vite | 页面、组件与 API 调用分开，类型检查帮助维护接口；已接入 Vue Router，路由表与登录守卫集中在 `frontend/src/router.ts`；暂不引入 Pinia，跨页面状态由 `composables/` 维护 |
+| Python 运行环境 | Python 3.12 + uv | 小组统一解释器小版本，使用 `pyproject.toml` 和 `uv.lock` 管理依赖；已落地 |
+| HTTP API | FastAPI + Uvicorn | Pydantic 校验、OpenAPI 与路由拆分；已注册健康、学期与课程、任务与固定日程、资料、核对、规则、问答、计划、提醒、导出、课程路径与外部日历接口 |
+| 配置 | pydantic-settings | 环境变量与本地 `.env` 注入，配置集中定义；已落地 |
+| 持久化 | PostgreSQL 17 + SQLAlchemy 2 + psycopg 3 + Alembic | 已有 49 个 Alembic 迁移，覆盖学习背景、资料证据链、候选核对、计划、提醒、课程路径与外部日历等模型。默认同步 Session，HTTP 同步数据库路径使用 `def`，不得在 `async def` 中直接执行阻塞 I/O |
+| 向量检索 | PostgreSQL 的 pgvector 扩展 | Compose 初始化启用扩展；`embedding_profiles` 配置、索引清单与 HNSW 索引、关键词／向量／RRF 混合检索均已接入（Q002–Q018） |
 | 文件存储 | 后端私有本地目录 + 存储接口 | 单实例开发先降低运维成本；文件元数据进数据库，原文件不进 Git。需要多实例时替换为 S3 兼容存储 |
-| 资料解析 | pypdf + 可替换 OCR／多模态适配器 | PDF 文本优先直接提取；扫描件和复杂表格走识别流程，保留页码及定位；资料功能阶段引入 |
-| AI 与 RAG | 应用层显式流程 + 模型适配接口 | 区分生成、多模态识别和 embedding 能力。具体供应商与模型待授权样本评估、费用和可用性验证后确定，不让 SDK 类型进入业务层 |
-| 后台作业 | RQ + Redis 7 + Python Worker | Compose 已提供 Redis；RQ、Worker 和实际作业在资料处理阶段接入。业务状态以 PostgreSQL 为准，Redis 不作为事实来源 |
-| 质量检查 | pytest + HTTPX + Ruff；vue-tsc + Vite build | 后端接口和规则测试、格式与静态检查，前端类型检查和构建；本次提供可执行命令 |
-| 部署 | 开发时前后端双进程 + 数据库和 Redis Compose | 后续增加 Worker 与同源反向代理；当前没有公网生产部署或认证实现 |
+| 资料解析 | pypdf／pypdfium2 + 可替换 OCR／多模态适配器 | PDF 文本直接提取、扫描页视觉回退，Word 走 python-docx、公开网页走 Beautiful Soup；保留页码、段落或元素定位 |
+| AI 与 RAG | 应用层显式流程 + 模型适配接口 | 区分生成、多模态识别和 embedding 能力；文字生成可按 `CAMPUSFLOW_TEXT_PROVIDER` 选择智谱或 DeepSeek，供应商模型经样本评测确定，SDK 类型不进入业务层 |
+| 后台作业 | RQ + Redis 7 + Python Worker | 服务端使用 RQ 与独立 Linux Worker，桌面模式改用数据库轮询 Worker；业务状态以 PostgreSQL 为准，Redis 不作为事实来源 |
+| 质量检查 | pytest + HTTPX + Ruff；vue-tsc + Vite build | 后端接口和规则测试、格式与静态检查，前端类型检查和构建；命令见 [开发文档](DEVELOPMENT.md) |
+| 部署 | 开发时前后端双进程 + 数据库和 Redis Compose | Worker、同源静态托管（桌面模式）与 `.campusflow` 归档已接入；当前没有公网生产部署，本机单用户会话不等同于生产身份系统 |
 
 Python 版本写在 `backend/.python-version`，前端建议 Node 24（见 `.nvmrc`，最低 22.12）。应用依赖的精确版本以实际生成的 `uv.lock`、`package-lock.json` 为准，不手工修改锁文件。
 
@@ -41,11 +41,11 @@ Python 版本写在 `backend/.python-version`，前端建议 Node 24（见 `.nvm
 - LangChain／LangGraph 等编排框架：先把检索、引用校验和计划确认实现为明确的 Python 用例，需要复杂持久工作流时再评估。
 - 独立向量数据库、Elasticsearch：先验证 PostgreSQL + pgvector 的效果；中文关键词检索与混合排序必须用中文样本评估，不假定默认全文检索配置足够。
 - 本地大模型／GPU 部署：模型适配接口保留替换能力，首期不要求每个成员配置 GPU。
-- UI 组件库、完整日历组件：具体页面原型确定后再引入，当前只有环境联通页。
+- UI 组件库、第三方完整日历组件：现有页面使用手写样式与语义 token，固定日程周视图为自研组件；需要脚本控制视图、拖拽排期等复杂日历交互时再评估引入。
 
 ## 2. 系统架构图
 
-下图保留基础管理链路示意；资料后端的实际启动与装配以 [资料处理运行手册](MATERIAL_PROCESSING.md) 为准。实线表示基础调用链，虚线表示完整资料到事实的后续链路；不表示所有链路已完成阶段验收。浏览器已通过统一 API 客户端接通手动管理业务，并由 Playwright 在真实 PostgreSQL 上覆盖登录、创建、更新、刷新、错误重试和退出保护流程。
+下图给出已接入的调用链：浏览器经统一 API 客户端调用 FastAPI，应用层用例同时被 API 与 Worker 复用；资料、模型、队列与日历适配器都在基础设施层。实线表示当前实现，验收状态以各验收记录为准，不表示全部能力都已通过独立复验。Playwright 在真实 PostgreSQL 上覆盖登录、创建、更新、刷新、错误重试、退出保护与资料库等流程。
 
 ```mermaid
 flowchart TB
@@ -55,26 +55,25 @@ flowchart TB
     API --> Health[进程健康检查]
     API --> Ready[数据库就绪检查]
 
-    API --> UseCases[应用层：课程、任务、固定日程]
-    UseCases --> Domain[领域层：日期、状态与时间范围]
-    UseCases --> Adapters[基础设施仓储]
+    API --> UseCases[应用层：资料与核对、问答、任务与计划、课程路径、外部日历]
+    UseCases --> Domain[领域层：日期、状态、依赖与冲突规则]
+    UseCases --> Adapters[基础设施：仓储、文件存储、队列、模型与日历适配器]
     Adapters --> DB[(PostgreSQL)]
-    API -.-> Future[待实现：资料、核对、问答与计划]
-    Future -.-> Adapters
-    Adapters -.-> Files[(私有原文件存储)]
-    Adapters -.-> Queue[(Redis / RQ)]
-    Adapters -.-> Models[模型服务：生成、视觉、embedding]
-    Queue -.-> Worker[独立 Python Worker]
-    Worker -.-> UseCases
+    Adapters --> Files[(私有原文件存储)]
+    Adapters --> Queue[(Redis / RQ)]
+    Adapters --> Models[模型服务：生成、视觉、embedding]
+    Adapters --> Calendar[Google 日历 / 本地模拟供应商]
+    Queue --> Worker[独立 Python Worker]
+    Worker --> UseCases
 ```
 
 开发前端通过 Vite 将 `/api` 转发到 `127.0.0.1:8000`，无需开放通配 CORS。生产目标由同一个域名提供前端静态文件和 `/api`，由反向代理替代 Vite。API、Worker、数据库和文件存储不直接暴露给浏览器。
 
-健康接口 `/api/v1/health` 仅表示 API 进程存活；就绪接口 `/api/v1/ready` 以短超时连接检查数据库连通，不可达时返回 503 且不泄露连接信息或口令。两者都不宣称模型等尚未接入的能力可用。
+健康接口 `/api/v1/health` 仅表示 API 进程存活；就绪接口 `/api/v1/ready` 以短超时连接检查数据库连通，不可达时返回 503 且不泄露连接信息或口令。两者都只表示进程与数据库状态，不宣称模型、队列或外部日历等依赖可用。
 
 ## 3. 文件分层
 
-以下目录均已建立；标注“预留”的目录目前只包含职责说明，按真实用例逐步添加代码。
+以下目录均已建立并承载实际实现，新增代码按现有分层放置，不预先创建空目录或空模块。
 
 ```text
 CampusFlow/
@@ -91,12 +90,13 @@ CampusFlow/
 │   │   ├── main.py              # 应用工厂、依赖装配、路由注册
 │   │   ├── core/                # 配置与运行时通用设施
 │   │   ├── api/                 # HTTP 路由与输入输出 schema
-│   │   ├── application/         # 课程、任务、日程用例及仓储端口
-│   │   ├── domain/              # 日期、状态和时间范围业务规则
-│   │   ├── infrastructure/      # 数据库与仓储；其余适配器待实现
-│   │   └── workers/             # 后台入口、安全日志与只读诊断
-│   ├── migrations/             # Alembic 环境及初始六表迁移
-│   └── tests/                  # 接口及后续领域、集成测试
+│   │   ├── application/         # 用例编排：资料、核对、问答、任务、计划、提醒、导出、课程路径、外部日历
+│   │   ├── domain/              # 日期、状态、依赖、冲突与引用规则等纯业务规则
+│   │   ├── infrastructure/      # 仓储、私有文件存储、RQ 队列、模型与日历适配器
+│   │   ├── sidecar/             # 桌面 sidecar 命令入口（serve／worker／migrate／backup／restore／doctor）
+│   │   └── workers/             # RQ 与数据库轮询 Worker、安全日志与只读诊断
+│   ├── migrations/              # Alembic 环境与 49 个版本迁移
+│   └── tests/                   # 接口、领域、集成与验收测试
 ├── frontend/
 │   ├── package.json
 │   ├── package-lock.json
@@ -107,16 +107,20 @@ CampusFlow/
 │   └── src/
 │       ├── main.ts              # 前端入口
 │       ├── App.vue              # 应用根组件
-│       ├── views/               # 页面
-│       ├── components/          # 预留：跨页面共享组件
+│       ├── router.ts            # 路由表、登录守卫与未匹配路径回退
+│       ├── views/               # 12 个路由页面（总览、健康检查、课程、课程路径、工具箱、资料库、任务、计划、提醒、导出、设置、登录）
+│       ├── components/          # 共享组件：导航外壳、失败提示、固定日程周视图、资料归档删除、原文定位
+│       ├── composables/         # 会话、主题等跨页面状态
 │       ├── api/                 # HTTP 调用与接口数据处理
-│       └── styles.css
+│       └── styles.css           # 语义 token 与全局样式
 ├── infra/                      # PostgreSQL、Redis Compose 与初始化脚本
 └── docs/
     ├── ARCHITECTURE.md          # 本文：选型、架构、边界
     ├── DEVELOPMENT.md           # 环境与执行命令
+    ├── MATERIAL_PROCESSING.md   # 资料处理运行手册
     ├── GitLab.md                # 已有仓库连接说明
-    └── planning/                # Milestone、Issue、标签与验收覆盖
+    ├── planning/                # Milestone、Issue、标签与验收覆盖
+    └── verification/            # 各任务与里程碑的验收记录
 ```
 
 ### 后端依赖方向
@@ -138,11 +142,11 @@ flowchart LR
 - `main`／后续 Worker 启动模块负责组装具体依赖。健康检查无需经过空的 service 和 repository。
 - 不预先创建十组空 CRUD 模块或通用基类；第一个实际用例确定后再增加必要文件。
 
-前端页面只通过 `api/` 访问后端。跨页面路由与状态管理按需增加，后端返回的事实与执行结果为准，前端不能把演示数据当成真实任务。
+前端页面只通过 `api/` 访问后端；路由表、登录守卫与未匹配路径回退集中在 `router.ts`，跨页面共享状态放在 `composables/`，不把服务端数据复制成全局 store。后端返回的事实与执行结果为准，前端不能把演示数据当成真实任务。
 
 ## 4. 关键业务链路设计
 
-### 资料到可查询事实（解析已接入，提取与索引待实现）
+### 资料到可查询事实（导入、解析、索引与问答已接入）
 
 ```mermaid
 sequenceDiagram
@@ -171,7 +175,7 @@ sequenceDiagram
 
 ### 检索、回答与计划
 
-Q006–Q018 已接入检索与回答：按工作空间、学期、教学班、资料有效状态过滤后再排序；关键词、向量与 RRF 混合排序结果可复现。引用 ID 由资料、版本和块确定，回答中的引用必须属于本次候选集；读取旧回答时重新核对来源状态，删除、归档、版本替代或原文改写都会使引用失效。模型只输出受控 JSON，正文不能变成工具调用；资料不足、部分覆盖、多资料冲突和不确定项分别返回。计划生成与冲突检查的意图已定义，但对应用例尚未上线，接口只返回能力边界。详见 [Q011 说明](verification/Q011-qa-protocol.md) 与 [Q018 验收](verification/Q018-acceptance.md)。
+Q006–Q018 已接入检索与回答：按工作空间、学期、教学班、资料有效状态过滤后再排序；关键词、向量与 RRF 混合排序结果可复现。引用 ID 由资料、版本和块确定，回答中的引用必须属于本次候选集；读取旧回答时重新核对来源状态，删除、归档、版本替代或原文改写都会使引用失效。模型只输出受控 JSON，正文不能变成工具调用；资料不足、部分覆盖、多资料冲突和不确定项分别返回。计划生成、冲突检查与局部重排已由 M5 与 A003–A007 接入，草案需用户接受后才成为当前计划，重排保留锁定时间块且不改写任务 DDL；课程路径（M8）与外部日历（M9）分别见后文。问答接口目前没有前端页面入口，可通过登录后的 OpenAPI `/docs` 或有范围会话接口调用。详见 [Q011 说明](verification/Q011-qa-protocol.md) 与 [Q018 验收](verification/Q018-acceptance.md)。
 
 ## 5. 数据与接口边界
 
@@ -200,7 +204,7 @@ R006 在 domain/rule_conversion.py 定义规则候选到正式课程规则的字
 R007 提供任务与日程的来源详情只读接口：`GET /api/v1/tasks/{id}/source` 与 `GET /api/v1/fixed-events/{id}/source`。application/source_detail.py 组合候选原始字段、逐条修正、原文引用与定位，只把仍能定位到原文的引用作为可验证引用返回；domain/source_detail.py 定义来源类型与引用可验证规则。固定日程补齐来源失效留痕（迁移 r006_event_source_invalidation），资料删除时与任务一并写入，删除影响预览新增关联日程并计入确认指纹。见 [R007 说明](verification/R007-source-detail.md)。
 X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候选；domain/rule_extraction.py 校验完整片段及限定语句边界，不依赖模型或数据库。条件/范围/生效信息保留独立证据，未知不推定无条件。调用方显式使用 X001 保存 pending 候选，正式确认由 R 系列处理。见 [X005 说明](verification/X005-rule-extraction.md)。
 
-目标数据分组如下，具体字段和迁移在功能实现时确定：
+目标数据分组如下，字段与迁移按任务逐步落地，当前实现见 `backend/migrations/versions/`：
 
 | 分组 | 对象 | 约束重点 |
 | --- | --- | --- |
@@ -211,33 +215,33 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 | 后台作业 | ProcessingJob、Outbox | 幂等、重试、待投递补偿、资料失效检查 |
 | 外部操作（第三阶段） | Confirmation、ExternalOperation | 确认范围、内容版本、幂等与实际结果 |
 
-统一接口前缀为 `/api/v1`，使用 JSON 与 OpenAPI。未来上传使用 multipart；长任务返回 `202` 和作业 ID，首期通过轮询查看状态，不先引入 WebSocket。
+统一接口前缀为 `/api/v1`，使用 JSON 与 OpenAPI。资料上传使用 multipart；长任务返回 `202` 和作业 ID，通过轮询查看状态，暂不引入 WebSocket。
 
 时间采用带时区的 ISO 8601 表示，数据库时间点使用 `timestamptz`，另存原始文本与来源时区。只有日期而没有时刻的 DDL 保留日期精度，不伪装成午夜或 23:59 的确定时间。学校教学周需依赖适用校历换算。
 
 当前业务错误通过 `DomainError` 和 `NotFoundError` 映射为可读消息及 HTTP 400／404，参数校验使用 422。后续完善统一稳定错误码与请求 ID；模型密钥只在后端配置，日志避免原始资料全文和个人信息。
 
-当前实现仅限本机单用户会话：登录成功后颁发 HttpOnly Cookie，退出或服务重启使会话失效，业务路由要求有效会话。共享部署、多人账户和跨工作空间对象授权仍需 W004–W006 后续验收；“单用户”不等于可以把资料公开访问。
+当前实现仅限本机单用户会话：登录成功后颁发 HttpOnly Cookie，退出或服务重启使会话失效，业务路由要求有效会话。跨工作空间对象授权已按 W004–W006 落到对象读取与写入校验；共享部署与多人账户仍未实现，“单用户”不等于可以把资料公开访问。
 
 ## 6. 实施顺序与完成条件
 
-1. **M0–M1：** 工程骨架和首个持久化切片已合并；完成样本、CI、真实数据库复验、身份与空间授权、手动管理前端，形成可验收闭环。
-2. **M2–M3：** 私有文件存储、RQ Worker、解析与来源定位、事项提取和核对；验证失败重试与删除派生失效。
-3. **M4：** embedding、检索、模型适配器和带引用回答；用中文授权样本评估缺失信息和来源冲突。
-4. **M5：** 两周计划、冲突检查和草案接受，完成八项业务 MVP 验收。
-5. **M6–M9：** 按第二、第三阶段接入扩展导入、变更、依赖、提醒、导出、课程路径及外部日历。具体完成条件与叶子任务见 [开发路线](planning/ROADMAP.md)。
+1. **M0–M1：** 工程骨架、样本与 CI、真实数据库复验、身份与空间授权、手动管理前端已接入，形成可验收闭环。
+2. **M2–M3：** 私有文件存储、RQ Worker、解析与来源定位、事项提取与集中核对已接入；删除派生失效与失败重试按验收记录处理。
+3. **M4：** embedding、检索、模型适配器与带引用回答已接入，真实账户与真实校务资料仍受授权条款限制。
+4. **M5：** 两周计划、冲突检查和草案接受已接入；v0.5.0 按作者决定放行，独立验收与全新机器验证豁免。
+5. **M6–M9：** 扩展导入、变更、依赖与局部重排、提醒、导出、课程路径与外部日历均已接入；外部日历真实 Google 账户验证待项目组提供 OAuth 客户端与测试账户。
 
-上述顺序细化 README 的三阶段功能边界。后续依赖在实际使用时加入锁文件，不为未实现能力预装整套 AI SDK。
+上述顺序细化 README 的三阶段功能边界。新依赖在实际使用时加入锁文件，不为未使用能力预装整套 AI SDK。
 
 ## Q001 评测准备边界
 
-`scripts/evaluate_qa_preparation.py` 独立于应用运行时，只读取合成样本及离线预设输出，以 B017 口径记录引用支持和不确定性计数；不调用检索器、数据库或供应商，不改变现有业务接口。未知表达保留人工复核，真实模型速度与费用保持未测。真实比较与选型尚待后续工作，见 [准备说明](verification/Q001-preparation.md)。
+`scripts/evaluate_qa_preparation.py` 独立于应用运行时，只读取合成样本及离线预设输出，以 B017 口径记录引用支持和不确定性计数；不调用检索器、数据库或供应商，不改变现有业务接口。未知表达保留人工复核。真实比较与选型已在后续真实运行与独立复核中完成（结论见 AGENTS 的 Q001 记录与 [真实评测记录](verification/Q001-live-progress.md)），本节只保留准备阶段的边界，见 [准备说明](verification/Q001-preparation.md)。
 
 `scripts/evaluate_qa_live.py` 为独立真实比较入口，默认仅打印计划；显式执行使用用户选定的型号集合与合成样本（默认仍是智谱两向量 × 两对话共四组，可用 `--embedders` / `--generators` 指定其他组合），域名与密钥按模型所属供应商路由，因此可跨供应商比较；预算预留和逐请求响应落盘，停止后可显式继承账本继续。不替代 Q002 的生产向量接口或 Q004 的索引流程；真实引用语义待人工复核，不能把编号合法视为支持正确。首轮中断及已知限制见 [真实评测记录](verification/Q001-live-progress.md)。
 
 ## Q002 向量配置与调用边界
 
-Q002 新增独立的向量端口及智谱适配器。不可变配置表登记供应商、型号、本地代次、维度和生成设置；应用入口必须核对已登记配置，返回结果和比较操作必须带同一配置编号。注册事务与外部请求分开，先提交配置再请求模型；无自动联网或隐式重试。后续 Q004/Q005 在索引外键和 SQL 检索条件中落实相同身份约束，当前不提供生产检索。详见 [Q002 契约](verification/Q002-embedding-adapter.md)。
+Q002 新增独立的向量端口及智谱适配器。不可变配置表登记供应商、型号、本地代次、维度和生成设置；应用入口必须核对已登记配置，返回结果和比较操作必须带同一配置编号。注册事务与外部请求分开，先提交配置再请求模型；无自动联网或隐式重试。Q004/Q005 已在索引外键和 SQL 检索条件中落实相同身份约束，检索与回答链路见第 4 节。详见 [Q002 契约](verification/Q002-embedding-adapter.md)。
 
 ## 7. 官方资料
 
@@ -249,7 +253,7 @@ Q002 新增独立的向量端口及智谱适配器。不可变配置表登记供
 
 ## 资料处理运行补充（J009）
 
-Q004 存储检查点以 `indexed_blocks` 记录逐块状态及 `vector(1024)`，配置编号与块编号构成唯一身份，来源删除级联移除向量；保存前验证授权空间和最新原文。新增 `index_manifests` 保存完整清单，来源/覆盖变更拒绝旧清单；块领取使用数据库时钟和独占凭证，过期写回拒绝，领取与模型调用分事务。它尚未接 Worker、投递补偿和自动恢复，不能当作生产索引流程使用；接入清单见 [Q004 进度](verification/Q004-progress.md)。
+Q004 存储检查点以 `indexed_blocks` 记录逐块状态及 `vector(1024)`，配置编号与块编号构成唯一身份，来源删除级联移除向量；保存前验证授权空间和最新原文。新增 `index_manifests` 保存完整清单，来源/覆盖变更拒绝旧清单；块领取使用数据库时钟和独占凭证，过期写回拒绝，领取与模型调用分事务。后续接入已补齐：Worker 投递补偿、有上限恢复与 HNSW 索引在 Q004 完成，索引读取与引用失效在 Q005–Q008，排序与回答在 Q006–Q018。过程记录见 [Q004 进度](verification/Q004-progress.md)。
 
 Windows 使用 Docker 运行现有 Linux RQ Worker，API 保持本机启动。两端共享同一数据库、Redis 库号和私有原文件目录。解析器注册表组合 PDF 文本解析、扫描页视觉回退与表格关联；数据库迁移分叉通过合并迁移汇合。只读诊断不调用模型，不修改任务，日志及 RQ 失败记录不保存原始异常堆栈。详见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
 
@@ -269,4 +273,10 @@ Q003 的 `domain/chunking.py` 只做可复现的原文切片，`application/retr
 
 同一套后端支持 `server` 与 `desktop` 两种部署模式，`/api/v1` 契约与业务逻辑不变。桌面模式使用绝对数据目录（`CAMPUSFLOW_DATA_DIR`），由 FastAPI 同源托管构建后的 SPA（`CAMPUSFLOW_STATIC_DIR`）：history 路由回退 `index.html`，缺失静态资源保持 404，`/api` 不参与回退。队列装配为数据库轮询（`DBJobQueue` + `workers/desktop.py`），不安装 Redis／RQ，领取仍复用数据库幂等 `claim`。迁移目录按显式配置、PyInstaller `_MEIPASS`、安装包数据、仓库目录的顺序解析。
 
-打包路线为 PyInstaller one-folder sidecar、内置 PostgreSQL 17 + pgvector、Electron 外壳与 `.campusflow` 全量迁移包；PyMuPDF 已由 pypdfium2 替换以避开 AGPL。服务端 Docker／RQ 运行方式保持不变。当前 P001（许可与 PDF 渲染）、P002a（macOS PyInstaller sidecar）、P003a（macOS 内置 PostgreSQL 17 + pgvector）、P004（部署模式）、P005（数据库 Worker）、P006（sidecar CLI）、P007（首启初始化与凭据）、P008（Electron 外壳）、P010（`.campusflow` 导出导入）、P011（升级备份回滚）与 P012（桌面安全加固）已接入；Windows 构建、安装包签名公证、真实 sidecar + 内置 PostgreSQL 端到端与干净机器验收仍在推进。证据见 [P001a](verification/DESKTOP-P001a-license-audit.md)、[P001b](verification/DESKTOP-P001b-pdf-render.md)、[P004](verification/DESKTOP-P004-desktop-mode.md) 与 [P005](verification/DESKTOP-P005-db-worker.md)。
+打包路线为 PyInstaller one-folder sidecar、内置 PostgreSQL 17 + pgvector、Electron 外壳与 `.campusflow` 全量迁移包；PyMuPDF 已由 pypdfium2 替换以避开 AGPL。服务端 Docker／RQ 运行方式保持不变。当前 P001（许可与 PDF 渲染）、P002a（macOS PyInstaller sidecar）、P003a（macOS 内置 PostgreSQL 17 + pgvector）、P004（部署模式）、P005（数据库 Worker）、P006（sidecar CLI）、P007（首启初始化与凭据）、P008（Electron 外壳）、P010（`.campusflow` 导出导入）、P011（升级备份回滚）与 P012（桌面安全加固）已接入。Windows 构建与未签名 NSIS 安装包已由 CI 产出；2026-11-11 作者决定收尾，真实 Windows 11 干净机器验收、代码签名与公证按豁免处理，不得表述为已验证。证据见 [P001a](verification/DESKTOP-P001a-license-audit.md)、[P001b](verification/DESKTOP-P001b-pdf-render.md)、[P004](verification/DESKTOP-P004-desktop-mode.md) 与 [P005](verification/DESKTOP-P005-db-worker.md)。
+
+### 桌面 AI 服务配置（#553）
+
+桌面安装包没有环境变量入口，模型密钥与文字供应方改由应用内配置。`application/ai_settings.py` 属于启动编排层（与 `application/bootstrap.py` 同层，装配 `SecretStore`，`core/config.py` 不反向依赖基础设施）：密钥只写本机凭据存储（账户 `ai-zhipu-api-key`／`ai-deepseek-api-key`），文字供应方偏好写 `<data_dir>/ai-settings.json`（0600，不含密钥），文件损坏时回退默认 `zhipu` 并给出可见警告而不是启动失败。`main.create_app`、`workers/desktop.py` 与 `sidecar/cli.py` 启动时都调用 `apply_stored_ai_settings` 把已保存值填进 `Settings`；构造 `Settings` 时已显式给出的字段（环境变量或调用方传参）优先，非桌面模式是 no-op。
+
+`api/ai_settings.py` 提供 `GET/PUT /api/v1/ai-settings`。GET 只返回 `editable`、`text_provider`、`zhipu_configured`、`deepseek_configured`、`text_available`、`vision_available`、`embedding_available`、`secret_backend`、`restart_required` 与警告，不含密钥明文或片段；非桌面模式返回环境变量配置的只读视图（`secret_backend=environment`）。PUT 仅桌面模式允许，用 `model_fields_set` 区分「未提交」与「提交空值」，校验最终文字供应方有对应密钥后才写凭据存储与偏好文件，失败不落库；响应同样不含密钥并标记 `restart_required=true`——API 进程内的文字／向量／问答适配器按请求从 `app.state.settings` 构造，立即可用，后台 Worker 需重启。ZHIPU 密钥同时用于文字、视觉与向量，DeepSeek 只用于文字。缺失密钥的提示（`workers/model_hints.py`）在桌面模式指向「设置 → AI 服务」，服务器模式仍说明环境变量。见 [BUG-553 记录](verification/BUG-553-ai-settings.md)。

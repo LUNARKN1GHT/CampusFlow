@@ -1,6 +1,6 @@
 # 本地开发
 
-当前代码包括 Vue 手动管理业务页面、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，RQ Worker 已接入；检索排序、带引用问答与两周学习计划已在本分支接入。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
+当前代码包括 Vue 业务页面（顶部横向导航，12 个路由页面）、本机单用户登录、Python API、OpenAPI，以及学期／课程／手动任务与进度历史／固定日程周视图／可用时间／学习偏好接口。业务数据接入 PostgreSQL，调用前需启动数据库并执行迁移；健康检查表示进程存活，就绪检查验证数据库连通。Compose 同时提供 pgvector 扩展和 Redis，RQ Worker 已接入；资料、核对、带引用问答、两周计划、课程路径与外部日历接口均已接入。2026-11-12 起智能问答、外部日历、待核对与版本对照的前端页面暂不提供入口（后端接口保留），课程路径改由设置页「工具箱」进入；详见下方「启动前端」。技术边界见 [架构文档](ARCHITECTURE.md)，独立复验和后续开发任务见 [开发路线](planning/ROADMAP.md)。
 
 ## 环境
 
@@ -54,7 +54,7 @@ uv run --locked uvicorn campusflow.main:app --reload --host 127.0.0.1 --port 800
 
 业务接口需要本机单用户会话。默认用户名为 `student`、默认密码为 `campusflow-dev`；仅供本机开发，复制 `.env.example` 后可通过 `CAMPUSFLOW_LOCAL_USERNAME` 和 `CAMPUSFLOW_LOCAL_PASSWORD` 修改。浏览器登录后使用 HttpOnly Cookie 保存会话，退出或后端重启后旧会话失效。共享部署前不得继续使用默认凭据。
 
-健康检查 `/api/v1/health` 成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。就绪检查 `/api/v1/ready` 以短超时连接数据库并执行 `SELECT 1`，数据库不可达时返回 503 且不包含连接信息或口令。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下），具体方法和字段见 OpenAPI。
+健康检查 `/api/v1/health` 成功响应为 `{"status":"ok","service":"campusflow-api"}`，仅验证 API 进程存活。就绪检查 `/api/v1/ready` 以短超时连接数据库并执行 `SELECT 1`，数据库不可达时返回 503 且不包含连接信息或口令。已注册的业务路径包括 `/api/v1/semesters`、`/courses`、`/tasks`、`/fixed-events` 和 `/availability-slots`（后四项同样位于 `/api/v1` 下）；资料、核对、规则、问答、计划、提醒、导出、课程路径与外部日历接口也都在 `/api/v1` 下，完整清单与字段见登录后的 OpenAPI。
 
 ## 资料后台与诊断
 
@@ -89,7 +89,26 @@ npm ci
 npm run dev
 ```
 
-访问 <http://127.0.0.1:5173>。页面通过 Vite 代理调用真实后端，能显示检查中、连接成功、连接失败，并支持重试。5173 被占用时会直接报错，不自动切换端口。
+访问 <http://127.0.0.1:5173>。页面通过 Vite 代理调用真实后端；未登录访问受保护页面会先跳到 `/login`，登录成功后回到原目标路径。默认账号 `student`、默认密码 `campusflow-dev`（复制 `.env.example` 后可用 `CAMPUSFLOW_LOCAL_USERNAME`／`CAMPUSFLOW_LOCAL_PASSWORD` 覆盖），会话保存在 HttpOnly Cookie，退出或后端重启后需要重新登录。
+
+当前路由定义在 `frontend/src/router.ts`，受保护页面统一挂在 `components/AppShell.vue` 布局下：
+
+| 路径 | 页面 | 入口位置 |
+| --- | --- | --- |
+| `/` | 总览（今日截止、计划与待核对数量） | 顶部导航 |
+| `/courses` | 学期与课程 | 顶部导航 |
+| `/library` | 资料库（导入、原文定位、归档与删除） | 顶部导航 |
+| `/tasks` | 任务与固定日程 | 顶部导航 |
+| `/plan` | 学习计划 | 顶部导航 |
+| `/reminders` | 提醒中心 | 顶部导航 |
+| `/export` | 清单与日历导出 | 顶部导航 |
+| `/settings` | 设置（时区、每周可用时间、AI 服务、主题色系、工具箱入口） | 顶部导航 |
+| `/tools` | 工具箱 | 设置页「工具箱」 |
+| `/course-paths` | 课程路径 | 工具箱或直接访问 |
+| `/health` | 健康检查页（只显示进程与数据库状态） | 直接访问 |
+| `/login` | 登录 | 未登录时自动跳转 |
+
+顶部右侧可切换浅色／深色／跟随系统，属于本机浏览器偏好，不写入工作空间设置。智能问答、外部日历、待核对与版本对照的前端页面已移除，直接访问这些旧路径不会报错，但会按未匹配路由回退到总览；对应后端接口仍可在登录后的 OpenAPI `/docs` 中调用。5173 被占用时会直接报错，不自动切换端口。
 
 前端请求统一使用相对 `/api` 地址。如调整后端端口，同步修改 `frontend/vite.config.ts` 的代理目标；不要把模型密钥写入前端环境变量。
 
@@ -317,7 +336,7 @@ uv run --locked pytest tests/test_qa_api.py -k intent
 
 接受草案时服务端会重新采集输入并比较指纹；任务、固定日程、可用时间或设置发生变化后，旧草案返回 409，需要重新生成。旧草案也不能覆盖较新接受的计划。
 
-## M9 外部日历
+## M9 外部日历（后端与 API）
 
 M9 新增迁移 `k001_external_calendar`（连接、OAuth state、草案、条目、执行记录与外部事件映射）。启动新代码前在 `backend/` 执行：
 
@@ -337,15 +356,15 @@ uv run --locked alembic upgrade head
 - `GOOGLE_CALENDAR_CLIENT_ID`、`GOOGLE_CALENDAR_CLIENT_SECRET`、`GOOGLE_CALENDAR_REDIRECT_URI`：Google OAuth 客户端配置；未配置时授权入口返回业务错误。
 - 授权范围限定为 `calendar.app.created`，只管理应用自建的专用日历。
 
-本地闭环：
+本地闭环（仅后端与 API，前端暂无入口）：
 
-1. 启动 API 与前端，登录后进入 `/calendar`；
-2. 点击“连接外部日历”完成授权，页面显示账户、日历与状态；
-3. 选择任务或已接受计划生成预览；预览不会写入外部日历；
-4. 勾选范围并确认，再点击“执行写入”；
-5. 页面逐项显示成功、失败或待核实；失败项可只重试，未知结果可先核对；
-6. 修改内部任务后可“检查同步差异”并生成新的更新／删除草案；
-7. 撤销连接后待写入操作立即失效，内部任务与计划保留。
+1. 启动 API，登录取得会话 Cookie；前端页面中外部日历入口已移除，直接访问旧路径 `/calendar` 会回退总览。
+2. 调用 `GET /api/v1/calendar/oauth/start` 取得授权地址并完成回调（`GET /api/v1/calendar/oauth/callback`），再用 `GET /api/v1/calendar/connections` 确认账户、目标日历与连接状态。
+3. 调用 `POST /api/v1/calendar/drafts`，用显式选择的任务或当前已接受计划生成草案；`GET /api/v1/calendar/drafts/{id}` 只读预览，不调用供应商、也不写入外部日历。
+4. 调用 `POST /api/v1/calendar/drafts/{id}/confirm` 带上确认指纹（绑定连接、目标日历、内容与选中条目，超过有效期需重新生成），再调用 `POST /api/v1/calendar/drafts/{id}/execute`。
+5. `GET /api/v1/calendar/operations` 逐项查看成功、失败或待核实；失败项用 `POST /api/v1/calendar/drafts/{id}/retry` 只重试未成功项，未知结果先用 `POST /api/v1/calendar/operations/{id}/reconcile` 按幂等键对账。
+6. 修改内部任务或计划后，`GET /api/v1/calendar/differences` 检查同步差异，再调用 `POST /api/v1/calendar/differences/draft` 生成新的更新／删除草案。
+7. `DELETE /api/v1/calendar/connections/{id}` 撤销连接后，待写入操作立即失效，内部任务与计划保留。
 
 接口、测试账户缺口与限制见 [M9 外部日历记录](verification/M9-external-calendar.md)。专项测试：
 
@@ -360,7 +379,8 @@ Q002 新增向量配置表，启动新代码前在 `backend/` 执行 `uv run --l
 
 Q009 补齐模型失败契约与视觉重试配置，无迁移、无新增依赖。环境字段为 `.env.example` 的 `CAMPUSFLOW_VISION_TIMEOUT_SECONDS`（默认 60，0–120 秒）、`CAMPUSFLOW_VISION_MAX_RETRIES`（默认 2，0–3 次）和 `CAMPUSFLOW_VISION_RETRY_BACKOFF_SECONDS`（默认 1，0–10 秒）；Worker 启动时读取，直接构造适配器也会校验。`domain/model_failures.py` 把模型异常分为「服务不可用／请求被拒绝／输出无效」并给出固定中文文案，`INSUFFICIENT_MATERIALS_MESSAGE` 只定义、尚未触发。本轮不新增问答接口或页面，展示留给 Q011；验收证据见 [Q009 说明](verification/Q009-model-resilience.md)。
 
-- 手动管理、资料处理、核对、带引用问答、两周计划、课程路径与外部日历写入已实现；仍无生产身份系统。真实模型语义复核（Q019）、M5 的 V001–V007 独立验收与发布准备尚未完成。
+- 手动管理、资料处理、核对、带引用问答、两周计划、课程路径与外部日历写入均已接入；仍无生产身份系统。Q019 已用 DeepSeek 真实模型补跑生成侧（仅合成样本），M5 的 V001–V007 独立验收与全新机器验证按作者决定豁免，不能表述为已验证。
+- 智能问答、外部日历、待核对与版本对照的前端页面已移除，只有后端接口保留；课程路径从设置页「工具箱」进入。这些页面恢复前，相关流程只能通过 OpenAPI 或 HTTP 客户端执行。
 - 外部日历的真实 Google 账户授权与写入尚未验证；当前验收使用确定性本地模拟供应商。真实账户验证需要项目组提供 Google Cloud OAuth 客户端与测试账户。
 - PR #1 正文报告 22 个测试通过；本次规划未在当前机器独立复验。应以实际执行记录为准，W003、T003 跟踪迁移与接口复验。
 - `npm run preview` 只预览构建后的静态页面，未配置生产 API 反向代理；完整联调使用 `npm run dev`。

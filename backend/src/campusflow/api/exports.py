@@ -31,6 +31,7 @@ class ExportRequestIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: Literal["tasks", "plan"]
     format: Literal["csv", "ics"]
+    # 数量上限与正数校验在应用层统一执行，预览与下载共用同一份检查。
     task_ids: list[int] | None = None
     plan_id: int | None = None
     options: ExportOptionsIn = Field(default_factory=ExportOptionsIn)

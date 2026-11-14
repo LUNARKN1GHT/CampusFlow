@@ -1,4 +1,4 @@
-"""sidecar 的数据库小型只读辅助：迁移头、空库判断与 libpq 连接串。
+"""sidecar 的数据库小型只读辅助：迁移头与空库判断。
 
 这里的函数只读或只做连接层转换，不承载业务规则；写入仍由 Alembic 迁移、
 pg_dump／pg_restore 完成。
@@ -41,11 +41,6 @@ def migration_state(settings: Settings, engine: Engine) -> dict[str, object]:
 
 def database_name(database_url: str) -> str:
     return make_url(database_url).database or ""
-
-
-def libpq_url(database_url: str) -> str:
-    """转成 libpq 可用的 `postgresql://` 地址；SQLAlchemy 的驱动后缀要摘掉。"""
-    return make_url(database_url).set(drivername="postgresql").render_as_string(hide_password=False)
 
 
 def redacted_database_url(database_url: str) -> str:

@@ -161,6 +161,10 @@ def convert_candidate_to_task(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 唯一约束兜底：并发请求可能已为同一候选建了任务，返回既有记录而不是 500（#623）。
+        existing = repos.tasks.get_by_source_candidate(candidate.id)
+        if existing is not None:
+            return existing
         raise
     return task
 
@@ -199,6 +203,10 @@ def convert_candidate_to_event(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 并发请求可能已建同一来源的固定日程；唯一约束兜底后返回既有记录（#623）。
+        existing = repos.schedule.get_fixed_event_by_source_candidate(candidate.id)
+        if existing is not None:
+            return existing
         raise
     return event
 
@@ -258,6 +266,10 @@ def convert_candidate_to_curriculum_course(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 并发请求可能已建同一来源的方案课程；唯一约束兜底后返回既有记录（#623）。
+        existing = repos.paths.get_course_by_source_candidate(candidate.id)
+        if existing is not None:
+            return existing
         raise
     return course
 
@@ -328,6 +340,10 @@ def convert_candidate_to_course_relation(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 并发请求可能已建同一来源的课程关系；唯一约束兜底后返回既有记录（#623）。
+        existing = repos.paths.get_relation_by_source_candidate(candidate.id)
+        if existing is not None:
+            return existing
         raise
     return created
 
@@ -368,5 +384,9 @@ def convert_candidate_to_rule(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 并发请求可能已建同一来源的课程规则；唯一约束兜底后返回既有记录（#623）。
+        existing = repos.rules.get_by_source_candidate(candidate.id)
+        if existing is not None:
+            return existing
         raise
     return rule

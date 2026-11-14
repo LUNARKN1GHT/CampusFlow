@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     static_dir: str | None = None
     # 打包后迁移脚本不在仓库相对位置时显式指定；未配置时按打包资源解析。
     migrations_dir: str | None = None
-    # P007：内置 PostgreSQL 的二进制目录（initdb／pg_ctl／pg_isready）；不填用 PATH。
+    # P007／P010／P011：PostgreSQL 二进制或客户端工具目录，initdb／pg_ctl／pg_isready
+    # 与 pg_dump／pg_restore 都从这里查找；不填时回退到 PATH。
     pg_bin: str | None = None
     # P007：本机口令存放位置。auto 依次尝试 macOS 钥匙串、Windows DPAPI、0600 文件。
     secret_backend: Literal["auto", "keychain", "dpapi", "file"] = "auto"
@@ -47,8 +48,6 @@ class Settings(BaseSettings):
     storage_dir: str = "data/materials"
     # P010：导入前安全备份与迁移包默认目录；未配置时落在数据目录或存储目录旁边。
     backup_dir: str | None = None
-    # P010：PostgreSQL 客户端工具目录（含 pg_dump/pg_restore）；未配置时使用 PATH。
-    pg_bin: str | None = None
     # P010：建库/改名用的维护连接；未配置时从 database_url 派生（连到 postgres 库）。
     pg_admin_url: str | None = None
     # 上传限制（D003）：可通过环境变量覆盖
@@ -58,8 +57,6 @@ class Settings(BaseSettings):
     backup_retention_days: int = 30
     # P011：升级前备份按份数保留，避免每次升级后无限累积；只在升级成功后清理。
     backup_retention_count: int = Field(default=5, ge=1)
-    # P011：pg_dump／pg_restore 所在目录；未配置时从 PATH 查找。
-    pg_bin: str | None = None
     # 启动时扫描并重投待投递作业（J004 补偿）；关闭时只保留手动重投入口
     dispatch_on_startup: bool = True
     # 作业超时（秒，J005）：领取后超过这个时长仍是"处理中"就回收为可重试失败

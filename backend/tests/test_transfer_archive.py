@@ -7,7 +7,9 @@
 
 数据库：使用真实 PostgreSQL。建库需要 CREATEDB／超级用户，因此测试优先用
 `CAMPUSFLOW_TEST_DATABASE_URL` 的账户建库，失败时再尝试 OS 用户（本地 trust
-认证）；两者都不可用时整体跳过，而不是悄悄降级为假实现。
+认证）；两者都因连接或权限不可用时整体跳过，而不是悄悄降级为假实现。探测中的
+其它异常（驱动缺失、连接串写错、探测语句本身出错）照常抛出，不会把模块静默标成
+skipped。
 """
 
 from __future__ import annotations
@@ -24,10 +26,12 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path, PurePosixPath
 
+import psycopg
 import pytest
 from alembic import command
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
@@ -132,18 +136,43 @@ def _databases_owned_by(admin_url: str, role: str) -> list[str]:
         engine.dispose()
 
 
+# 探测维护连接时只把"连不上"和"没有建库权限"当作环境限制：psycopg 把前者映射为
+# OperationalError、后者映射为 InsufficientPrivilege／InvalidCatalogName，
+# SQLAlchemy 再包成 DBAPIError 并挂在 `.orig` 上。其它异常（驱动缺失、连接串写错、
+# 探测语句本身出错）必须照常抛出，否则整个模块会因一次探测失败被静默 skip。
+_PROBE_ENVIRONMENT_ERRORS = (
+    psycopg.OperationalError,
+    psycopg.errors.InsufficientPrivilege,
+    psycopg.errors.InvalidCatalogName,
+)
+
+
+def _probe_error_is_environmental(error: DBAPIError) -> bool:
+    return isinstance(error.orig, _PROBE_ENVIRONMENT_ERRORS)
+
+
 @pytest.fixture(scope="session")
 def admin_url() -> str:
     """返回一个确实能建库/建角色的维护连接；否则跳过整个模块。"""
+    unavailable: list[str] = []
     for candidate in _admin_candidates():
         probe = f"p010_probe_{secrets.token_hex(4)}"
         try:
             _execute_admin(candidate, f'CREATE DATABASE "{probe}"')
-        except Exception:
+        except DBAPIError as error:
+            if not _probe_error_is_environmental(error):
+                raise
+            detail = (str(error.orig).strip() or type(error.orig).__name__).splitlines()[0]
+            unavailable.append(
+                f"{make_url(candidate).render_as_string(hide_password=True)}（{detail}）"
+            )
             continue
         _execute_admin(candidate, f'DROP DATABASE IF EXISTS "{probe}"', ignore_error=True)
         return candidate
-    pytest.skip("需要具备 CREATEDB 权限的 PostgreSQL 账户才能验收迁移包")
+    pytest.skip(
+        "需要可连接且具备 CREATEDB 权限的 PostgreSQL 账户才能验收迁移包；"
+        f"已试候选均不可用：{'；'.join(unavailable)}"
+    )
 
 
 @pytest.fixture(scope="session")
@@ -567,6 +596,22 @@ def _token_for(path: Path) -> str:
 
 
 # --------------------------------------------------------------------------- 用例
+
+
+def test_admin_probe_only_treats_environment_failures_as_unavailable() -> None:
+    """只有连不上／没建库权限可以换下一个候选；其它异常必须让验收失败。
+
+    该用例不依赖 PostgreSQL，因此即使整模块因环境跳过也会执行，防止探测异常
+    再次退化成"任何问题都 skip"。
+    """
+    statement = 'CREATE DATABASE "p010_probe_deadbeef"'
+    connection_refused = OperationalError(statement, {}, psycopg.OperationalError("拒绝连接"))
+    no_createdb = ProgrammingError(statement, {}, psycopg.errors.InsufficientPrivilege("权限不足"))
+    broken_probe = ProgrammingError(statement, {}, psycopg.errors.SyntaxError("语法错误"))
+
+    assert _probe_error_is_environmental(connection_refused)
+    assert _probe_error_is_environmental(no_createdb)
+    assert not _probe_error_is_environmental(broken_probe)
 
 
 def test_export_import_roundtrip_preserves_rows_files_and_checksums(site: Site) -> None:

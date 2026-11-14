@@ -18,6 +18,7 @@ from typing import Any
 
 from sqlalchemy.exc import SQLAlchemyError
 
+from campusflow.application.ai_settings import apply_stored_ai_settings
 from campusflow.core.config import Settings
 from campusflow.sidecar.backup import run_backup, run_restore
 from campusflow.sidecar.bootstrap import run_bootstrap
@@ -164,14 +165,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_settings() -> Settings:
-    """按环境变量与 .env 装配配置；失败只提示可检查的项，不回显取值。"""
+    """按环境变量与 .env 装配配置；失败只提示可检查的项，不回显取值。
+
+    桌面模式在返回前把设置页保存的模型密钥与供应方填进配置（环境变量优先），
+    这样 serve／worker 与后续输出脱敏都使用同一份有效配置；非桌面模式是 no-op。
+    """
     try:
-        return Settings()
+        settings = Settings()
     except Exception:
         raise SidecarError(
             "配置无效：请检查 CAMPUSFLOW_* 环境变量"
             "（桌面模式必须提供绝对路径的 CAMPUSFLOW_DATA_DIR）"
         ) from None
+    apply_stored_ai_settings(settings)
+    return settings
 
 
 def _secrets(settings: Settings) -> list[str | None]:

@@ -243,16 +243,11 @@ test('打包应用可导航到所有已实现页面', async () => {
 
     const routes: Array<[string, string]> = [
       ['课程', '/courses'],
-      ['课程路径', '/course-paths'],
       ['资料库', '/library'],
-      ['待核对', '/review'],
-      ['版本对照', '/review/changes'],
-      ['智能问答', '/qa'],
       ['任务', '/tasks'],
       ['学习计划', '/plan'],
       ['提醒', '/reminders'],
       ['导出', '/export'],
-      ['外部日历', '/calendar'],
       ['设置', '/settings'],
       ['总览', '/'],
     ]
@@ -261,6 +256,14 @@ test('打包应用可导航到所有已实现页面', async () => {
       await expect.poll(() => new URL(main.url()).pathname, { timeout: 15_000 }).toBe(route)
       await expect(main.locator('h1, h2').first()).toBeVisible()
     }
+
+    // 低频的课程路径改由设置页工具箱进入，主导航不再单列。
+    await main.getByRole('link', { name: '设置', exact: true }).click()
+    await main.getByRole('link', { name: '进入工具箱', exact: true }).click()
+    await expect.poll(() => new URL(main.url()).pathname, { timeout: 15_000 }).toBe('/tools')
+    await main.getByRole('link', { name: /培养方案、课程关系与学期试排/ }).click()
+    await expect.poll(() => new URL(main.url()).pathname, { timeout: 15_000 }).toBe('/course-paths')
+    await expect(main.locator('h1, h2').first()).toBeVisible()
   } finally {
     if (app) {
       try {

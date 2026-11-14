@@ -91,18 +91,14 @@ def accept_change(
     )
     # 幂等键是“基准候选 + 新候选 + 字段集合”，字段顺序不影响；重复提交不重写。
     if existing is not None:
-        return AcceptanceResult(existing, False, existing.previous_review_status)
+        # 结束只读事务后再读候选，避免返回本请求缓存的旧核对状态（#624）。
+        repos.uow.rollback()
+        return AcceptanceResult(
+            existing,
+            False,
+            get_candidate(repos, workspace_id, baseline_candidate_id).review_status.value,
+        )
 
-    baseline = get_candidate(repos, workspace_id, baseline_candidate_id)
-    change = ReviewChange(
-        baseline.review_status,
-        ReviewStatus.SUPERSEDED,
-        operator,
-        reason.strip(),
-    )
-    from campusflow.domain.candidates import validate_review_change
-
-    validate_review_change(change)
     evidence = tuple(
         {
             "name": name,
@@ -115,6 +111,28 @@ def accept_change(
     try:
         # 先锁工作空间再写状态与历史，避免并发接受产生两套有效记录。
         store.lock_workspace(workspace_id)
+        # 取得锁后重新查询：并发的第二个请求应看到已提交的接受记录，
+        # 而不是按锁外读到的旧快照再写一条（#623）。
+        existing = store.find_acceptance(
+            workspace_id, baseline_candidate_id, comparison_candidate_id, names
+        )
+        if existing is not None:
+            repos.uow.rollback()
+            return AcceptanceResult(
+                existing,
+                False,
+                get_candidate(repos, workspace_id, baseline_candidate_id).review_status.value,
+            )
+        baseline = get_candidate(repos, workspace_id, baseline_candidate_id)
+        change = ReviewChange(
+            baseline.review_status,
+            ReviewStatus.SUPERSEDED,
+            operator,
+            reason.strip(),
+        )
+        from campusflow.domain.candidates import validate_review_change
+
+        validate_review_change(change)
         repos.candidates.set_review_status(workspace_id, baseline_candidate_id, change)
         record = store.create_acceptance(
             workspace_id,
@@ -133,6 +151,16 @@ def accept_change(
         repos.uow.commit()
     except Exception:
         repos.uow.rollback()
+        # 唯一约束兜底：并发的另一请求已写入同一组字段时返回既有记录。
+        existing = store.find_acceptance(
+            workspace_id, baseline_candidate_id, comparison_candidate_id, names
+        )
+        if existing is not None:
+            return AcceptanceResult(
+                existing,
+                False,
+                get_candidate(repos, workspace_id, baseline_candidate_id).review_status.value,
+            )
         raise
     return AcceptanceResult(record, True, baseline.review_status.value)
 

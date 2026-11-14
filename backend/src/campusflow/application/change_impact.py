@@ -1,7 +1,7 @@
 """N013：列出通知变更可能影响的正式事项与计划时间块；只读、不执行调整。
 
 影响范围来自基准候选（旧版本）已经生成的正式事项；已完成任务与锁定时间块
-照常列出，提醒与外部日历明确标为未接入，不伪装已同步。
+照常列出。响应附带提醒与外部日历的后续行为说明，不声称本次查询已同步。
 """
 
 from dataclasses import dataclass
@@ -55,7 +55,7 @@ class ChangeImpact:
     tasks: tuple[ImpactedTask, ...]
     fixed_events: tuple[ImpactedEvent, ...]
     rules: tuple[ImpactedRule, ...]
-    unsupported: tuple[dict, ...]
+    notes: tuple[dict, ...]
     summary: dict
 
 
@@ -130,15 +130,21 @@ def collect_impact(
         tasks=tuple(tasks),
         fixed_events=tuple(events),
         rules=tuple(rules),
-        # 首期没有应用内提醒和外部日历连接，必须明确未同步，不能静默省略。
-        unsupported=(
+        # 两项能力均已接入；这里说明本查询之后实际会发生什么，不声称本次已同步。
+        notes=(
             {
                 "code": "reminders",
-                "message": "应用内提醒尚未接入，本次不调整或声称已重排提醒。",
+                "message": (
+                    "接受变更成功后会在同一事务内按当前任务与提醒规则重算提醒，"
+                    "并刷新待核对提醒数量；本查询只读，不调整提醒。"
+                ),
             },
             {
                 "code": "external_calendar",
-                "message": "外部日历尚未接入，本次不写入或声称已同步。",
+                "message": (
+                    "接受变更不会自动写入外部日历；已同步的任务或计划需要重新生成"
+                    "更新或删除草案，并逐项确认后才会写入。"
+                ),
             },
         ),
         summary={

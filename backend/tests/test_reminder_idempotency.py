@@ -18,12 +18,14 @@ from campusflow.infrastructure.db.models import ReminderTrigger
 from campusflow.infrastructure.repositories import build_repositories
 
 SHANGHAI = timezone(timedelta(hours=8))
+# 截止日期必须相对测试运行日生成，避免固定日期变成过去后提醒窗口不再生成。
+DUE_DAY = date.today() + timedelta(days=10)
 
 
 def _task(client: TestClient, **overrides) -> dict:
     payload = {
         "title": "幂等任务",
-        "due_date": "2026-11-10",
+        "due_date": DUE_DAY.isoformat(),
         "due_time": "18:00:00",
         "estimated_minutes": 60,
         "remaining_minutes": 60,
@@ -99,8 +101,9 @@ def test_repeated_cycles_keep_one_trigger(client: TestClient) -> None:
     with factory() as session:
         repos = build_repositories(session)
         workspace_id = repos.tasks.get(task["id"]).workspace_id
-        sync_reminders(repos, workspace_id, now=datetime(2026, 11, 9, 10, tzinfo=UTC))
-        sync_reminders(repos, workspace_id, now=datetime(2026, 11, 9, 12, tzinfo=UTC))
+        base = datetime.combine(DUE_DAY - timedelta(days=1), time(18), tzinfo=SHANGHAI)
+        sync_reminders(repos, workspace_id, now=base.astimezone(UTC))
+        sync_reminders(repos, workspace_id, now=(base + timedelta(hours=2)).astimezone(UTC))
         session.commit()
         pending = repos.reminders.list_triggers(workspace_id, statuses=("pending",))
         assert len(pending) == 1

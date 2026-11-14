@@ -8,7 +8,7 @@ update_* 接收"合并后的最终值"，None 表示清空；按 ID 的操作校
 from datetime import date
 
 from campusflow.application.ports.repositories import CourseData, Repositories, SemesterData
-from campusflow.application.scope import require_in_workspace
+from campusflow.application.scope import require_in_workspace, require_semester_in_workspace
 from campusflow.domain.errors import DomainError, NotFoundError
 from campusflow.domain.semesters import validate_semester_range
 
@@ -60,14 +60,6 @@ def get_course(repos: Repositories, workspace_id: int, course_id: int) -> Course
         raise NotFoundError("课程不存在")
     require_in_workspace(course.workspace_id, workspace_id, "课程不存在")
     return course
-
-
-def require_semester_in_workspace(repos: Repositories, workspace_id: int, semester_id: int) -> None:
-    """校验学期存在且属于当前空间；供任务、日程与排期等用例共用。"""
-    semester = repos.semesters.get(semester_id)
-    if semester is None:
-        raise NotFoundError("学期不存在")
-    require_in_workspace(semester.workspace_id, workspace_id, "学期不存在")
 
 
 def create_course(

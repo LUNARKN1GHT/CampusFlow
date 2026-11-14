@@ -1,12 +1,14 @@
 // 资料库与后台处理作业：导入（文件／网页／粘贴文本）→ 版本与片段 → 归档／删除。
 // 文件上传走 multipart（归属范围放在查询参数里），删除必须先取影响预览再用其中的确认令牌。
 
+import { queryString } from '../utils/query'
+
 import { apiRequest, apiRequestBlob } from './client'
 import type {
-  JobAttempt,
   Material,
   MaterialDeleteImpact,
-  MaterialMetadataInput,
+  MaterialRecognition,
+  MaterialRecognitionStart,
   MaterialSourceType,
   MaterialStatus,
   MaterialUploadItem,
@@ -19,15 +21,6 @@ import type {
   WebImportResult,
 } from './types'
 
-function queryString(params: Record<string, string | number | boolean | null | undefined>): string {
-  const query = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== '') query.set(key, String(value))
-  })
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
-
 export type MaterialFilters = {
   semesterId?: number | null
   courseId?: number | null
@@ -38,7 +31,6 @@ export type MaterialFilters = {
 
 export type TextImportResult = { material: Material; chunks: SourceChunk[] }
 export type UploadResult = { results: MaterialUploadItem[] }
-export type DeleteResult = { delivered: number; failed: number }
 
 export const materialsApi = {
   list: (filters: MaterialFilters = {}) => apiRequest<Material[]>(`/materials${queryString({
@@ -53,11 +45,20 @@ export const materialsApi = {
     method: 'POST',
     body: JSON.stringify(input),
   }),
+  // 粘贴文本只保存原文；识别状态与“开始识别”入口分开查询和触发，不自动调用模型。
+  recognition: (id: number) => apiRequest<MaterialRecognition>(`/materials/${id}/recognition`),
+  // 事项提取在请求内同步调用文字模型，最长等待 120 秒；这里放宽默认 8 秒超时。
+  startRecognition: (id: number) => apiRequest<MaterialRecognitionStart>(`/materials/${id}/recognition`, {
+    method: 'POST',
+  }, 130000),
+  // 网页抓取在后端最长可等 15 秒；前端至少放宽到 30 秒，避免正常慢页面被 8 秒默认超时误判。
+  // 超时只表示前端先放弃等待，后端可能仍会建档，界面据此提示“结果未知”。
   importWeb: (input: WebImportInput) => apiRequest<WebImportResult>('/materials/web', {
     method: 'POST',
     body: JSON.stringify(input),
-  }),
+  }, 30000),
   // 多文件一次提交，逐项返回成功、重复或失败；allow_duplicate 决定重复文件是否仍导入。
+  // 单文件上限 20 MB，读取与解析可能远超 8 秒，这里至少放宽到 60 秒。
   upload: (files: File[], params: MaterialUploadParams) => {
     const form = new FormData()
     files.forEach((file) => form.append('files', file, file.name))
@@ -66,12 +67,8 @@ export const materialsApi = {
       course_id: params.course_id,
       class_name: params.class_name,
       allow_duplicate: params.allow_duplicate,
-    })}`, { method: 'POST', body: form })
+    })}`, { method: 'POST', body: form }, 60000)
   },
-  update: (id: number, input: MaterialMetadataInput) => apiRequest<Material>(`/materials/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  }),
   // 归档与恢复只切换标记：归档后退出检索与问答，原有片段与引用保留。
   archive: (id: number) => apiRequest<Material>(`/materials/${id}/archive`, { method: 'POST' }),
   restore: (id: number) => apiRequest<Material>(`/materials/${id}/restore`, { method: 'POST' }),
@@ -89,9 +86,5 @@ export const materialsApi = {
 
 export const jobsApi = {
   forMaterial: (id: number) => apiRequest<ProcessingJob[]>(`/jobs?material_id=${id}`),
-  get: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}`),
-  attempts: (id: number) => apiRequest<JobAttempt[]>(`/jobs/${id}/attempts`),
   retry: (id: number) => apiRequest<ProcessingJob>(`/jobs/${id}/retry`, { method: 'POST' }),
-  // 队列曾不可用时的补救入口：重投本空间所有待投递作业，返回成功与失败数量。
-  redeliver: () => apiRequest<DeleteResult>('/jobs/redeliver', { method: 'POST' }),
 }

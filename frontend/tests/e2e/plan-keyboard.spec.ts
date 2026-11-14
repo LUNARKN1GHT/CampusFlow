@@ -1,12 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
-function dateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+import { cancelLeftoverTestTasks, cancelTaskByTitle, dateKey, e2eAccount, hasAvailabilitySlot, listAvailabilitySlots, uniqueSuffix } from './support'
 
 function activeText(page: Page) {
   return page.evaluate(() => {
@@ -55,7 +50,7 @@ async function tabUntilButtonInRow(page: Page, rowText: string, buttonText: stri
 }
 
 test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({ page }) => {
-  const unique = Date.now().toString().slice(-6)
+  const unique = uniqueSuffix()
   const taskName = `键盘计划任务 ${unique}`
   const today = new Date()
   const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
@@ -66,9 +61,9 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
   const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A'
   await tabUntilControl(page, '用户名')
   await page.keyboard.press(selectAll)
-  await page.keyboard.type('student')
+  await page.keyboard.type(e2eAccount.username)
   await tabUntilControl(page, '密码')
-  await page.keyboard.type('campusflow-dev')
+  await page.keyboard.type(e2eAccount.password)
   await tabUntilText(page, '登录')
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
@@ -77,13 +72,11 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
   await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', { name: '学习计划' })).toBeVisible()
 
-  const slots = await page.request.get('/api/v1/availability-slots')
-  expect(slots.ok()).toBeTruthy()
-  const slotList = (await slots.json()) as Array<{ day_of_week: number; start_time: string; end_time: string }>
-  const hasWindow = slotList.some(
-    (slot) => slot.day_of_week === weekday && slot.start_time.slice(0, 5) === '08:00' && slot.end_time.slice(0, 5) === '09:00',
-  )
-  if (!hasWindow) {
+  // 历史运行留下的测试任务会占用更早的截止顺序，先取消再安排本用例任务。
+  await cancelLeftoverTestTasks(page)
+
+  const slotList = await listAvailabilitySlots(page)
+  if (!hasAvailabilitySlot(slotList, weekday, '08:00', '09:00')) {
     const created = await page.request.post('/api/v1/availability-slots', {
       data: { day_of_week: weekday, start_time: '08:00', end_time: '09:00' },
     })
@@ -141,4 +134,7 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
 
   await expect(row.getByText('用户手动移动')).toBeVisible()
   await expect(row.locator('.task-title-line strong').first()).not.toHaveText(originalTime ?? '')
+
+  // 取消本用例任务，避免历史任务在下一次运行中占用排期容量。
+  await cancelTaskByTitle(page, taskName)
 })

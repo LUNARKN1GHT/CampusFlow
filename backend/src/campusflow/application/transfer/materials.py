@@ -54,18 +54,3 @@ def collect_material_files(root: Path) -> CollectedMaterials:
     files.sort(key=lambda item: item[0])
     omitted.sort()
     return CollectedMaterials(files=tuple(files), omitted=tuple(omitted))
-
-
-def copy_with_digest(source: Path, destination: Path) -> tuple[int, str]:
-    """复制文件并同时计算大小与 SHA-256；目标目录不存在时创建。"""
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    digest = hashlib.sha256()
-    size = 0
-    with source.open("rb") as reader, destination.open("wb") as writer:
-        for chunk in iter(lambda: reader.read(_CHUNK_BYTES), b""):
-            digest.update(chunk)
-            size += len(chunk)
-            writer.write(chunk)
-        writer.flush()
-        os.fsync(writer.fileno())
-    return size, digest.hexdigest()

@@ -26,6 +26,18 @@ export type PlanBlock = {
   constraint_source: PlanConstraint[]
 }
 
+// #629：总览只返回当前已接受计划中今天的时间块，不含草案字段（draft_id/kind/seq/constraint_source）。
+export type OverviewBlock = {
+  id: number
+  task_id: number | null
+  title: string
+  starts_at: string
+  ends_at: string
+  minutes: number
+  locked: boolean
+  reason: string
+}
+
 export type PlanTaskDisposition = {
   task_id: number
   title: string
@@ -160,8 +172,8 @@ export type PlanOverview = {
   has_plan: boolean
   plan_status: string | null
   plan_version: number | null
-  today_blocks: PlanBlock[]
-  next_block: PlanBlock | null
+  today_blocks: OverviewBlock[]
+  next_block: OverviewBlock | null
   upcoming_tasks: Array<{
     id: number
     title: string

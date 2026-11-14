@@ -87,6 +87,37 @@ def test_oversized_file_rejected(client: TestClient) -> None:
     assert "上限" in result["error"]
 
 
+def test_oversized_file_fails_without_blocking_valid_file(client: TestClient) -> None:
+    """#602：超限文件按逐文件失败返回，同批正常文件仍成功导入。"""
+    big = REAL_PDF + b"x" * (20 * 1024 * 1024)
+    response = _upload(client, [("超大.pdf", big), ("作业通知.pdf", REAL_PDF)])
+    assert response.status_code == 201  # 整批不因单个超限文件失败
+    results = {r["filename"]: r for r in response.json()["results"]}
+    assert results["超大.pdf"]["material"] is None
+    assert "上限" in results["超大.pdf"]["error"]
+    assert results["作业通知.pdf"]["material"] is not None
+    assert results["作业通知.pdf"]["error"] is None
+
+
+def test_declared_content_length_over_cap_rejected_before_reading(
+    client: TestClient,
+) -> None:
+    """#602：声明的 Content-Length 超过整包上限时直接拒绝，不进入逐文件处理。"""
+    settings = client.app.state.settings
+    over_cap = settings.upload_max_files * settings.upload_max_bytes + 2 * 1024 * 1024
+    response = client.post(
+        "/api/v1/materials/upload",
+        headers={"Content-Length": str(over_cap)},
+        files=[("files", ("作业通知.pdf", REAL_PDF))],
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert "总大小" in body["detail"]
+    assert "results" not in body
+    # 未读取文件，也没有留下任何资料
+    assert client.get("/api/v1/materials").json() == []
+
+
 def test_too_many_files_rejected(client: TestClient) -> None:
     files = [(f"第{i}.png", REAL_PNG) for i in range(6)]  # 超过默认 5 个上限
     response = _upload(client, files)

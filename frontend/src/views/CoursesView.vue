@@ -10,22 +10,34 @@ import { coursesApi, semestersApi } from '../api/business'
 import { errorMessage } from '../api/client'
 import type { Course, CourseInput, Semester } from '../api/types'
 import ApiFeedback from '../components/ApiFeedback.vue'
+import { useAsyncResource } from '../composables/useAsyncResource'
 
 const semesters = ref<Semester[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const formError = ref('')
+const listNotice = ref('')
 const showHistory = ref(false)
 const selectedId = ref<number | null>(null)
 const form = reactive({ name: '', start_date: '', end_date: '' })
-const courses = ref<Course[]>([])
-const coursesLoading = ref(false)
 const courseSaving = ref(false)
-const courseError = ref('')
 const editingCourse = ref<Course | null>(null)
 const editorOpen = ref(false)
 const courseForm = reactive({ name: '', code: '', teacher: '', class_name: '' })
+
+// 课程列表按所选学期加载：快速切换学期时只有最后一次请求能写回，旧响应不会串到新范围。
+const {
+  data: courses,
+  loading: coursesLoading,
+  error: courseError,
+  load: loadCourses,
+} = useAsyncResource<Course[]>(
+  () => (selectedId.value === null ? Promise.resolve([]) : coursesApi.list(selectedId.value)),
+  { initial: [], resetOnLoad: true },
+)
+// 模板与读取统一使用非空列表；data 的 null 只表示尚未加载。
+const courseItems = computed(() => courses.value ?? [])
 
 // 默认只列出进行中学期；历史开关打开后才把已归档学期加入可选范围。
 const visibleSemesters = computed(() => showHistory.value
@@ -75,26 +87,18 @@ async function toggleArchived(semester: Semester) {
   try {
     const updated = await semestersApi.setArchived(semester.id, !semester.archived)
     const index = semesters.value.findIndex((item) => item.id === semester.id)
+    if (index === -1) {
+      // 列表已被重新加载且不含该学期时，不写入 -1 属性；重新读取并说明原因。
+      await load()
+      if (!error.value) listNotice.value = '学期已更新，但不在当前列表中；已重新加载学期列表。'
+      return
+    }
     semesters.value[index] = updated
     if (updated.archived && selectedId.value === updated.id) {
       selectedId.value = semesters.value.find((item) => !item.archived)?.id ?? null
     }
   } catch (caught) {
     formError.value = errorMessage(caught)
-  }
-}
-
-async function loadCourses() {
-  courses.value = []
-  courseError.value = ''
-  if (selectedId.value === null) return
-  coursesLoading.value = true
-  try {
-    courses.value = await coursesApi.list(selectedId.value)
-  } catch (caught) {
-    courseError.value = errorMessage(caught)
-  } finally {
-    coursesLoading.value = false
   }
 }
 
@@ -129,10 +133,12 @@ async function saveCourse() {
       }
       if (Object.keys(patch).length) {
         const updated = await coursesApi.update(editingCourse.value.id, patch)
-        courses.value[courses.value.findIndex((course) => course.id === updated.id)] = updated
+        const list = courseItems.value
+        const index = list.findIndex((course) => course.id === updated.id)
+        if (index >= 0) list[index] = updated
       }
     } else {
-      courses.value.push(await coursesApi.create({ semester_id: selectedId.value, ...values }))
+      courseItems.value.push(await coursesApi.create({ semester_id: selectedId.value, ...values }))
     }
     editorOpen.value = false
     editingCourse.value = null
@@ -144,7 +150,11 @@ async function saveCourse() {
   }
 }
 
-watch(selectedId, loadCourses)
+// 快速切换学期时会连续触发；composable 只让最后一次请求写回课程与错误。
+watch(selectedId, () => {
+  listNotice.value = ''
+  void loadCourses()
+})
 // 关闭历史视图时，如当前仍在已归档学期，自动退回进行中学期。
 watch(showHistory, (visible) => {
   if (!visible && selectedSemester.value?.archived) {
@@ -215,8 +225,8 @@ onMounted(load)
       </div>
       <ApiFeedback v-if="courseError && !editingCourse" :message="courseError" :busy="coursesLoading" @retry="loadCourses" />
       <p v-else-if="coursesLoading" class="muted">正在加载课程…</p>
-      <div v-else-if="courses.length" class="course-grid">
-        <article v-for="course in courses" :key="course.id" class="course-card">
+      <div v-else-if="courseItems.length" class="course-grid">
+        <article v-for="course in courseItems" :key="course.id" class="course-card">
           <div class="course-code">{{ course.code || '未填写代码' }}</div>
           <h3>{{ course.name }}</h3>
           <dl>
@@ -229,7 +239,7 @@ onMounted(load)
       <div v-else class="compact-empty">{{ selectedSemester ? '这个学期还没有课程。' : '选择学期后查看课程。' }}</div>
     </section>
 
-    <section v-if="selectedSemester && (editorOpen || !courses.length)" class="panel editor-panel">
+    <section v-if="selectedSemester && (editorOpen || !courseItems.length)" class="panel editor-panel">
       <!-- 没有课程时直接展开新建表单，避免空白学期多一次点击。 -->
       <div class="section-heading">
         <div><p class="eyebrow">{{ editingCourse ? '编辑' : '新建' }}</p><h2>{{ editingCourse?.name || '添加课程' }}</h2></div>
@@ -247,5 +257,6 @@ onMounted(load)
         <button type="submit" :disabled="courseSaving">{{ courseSaving ? '正在保存…' : '保存课程' }}</button>
       </form>
     </section>
+    <p v-if="listNotice" class="inline-notice" role="status">{{ listNotice }}</p>
   </main>
 </template>

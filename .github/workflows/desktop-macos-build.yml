@@ -39,13 +39,13 @@ jobs:
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
-          version: "0.12.15"
+          version: "0.12.19"
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
+          node-version-file: frontend/.nvmrc
           cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
@@ -85,6 +85,18 @@ jobs:
           fi
           echo "dmg: ${dmgs[0]} ($(du -h "${dmgs[0]}" | cut -f1))"
           bash desktop/verify_macos_dmg.sh "${dmgs[0]}" "$ARCH"
+
+      - name: Run packaged maintenance tests
+        working-directory: desktop/electron
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          if [ "$ARCH" = "arm64" ]; then app="release/mac-arm64/CampusFlow.app"; else app="release/mac/CampusFlow.app"; fi
+          export CAMPUSFLOW_PACKAGED_APP="$PWD/$app/Contents/MacOS/CampusFlow"
+          export CAMPUSFLOW_SIDECAR_BIN="$PWD/$app/Contents/Resources/sidecar/campusflow-sidecar"
+          export CAMPUSFLOW_PG_BIN="$PWD/$app/Contents/Resources/pgsql/bin"
+          npx playwright test tests/packaged-maintenance.spec.ts --reporter=line
 
       - name: Write checksums
         run: |

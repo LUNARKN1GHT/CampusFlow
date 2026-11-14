@@ -248,6 +248,22 @@ def two_week_range(today: date) -> tuple[date, date]:
     return today, today + timedelta(days=13)
 
 
+# #625：限制规划区间长度，避免 0001–9999 这类区间按天展开数百万次。
+MAX_PLANNING_RANGE_DAYS = 366
+
+
+def validate_planning_range(start: date, end: date) -> None:
+    """校验闭区间起止：结束不得早于开始，且含首尾不超过 366 天。
+
+    生成草案、局部重排与接受草案都会先经过这里，固定日程展开因此不会
+    因超长区间产生海量实例；返回中文原因由 API 统一映射为 400。
+    """
+    if end < start:
+        raise DomainError("规划结束日期不得早于开始日期")
+    if (end - start).days + 1 > MAX_PLANNING_RANGE_DAYS:
+        raise DomainError(f"规划区间不能超过 {MAX_PLANNING_RANGE_DAYS} 天")
+
+
 def resolve_planning_range(
     kind: str,
     today: date,
@@ -271,8 +287,7 @@ def resolve_planning_range(
     if kind == "custom":
         if start is None or end is None:
             raise DomainError("自定义规划区间需要同时提供开始和结束日期")
-        if end < start:
-            raise DomainError("规划结束日期不得早于开始日期")
+        validate_planning_range(start, end)
         return start, end
     raise DomainError("不支持的规划区间类型")
 

@@ -20,6 +20,7 @@ from campusflow.application.ports.parsers import (
     ParserLocator,
 )
 from campusflow.application.processing import ParserRegistry, set_parser_registry
+from campusflow.domain.errors import ConfigurationError
 from campusflow.domain.jobs import can_retry, is_terminal
 from campusflow.domain.states import JobStatus, MaterialSourceType, MaterialStatus
 from campusflow.infrastructure.db.models import Material, MaterialVersion, ProcessingJob, Workspace
@@ -62,6 +63,13 @@ class PermanentVisionParser:
 
     def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
         raise ValueError("图片格式不支持")
+
+
+class ConfigVisionParser:
+    """缺少模型配置：配置补齐后可人工重试。"""
+
+    def parse(self, content: bytes, mime_type: str) -> ParseOutcome:
+        raise ConfigurationError("未配置视觉模型密钥，请先在设置 → AI 服务配置")
 
 
 class StagedVisionParser:
@@ -280,6 +288,25 @@ def test_retry_rejects_done_job(client: TestClient, shared_storage, queue) -> No
     assert response.status_code == 400
     assert "不可重试" in response.json()["detail"]
     assert queue.enqueued == delivered_before  # 没有新的投递
+
+
+def test_retry_allows_configuration_failure(client: TestClient, shared_storage, queue) -> None:
+    """缺模型配置属于可恢复失败：接口允许重试，不再返回 400（#556）。"""
+    _use_vision_parser(ConfigVisionParser())
+    result = _upload(client)
+    job_id = result["job_id"]
+    with pytest.raises(ConfigurationError):
+        parse_version_job(job_id)
+
+    status = client.get(f"/api/v1/jobs/{job_id}").json()
+    assert status["status"] == JobStatus.FAILED
+    assert status["retryable"] is True
+    assert "AI 服务" in status["error_reason"]
+
+    response = client.post(f"/api/v1/jobs/{job_id}/retry")
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == JobStatus.PENDING
+    assert queue.enqueued == [job_id, job_id]
 
 
 def test_retry_rejects_permanent_failure(client: TestClient, shared_storage, queue) -> None:
