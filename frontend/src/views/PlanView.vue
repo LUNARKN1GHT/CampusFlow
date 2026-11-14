@@ -3,7 +3,8 @@
  * 学习计划页：按今天／本周／未来两周／自定义区间生成排期草案，显式接受后才成为当前计划。
  * 草案与当前计划分开保存；预览区展示假设、冲突风险、未排任务与保留／新安排统计，接受时服务端重新校验输入指纹和版本。
  * 时间块按计划时区展示并分组；锁定块在局部重排时保留，移动时间块不会改写任务原始 DDL。
- * 输入或版本过期时只显示错误，草案保持不变，不会静默覆盖已接受计划。
+ * 输入或版本过期时不静默覆盖已接受计划：其它错误只显示原因，版本冲突则作废旧草案并刷新后重新确认。
+ * 待接受草案可显式丢弃，丢弃只删除草案，不影响当前已接受计划。
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 
@@ -32,14 +33,19 @@ const generating = computed(() => planningBusy.value === 'generate')
 const rescheduling = computed(() => planningBusy.value === 'reschedule')
 const adjustmentDrafting = computed(() => planningBusy.value === 'adjustment')
 const accepting = ref(false)
-// 接受同样会替换 draft／current，因此与生成、重排、调整草案共用同一个禁用判断：
-// 接受进行中不能再触发新的预览，避免新草案与已接受状态互相覆盖。
-const planActionsLocked = computed(() => planningLocked.value || accepting.value)
+const discardingDraft = ref(false)
+// 接受与丢弃同样会替换 draft／current，因此与生成、重排、调整草案共用同一个禁用判断：
+// 这些操作进行中不能再触发新的写请求，避免新草案与已接受状态互相覆盖。
+const planActionsLocked = computed(
+  () => planningLocked.value || accepting.value || discardingDraft.value,
+)
 // 计划写请求（生成／重排／调整草案／接受）的序号：只有最新一次请求的响应才写回状态，
 // 较早发出但较晚返回的结果不得覆盖当前 draft、current 与提示。
 let planRequestSeq = 0
 const adjustmentLoading = ref(false)
 const adjustments = ref<AdjustmentSummary | null>(null)
+// 变化检测失败必须单独可见：没有数据不等于“无需调整”，否则用户会误以为当前计划仍然适用。
+const adjustmentError = ref('')
 const acceptedNotice = ref('')
 const rangeForm = reactive({
   type: 'two_weeks' as PlanRangeType,
@@ -154,6 +160,8 @@ function toLocalInput(value: string): string {
 }
 
 function prepareMove(block: PlanBlock) {
+  // 块级写操作与生成／重排／接受互斥：请求在途时不再打开第二个移动表单。
+  if (planActionsLocked.value || busyBlockId.value !== null) return
   moveForms[block.id] = {
     starts_at: toLocalInput(block.starts_at),
     ends_at: toLocalInput(block.ends_at),
@@ -182,15 +190,20 @@ async function load() {
 }
 
 async function loadAdjustments() {
+  // 没有当前计划时保持原空态，不把“无法检查”显示成已有结论。
   if (!current.value) {
     adjustments.value = null
+    adjustmentError.value = ''
     return
   }
   adjustmentLoading.value = true
   try {
     adjustments.value = await plansApi.adjustments()
-  } catch {
+    // 只有本次读取成功才清空上次的失败提示。
+    adjustmentError.value = ''
+  } catch (caught) {
     adjustments.value = null
+    adjustmentError.value = errorMessage(caught)
   } finally {
     adjustmentLoading.value = false
   }
@@ -276,8 +289,8 @@ async function reschedulePlan() {
   }
 }
 
-// 提交草案版本号；服务端重新收集输入比对指纹，输入变化、已有更新的已接受计划或版本过期都会拒绝，草案保持不变。
-// 409 表示版本或当前计划已被其它操作改变：刷新到最新草案后再让用户重新确认，其它错误只在页面上就地提示。
+// 提交草案版本号；服务端重新收集输入比对指纹，输入变化、已有更新的已接受计划或版本过期都会拒绝。
+// 409 表示版本或当前计划已被其它操作改变：作废旧草案后刷新到最新计划再让用户重新确认，其它错误只在页面上就地提示。
 async function accept() {
   const target = draft.value
   if (!target || planActionsLocked.value) return
@@ -300,8 +313,13 @@ async function accept() {
   } catch (caught) {
     if (seq !== planRequestSeq) return
     if (caught instanceof ApiError && caught.status === 409) {
+      // 版本冲突后旧草案已不可接受：先清空，避免刷新失败时用户继续点击接受同一份过期草案。
+      draft.value = null
       await load()
-      actionError.value = '草案已更新，请重新确认。'
+      // 刷新失败时不能声称已经更新成功，必须把真实的读取错误一并告诉用户。
+      actionError.value = error.value
+        ? `计划已被其它操作更新，但刷新失败：${error.value}，请重新加载页面。`
+        : '计划已被其它操作更新，已刷新为最新计划，请重新确认。'
       return
     }
     actionError.value = errorMessage(caught)
@@ -310,14 +328,43 @@ async function accept() {
   }
 }
 
+// 丢弃只作用于待接受草案：服务端删除该草案后重新读取，当前已接受计划保持不变。
+// 只有 draft 状态才允许丢弃，已接受的计划不会被误删。
+async function discardDraft() {
+  const target = draft.value
+  if (!target || target.status !== 'draft' || planActionsLocked.value) return
+  if (!confirm('丢弃这份草案？当前已接受计划不会改变。')) return
+  discardingDraft.value = true
+  actionError.value = ''
+  acceptedNotice.value = ''
+  try {
+    await plansApi.discard(target.id)
+    // 删除成功后重新读取当前计划；失败原因由 load 自己写入 error，这里不声称草案已丢弃。
+    await load()
+  } catch (caught) {
+    actionError.value = errorMessage(caught)
+  } finally {
+    discardingDraft.value = false
+  }
+}
+
 // 锁定与移动只作用于已接受计划的块，请求带版本号防止并发覆盖；成功后同步更新 current。
+// 请求在途期间若发生生成／重排／调整／接受，草案 id/version 或请求序号会变化，
+// 此时迟到的旧响应直接丢弃，不覆盖新的预览草案与当前计划。
 async function toggleLock(block: PlanBlock) {
-  if (!draft.value) return
+  if (!draft.value || planActionsLocked.value) return
+  const draftId = draft.value.id
+  const expectedVersion = draft.value.version
+  const seq = planRequestSeq
   busyBlockId.value = block.id
   actionError.value = ''
   try {
-    draft.value = await plansApi.setLock(block.id, !block.locked, draft.value.version)
-    if (draft.value.status === 'accepted') current.value = draft.value
+    const updated = await plansApi.setLock(block.id, !block.locked, expectedVersion)
+    if (seq !== planRequestSeq) return
+    const shown = draft.value
+    if (!shown || shown.id !== draftId || shown.version !== expectedVersion) return
+    draft.value = updated
+    if (updated.status === 'accepted') current.value = updated
   } catch (caught) {
     actionError.value = errorMessage(caught)
   } finally {
@@ -326,19 +373,27 @@ async function toggleLock(block: PlanBlock) {
 }
 
 // 移动提交按计划时区换算后的时间点；后端会拒绝越出计划范围、与其他块或固定日程重叠的时段。
+// 与锁定相同：草案已被替换时丢弃迟到的响应，移动表单保持原样供用户确认。
 async function saveMove(block: PlanBlock) {
   const form = moveForms[block.id]
-  if (!draft.value || !form) return
+  if (!draft.value || !form || planActionsLocked.value) return
+  const draftId = draft.value.id
+  const expectedVersion = draft.value.version
+  const seq = planRequestSeq
   busyBlockId.value = block.id
   actionError.value = ''
   try {
-    draft.value = await plansApi.moveBlock(
+    const updated = await plansApi.moveBlock(
       block.id,
       zonedInputToIso(form.starts_at),
       zonedInputToIso(form.ends_at),
-      draft.value.version,
+      expectedVersion,
     )
-    if (draft.value.status === 'accepted') current.value = draft.value
+    if (seq !== planRequestSeq) return
+    const shown = draft.value
+    if (!shown || shown.id !== draftId || shown.version !== expectedVersion) return
+    draft.value = updated
+    if (updated.status === 'accepted') current.value = updated
     delete moveForms[block.id]
   } catch (caught) {
     actionError.value = errorMessage(caught)
@@ -444,10 +499,27 @@ onMounted(load)
           <button type="button" :disabled="planActionsLocked" @click="accept">
             {{ accepting ? '接受中…' : '接受为当前计划' }}
           </button>
+          <!-- 丢弃只删除这份待接受草案；当前已接受计划不受影响。 -->
+          <button type="button" class="button-secondary" :disabled="planActionsLocked" @click="discardDraft">
+            {{ discardingDraft ? '丢弃中…' : '丢弃草案' }}
+          </button>
         </div>
       </section>
 
-      <section v-if="adjustments?.has_changes" class="panel" aria-label="调整建议">
+      <!-- 变化检测失败时单独提示并允许重试：没有建议不等于无需调整。 -->
+      <section v-if="adjustmentError" class="panel" aria-label="调整建议">
+        <div class="section-heading">
+          <div><p class="eyebrow">变化检测</p><h2>需要调整吗？</h2></div>
+        </div>
+        <p class="form-error" role="alert">{{ adjustmentError }}</p>
+        <div class="page-actions">
+          <button type="button" class="button-secondary" :disabled="adjustmentLoading" @click="loadAdjustments">
+            {{ adjustmentLoading ? '正在重试…' : '重试' }}
+          </button>
+        </div>
+      </section>
+
+      <section v-else-if="adjustments?.has_changes" class="panel" aria-label="调整建议">
         <div class="section-heading">
           <div><p class="eyebrow">变化检测</p><h2>需要调整吗？</h2></div>
           <span class="count-badge">{{ adjustments.suggestions.length }} 条建议</span>
@@ -532,15 +604,15 @@ onMounted(load)
               </div>
             </div>
             <div v-if="draft.status === 'accepted'" class="block-actions">
-              <button type="button" class="text-button" :disabled="busyBlockId === block.id" @click="toggleLock(block)">
+              <button type="button" class="text-button" :disabled="planActionsLocked || busyBlockId !== null" @click="toggleLock(block)">
                 {{ block.locked ? '解锁' : '锁定' }}
               </button>
-              <button type="button" class="text-button" @click="prepareMove(block)">调整时间</button>
+              <button type="button" class="text-button" :disabled="planActionsLocked || busyBlockId !== null" @click="prepareMove(block)">调整时间</button>
               <div v-if="moveForms[block.id]" class="move-form">
                 <label>开始<input v-model="moveForms[block.id].starts_at" type="datetime-local" /></label>
                 <label>结束<input v-model="moveForms[block.id].ends_at" type="datetime-local" /></label>
                 <div class="page-actions">
-                  <button type="button" :disabled="busyBlockId === block.id" @click="saveMove(block)">保存</button>
+                  <button type="button" :disabled="planActionsLocked || busyBlockId !== null" @click="saveMove(block)">保存</button>
                   <button type="button" class="text-button" @click="delete moveForms[block.id]">取消</button>
                 </div>
               </div>

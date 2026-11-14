@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from campusflow.api.deps import get_current_workspace, get_repositories
@@ -159,6 +159,9 @@ def _default_range(workspace: WorkspaceData, repos: Repositories, payload: PlanD
         )
     if kind != "custom" and (payload.start_date is not None or payload.end_date is not None):
         raise DomainError("预设规划区间不接受自定义起止日期；如需指定日期请使用 custom")
+    if kind == "custom" and payload.start_date is not None and payload.end_date is not None:
+        # 先按可操作文案校验；resolve_planning_range 的同一校验只保留上限兜底。
+        use_cases.validate_planning_range_with_hint(payload.start_date, payload.end_date)
     return resolve_planning_range(kind, today, start=payload.start_date, end=payload.end_date)
 
 
@@ -238,6 +241,16 @@ def list_plan_drafts(
 @router.get("/plans/drafts/{draft_id}", response_model=PlanDraftOut)
 def get_plan_draft(draft_id: int, workspace: CurrentWorkspace, repos: Repos) -> PlanDraftOut:
     return PlanDraftOut.from_data(use_cases.get_draft(repos, workspace.id, draft_id))
+
+
+@router.delete("/plans/drafts/{draft_id}", status_code=204)
+def discard_plan_draft(draft_id: int, workspace: CurrentWorkspace, repos: Repos) -> Response:
+    """丢弃待接受草案；已接受计划与任务截止不受影响。
+
+    超长区间的历史草案无法再接受或重排，用户可丢弃后按不超过 366 天重新生成。
+    """
+    use_cases.discard_draft(repos, workspace.id, draft_id)
+    return Response(status_code=204)
 
 
 @router.post("/plans/drafts/{draft_id}/accept", response_model=PlanDraftOut)

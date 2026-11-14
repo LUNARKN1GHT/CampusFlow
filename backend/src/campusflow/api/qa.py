@@ -4,6 +4,9 @@
 回答正文与引用、覆盖、冲突分别返回，旧会话读取时重新核对引用来源。
 """
 
+import asyncio
+import inspect
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -55,6 +58,71 @@ SessionDep = Annotated[Session, Depends(get_session)]
 GeneratorDep = Annotated[TextGenerator, Depends(get_text_generator)]
 
 
+# 同一请求内只解析一次注入替身：排序与配置身份共用同一结果，不重复构造。
+_OVERRIDE_STATE_KEY = "campusflow_qa_embedder_override"
+_UNRESOLVED = object()
+
+
+def _call_override(override, request: Request):
+    """按依赖注入语义调用 get_embedder 的替身，兼容同步与 async 两种写法。
+
+    无必填参数直接调用；恰好一个必填参数视为 request（FastAPI 依赖签名）；
+    更多必填参数无法推断，抛业务错误而不是让 TypeError 变成 500。
+    """
+    required = [
+        parameter
+        for parameter in inspect.signature(override).parameters.values()
+        if parameter.default is inspect.Parameter.empty
+        and parameter.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+    ]
+    if not required:
+        result = override()
+    elif len(required) == 1:
+        parameter = required[0]
+        result = (
+            override(**{parameter.name: request})
+            if parameter.kind is inspect.Parameter.KEYWORD_ONLY
+            else override(request)
+        )
+    else:
+        raise DomainError(
+            "向量模型依赖替身最多只能接收一个必填参数（request）；请检查测试或部署的依赖注入方式"
+        )
+    return _await_override(result) if inspect.isawaitable(result) else result
+
+
+def _await_override(awaitable):
+    """同步端点里等待 async 替身；端点已在事件循环内时退回独立线程执行。"""
+    if not inspect.iscoroutine(awaitable):
+        awaitable = _as_coroutine(awaitable)
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(awaitable)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, awaitable).result()
+
+
+async def _as_coroutine(awaitable):
+    return await awaitable
+
+
+def _embedder_override(request: Request) -> Embedder | None:
+    """解析并缓存 get_embedder 的注入替身；None 表示没有替身，按真实配置装配。"""
+    cached = getattr(request.state, _OVERRIDE_STATE_KEY, _UNRESOLVED)
+    if cached is not _UNRESOLVED:
+        return cached
+    override = request.app.dependency_overrides.get(get_embedder)
+    embedder = None if override is None else _call_override(override, request)
+    setattr(request.state, _OVERRIDE_STATE_KEY, embedder)
+    return embedder
+
+
 def _embedder_for_mode(mode: RankingMode, request: Request) -> Embedder | None:
     """关键词排序只读候选原文，不装配也不调用向量模型（#627）。
 
@@ -63,9 +131,9 @@ def _embedder_for_mode(mode: RankingMode, request: Request) -> Embedder | None:
     """
     if mode is RankingMode.KEYWORD:
         return None
-    override = request.app.dependency_overrides.get(get_embedder)
+    override = _embedder_override(request)
     if override is not None:
-        return override()
+        return override
     return get_embedder(request)
 
 
@@ -76,9 +144,9 @@ def _profile_id(request: Request, embedder: Embedder | None) -> str:
     """
     if embedder is not None:
         return embedder.profile.id
-    override = request.app.dependency_overrides.get(get_embedder)
+    override = _embedder_override(request)
     if override is not None:
-        return override().profile.id
+        return override.profile.id
     return profile_from_settings(request.app.state.settings).id
 
 

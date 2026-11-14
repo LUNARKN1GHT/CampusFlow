@@ -210,6 +210,15 @@ void loadAll()
               <p class="form-help">浏览器内置阅读器定位到第 {{ selected?.page ?? 1 }} 页；页码来自解析结果，坐标若有则以侧栏为准。</p>
             </div>
 
+            <!-- Word 与网页没有页内渲染，但片段与引用定位仍可核对，文案不能让人误以为无法定位。 -->
+            <div v-else-if="material.source_type === 'word'" class="compact-empty">
+              Word 原文件暂不支持页内预览；左侧片段与引用定位仍可核对原文。
+            </div>
+
+            <div v-else-if="material.source_type === 'web'" class="compact-empty">
+              网页快照暂不支持页内预览；左侧片段与引用定位仍可核对原文。
+            </div>
+
             <div v-else class="compact-empty">该来源类型暂不支持原文定位。</div>
           </template>
 

@@ -205,17 +205,25 @@ def _deadline_windows(
     due_at: datetime,
     repeat_minutes: int | None,
 ) -> list[datetime]:
-    """截止前的触发窗口；高频重复只保留最接近截止日的最近 N 个。
+    """截止前的触发窗口；高频重复时保留最早提前提醒与最近 N-1 个窗口。
 
-    逆序截断而不是从首个窗口顺延，保证记录数始终有界，且规则窗口集合不随读取时间变化。
-    不重复时只有一个提前量窗口，与原行为一致。
+    截断不再从首个窗口顺延：首个提前量窗口（first_window）始终保留，避免
+    repeat_minutes 很小时用户看不到最早的提醒；其余名额留给最接近截止的窗口。
+    总数仍不超过 MAX_DEADLINE_WINDOWS，且窗口集合只由截止时间与规则决定，
+    不随读取时间变化。不重复时只有一个提前量窗口，与原行为一致。
     """
     if not repeat_minutes:
         return [first_window]
     step = timedelta(minutes=repeat_minutes)
     last_index = (due_at - first_window) // step
-    first_index = max(0, last_index + 1 - MAX_DEADLINE_WINDOWS)
-    return [first_window + step * index for index in range(first_index, last_index + 1)]
+    total = last_index + 1
+    if total <= MAX_DEADLINE_WINDOWS:
+        return [first_window + step * index for index in range(total)]
+    # 首个窗口 + 最近的 MAX-1 个窗口；两者在 total 超限时不会重叠。
+    recent_start = last_index - (MAX_DEADLINE_WINDOWS - 2)
+    return [first_window] + [
+        first_window + step * index for index in range(recent_start, last_index + 1)
+    ]
 
 
 def _deadline_rows(
@@ -308,18 +316,48 @@ def _deadline_rows(
 
 
 @dataclass(frozen=True)
-class _TriggerState:
-    """读取路径的触发状态快照：去重键到（所属任务、当前状态）。"""
+class _StoredTrigger:
+    """已存在触发记录的只读快照；正文与载荷参与"是否需要改写"的判断。"""
 
-    by_key: dict[str, tuple[int | None, str]]
+    task_id: int | None
+    status: str
+    message: str
+    payload: dict
+
+
+@dataclass(frozen=True)
+class _TriggerState:
+    """读取路径的触发状态快照：去重键到已存记录（所属任务、状态、正文与载荷）。"""
+
+    by_key: dict[str, _StoredTrigger]
 
     @property
     def pending_by_task(self) -> dict[int, set[str]]:
         pending: dict[int, set[str]] = {}
-        for key, (owner, status) in self.by_key.items():
-            if status == "pending" and owner is not None:
-                pending.setdefault(owner, set()).add(key)
+        for key, item in self.by_key.items():
+            if item.status == "pending" and item.task_id is not None:
+                pending.setdefault(item.task_id, set()).add(key)
         return pending
+
+    def has_pending_workspace_review(self) -> bool:
+        return any(
+            item.task_id is None and item.status == "pending" for item in self.by_key.values()
+        )
+
+
+def _needs_write(existing: _StoredTrigger | None, row: dict) -> bool:
+    """判断一条期望记录是否需要写入。
+
+    已读、已发送或已忽略的记录绝不重新激活，也不改写正文；待发送记录在正文或
+    载荷变化时才更新（任务改名、待核对数量变化），避免提醒一直显示旧内容。
+    """
+    if existing is None:
+        return True
+    if existing.status == "cancelled":
+        return True
+    if existing.status != "pending":
+        return False
+    return existing.message != row["message"] or existing.payload != row["payload"]
 
 
 def _trigger_state(repos: Repositories, workspace_id: int) -> _TriggerState | None:
@@ -327,7 +365,17 @@ def _trigger_state(repos: Repositories, workspace_id: int) -> _TriggerState | No
     triggers = repos.reminders.list_triggers(workspace_id, limit=READ_STATE_LIMIT)
     if len(triggers) >= READ_STATE_LIMIT:
         return None
-    return _TriggerState({item.dedupe_key: (item.task_id, item.status) for item in triggers})
+    return _TriggerState(
+        {
+            item.dedupe_key: _StoredTrigger(
+                task_id=item.task_id,
+                status=item.status,
+                message=item.message,
+                payload=item.payload,
+            )
+            for item in triggers
+        }
+    )
 
 
 def sync_reminders(
@@ -343,8 +391,9 @@ def sync_reminders(
     sync 不提交事务，由调用方提交；dedupe_key 唯一约束保证同一事项、规则版本和窗口只一条。
     完成/取消、规则暂停或停用会撤消待发送提醒；仍需要的已取消记录在 upsert 时恢复。
     task_ids 为空列表时只同步工作空间级待核对提醒。
-    ``state`` 是读取路径传入的既有触发快照（#626）：已存在且非取消的记录跳过重复 upsert，
-    没有过期待发送记录时也不发送撤消写入；传入 None 时保持完整同步语义。
+    ``state`` 是读取路径传入的既有触发快照（#626）：缺失或已撤消的窗口照常写入，
+    待发送记录仅在正文或载荷变化时刷新（任务改名、待核对数量变化），已发送、已读与
+    已忽略的记录不改写也不重新激活；传入 None 时保持完整同步语义。
     """
     moment = _now(repos, workspace_id, now)
     timezone = ZoneInfo(get_settings(repos, workspace_id).timezone)
@@ -374,12 +423,10 @@ def sync_reminders(
         if state is None:
             changed = desired
         else:
-            # 已存在且未取消的记录不会被 upsert 改写；只写入缺失或待恢复的窗口。
+            # 缺失、已取消或待发送但正文/载荷已变的窗口需要写入；
+            # 已发送、已读与已忽略的记录保持原样，不重新激活。
             changed = [
-                row
-                for row in desired
-                if state.by_key.get(row["dedupe_key"], (None, "missing"))[1] == "cancelled"
-                or row["dedupe_key"] not in state.by_key
+                row for row in desired if _needs_write(state.by_key.get(row["dedupe_key"]), row)
             ]
         rows = [
             {
@@ -400,30 +447,22 @@ def sync_reminders(
             repos.candidates.list_for_review(workspace_id, review_statuses=(ReviewStatus.PENDING,))
         )
         review_key = workspace_review_dedupe_key(day=moment.date())
-        review_state = None if state is None else state.by_key.get(review_key)
-        review_pending = review_state is not None and review_state[1] == "pending"
+        row = {
+            "workspace_id": workspace_id,
+            "rule_id": default_rule.rule_id if default_rule is not None else None,
+            "task_id": None,
+            "kind": "review",
+            "dedupe_key": review_key,
+            "scheduled_for": moment,
+            "message": (f"有 {pending_reviews} 项待核对事项；确认前不会作为确定约束参与排期"),
+            "payload": {"pending_review_count": pending_reviews},
+        }
         if pending_reviews and default_rule is not None and not default_rule.paused:
-            if not review_pending:
-                repos.reminders.cancel_pending_reviews(workspace_id)
-                rows = [
-                    {
-                        "workspace_id": workspace_id,
-                        "rule_id": default_rule.rule_id,
-                        "task_id": None,
-                        "kind": "review",
-                        "dedupe_key": review_key,
-                        "scheduled_for": moment,
-                        "message": (
-                            f"有 {pending_reviews} 项待核对事项；确认前不会作为确定约束参与排期"
-                        ),
-                        "payload": {"pending_review_count": pending_reviews},
-                    }
-                ]
-                if rows:
-                    created += len(repos.reminders.upsert_triggers(rows))
-        elif state is None or any(
-            owner is None and status == "pending" for owner, status in state.by_key.values()
-        ):
+            # 数量变化时同一天的同一条记录也要改正文与载荷，而不是继续显示旧数量。
+            if state is None or _needs_write(state.by_key.get(review_key), row):
+                cancelled += repos.reminders.cancel_pending_reviews(workspace_id)
+                created += len(repos.reminders.upsert_triggers([row]))
+        elif state is None or state.has_pending_workspace_review():
             repos.reminders.cancel_pending_reviews(workspace_id)
 
     # 没有独立推送进程：同步时把已到窗口的待发送记录直接标记为已发送。

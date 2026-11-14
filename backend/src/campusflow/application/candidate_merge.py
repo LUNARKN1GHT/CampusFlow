@@ -167,12 +167,16 @@ def execute_merge(
 ) -> MergeResult:
     """执行合并；必须携带与当前范围匹配的预览令牌。
 
-    全部来源已有合并记录时直接返回既有结果，视为重试而不重复迁移；
+    先锁工作空间行串行化同空间合并，再检查来源是否已被合并到其它目标，
+    避免同一来源先后／并发合并到两个目标、重复取消来源任务（#623）。
+    全部来源已有当前目标的合并记录时直接返回既有结果，视为重试而不重复迁移；
     令牌不匹配返回冲突，要求重新预览。事务内完成状态变更、时间块迁移、
     任务取消与历史写入，任一步失败整体回滚。
     """
     if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1000:
         raise DomainError("请填写 1 至 1000 字的合并原因")
+    # 锁必须在读取合并记录之前取得：否则两次跨目标的并发合并都会读到空记录。
+    repos.plans.lock_workspace(workspace_id)
     preview = preview_merge(repos, workspace_id, target_candidate_id, source_ids)
     existing_records = [
         repos.candidates.find_merge(workspace_id, target_candidate_id, source_id)
@@ -181,6 +185,7 @@ def execute_merge(
     # 幂等检查放在令牌校验之前：已完成的合并重试时不需要用户重新预览。
     if all(record is not None for record in existing_records):
         return MergeResult(tuple(existing_records), False, preview)
+    _reject_sources_merged_elsewhere(repos, workspace_id, target_candidate_id, source_ids)
     if preview_token != preview.token:
         raise ConflictError("合并范围或进度已变化，请重新预览后再确认")
     target_kind, target_formal_id, target_progress, _ = _formal(
@@ -263,6 +268,24 @@ def execute_merge(
             return MergeResult(existing, False, preview)
         raise
     return MergeResult(tuple(records), created, preview)
+
+
+def _reject_sources_merged_elsewhere(
+    repos: Repositories, workspace_id: int, target_candidate_id: int, source_ids: tuple[int, ...]
+) -> None:
+    """同一来源只允许合并到一个目标；已在别处的来源必须重新选择（#623）。
+
+    唯一键只约束（目标, 来源），同一来源仍能合并到第二个目标并留下第二条记录，
+    还会再次取消来源任务、覆盖来源候选状态。调用方必须先持有工作空间锁，
+    否则并发请求都读到空记录而同时放行。
+    """
+    for source_id in source_ids:
+        for record in repos.candidates.list_merges(workspace_id, source_id):
+            if (
+                record.source_candidate_id == source_id
+                and record.target_candidate_id != target_candidate_id
+            ):
+                raise ConflictError("该来源候选已合并到其它候选，请刷新后重新选择")
 
 
 def _existing_merges(

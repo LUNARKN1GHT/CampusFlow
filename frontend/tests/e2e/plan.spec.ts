@@ -136,6 +136,63 @@ test('过期草案接受被拒绝后可刷新到最新计划', async ({ page }) 
   await cancelTaskByTitle(page, taskName)
 })
 
+test('丢弃待接受草案后当前计划保持不变，刷新后草案仍不存在', async ({ page }) => {
+  const unique = uniqueSuffix()
+  // 沿用 support 中已有的测试任务前缀，历史运行留下的同套件任务会在下次开始时被清理。
+  const taskName = `过期草案任务 丢弃 ${unique}`
+  const today = new Date()
+  const due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2)
+  const dueDate = dateKey(due)
+  const weekday = (due.getDay() + 6) % 7
+
+  await login(page)
+  await cancelLeftoverTestTasks(page)
+
+  const slots = await listAvailabilitySlots(page)
+  if (!hasAvailabilitySlot(slots, weekday, '12:00', '13:00')) {
+    const created = await page.request.post('/api/v1/availability-slots', {
+      data: { day_of_week: weekday, start_time: '12:00', end_time: '13:00' },
+    })
+    expect(created.ok()).toBeTruthy()
+  }
+  const task = await page.request.post('/api/v1/tasks', {
+    data: {
+      title: taskName,
+      due_date: dueDate,
+      due_time: '14:00',
+      priority: 'high',
+      estimated_minutes: 60,
+      remaining_minutes: 60,
+    },
+  })
+  expect(task.ok()).toBeTruthy()
+
+  await page.getByRole('navigation', { name: '主要导航' }).getByRole('link', { name: '学习计划' }).click()
+  // 先接受一份计划，作为“丢弃草案不影响当前计划”的对照。
+  await page.getByRole('button', { name: '生成草案' }).click()
+  await expect(page.getByText('待接受草案')).toBeVisible()
+  await page.getByRole('button', { name: '接受为当前计划' }).click()
+  await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
+
+  // 再生成一份新的待接受草案并丢弃：当前计划必须原样保留，草案不再可接受。
+  await page.getByRole('button', { name: '生成草案' }).click()
+  await expect(page.getByText('待接受草案')).toBeVisible()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '丢弃草案' }).click()
+  await expect(page.getByText('待接受草案')).toHaveCount(0)
+  await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '丢弃草案' })).toHaveCount(0)
+
+  // 刷新后草案确实已删除，页面直接显示当前计划。
+  await page.reload()
+  await expect(page.getByText('当前计划', { exact: true })).toBeVisible()
+  await expect(page.getByText('待接受草案')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '丢弃草案' })).toHaveCount(0)
+
+  // 取消本用例任务，避免历史任务在下一次运行中占用排期容量。
+  await cancelTaskByTitle(page, taskName)
+})
+
 test('计划加载失败后可点击重试恢复', async ({ page }) => {
   await login(page)
 

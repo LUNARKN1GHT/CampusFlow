@@ -200,14 +200,78 @@ def test_high_frequency_repeat_is_capped(client: TestClient) -> None:
     assert len(pending) == MAX_DEADLINE_WINDOWS
     scheduled = sorted(_instant(item["scheduled_for"]) for item in pending)
     due_at = _at(DUE_DAY, 10, 0)
+    # 最早的提前提醒（T-24h）必须保留，剩余名额留给最接近截止的窗口。
+    assert scheduled[0] == due_at - timedelta(minutes=1440)
+    assert scheduled[1] == due_at - timedelta(minutes=MAX_DEADLINE_WINDOWS - 2)
     assert scheduled[-1] == due_at
-    assert scheduled[0] == due_at - timedelta(minutes=MAX_DEADLINE_WINDOWS - 1)
+    assert len(set(scheduled)) == MAX_DEADLINE_WINDOWS
     assert len({item["id"] for item in pending}) == MAX_DEADLINE_WINDOWS
 
     # 重复读取不会新增窗口，记录数保持有界。
     again = _reminders(client, status="pending")
     assert len(again) == MAX_DEADLINE_WINDOWS
     assert [item["id"] for item in again] == [item["id"] for item in pending]
+
+
+def test_truncated_windows_keep_earliest_advance_reminder(client: TestClient) -> None:
+    """截断丢窗口时不能丢首个提前提醒：advance=1440、repeat=5 的 T-24h 必须存在。"""
+    task = _task(client)
+    _rule(client, task_id=task["id"], advance_minutes=1440, repeat_minutes=5)
+
+    pending = _reminders(client, status="pending")
+    assert len(pending) == MAX_DEADLINE_WINDOWS
+    scheduled = sorted(_instant(item["scheduled_for"]) for item in pending)
+    due_at = _at(DUE_DAY, 10, 0)
+    assert scheduled[0] == _at(DUE_DAY - timedelta(days=1), 10, 0)
+    assert scheduled[-1] == due_at
+    # 首个窗口之后是连续的 5 分钟重复窗口，数量为 MAX-1。
+    assert scheduled[-1] - scheduled[1] == timedelta(minutes=5 * (MAX_DEADLINE_WINDOWS - 2))
+    assert all(
+        later - earlier == timedelta(minutes=5)
+        for earlier, later in zip(scheduled[1:], scheduled[2:], strict=False)
+    )
+    assert len(set(scheduled)) == MAX_DEADLINE_WINDOWS
+
+    again = _reminders(client, status="pending")
+    assert [item["id"] for item in again] == [item["id"] for item in pending]
+
+
+def test_pending_reminder_message_follows_task_rename(client: TestClient) -> None:
+    """任务改名后同一条待发送提醒改正文，不新增记录。"""
+    task = _task(client, title="旧标题")
+    _rule(client, task_id=task["id"], advance_minutes=60)
+    [first] = _reminders(client, status="pending")
+    assert "旧标题" in first["message"]
+
+    renamed = client.patch(f"/api/v1/tasks/{task['id']}", json={"title": "新标题"})
+    assert renamed.status_code == 200, renamed.text
+
+    pending = _reminders(client, status="pending")
+    assert len(pending) == 1
+    assert pending[0]["id"] == first["id"]
+    assert pending[0]["status"] == "pending"
+    assert "新标题" in pending[0]["message"]
+    assert "旧标题" not in pending[0]["message"]
+
+
+def test_sent_or_read_reminder_is_not_rewritten(client: TestClient) -> None:
+    """已发送或已读的提醒保留历史正文，改名或重复同步都不改写、不重新激活。"""
+    task = _task(client, title="已发送标题")
+    _rule(client, task_id=task["id"], advance_minutes=60)
+    [item] = _reminders(client, status="pending")
+
+    read = client.post(f"/api/v1/reminders/{item['id']}/action", json={"action": "read"})
+    assert read.status_code == 200, read.text
+    assert read.json()["status"] == "sent"
+
+    renamed = client.patch(f"/api/v1/tasks/{task['id']}", json={"title": "改名之后"})
+    assert renamed.status_code == 200, renamed.text
+
+    stored = next(row for row in _reminders(client) if row["id"] == item["id"])
+    assert stored["id"] == item["id"]
+    assert stored["status"] == "sent"
+    assert stored["message"] == item["message"]
+    assert stored["read_at"] is not None
 
 
 def test_read_path_skips_unchanged_upserts(client: TestClient, monkeypatch) -> None:

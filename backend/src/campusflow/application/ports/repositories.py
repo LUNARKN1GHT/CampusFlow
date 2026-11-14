@@ -1136,6 +1136,14 @@ class PlanRepository(Protocol):
         self, workspace_id: int, *, semester_id: int | None = None
     ) -> list[PlanDraftData]: ...
 
+    def delete_draft(self, workspace_id: int, draft_id: int) -> bool:
+        """只删除该空间下待接受的草案，时间块与版本随数据库级联清理。
+
+        已接受或被替代的计划保留历史，不删除；草案不存在、属于其它空间或
+        已进入终态时返回 False。
+        """
+        ...
+
     def get_current(
         self, workspace_id: int, *, semester_id: int | None = None
     ) -> PlanDraftData | None:
@@ -1273,7 +1281,7 @@ class ReminderRepository(Protocol):
     def get_trigger(self, trigger_id: int) -> ReminderTriggerData | None: ...
 
     def upsert_triggers(self, rows: list[dict]) -> list[ReminderTriggerData]:
-        """按 dedupe_key 幂等插入；仍需要的已取消触发恢复为待发送。"""
+        """按 dedupe_key 幂等插入；已撤消的恢复为待发送，待发送的刷新正文与载荷。"""
         ...
 
     def set_trigger_status(

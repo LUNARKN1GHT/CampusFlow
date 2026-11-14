@@ -201,6 +201,8 @@ export const plansApi = {
       method: 'POST',
       body: JSON.stringify({ expected_version: expectedVersion }),
     }),
+  // 丢弃待接受草案：只删除这份草案，当前已接受计划不受影响；成功返回 204。
+  discard: (id: number) => apiRequest<void>(`/plans/drafts/${id}`, { method: 'DELETE' }),
   // 没有当前计划时返回 null，不自动生成。
   current: (semesterId?: number) =>
     apiRequest<PlanDraft | null>(`/plans/current${semesterId ? `?semester_id=${semesterId}` : ''}`),

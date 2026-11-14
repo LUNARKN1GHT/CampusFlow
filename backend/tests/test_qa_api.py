@@ -481,3 +481,104 @@ def test_keyword_conversation_works_without_vector_configuration(client):
     assert response.status_code == 200, response.text
     assert response.json()["insufficient"] is False
     assert len(response.json()["citations"]) == 1
+
+
+def test_keyword_mode_resolves_dependency_override_signatures(client):
+    """#627：关键词模式接受无参、带 request 与 async 三种替身写法，各完成一次问答。"""
+    client.app.state.settings.zhipu_api_key = None
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+
+    async def async_override():
+        return FakeEmbedder()
+
+    overrides = [
+        lambda: FakeEmbedder(),
+        lambda request: FakeEmbedder(),
+        async_override,
+    ]
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        for override in overrides:
+            client.app.dependency_overrides[get_embedder] = override
+            response = client.post(
+                "/api/v1/qa/query",
+                json=query_body(scope, mode="keyword", question="CS101 作业截止"),
+            )
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["insufficient"] is False
+            assert len(body["citations"]) == 1
+    finally:
+        client.app.dependency_overrides.pop(get_embedder, None)
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+
+def test_qa_request_resolves_embedder_override_only_once(client):
+    """#627：同一请求复用已解析的替身，混合模式不会为配置身份再构造一次。"""
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    embedder = FakeEmbedder()
+    calls = {"count": 0}
+
+    def counting_override(request):
+        calls["count"] += 1
+        return embedder
+
+    client.app.dependency_overrides[get_embedder] = counting_override
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post("/api/v1/qa/query", json=query_body(scope))
+    finally:
+        client.app.dependency_overrides.pop(get_embedder, None)
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["insufficient"] is False
+    assert calls["count"] == 1
+
+
+def test_keyword_mode_never_builds_embedder_from_settings(client, monkeypatch):
+    """#627：关键词模式只按已保存设置推导配置身份，不装配真实向量模型。"""
+
+    def explode(settings):
+        raise AssertionError("关键词模式不应装配真实向量模型")
+
+    monkeypatch.setattr("campusflow.api.deps.make_embedder", explode)
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    client.app.dependency_overrides.pop(get_embedder, None)
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post(
+            "/api/v1/qa/query",
+            json=query_body(scope, mode="keyword", question="CS101 作业截止"),
+        )
+    finally:
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["insufficient"] is False
+
+
+def test_unresolvable_embedder_override_returns_business_error(client):
+    """#627：替身带多个必填参数时给出明确业务错误，而不是 TypeError 导致 500。"""
+    semesters, courses = scope_rows(client)
+    scope = (semesters[0], courses[0])
+    index_material(client, (SCOPE_TEXT,), scope)
+    client.app.dependency_overrides[get_embedder] = lambda app, request: FakeEmbedder()
+    client.app.dependency_overrides[get_text_generator] = lambda: ScriptedGenerator(first_citation)
+    try:
+        response = client.post(
+            "/api/v1/qa/query",
+            json=query_body(scope, mode="keyword", question="CS101 作业截止"),
+        )
+    finally:
+        client.app.dependency_overrides.pop(get_embedder, None)
+        client.app.dependency_overrides.pop(get_text_generator, None)
+
+    assert response.status_code == 400, response.text
+    assert "request" in response.json()["detail"]
