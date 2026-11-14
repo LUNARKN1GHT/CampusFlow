@@ -12,6 +12,8 @@ CampusFlow 面向学生日常学习中的信息整理与时间管理需求，连
 
 > **2026-11-12 前端导航调整：** 智能问答、外部日历、待核对与版本对照页面及入口暂下线（后端能力保留）；课程路径移出主导航，改由设置页「工具箱」进入，原 `/course-paths` 仍可直接访问。导航改为页面顶部横向布局，浅色／深色／跟随系统移到右上角；界面主题新增绿色／蓝色／白色色系，与浅色／深色独立叠加。
 
+> **使用说明：** 安装、登录、资料导入、任务与计划、提醒、导出与课程路径的操作步骤见 [用户使用手册](docs/USER-GUIDE.md)。
+
 ## 开发与架构入口
 
 X007 已提供选定学期内的课程/教学班严格匹配：同名多班或无法匹配时保留原文和人工选项，唯一候选也不自动绑定。核对页面及自动处理入口仍待接入，见 [X007 说明](docs/verification/X007-course-matching.md)。
@@ -50,6 +52,7 @@ X005 已提供课程规则候选提取：保留完整规定，再单列条件、
 
 扩展导入正在分任务推进：N002 已接入普通 DOCX 上传校验，N003 已接通正文/表格解析和版本定位。说明见 [Word 校验](docs/verification/N002-word-validation.md) 与 [Word 解析](docs/verification/N003-word-parsing.md)；资料页面仍待接入。
 
+- [用户使用手册](docs/USER-GUIDE.md)
 - [技术选型、目录分层与架构图](docs/ARCHITECTURE.md)
 - [本地启动与验证命令](docs/DEVELOPMENT.md)
 - [资料处理、Docker Worker 与只读诊断](docs/MATERIAL_PROCESSING.md)
