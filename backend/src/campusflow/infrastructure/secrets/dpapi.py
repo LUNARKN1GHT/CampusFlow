@@ -32,6 +32,15 @@ class DpapiError(RuntimeError):
     """DPAPI 加解密失败；消息只含错误码，不含凭据内容。"""
 
 
+def _unique_records(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    records: dict[str, object] = {}
+    for key, value in pairs:
+        if key in records:
+            raise DpapiError("凭据文件包含重复记录，未修改原文件")
+        records[key] = value
+    return records
+
+
 def _replace_with_retry(source: Path, target: Path) -> None:
     """Windows 文件短暂占用时最多等待一秒；始终原子替换密文文件。"""
     for attempt in range(6):
@@ -123,12 +132,12 @@ class WindowsDpapiSecretStore:
         except FileNotFoundError:
             return {}
         try:
-            data = json.loads(raw)
+            data = json.loads(raw, object_pairs_hook=_unique_records)
         except json.JSONDecodeError as exc:
             raise DpapiError("凭据文件损坏，无法解析") from exc
-        if not isinstance(data, dict):
+        if not isinstance(data, dict) or any(not isinstance(value, str) for value in data.values()):
             raise DpapiError("凭据文件格式无效")
-        return {key: value for key, value in data.items() if isinstance(value, str)}
+        return data
 
     def _save(self, data: dict[str, str]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)

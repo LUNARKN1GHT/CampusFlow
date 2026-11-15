@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from '@playwright/test'
@@ -9,7 +9,8 @@ let source: string
 let cacheRoot: string
 const files = [
   'bin/initdb.exe', 'bin/postgres.exe', 'bin/pg_ctl.exe', 'bin/pg_dump.exe',
-  'bin/pg_restore.exe', 'lib/extension.dll', 'share/postgres.bki', 'share/extension/vector.sql',
+  'bin/pg_restore.exe', 'bin/pg_isready.exe', 'bin/psql.exe', 'bin/createdb.exe',
+  'lib/extension.dll', 'share/postgres.bki', 'share/extension/vector.sql',
   'server_license.txt',
 ]
 
@@ -95,4 +96,21 @@ test('缓存不可写入时保留原始运行文件', async () => {
   await writeFile(cacheRoot, 'not-a-directory')
   await expect(prepare()).rejects.toThrow()
   expect(await readFile(path.join(source, 'bin/postgres.exe'), 'utf8')).toBe('synthetic:bin/postgres.exe')
+})
+
+for (const tool of ['pg_isready', 'psql', 'createdb']) {
+  test(`缺少 ${tool} 时提前阻止发布不完整副本`, async () => {
+    await rm(path.join(source, 'bin', `${tool}.exe`))
+    await expect(prepare()).rejects.toThrow(`缺少 bin/${tool}.exe`)
+    expect(await readdir(cacheRoot)).toEqual([])
+  })
+}
+
+test('副本目录被改成中文名称后不会复用', async () => {
+  const bin = await prepare()
+  const changed = path.join(cacheRoot, `${path.basename(path.dirname(bin))}-中文`)
+  await rename(path.dirname(bin), changed)
+  const replacement = await prepare()
+  expect(replacement).not.toMatch(/[^\x20-\x7e]/)
+  expect(await readFile(path.join(changed, 'bin/postgres.exe'), 'utf8')).toContain('synthetic')
 })

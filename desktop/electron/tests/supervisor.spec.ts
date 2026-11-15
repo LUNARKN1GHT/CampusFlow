@@ -184,6 +184,66 @@ test('按 PostgreSQL → migrate → API → Worker 顺序启动，并按 Worker
   cleanupHarness()
 })
 
+test('重复及并发启动复用同一套服务，停止后仍能正常启动', async () => {
+  const harness = createHarness()
+  try {
+    await Promise.all([harness.supervisor.start(), harness.supervisor.start()])
+    const initialCalls = [...harness.calls]
+    await harness.supervisor.start()
+    await harness.supervisor.retry()
+    expect(harness.calls).toEqual(initialCalls)
+    await harness.supervisor.stop()
+    expect(harness.kills).toEqual(['worker', 'api'])
+    await harness.supervisor.start()
+    expect(harness.calls.filter(call => call === 'spawn:serve')).toHaveLength(2)
+    expect(harness.supervisor.getStatus().phase).toBe('ready')
+  } finally {
+    await harness.supervisor.stop()
+    cleanupHarness()
+  }
+})
+
+test('初始化未结束时关闭，等待晚到数据库回收后才报告停止', async () => {
+  let release!: () => void
+  const pending = new Promise<void>(resolve => { release = resolve })
+  let entered = false
+  const harness = createHarness({
+    config: { bootstrap: true, pgMode: 'managed', pgBin: '/fake/pg' },
+    run: async (_command, args) => {
+      if (args[0] === 'bootstrap') {
+        entered = true
+        await pending
+        return { code: 0, stderr: '', stdout: JSON.stringify({
+          ready: true, status: 'initialized', database_url: 'postgresql://synthetic',
+          local_username: 'synthetic', local_password: 'synthetic',
+          started_postgres: true, postgres_running: true,
+        }) }
+      }
+      return { code: 0, stderr: '', stdout: '' }
+    },
+  })
+  const starting = harness.supervisor.start()
+  try {
+    await eventually(() => entered)
+    let stopped = false
+    const stopping = harness.supervisor.stop().then(() => { stopped = true })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(stopped).toBe(false)
+    expect(harness.supervisor.getStatus().phase).toBe('stopping')
+    release()
+    await Promise.all([starting, stopping])
+    expect(harness.runCalls.filter(call => call.args.includes('stop'))).toHaveLength(1)
+    expect(harness.spawnCalls).toHaveLength(0)
+    expect(harness.supervisor.getStatus().phase).toBe('stopped')
+    expect(harness.supervisor.getBootstrapLogin()).toBeNull()
+  } finally {
+    release()
+    await starting
+    await harness.supervisor.stop()
+    cleanupHarness()
+  }
+})
+
 test('bootstrap 成功时跳过 initdb，先过升级闸门再按 bootstrap → migrate → API → Worker 启动', async () => {
   const databaseUrl =
     'postgresql+psycopg://campusflow:db-secret@127.0.0.1:59945/campusflow'

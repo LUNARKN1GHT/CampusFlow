@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -7,10 +8,41 @@ from campusflow.core.config import Settings
 from campusflow.infrastructure.secrets import dpapi
 
 
+@pytest.mark.parametrize("bad_value", [None, 123, {}, []])
+@pytest.mark.parametrize("operation", ["set", "delete"])
+def test_malformed_entry_never_disappears_on_update(tmp_path, monkeypatch, bad_value, operation):
+    target = tmp_path / "secrets.dpapi"
+    original = json.dumps({"damaged": bad_value, "existing": "synthetic-ciphertext"})
+    target.write_text(original, encoding="utf-8")
+    store = dpapi.WindowsDpapiSecretStore(target)
+    monkeypatch.setattr(dpapi, "_protect", lambda value: b"synthetic-encrypted")
+    with pytest.raises(dpapi.DpapiError, match="格式无效"):
+        if operation == "set":
+            store.set("new", "synthetic-secret")
+        else:
+            store.delete("existing")
+    assert target.read_text(encoding="utf-8") == original
+    assert list(tmp_path.glob(".secrets-*.tmp")) == []
+
+
 def locked(code: int = 5) -> PermissionError:
     error = PermissionError("synthetic lock")
     error.winerror = code
     return error
+
+
+@pytest.mark.parametrize("operation", ["get", "set", "delete"])
+def test_duplicate_records_are_rejected_without_losing_original(tmp_path, operation):
+    target = tmp_path / "secrets.dpapi"
+    original = '{"account":"first","account":"second"}'
+    target.write_text(original, encoding="utf-8")
+    store = dpapi.WindowsDpapiSecretStore(target)
+    with pytest.raises(dpapi.DpapiError, match="重复记录"):
+        if operation == "set":
+            store.set("new", "synthetic")
+        else:
+            getattr(store, operation)("account")
+    assert target.read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize("code", [5, 32, 33])

@@ -6,7 +6,8 @@ import path from 'node:path'
 const ascii = (value: string) => /^[\x20-\x7e]+$/.test(value)
 const required = [
   'bin/initdb.exe', 'bin/postgres.exe', 'bin/pg_ctl.exe', 'bin/pg_dump.exe',
-  'bin/pg_restore.exe', 'share/postgres.bki',
+  'bin/pg_restore.exe', 'bin/pg_isready.exe', 'bin/psql.exe', 'bin/createdb.exe',
+  'share/postgres.bki',
 ]
 type Entry = { name: string; digest: string }
 
@@ -77,7 +78,7 @@ export async function preparePgRuntime(options: {
   const digest = createHash('sha256').update(expected).digest('hex')
   // 每份副本完整核对内容；损坏或中断的副本不执行、不原地覆盖。
   for (const candidate of (await readdir(cacheRoot)).sort()) {
-    if (!candidate.startsWith(`${digest}-`)) continue
+    if (!candidate.startsWith(`${digest}-`) || !ascii(candidate)) continue
     const destination = path.join(cacheRoot, candidate)
     try {
       if ((await lstat(destination)).isSymbolicLink()) continue

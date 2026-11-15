@@ -192,7 +192,11 @@ export class Supervisor extends EventEmitter {
   }
 
   start(): Promise<void> {
+    if (this.stopPromise && this.status.phase === 'stopping') {
+      return this.stopPromise.then(() => this.start())
+    }
     if (this.startPromise) return this.startPromise
+    if (this.status.phase === 'ready') return Promise.resolve()
     this.startPromise = this.runStartup().finally(() => {
       this.startPromise = null
     })
@@ -269,6 +273,8 @@ export class Supervisor extends EventEmitter {
     this.stopping = true
     this.setStatus({ phase: 'stopping', message: '正在停止服务，请稍候…' })
     this.stopPromise = (async () => {
+      // bootstrap 可能尚未返回，此时数据库归属尚未登记；先等其收尾，不能提前退出主进程。
+      await this.startPromise?.catch(() => undefined)
       await this.stopChildren()
       // 退出后不保留本机凭据与连接串。
       this.bootstrapLogin = null
@@ -324,7 +330,9 @@ export class Supervisor extends EventEmitter {
       await this.stopChildren()
       this.failing = false
       if (this.stopping) {
-        this.setStatus({ phase: 'stopped', stage: 'idle', message: '服务已停止' })
+        if (!this.stopPromise) {
+          this.setStatus({ phase: 'stopped', stage: 'idle', message: '服务已停止' })
+        }
         return
       }
       const message = describeError(error)
