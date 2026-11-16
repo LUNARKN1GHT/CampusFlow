@@ -3,10 +3,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, time, timedelta, timezone
 
+import pytest
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, delete, func, select
 
+from campusflow.application import reminders
 from campusflow.application.reminders import sync_reminders
 from campusflow.domain.reminders import (
     MAX_DEDUPE_KEY_LENGTH,
@@ -18,6 +20,19 @@ from campusflow.infrastructure.db.models import ReminderTrigger
 from campusflow.infrastructure.repositories import build_repositories
 
 SHANGHAI = timezone(timedelta(hours=8))
+
+
+@pytest.fixture(autouse=True)
+def fixed_reminder_clock(monkeypatch):
+    """本组验证重复调度及回滚，时钟固定在样本截止前，避免日期过期造成误报。"""
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            moment = datetime(2026, 11, 9, 10, tzinfo=UTC)
+            return moment.astimezone(tz) if tz else moment.replace(tzinfo=None)
+
+    monkeypatch.setattr(reminders, "datetime", FixedDateTime)
 
 
 def _task(client: TestClient, **overrides) -> dict:
@@ -151,9 +166,13 @@ def test_failed_sync_rolls_back_and_retry_succeeds(client: TestClient) -> None:
     with factory() as session:
         repos = build_repositories(session)
         workspace_id = repos.tasks.get(task["id"]).workspace_id
+        # 清除创建规则时自动产生的记录，真正验证本轮写入的事务回滚。
+        session.execute(delete(ReminderTrigger).where(ReminderTrigger.workspace_id == workspace_id))
+        session.commit()
         original = repos.reminders.upsert_triggers
 
         def fail_once(rows):
+            original(rows)
             raise RuntimeError("模拟调度失败")
 
         repos.reminders.upsert_triggers = fail_once
@@ -163,6 +182,8 @@ def test_failed_sync_rolls_back_and_retry_succeeds(client: TestClient) -> None:
             session.rollback()
         else:
             raise AssertionError("预期第一次同步失败")
+
+        assert repos.reminders.list_triggers(workspace_id, statuses=("pending",)) == []
 
         repos.reminders.upsert_triggers = original
         sync_reminders(repos, workspace_id)
