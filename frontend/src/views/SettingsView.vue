@@ -131,7 +131,7 @@ async function saveSettings() {
   message.value = ''
   try {
     Object.assign(form, await settingsApi.update(form))
-    message.value = '学习偏好已保存，并可从服务端重新加载。'
+    message.value = '学习偏好已保存。'
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -214,10 +214,10 @@ onMounted(() => {
       </div>
 
       <section class="panel editor-panel">
-        <div class="section-heading"><div><p class="eyebrow">真实配置</p><h2>每周可用时间</h2></div><span class="count-badge">{{ slots.length }} 段</span></div>
+        <div class="section-heading"><div><p class="eyebrow">已保存</p><h2>每周可用时间</h2></div><span class="count-badge">{{ slots.length }} 段</span></div>
         <p v-if="slotDeleteError" class="form-error" role="alert">{{ slotDeleteError }}</p>
         <div v-if="slots.length" class="availability-grid"><article v-for="slot in slots" :key="slot.id"><span><strong>{{ weekdays[slot.day_of_week] }}</strong><small>{{ slot.start_time.slice(0, 5) }}–{{ slot.end_time.slice(0, 5) }}</small></span><button type="button" class="text-button" :disabled="removingSlotId !== null" @click="deleteSlot(slot)">{{ removingSlotId === slot.id ? '移除中…' : '移除' }}</button></article></div>
-        <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排学习块。</div>
+        <div v-else class="compact-empty">还没有可用时段。没有时段时，后续计划无法自动安排时间块。</div>
       </section>
     </template>
 
@@ -262,7 +262,7 @@ onMounted(() => {
 
     <section class="panel editor-panel">
       <div class="section-heading"><div><p class="eyebrow">低频功能</p><h2>工具箱</h2></div></div>
-      <p class="form-help">课程路径等低频能力不在主导航展示，集中放在工具箱里按需进入；入口位置调整不影响已保存的培养方案、课程关系与计划。</p>
+      <p class="form-help">课程路径等低频能力集中在此，不占用主导航；入口位置不影响已保存的培养方案、课程关系与计划。</p>
       <RouterLink class="toolbox-link" to="/tools">进入工具箱</RouterLink>
     </section>
   </main>

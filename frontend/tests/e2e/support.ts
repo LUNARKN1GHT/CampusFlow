@@ -40,7 +40,7 @@ export async function signIn(page: Page): Promise<void> {
   await page.getByLabel('用户名').fill(e2eAccount.username)
   await page.getByLabel('密码').fill(e2eAccount.password)
   await page.getByLabel('密码').press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '今日总览' })).toBeVisible()
 }
 
 /** 打开应用并完成本机单用户登录。 */

@@ -14,6 +14,6 @@ test('访问 /calendar 回退到总览且不渲染外部日历页面', async ({ 
   // 旧地址由未知路径回退到总览，且不出现日历页面标题。
   await page.goto('/calendar')
   await expect(page).toHaveURL((url) => url.pathname === '/')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '今日总览' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '外部日历' })).toHaveCount(0)
 })

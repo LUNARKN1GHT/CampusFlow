@@ -108,7 +108,7 @@ function staleDelete() {
 
       <div>
         <h3 class="subheading">删除影响预览</h3>
-        <p class="form-help">删除会覆盖原文件、解析结果与派生内容。确认只执行下列展示范围；内容变化后需重新预览。</p>
+        <p class="form-help">删除会移除原文件、解析结果与派生内容。确认只执行下列展示范围；内容变化后需重新预览。</p>
         <p v-if="previewError" class="form-error" role="alert">{{ previewError }}</p>
         <p v-if="deletingError" class="form-error" role="alert">删除未完成：{{ deletingError }}。资料仍可访问，可重新预览后再删除。</p>
         <p v-if="deleteResult" class="success-message" role="status">{{ deleteResult }}</p>
@@ -131,7 +131,7 @@ function staleDelete() {
           </p>
           <label class="stack-field">关联的个人任务
             <select v-model="keepTasks">
-              <option :value="true">保留任务，标注来源已删除（推荐）</option>
+              <option :value="true">保留任务，标注来源已删除</option>
               <option :value="false">随资料一并删除</option>
             </select>
           </label>

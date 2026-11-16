@@ -44,9 +44,9 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading">
-      <p class="eyebrow">今日总览</p>
-      <h1>今天先做什么，<br />一眼看清。</h1>
-      <p class="intro">今日安排、近期截止和计划风险集中展示；总览只读取数据，不修改计划。</p>
+      <p class="eyebrow">总览</p>
+      <h1>今日总览</h1>
+      <p class="intro">汇总今日时间块、未来 7 天截止和计划风险；总览只读取数据，不修改计划。</p>
     </div>
 
     <ApiFeedback v-if="error" :message="error" @retry="load" />
@@ -80,7 +80,7 @@ onMounted(load)
             <RouterLink class="nav-link" to="/plan">查看计划</RouterLink>
           </div>
           <p v-if="!overview.has_plan" class="compact-empty">
-            尚无已接受计划。先到<RouterLink to="/plan">学习计划</RouterLink>生成并接受两周草案。
+            尚无已接受计划。先到<RouterLink to="/plan">学习计划</RouterLink>生成并接受计划草案。
           </p>
           <template v-else>
             <p class="form-help">
@@ -129,7 +129,7 @@ onMounted(load)
       <section class="panel quick-links" aria-label="下一步">
         <h2>下一步</h2>
         <div class="page-actions">
-          <RouterLink class="button-link" to="/plan">调整两周计划</RouterLink>
+          <RouterLink class="button-link" to="/plan">打开学习计划</RouterLink>
         </div>
       </section>
     </template>

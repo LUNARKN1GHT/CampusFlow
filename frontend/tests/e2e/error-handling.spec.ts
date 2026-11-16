@@ -58,7 +58,7 @@ test('保存工作空间设置返回 403 时显示后端原因且没有成功提
 
   // 4xx 使用后端 detail 文案；请求被拒绝时不能出现任何“已保存”提示。
   await expect(page.getByText('当前会话无权修改该工作空间')).toBeVisible()
-  await expect(page.getByText('学习偏好已保存')).toHaveCount(0)
+  await expect(page.getByText('学习偏好已保存。')).toHaveCount(0)
 
   await page.unroute('**/api/v1/settings')
 })
