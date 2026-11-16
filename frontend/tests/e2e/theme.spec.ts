@@ -41,23 +41,25 @@ test('色系可独立切换、跨刷新保持且与深浅模式叠加', async ({
   const root = page.locator('html')
   await page.getByRole('link', { name: '设置' }).click()
   await expect(page.getByRole('heading', { name: '主题色系' })).toBeVisible()
-  await expect(root).toHaveAttribute('data-palette', 'green')
-  // 顶部品牌块使用品牌填充色，色系切换后应随之变化。
-  const greenBrand = await page.locator('.brand-mark').first().evaluate((el) => getComputedStyle(el).backgroundColor)
-
-  await page.getByRole('button', { name: '蓝色', exact: true }).click()
+  // 默认色系为天蓝。
   await expect(root).toHaveAttribute('data-palette', 'blue')
-  await expect(root).toHaveAttribute('data-theme', 'light')
-  const blueBrand = await page.locator('.brand-mark').first().evaluate((el) => getComputedStyle(el).backgroundColor)
-  expect(blueBrand).not.toBe(greenBrand)
+  // 顶部品牌块使用品牌填充色，色系切换后应随之变化。
+  const skyBrand = await page.locator('.brand-mark').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(skyBrand).toBe('rgb(3, 105, 161)')
 
-  // 色系与深浅独立：顶部切换深色不会改回绿色。
+  await page.getByRole('button', { name: '绿色', exact: true }).click()
+  await expect(root).toHaveAttribute('data-palette', 'green')
+  await expect(root).toHaveAttribute('data-theme', 'light')
+  const greenBrand = await page.locator('.brand-mark').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+  expect(greenBrand).not.toBe(skyBrand)
+
+  // 色系与深浅独立：顶部切换深色不会改回天蓝。
   await page.getByRole('button', { name: '深色', exact: true }).click()
   await expect(root).toHaveAttribute('data-theme', 'dark')
-  await expect(root).toHaveAttribute('data-palette', 'blue')
+  await expect(root).toHaveAttribute('data-palette', 'green')
 
   await page.reload()
-  await expect(root).toHaveAttribute('data-palette', 'blue')
+  await expect(root).toHaveAttribute('data-palette', 'green')
   await expect(root).toHaveAttribute('data-theme', 'dark')
 
   await page.getByRole('button', { name: '白色', exact: true }).click()
@@ -93,7 +95,7 @@ for (const mode of ['浅色', '深色']) {
     await login(page)
     await page.getByRole('button', { name: mode, exact: true }).click()
 
-    for (const palette of ['绿色', '蓝色', '白色']) {
+    for (const palette of ['天蓝', '绿色', '白色']) {
       await page.getByRole('link', { name: '设置' }).click()
       await page.getByRole('button', { name: palette, exact: true }).click()
       await page.getByRole('link', { name: '任务', exact: true }).click()

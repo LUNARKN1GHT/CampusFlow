@@ -19,8 +19,8 @@
     root.dataset.palette =
       storedPalette === 'green' || storedPalette === 'blue' || storedPalette === 'white'
         ? storedPalette
-        : 'green'
+        : 'blue'
   } catch (error) {
-    root.dataset.palette = 'green'
+    root.dataset.palette = 'blue'
   }
 })()

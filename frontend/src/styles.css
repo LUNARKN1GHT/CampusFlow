@@ -1,5 +1,5 @@
 /*
- * 主题通过 :root[data-theme] 切换；浅色值为原有配色，深色覆盖同名的语义 token。
+ * 主题通过 :root[data-theme] 切换；浅色值为天蓝默认配色，深色覆盖同名的语义 token。
  * 首屏由 public/theme-boot.js 在样式生效前写入 data-theme 与 data-palette，之后由
  * frontend/src/composables/useTheme.ts 接管手动切换与本地持久化。
  */
@@ -11,26 +11,27 @@
   font-synthesis: none;
   line-height: 1.6;
 
-  --page-bg: #f3f5ef;
-  --ink: #172d26;
-  --muted: #64736d;
-  --muted-strong: #567068;
-  --muted-soft: #9ba7a1;
-  --line: #dce3da;
-  --line-strong: #bdc9c1;
-  --line-dashed: #cbd4cd;
-  --paper: #fffefa;
+  /* 默认色系为天蓝；绿色与白色在下方按 data-palette 覆盖。 */
+  --page-bg: #f2f7fc;
+  --ink: #142638;
+  --muted: #5b6f82;
+  --muted-strong: #4b6378;
+  --muted-soft: #8fa3b5;
+  --line: #d9e5ef;
+  --line-strong: #b9ccdd;
+  --line-dashed: #c7d7e5;
+  --paper: #fdfeff;
   --paper-strong: #ffffff;
-  --surface-muted: #fafbf8;
-  --surface-soft: #eef1ec;
+  --surface-muted: #f7fbfe;
+  --surface-soft: #ecf3f9;
 
   /* 品牌色分三个角色：正文强调（--brand）、实心按钮填充（--brand-fill）、填充上的文字（--on-brand-fill）。 */
-  --brand: #174f3d;
-  --brand-fill: #174f3d;
+  --brand: #0369a1;
+  --brand-fill: #0369a1;
   --on-brand-fill: #ffffff;
-  --brand-soft: #e4efe8;
-  --brand-border: #6e9b88;
-  --brand-selected: #f2f8f4;
+  --brand-soft: #e0f2fe;
+  --brand-border: #7cc4ea;
+  --brand-selected: #eff8ff;
   --accent: #cf8c31;
   --accent-soft: #fdf1dc;
   --accent-border: #e6cfa4;
@@ -54,20 +55,20 @@
   --neutral-bg: #ecebe4;
   --neutral-ink: #5c5a52;
 
-  --event-bg: #e7edf6;
-  --event-ink: #243c5e;
-  --schedule-accent: #5f7aa5;
+  --event-bg: #e3f2fd;
+  --event-ink: #0c4a6e;
+  --schedule-accent: #0284c7;
   --priority-low: #9eb1aa;
   --priority-medium: #d59b42;
   --priority-high: #c75d3c;
-  --focus-ring: #c9ddd1;
-  --header-bg: rgba(255, 254, 250, .82);
-  --login-glow: #dfece4;
-  --shadow-card: 0 12px 35px rgba(41, 62, 54, .05);
+  --focus-ring: #bae6fd;
+  --header-bg: rgba(253, 254, 255, .82);
+  --login-glow: #dcecf9;
+  --shadow-card: 0 12px 35px rgba(25, 60, 88, .06);
 
   /* 以下 token 用于保留原本各自独立的少量色值，避免并入近似色后改变浅色观感。 */
-  --brand-mark-border: #85a79a;
-  --surface-segmented: #f4f6f1;
+  --brand-mark-border: #7cc4ea;
+  --surface-segmented: #f2f8fd;
   --warn-strong-ink: #8a5a12;
   --danger-strong-ink: #a83225;
   --danger-bg-button: #fff1ec;
@@ -76,25 +77,25 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --page-bg: #121714;
-  --ink: #e5ece8;
-  --muted: #9aa8a1;
-  --muted-strong: #93a79d;
-  --muted-soft: #8a978f;
-  --line: #2c352f;
-  --line-strong: #3d4842;
-  --line-dashed: #364039;
-  --paper: #1a201d;
-  --paper-strong: #212825;
-  --surface-muted: #1e2522;
-  --surface-soft: #262e2a;
+  --page-bg: #0c1520;
+  --ink: #e4eef7;
+  --muted: #9aabbb;
+  --muted-strong: #94a8ba;
+  --muted-soft: #8799a9;
+  --line: #26323f;
+  --line-strong: #384757;
+  --line-dashed: #313f4e;
+  --paper: #131d29;
+  --paper-strong: #1a2532;
+  --surface-muted: #17222f;
+  --surface-soft: #202c3a;
 
-  --brand: #8ed0b3;
-  --brand-fill: #2f7d61;
-  --on-brand-fill: #f2fbf6;
-  --brand-soft: #22322b;
-  --brand-border: #3f6b58;
-  --brand-selected: #1f2c26;
+  --brand: #7dd3fc;
+  --brand-fill: #0369a1;
+  --on-brand-fill: #f0f9ff;
+  --brand-soft: #14293a;
+  --brand-border: #2d5a7a;
+  --brand-selected: #10202e;
   --accent: #e0a659;
   --accent-soft: #2e2717;
   --accent-border: #5a4a24;
@@ -118,12 +119,93 @@
   --neutral-bg: #262a27;
   --neutral-ink: #b3b1a6;
 
+  --event-bg: #14263a;
+  --event-ink: #b9d7ef;
+  --schedule-accent: #5da9d8;
+  --priority-low: #56655f;
+  --priority-medium: #c9922f;
+  --priority-high: #d4674b;
+  --focus-ring: #2b5270;
+  --header-bg: rgba(19, 29, 41, .82);
+  --login-glow: #132638;
+  --shadow-card: 0 12px 35px rgba(0, 0, 0, .38);
+
+  --brand-mark-border: #3d6f91;
+  --surface-segmented: #1c2836;
+  --warn-strong-ink: #e0b56a;
+  --danger-strong-ink: #f19d84;
+  --danger-bg-button: #2f1f19;
+}
+
+/* 色系与深浅独立：天蓝为默认值（:root），此处只覆盖绿色与白色两套语义 token。
+ * 每个色系的深色块必须覆盖其浅色块用到的全部同名 token，避免浅色值漏进深色模式。 */
+:root[data-palette="green"] {
+  --page-bg: #f3f5ef;
+  --ink: #172d26;
+  --muted: #64736d;
+  --muted-strong: #567068;
+  --muted-soft: #9ba7a1;
+  --line: #dce3da;
+  --line-strong: #bdc9c1;
+  --line-dashed: #cbd4cd;
+  --paper: #fffefa;
+  --paper-strong: #ffffff;
+  --surface-muted: #fafbf8;
+  --surface-soft: #eef1ec;
+
+  --brand: #174f3d;
+  --brand-fill: #174f3d;
+  --on-brand-fill: #ffffff;
+  --brand-soft: #e4efe8;
+  --brand-border: #6e9b88;
+  --brand-selected: #f2f8f4;
+
+  --info-bg: #e7f0f6;
+  --info-ink: #2f5b78;
+  --neutral-bg: #ecebe4;
+  --neutral-ink: #5c5a52;
+  --event-bg: #e7edf6;
+  --event-ink: #243c5e;
+  --schedule-accent: #5f7aa5;
+  --priority-low: #9eb1aa;
+  --focus-ring: #c9ddd1;
+  --header-bg: rgba(255, 254, 250, .82);
+  --login-glow: #dfece4;
+  --shadow-card: 0 12px 35px rgba(41, 62, 54, .05);
+
+  --brand-mark-border: #85a79a;
+  --surface-segmented: #f4f6f1;
+}
+
+:root[data-palette="green"][data-theme="dark"] {
+  --page-bg: #121714;
+  --ink: #e5ece8;
+  --muted: #9aa8a1;
+  --muted-strong: #93a79d;
+  --muted-soft: #8a978f;
+  --line: #2c352f;
+  --line-strong: #3d4842;
+  --line-dashed: #364039;
+  --paper: #1a201d;
+  --paper-strong: #212825;
+  --surface-muted: #1e2522;
+  --surface-soft: #262e2a;
+
+  --brand: #8ed0b3;
+  --brand-fill: #2f7d61;
+  --on-brand-fill: #f2fbf6;
+  --brand-soft: #22322b;
+  --brand-border: #3f6b58;
+  --brand-selected: #1f2c26;
+
+  --info-bg: #1b2a33;
+  --info-ink: #9cc4e0;
+  --neutral-bg: #262a27;
+  --neutral-ink: #b3b1a6;
   --event-bg: #1e2836;
   --event-ink: #b9cde8;
   --schedule-accent: #7f9dc9;
   --priority-low: #56655f;
-  --priority-medium: #c9922f;
-  --priority-high: #d4674b;
   --focus-ring: #3c5a4c;
   --header-bg: rgba(26, 32, 29, .82);
   --login-glow: #1c2b25;
@@ -131,70 +213,6 @@
 
   --brand-mark-border: #4e7a68;
   --surface-segmented: #232b27;
-  --warn-strong-ink: #e0b56a;
-  --danger-strong-ink: #f19d84;
-  --danger-bg-button: #2f1f19;
-}
-
-/* 色系与深浅独立：绿色为默认值（:root），此处只覆盖蓝色与白色两套语义 token。
- * 每个色系的深色块必须覆盖其浅色块用到的全部同名 token，避免浅色值漏进深色模式。 */
-:root[data-palette="blue"] {
-  --page-bg: #f2f5f9;
-  --ink: #16273a;
-  --muted: #5c6f84;
-  --muted-strong: #4e657c;
-  --muted-soft: #93a4b6;
-  --line: #dbe3ec;
-  --line-strong: #bccad9;
-  --line-dashed: #c9d4e0;
-  --paper: #fdfeff;
-  --paper-strong: #ffffff;
-  --surface-muted: #f8fafc;
-  --surface-soft: #edf2f7;
-
-  --brand: #1d4f7f;
-  --brand-fill: #1d4f7f;
-  --on-brand-fill: #ffffff;
-  --brand-soft: #e5effa;
-  --brand-border: #79a2c8;
-  --brand-selected: #eff6fd;
-
-  --focus-ring: #c6dbee;
-  --header-bg: rgba(253, 254, 255, .82);
-  --login-glow: #dce8f4;
-
-  --brand-mark-border: #85a7c5;
-  --surface-segmented: #f3f6fa;
-}
-
-:root[data-palette="blue"][data-theme="dark"] {
-  --page-bg: #0f1520;
-  --ink: #e5edf6;
-  --muted: #98a9bb;
-  --muted-strong: #93a7bb;
-  --muted-soft: #8697a9;
-  --line: #293443;
-  --line-strong: #3a4757;
-  --line-dashed: #334050;
-  --paper: #161e2a;
-  --paper-strong: #1d2633;
-  --surface-muted: #1a2330;
-  --surface-soft: #222d3c;
-
-  --brand: #8fc3f0;
-  --brand-fill: #2f6d9e;
-  --on-brand-fill: #f2f9ff;
-  --brand-soft: #1c2e40;
-  --brand-border: #3d6688;
-  --brand-selected: #182838;
-
-  --focus-ring: #35506a;
-  --header-bg: rgba(22, 30, 42, .82);
-  --login-glow: #172435;
-  --shadow-card: 0 12px 35px rgba(0, 0, 0, .4);
-
-  --brand-mark-border: #4d7394;
-  --surface-segmented: #1f2936;
 }
 
 :root[data-palette="white"] {

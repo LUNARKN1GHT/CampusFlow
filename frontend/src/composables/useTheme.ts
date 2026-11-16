@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 
-// 主题：浅色／深色／跟随系统写入 data-theme；色系（绿色／蓝色／白色）写入 data-palette，两者独立叠加。
+// 主题：浅色／深色／跟随系统写入 data-theme；色系（天蓝／绿色／白色）写入 data-palette，两者独立叠加。
 // 选择存 localStorage，只影响本机；首屏由 public/theme-boot.js（外部同源脚本，兼容桌面 CSP）按同一键预先写入。
 
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -39,9 +39,9 @@ function readStoredMode(): ThemeMode {
 function readStoredPalette(): ColorPalette {
   try {
     const stored = window.localStorage.getItem(PALETTE_STORAGE_KEY)
-    return isColorPalette(stored) ? stored : 'green'
+    return isColorPalette(stored) ? stored : 'blue'
   } catch {
-    return 'green'
+    return 'blue'
   }
 }
 
@@ -86,8 +86,8 @@ export function useTheme() {
       { value: 'system' as ThemeMode, label: '跟随系统' },
     ],
     paletteOptions: [
+      { value: 'blue' as ColorPalette, label: '天蓝' },
       { value: 'green' as ColorPalette, label: '绿色' },
-      { value: 'blue' as ColorPalette, label: '蓝色' },
       { value: 'white' as ColorPalette, label: '白色' },
     ],
     mode,

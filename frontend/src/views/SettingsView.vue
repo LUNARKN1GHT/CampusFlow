@@ -257,7 +257,7 @@ onMounted(() => {
       <div class="segmented" role="group" aria-label="主题色系">
         <button v-for="option in paletteOptions" :key="option.value" type="button" class="segmented-item" :class="{ 'is-active': palette === option.value }" :aria-pressed="palette === option.value" @click="setColorPalette(option.value)">{{ option.label }}</button>
       </div>
-      <p class="form-help">深浅模式在页面右上角切换；色系（绿色为默认）与深浅模式独立叠加，选择立即生效并保存在本机浏览器，不写入工作空间设置。</p>
+      <p class="form-help">深浅模式在页面右上角切换；色系（天蓝为默认）与深浅模式独立叠加，选择立即生效并保存在本机浏览器，不写入工作空间设置。</p>
     </section>
 
     <section class="panel editor-panel">
