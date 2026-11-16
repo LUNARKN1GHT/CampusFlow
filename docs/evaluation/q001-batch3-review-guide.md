@@ -61,4 +61,4 @@ uv run --locked --project backend python scripts/prepare_q001_review_sheet.py --
 
 脚本**只读**证据文件，绝不改写它们；`系统检出-*` 两栏取自同目录的 `results.json`；脚本还会逐行检查两份文件是否对齐，对不上就直接报错。
 
-第三批的运行过程、费用与结论见 [Q001 模型选型结论](../verification/Q001-model-selection.md) 与 [真实评测进度](../verification/Q001-live-progress.md)。
+第三批的运行过程、费用与结论见 [Q001 模型选型结论](../verification/Q001-model-selection.md)，语义复核见 [Q001 第三批独立复核](../verification/Q001-independent-review.md)。

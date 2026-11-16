@@ -160,7 +160,7 @@ Q001 要回答的问题是：**中文检索问答该选哪一组模型**（两�
 1. 把工作表的数字写回证据文件（`docs/evaluation/q001-live-batch2/answer-review.csv` 和 `annotation-review.csv` 的对应列），并保留你填的原值；
 2. 按 B017 汇总出这一轮的人工版引用支持率和不确定提示准确率；
 3. 和四组配置的检索成绩、延迟一起，形成「选哪一组模型」的依据；
-4. 在 `docs/verification/Q001-live-progress.md` 里记上「人工语义复核已完成」以及复核人和日期。
+4. 在 `docs/verification/Q001-batch2-comparison.md` 里记上「人工语义复核已完成」以及复核人和日期。
 
 **只有填了真名和日期，这一步才算数**，作者不能替你签字。
 
@@ -174,4 +174,4 @@ uv run --locked --project backend python scripts/prepare_q001_review_sheet.py --
 
 脚本**只读**证据文件，绝不改写它们；`系统检出-*` 两栏取自同目录的 `results.json`。脚本还会逐行检查两份文件是否对齐，对不上就直接报错，不会把数字填到错行上。
 
-第二批的样本构成（哪些是干扰资料、哪 6 道是新题）见 [样本说明](../../samples/synthetic/q001/README.md)；运行过程与费用见 [进度记录](../verification/Q001-live-progress.md)。
+第二批的样本构成（哪些是干扰资料、哪 6 道是新题）见 [样本说明](../../samples/synthetic/q001/README.md)；运行过程与费用见 [第二批比较记录](../verification/Q001-batch2-comparison.md)。

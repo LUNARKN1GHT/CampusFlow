@@ -116,7 +116,7 @@ npm run dev
 
 X001 新增候选、字段和证据表，更新代码后先运行 `uv run --locked alembic upgrade head`。该基础供后续自动提取与核对使用，尚未开放候选写入 HTTP 接口。来源、删除边界和验证命令见 [X001 说明](verification/X001-candidate-evidence.md)。
 
-X003 复用 X002 装配出的 TextGenerator，应用调用 `task_extraction.extract_task_drafts` 得到已校验草稿，再按需显式调用 `candidates.save_candidates`。尚无提取按钮或自动排队入口。专项测试命令：`uv run --locked pytest tests/test_task_extraction.py tests/test_deadline_completeness.py -q`；字段、日期检查范围及样本证据见 [X003 说明](verification/X003-progress.md)。
+X003 复用 X002 装配出的 TextGenerator，应用调用 `task_extraction.extract_task_drafts` 得到已校验草稿，再按需显式调用 `candidates.save_candidates`。尚无提取按钮或自动排队入口。专项测试命令：`uv run --locked pytest tests/test_task_extraction.py tests/test_deadline_completeness.py -q`；字段、日期检查范围及样本证据见 [X003 说明](verification/X003-task-extraction.md)。
 
 X004 复用现有文字模型配置，通过 `event_extraction.extract_event_drafts` 显式取得活动候选；调用方可用 `candidates.save_candidates` 保存待核对数据。无新增安装包或迁移，没有自动提取按钮。专项测试：`uv run --locked pytest tests/test_event_extraction.py -q`；错误处理与契约见 [X004 说明](verification/X004-event-extraction.md)。
 
@@ -305,11 +305,11 @@ npm run test:e2e             # 需先启动 PostgreSQL、迁移和后端；自�
 
 在仓库根目录执行 `python scripts/evaluate_qa_preparation.py --output-dir data/q001/run-001`，生成逐题证据 JSON 和 B017 格式的 CSV。仅使用 Python 标准库，无需启动数据库或设置模型密钥；每次用新目录保留历史。预设回答只检查计数流程，不代表供应商效果，详见 [Q001 准备说明](verification/Q001-preparation.md)。
 
-真实比较入口 `python scripts/evaluate_qa_live.py` 默认不联网。用户授权的型号、费用上限、显式执行／继续运行参数及恢复点见 [Q001 真实评测进度](verification/Q001-live-progress.md)。继续运行不能重置预算，也不能覆盖已有人工复核记录。
+真实比较入口 `python scripts/evaluate_qa_live.py` 默认不联网。用户授权的型号、费用上限、数据边界与历次费用账本见 [Q001 模型选型结论](verification/Q001-model-selection.md) 第九节；显式执行／继续运行参数以 `python scripts/evaluate_qa_live.py --help` 为准。继续运行不能重置预算，也不能覆盖已有人工复核记录。
 
 ## Q003 检索分块
 
-Q004 存储检查点增加 pgvector Python 依赖及 `q004_indexed_blocks`、`q004_index_manifests` 两个迁移（向量存储、完整清单、领取有效期）；更新代码后执行 `uv sync --locked`、`uv run --locked alembic upgrade head`。现有 Worker 尚未自动建立向量索引。恢复范围与测试命令见 [Q004 进度](verification/Q004-progress.md)。
+Q004 存储检查点增加 pgvector Python 依赖及 `q004_indexed_blocks`、`q004_index_manifests` 两个迁移（向量存储、完整清单、领取有效期）；更新代码后执行 `uv sync --locked`、`uv run --locked alembic upgrade head`。现有 Worker 尚未自动建立向量索引。恢复范围与测试命令见 [Q004 索引完成记录](verification/Q004-indexing.md)。
 
 Q003 不增加迁移或依赖；`build_version_blocks` 通过既有仓储读取指定版本，纯计算生成检索块，不联网。默认单块 3000 UTF-8 字节、无重叠，可在内部调用显式传入 `ChunkingConfig`；仍须与后续向量模型输入上限一致。专项检查：`uv run --locked pytest tests/test_retrieval_blocks.py`，细节见 [Q003 说明](verification/Q003-source-blocks.md)。
 
