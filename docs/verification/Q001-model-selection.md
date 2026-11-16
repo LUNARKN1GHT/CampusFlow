@@ -123,4 +123,66 @@
 
 `model_selection_complete: true`、`independent_review_complete: true`（见 [summary.json](../evaluation/q001-live-batch3/summary.json) 与 [第三批独立复核](Q001-independent-review.md)）。第三批语义复核已完成：四条红线均为 0，15/15 条预标注正确，回答模型按质量优先选 `deepseek-flash`，部署受 DeepSeek 数据边界约束；`Embedding-3` 属工程判断。Issue #128 的两项验收条件（供应商选择有样本数据、记录隐私传输边界与无法覆盖的输入）已具备可核验证据。
 
-官方价格与型号依据见 [真实评测记录](Q001-live-progress.md) 的「官方依据」一节。
+官方价格与型号依据、DeepSeek 条款及历次费用账本见本文第九节；第二批单独记录见 [Q001 第二批比较](Q001-batch2-comparison.md)。
+
+## 九、费用、价格依据与数据边界（附）
+
+本节保留原真实评测进度日志中仍服务于验收追溯的长期结论：费用账本、官方价格依据与 DeepSeek 条款。运行器的临时恢复步骤不再保留；历次原始证据目录见 9.4。
+
+### 9.1 费用账本
+
+三笔额度分别列示、不合并计算。金额均为「公开单价 × 实测用量」的估算，不是供应商结算账单；未知用量调用保留未知，不当作免费。
+
+| 批次 | 请求数 | 公开价估算（元） | 保守预留（元） | 证据 |
+| --- | --- | --- | --- | --- |
+| 首轮 v1 | 170 | 0.0007050 | 0.3768320 | [q001-live-comparison](../evaluation/q001-live-comparison/billing.json) |
+| 严格编号 v2 | 累计 336 | 0.0013990 | 0.7454720 | [q001-live-strict-comparison](../evaluation/q001-live-strict-comparison/billing.json) |
+| 状态定义 v3 | 累计 380 | 0.0015755 | 0.8437760 | [q001-live-status-comparison](../evaluation/q001-live-status-comparison/billing.json) |
+| 第二批（干扰资料与全新题目） | 310 | 0.0015355 | 0.7536640 | [q001-live-batch2](../evaluation/q001-live-batch2/billing.json) |
+| 第三批（跨供应商） | 215 | 0.0557415 | 1.5155200 | [q001-live-batch3](../evaluation/q001-live-batch3/billing.json) |
+
+- 首轮预算 1 元；第二批与第三批各为单独授权的 3 元，不能从旧目录继承账本，也不能视为同一笔额度重复使用。
+- 第 51 次调用无返回用量，继续保留未知记录；实际结算账单未核对，不能把上述数字当作最终扣费金额。
+- 第三批 215 次请求全部 `completed`，无失败、无中断、无重试，无未知用量调用；其中向量请求 122 次、回答请求 93 次（DeepSeek 31 次、GLM 62 次）。
+
+### 9.2 官方价格与型号依据（2026-10-15 核实，2026-10-16 追加 DeepSeek）
+
+- [Embedding-2](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-2)：0.5 元／百万 Tokens，固定 1024 维。
+- [Embedding-3](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)：0.5 元／百万 Tokens，允许 1024 维。
+- [文本向量接口](https://docs.bigmodel.cn/api-reference/模型-api/文本嵌入)：固定使用官方 embeddings 地址；两种型号输入限制不同，运行器使用短文本逐条请求并检查返回长度和数值。
+- [GLM-4-Flash-250414](https://docs.bigmodel.cn/cn/guide/models/free/glm-4-flash-250414) 与 [GLM-4.5-Flash](https://docs.bigmodel.cn/cn/guide/models/free/glm-4.5-flash)：型号页当前均标明免费。后者可关闭深度思考；比较时保留该配置。
+- **GLM-4.5-Flash 下线公告（2026-10-16 核实）**：该型号页公告原文为「GLM-4.5-Flash 将于 2026 年 1 月 30 日下线，请您及时将模型编码更新为最新版本。正式下线后，相关请求将会自动路由至 GLM-4.7-Flash。」公告日期**已过**，故本批 `model_returned` 回显的旧别名**不能证明底层实际型号**；智谱当前在售型号已排到 GLM-5.3 系列。详见第七节第 9 条。
+- [DeepSeek 模型与价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing)（2026-10-16 核实）：型号名 `deepseek-flash`（版本 DeepSeek-V4.1-Flash），OpenAI 兼容接入口 `https://api.deepseek.com`。属**付费档**：百万 token 高峰价输入（缓存未命中）2 元、输出 8 元，空闲时段为高峰价的一半，缓存命中输入 0.04 元。高峰时段为北京时间周一至周五 9:00–12:00 与 14:00–18:00（不含中国法定节假日）。**思考模式默认开启**，跨模型比较必须显式关闭（本项目已关闭）。价格可能变动，重跑前需重新核实。
+- [官方价格说明](https://docs.bigmodel.cn/cn/guide/start/pricing)：按型号与输入／输出计费，后续重跑需重新核实价格。本文不是永久价格承诺。
+- [隐私政策](https://docs.bigmodel.cn/cn/terms/privacy-policy)／[服务协议](https://docs.bigmodel.cn/cn/terms/service-agreement)：平台个人信息存储说明为境内、必要期限，政策也涉及匿名数据用于服务改进；没有据此获得 API 请求零留存或绝不训练的承诺。本轮不上传真实课程／个人资料；具体 API 保留天数与账号专属条款仍待供应商澄清。DeepSeek 一侧的条款已于 2026-10-16 完成核实，见 9.3。
+
+### 9.3 DeepSeek 条款核实（2026-10-16 完成）
+
+此前记为「尚未核实」。现已读取 DeepSeek 官方三份文件的公开原文（**只读公开网页，未登录账号、未上传任何数据**）：
+
+| 文件 | 更新／生效日期 | 链接 |
+| --- | --- | --- |
+| 《DeepSeek 用户协议》 | 2025-09-05 | <https://cdn.deepseek.com/policies/zh-CN/deepseek-terms-of-use.html> |
+| 《DeepSeek 隐私政策》 | 2026-02-10 | <https://cdn.deepseek.com/policies/zh-CN/deepseek-privacy-policy.html> |
+| 《DeepSeek 开放平台服务协议》 | 更新 2026-04-22／生效 2026-04-29 | <https://cdn.deepseek.com/policies/zh-CN/deepseek-open-platform-terms-of-service.html> |
+
+**四项结论：**
+
+1. **数据存放地：中华人民共和国境内。** 隐私政策第五章原文：「我们依照法律法规的规定，将在境内运营过程中收集和产生的您的个人信息存储于中华人民共和国境内。目前，我们不会将上述信息传输至境外。」
+2. **保留期限：API 请求的保留期在公开文件里没有规定。** 隐私政策只给原则性说法（「仅在为提供 DeepSeek 之目的所必需的期间内保留」；「对话记录」保留以便展示历史），并按《网络安全法》要求「留存相关的网络日志不少于六个月」。**API 的输入／输出具体保留多久，公开文件未答。**
+3. **是否用于训练：公开文件没有「API 输入不用于训练」的承诺。** 《DeepSeek 用户协议》4.3 原文：「在经安全加密技术处理、严格去标识化且无法重新识别特定个人的前提下，我们可能会将服务所收集的输入及对应输出，用于模型训练和服务的优化。」退出方式是「在产品内通过关闭『数据用于优化体验』来选择退出」。《隐私政策》把同一段放在「智能对话」小节下，而「开放平台服务」小节**只列了实名信息、邮箱、支付信息，没有列 API 的输入与输出**。《开放平台服务协议》4.2 把输入输出的使用权给了开发者（可用于「训练其他模型（如模型蒸馏）」），但**没有反过来承诺不使用 API 输入训练自己的模型**；该协议开头即写明它是《用户协议》项下的具体协议，因此 4.3 仍然适用。**结论：不能假定 API 请求不会被用于训练。**
+4. **开发者一方的义务（《开放平台服务协议》第 3、4 条）：** 输入须由开发者保证拥有全部权利，且「不涉及任何国家秘密、商业秘密或其他可能会对国家安全或者公共利益造成不利影响的数据」；涉及个人信息时，开发者自身即「个人信息处理者」，须向终端用户告知并取得同意；须履行内容过滤、生成内容标识等合规义务。争议适用中华人民共和国大陆地区法律。
+
+**对本项目的判断：** 继续只发合成样本没有问题。**在下列三点澄清之前，不得把真实校务资料或学生个人信息发往该接口：**（a）账号端「数据用于优化体验」的实际状态（需登录账号自查，公开文件看不到）；（b）API 请求的具体保留期；（c）该账号适用的是个人开发者条款，还是另签的企业《DeepSeek 模型服务合作协议》。澄清途径：开放平台工单／`api-service@deepseek.com`。
+
+> **核实范围声明**：以上仅覆盖公开网页条款。**账号专属条款与账号内开关状态不在核实范围内**，仍需由账号持有人自行确认。
+
+### 9.4 原始证据目录
+
+- [q001-live-001](../evaluation/q001-live-001/results.json)：首轮中断快照，前 20 条样本记录与前 51 条调用账本在继续运行后原样保留。
+- [q001-live-comparison](../evaluation/q001-live-comparison/summary.json)：首轮完整四组比较。
+- [q001-live-strict-comparison](../evaluation/q001-live-strict-comparison/summary.json)：严格编号复测。
+- [q001-live-status-comparison](../evaluation/q001-live-status-comparison/summary.json)：状态定义定向复测。
+- [q001-live-batch2](../evaluation/q001-live-batch2/summary.json)：第二批；结论与限制见 [Q001 第二批比较](Q001-batch2-comparison.md)。
+- [q001-live-batch3](../evaluation/q001-live-batch3/summary.json)：第三批跨供应商实测。
+- [q001-preparation](../evaluation/q001-preparation/evidence.json)：离线准备阶段证据。

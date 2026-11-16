@@ -189,7 +189,7 @@ X004 在 application/event_extraction.py 定义活动字段并复用 X002 的授
 
 X002 在 application/ports/generation.py 定义 TextGenerator，仅交换受控提示词、资料 JSON 与模型原始正文；供应商 HTTP 实现位于 infrastructure/llm/text.py，domain 不导入供应商库。application/candidate_generation.py 先检查空间与资料版本，再按调用用例定义的字段契约校验输出；编号必须属于本次输入，摘录必须逐字出现，整批有效才返回草稿，不在生成步骤写库。workers/generation.py 按配置装配，不随启动自动调用。后续 X003–X005 定义各业务字段，X009 继续负责专门的资料指令隔离验收；本项不替代真实语义准确率评测。限制与验证见 [X002 说明](verification/X002-generation-contract.md)。
 
-X003 的 application/task_extraction.py 定义任务专用字段并复用 X002 授权与生成边界；domain/deadline_completeness.py 仅检查截止原文完整性，不依赖模型或系统时间，不生成可排期日期。缺失及建议原因由代码补充，模型不能覆盖。调用方显式使用 X001 保存草稿，仍保持 pending；日期换算及核对交互由后续模块负责，见 [X003 说明](verification/X003-progress.md)。
+X003 的 application/task_extraction.py 定义任务专用字段并复用 X002 授权与生成边界；domain/deadline_completeness.py 仅检查截止原文完整性，不依赖模型或系统时间，不生成可排期日期。缺失及建议原因由代码补充，模型不能覆盖。调用方显式使用 X001 保存草稿，仍保持 pending；日期换算及核对交互由后续模块负责，见 [X003 说明](verification/X003-task-extraction.md)。
 
 R002 在 domain/candidates.py 增加 FieldRevision 与 effective_fields：字段修正按追加保存修正前后值、操作者与来源类型，原始提取与证据不改写；application/candidates.py 的 revise_candidate_field 复用同一字段出处规则，用户填写的值不能声明为原文规定，来源只能标为用户补充或规划建议。新表 candidate_field_revisions 由 infrastructure 仓储持久化，候选核对状态仍由 R003 定义转换。见 [R002 说明](verification/R002-field-revisions.md)。
 
@@ -235,9 +235,9 @@ X005 的 application/rule_extraction.py 使用 X002 生成接口返回规则候�
 
 ## Q001 评测准备边界
 
-`scripts/evaluate_qa_preparation.py` 独立于应用运行时，只读取合成样本及离线预设输出，以 B017 口径记录引用支持和不确定性计数；不调用检索器、数据库或供应商，不改变现有业务接口。未知表达保留人工复核。真实比较与选型已在后续真实运行与独立复核中完成（结论见 AGENTS 的 Q001 记录与 [真实评测记录](verification/Q001-live-progress.md)），本节只保留准备阶段的边界，见 [准备说明](verification/Q001-preparation.md)。
+`scripts/evaluate_qa_preparation.py` 独立于应用运行时，只读取合成样本及离线预设输出，以 B017 口径记录引用支持和不确定性计数；不调用检索器、数据库或供应商，不改变现有业务接口。未知表达保留人工复核。真实比较与选型已在后续真实运行与独立复核中完成（结论见 [Q001 模型选型结论](verification/Q001-model-selection.md) 与 [第三批独立复核](verification/Q001-independent-review.md)），本节只保留准备阶段的边界，见 [准备说明](verification/Q001-preparation.md)。
 
-`scripts/evaluate_qa_live.py` 为独立真实比较入口，默认仅打印计划；显式执行使用用户选定的型号集合与合成样本（默认仍是智谱两向量 × 两对话共四组，可用 `--embedders` / `--generators` 指定其他组合），域名与密钥按模型所属供应商路由，因此可跨供应商比较；预算预留和逐请求响应落盘，停止后可显式继承账本继续。不替代 Q002 的生产向量接口或 Q004 的索引流程；真实引用语义待人工复核，不能把编号合法视为支持正确。首轮中断及已知限制见 [真实评测记录](verification/Q001-live-progress.md)。
+`scripts/evaluate_qa_live.py` 为独立真实比较入口，默认仅打印计划；显式执行使用用户选定的型号集合与合成样本（默认仍是智谱两向量 × 两对话共四组，可用 `--embedders` / `--generators` 指定其他组合），域名与密钥按模型所属供应商路由，因此可跨供应商比较；预算预留和逐请求响应落盘，停止后可显式继承账本继续。不替代 Q002 的生产向量接口或 Q004 的索引流程；真实引用语义待人工复核，不能把编号合法视为支持正确。首轮中断及已知限制见 [首轮比较记录](verification/Q001-first-comparison.md)。
 
 ## Q002 向量配置与调用边界
 
@@ -253,7 +253,7 @@ Q002 新增独立的向量端口及智谱适配器。不可变配置表登记供
 
 ## 资料处理运行补充（J009）
 
-Q004 存储检查点以 `indexed_blocks` 记录逐块状态及 `vector(1024)`，配置编号与块编号构成唯一身份，来源删除级联移除向量；保存前验证授权空间和最新原文。新增 `index_manifests` 保存完整清单，来源/覆盖变更拒绝旧清单；块领取使用数据库时钟和独占凭证，过期写回拒绝，领取与模型调用分事务。后续接入已补齐：Worker 投递补偿、有上限恢复与 HNSW 索引在 Q004 完成，索引读取与引用失效在 Q005–Q008，排序与回答在 Q006–Q018。过程记录见 [Q004 进度](verification/Q004-progress.md)。
+Q004 存储检查点以 `indexed_blocks` 记录逐块状态及 `vector(1024)`，配置编号与块编号构成唯一身份，来源删除级联移除向量；保存前验证授权空间和最新原文。新增 `index_manifests` 保存完整清单，来源/覆盖变更拒绝旧清单；块领取使用数据库时钟和独占凭证，过期写回拒绝，领取与模型调用分事务。后续接入已补齐：Worker 投递补偿、有上限恢复与 HNSW 索引在 Q004 完成，索引读取与引用失效在 Q005–Q008，排序与回答在 Q006–Q018。完成记录见 [Q004 索引完成记录](verification/Q004-indexing.md)。
 
 Windows 使用 Docker 运行现有 Linux RQ Worker，API 保持本机启动。两端共享同一数据库、Redis 库号和私有原文件目录。解析器注册表组合 PDF 文本解析、扫描页视觉回退与表格关联；数据库迁移分叉通过合并迁移汇合。只读诊断不调用模型，不修改任务，日志及 RQ 失败记录不保存原始异常堆栈。详见 [资料处理运行手册](MATERIAL_PROCESSING.md)。
 

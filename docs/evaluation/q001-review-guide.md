@@ -138,7 +138,7 @@ Q001 是要为「选哪个模型供应商」提供依据的实验。脚本能自
 
 1. 把工作表的数字写回原来的证据文件（`answer-review.csv` 和 `annotation-review.csv` 的对应列），并保留你填的原值；
 2. 按 B017 汇总出这一轮的人工版引用支持率和不确定提示准确率；
-3. 在 `docs/verification/Q001-live-progress.md` 里记上「人工语义复核已完成」以及复核人和日期。
+3. 在对应批次的验证记录（如 `docs/verification/Q001-first-comparison.md`、`Q001-strict-comparison.md` 或 `Q001-batch2-comparison.md`）里记上「人工语义复核已完成」以及复核人和日期。
 
 **只有填了真名和日期，这一步才算数**，我不能替你签字。
 
