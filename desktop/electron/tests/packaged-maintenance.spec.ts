@@ -39,18 +39,6 @@ async function waitForLog(file: string, needle: string, timeoutMs = 150_000): Pr
   throw new Error(`等待日志超时：${needle}\n--- ${file} ---\n${tail}`)
 }
 
-async function waitForExit(app: ElectronApplication, timeoutMs = 30_000): Promise<void> {
-  const process = app.process()
-  if (process.exitCode !== null) return
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(resolve, timeoutMs)
-    process.once('exit', () => {
-      clearTimeout(timer)
-      resolve()
-    })
-  })
-}
-
 async function messages(app: ElectronApplication): Promise<DialogMessage[]> {
   return app.evaluate(() => ((globalThis as Record<string, unknown>).__cfMessages ?? []) as [])
 }
@@ -181,11 +169,13 @@ test('打包应用经菜单导出、检查升级并导入归档', async () => {
     expect(imported?.detail).toContain('已恢复条目')
 
     // 恢复真实退出函数，按正常路径回收服务与 PostgreSQL。
-    await app.evaluate(() => {
+    const closed = app.waitForEvent('close', { timeout: 30_000 })
+    await app.evaluate(({ app: electronApp }) => {
       const scope = globalThis as Record<string, unknown>
-      ;(scope.__cfExit as (code: number) => void)(0)
+      electronApp.exit = scope.__cfExit as typeof electronApp.exit
+      electronApp.quit()
     })
-    await waitForExit(app)
+    await closed
   } finally {
     if (app) {
       try {
@@ -264,7 +254,7 @@ test('打包应用可导航到所有已实现页面', async () => {
   } finally {
     if (app) {
       try {
-        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        const closed = app.waitForEvent('close', { timeout: 30_000 })
         await app.evaluate(({ app: electronApp }) => electronApp.quit())
         await closed
       } catch {
@@ -326,8 +316,9 @@ test('打包应用可创建任务并在重启后保留', async () => {
     await opened.main.getByRole('button', { name: '保存任务', exact: true }).click()
     await expect(opened.main.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 20_000 })
 
+    const closed = opened.launched.waitForEvent('close', { timeout: 30_000 })
     await opened.launched.evaluate(({ app: electronApp }) => electronApp.quit())
-    await opened.launched.waitForEvent('close', { timeout: 20_000 }).catch(() => undefined)
+    await closed
     app = null
     await new Promise((resolve) => setTimeout(resolve, 3_000))
 
@@ -338,7 +329,7 @@ test('打包应用可创建任务并在重启后保留', async () => {
   } finally {
     if (app) {
       try {
-        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        const closed = app.waitForEvent('close', { timeout: 30_000 })
         await app.evaluate(({ app: electronApp }) => electronApp.quit())
         await closed
       } catch {
@@ -396,7 +387,7 @@ test('打包应用可上传资料', async () => {
   } finally {
     if (app) {
       try {
-        const closed = app.waitForEvent('close', { timeout: 10_000 })
+        const closed = app.waitForEvent('close', { timeout: 30_000 })
         await app.evaluate(({ app: electronApp }) => electronApp.quit())
         await closed
       } catch {

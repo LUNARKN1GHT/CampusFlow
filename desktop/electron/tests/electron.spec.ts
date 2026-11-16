@@ -66,6 +66,14 @@ async function firstWindow(app: ElectronApplication) {
 test.afterEach(async () => {
   // 测试失败时也确保 Electron 及其桩进程退出，避免污染后续用例。
   for (const app of openApps.splice(0)) {
+    let running = false
+    try { running = app.process().exitCode === null } catch {
+      // Playwright 在应用正常关闭后会释放进程对象。
+      continue
+    }
+    if (running) {
+      try { await quitGracefully(app) } catch { /* 后续强制清理兜底。 */ }
+    }
     try {
       // 主进程卡住时 app.close 会一直等待；超时后强制结束，避免整个 worker 超时。
       await Promise.race([
@@ -82,7 +90,12 @@ test.afterEach(async () => {
     }
   }
   for (const dir of tempDirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true })
+    const resolved = path.resolve(dir)
+    if (path.dirname(resolved) !== path.resolve(os.tmpdir()) ||
+        !path.basename(resolved).startsWith('campusflow-p008-e2e-')) {
+      throw new Error('拒绝清理测试目录之外的路径')
+    }
+    rmSync(resolved, { recursive: true, force: true, maxRetries: 40, retryDelay: 250 })
   }
 })
 
@@ -233,8 +246,9 @@ test('模拟迁移失败时显示错误页，点击重试后进入主窗口', as
 
   const apiPid = readPid(userData, 'api')
   const workerPid = readPid(userData, 'worker')
-  // 第二次退出走 SIGTERM，覆盖信号触发的优雅回收路径。
-  await quitWithSignal(app, 'SIGTERM')
+  // Windows 的 kill(SIGTERM) 是强制终止，不能用它验证优雅退出；POSIX 保留信号覆盖。
+  if (process.platform === 'win32') await quitGracefully(app)
+  else await quitWithSignal(app, 'SIGTERM')
   await expect.poll(() => isAlive(apiPid), { timeout: 5_000 }).toBe(false)
   await expect.poll(() => isAlive(workerPid), { timeout: 5_000 }).toBe(false)
 })

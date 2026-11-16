@@ -1,0 +1,28 @@
+# 全量复验与上传记录
+
+整理日期：2026-11-16。作者：金嘉睿。运行样本均为隔离合成数据，未调用收费模型。
+
+## 已取得结果
+
+- 后端全量：1763 passed / 24 skipped / 1 failed（878.96 秒）。失败项为
+  `test_reminder_idempotency.py::test_failed_sync_rolls_back_and_retry_succeeds`，
+  重试后预期一条提醒，实际为空；待定位，不宣称全量通过。
+- 后端 Ruff 检查通过，406 文件格式检查通过。
+- 前端构建和类型检查通过；浏览器 20 passed / 1 skipped（23.1 秒）。首次缺少后端服务
+  导致 4 项失败，补齐独立 API 与测试库后全部可执行场景通过；真实队列资料闭环未启用。
+- Electron 外壳：4 passed / 1 skipped（45.3 秒）。覆盖启动、迁移失败重试、菜单和单实例。
+  Windows 不支持按 POSIX SIGTERM 方式优雅退出，改为正常退出并仍断言后台进程消失；
+  修正读取已关闭进程对象和临时目录清理重试。POSIX 平台保留 SIGTERM 覆盖。
+- 真实桌面包：3 passed（1.9 分钟），覆盖归档导出/升级检查/导入、全部页面导航、创建任务后重启保留。
+  修正测试脚本直接 exit 和过短退出等待造成的强制终止，改走正常退出；不吞掉重启前退出超时。
+- Electron 类型检查通过。真实模型、外部日历授权、干净机器安装等不在本轮结论内。
+
+## 本地证据
+
+完整日志位于忽略提交的 `desktop/.scratch/`：
+`full-backend-20261115.log`、`frontend-recheck-20261115.log`、
+`electron-final-20261115.log`、`packaged-final-20261115.log`。
+
+此前修改位于 `CampusFlow-desktop-fixes` 本地工作目录；截至本次上传前尚未推送，
+也未覆盖已安装的 App。远程 #554 已关闭，本次分支上传不代表自动重新打开或关闭 Issue，
+不代表合并到 main/develop。后续以实际推送结果为准。
