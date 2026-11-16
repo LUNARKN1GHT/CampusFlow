@@ -227,7 +227,7 @@ async function generate() {
   actionError.value = ''
   acceptedNotice.value = ''
   if (rangeForm.type === 'custom' && (!rangeForm.start || !rangeForm.end)) {
-    actionError.value = '自定义区间需要同时选择开始和结束日期'
+    actionError.value = '自定义区间需要同时选择开始和结束日期。'
     return
   }
   const seq = ++planRequestSeq
@@ -424,7 +424,7 @@ onMounted(load)
       <div>
         <p class="eyebrow">任务与计划</p>
         <h1>学习计划</h1>
-        <p class="intro">按今天、本周、未来两周或自定义区间生成草案；确认后才成为当前计划。</p>
+        <p class="intro">按今天、本周、未来两周或自定义区间生成草案；接受后才成为当前计划。</p>
         <p class="form-help">调整时间块不会改写任务原始 DDL。未接受前不会影响现有安排；锁定块会在局部重排时保留。</p>
       </div>
       <div class="page-actions">
@@ -509,7 +509,7 @@ onMounted(load)
       <!-- 变化检测失败时单独提示并允许重试：没有建议不等于无需调整。 -->
       <section v-if="adjustmentError" class="panel" aria-label="调整建议">
         <div class="section-heading">
-          <div><p class="eyebrow">变化检测</p><h2>需要调整吗？</h2></div>
+          <div><p class="eyebrow">变化检测</p><h2>调整建议</h2></div>
         </div>
         <p class="form-error" role="alert">{{ adjustmentError }}</p>
         <div class="page-actions">
@@ -521,7 +521,7 @@ onMounted(load)
 
       <section v-else-if="adjustments?.has_changes" class="panel" aria-label="调整建议">
         <div class="section-heading">
-          <div><p class="eyebrow">变化检测</p><h2>需要调整吗？</h2></div>
+          <div><p class="eyebrow">变化检测</p><h2>调整建议</h2></div>
           <span class="count-badge">{{ adjustments.suggestions.length }} 条建议</span>
         </div>
         <p>{{ adjustments.message }}</p>
@@ -534,7 +534,7 @@ onMounted(load)
         </p>
         <div class="page-actions">
           <button type="button" :disabled="planActionsLocked || adjustmentLoading" @click="createAdjustmentDraft">
-            {{ adjustmentDrafting ? '生成中…' : '生成本地调整草案' }}
+            {{ adjustmentDrafting ? '生成中…' : '生成调整草案' }}
           </button>
           <button type="button" class="text-button" :disabled="adjustmentLoading || planActionsLocked" @click="loadAdjustments">重新检查</button>
         </div>

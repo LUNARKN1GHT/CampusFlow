@@ -66,7 +66,7 @@ test('计划关键流程可仅用键盘完成，并保留可见焦点', async ({
   await page.keyboard.type(e2eAccount.password)
   await tabUntilText(page, '登录')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('heading', { name: /今天先做什么/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '今日总览' })).toBeVisible()
 
   await tabUntilText(page, '学习计划')
   await page.keyboard.press('Enter')

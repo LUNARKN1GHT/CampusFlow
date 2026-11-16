@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
     <div class="page-heading">
       <p class="eyebrow">提醒与跟进</p>
       <h1>提醒</h1>
-      <p class="intro">集中查看应用内提醒，调整提前量、重复与暂停；没有提醒不代表没有待办或冲突。</p>
+      <p class="intro">查看应用内提醒，调整提前量、重复与暂停；没有提醒不代表没有待办或冲突。</p>
       <p class="form-help">提醒只用于提示，不会改变任务 DDL、核对状态或计划时间块。时间按工作空间时区生成，这里按本机时区显示。</p>
     </div>
 
@@ -432,7 +432,7 @@ onBeforeUnmount(() => {
 
       <section class="panel" aria-label="默认提醒规则">
         <div class="section-heading">
-          <div><p class="eyebrow">默认策略</p><h2>所有任务的提醒规则</h2></div>
+          <div><p class="eyebrow">默认策略</p><h2>默认提醒规则</h2></div>
           <span class="count-badge">{{ defaultRule?.builtin ? '内置默认' : `版本 ${defaultRule?.version ?? 1}` }}</span>
         </div>
         <p class="form-help">未单独设置的任务都使用这套规则。停用默认规则后，没有单独规则的任务不再生成提醒；暂停则保留规则但暂时不生成。</p>

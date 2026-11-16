@@ -224,7 +224,7 @@ async function saveTask() {
       if (matchesFilters(created)) {
         listNotice.value = ''
       } else {
-        listNotice.value = '任务已创建，但不在当前筛选结果中；请调整筛选查看'
+        listNotice.value = '任务已创建，但不在当前筛选结果中；请调整筛选查看。'
       }
     }
     closeEditor()
@@ -362,7 +362,7 @@ async function addDependency() {
   if (!task) return
   const dependsOn = parsePositiveInt(dependencyInput.value)
   if (dependsOn === null) {
-    relationsError.value = '请输入有效的任务编号'
+    relationsError.value = '请输入有效的任务编号。'
     return
   }
   relationsError.value = ''
@@ -420,12 +420,12 @@ async function saveSubtasks() {
   const task = selectedTask.value
   if (!task) return
   if (splitSourceTaskId !== null && splitSourceTaskId !== task.id) {
-    subtaskError.value = '拆分建议来自其他任务，请重新生成后再创建'
+    subtaskError.value = '拆分建议来自其他任务，请重新生成后再创建。'
     return
   }
   const items = subtaskRows.value.filter((row) => row.title.trim())
   if (!items.length) {
-    subtaskError.value = '至少需要一项子任务标题'
+    subtaskError.value = '至少需要一项子任务标题。'
     return
   }
   subtaskSaving.value = true
@@ -454,7 +454,7 @@ onMounted(load)
 <template>
   <main class="page-content">
     <div class="page-heading page-heading-row">
-      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">手动维护 DDL、优先级与剩余投入，不改变课程原始截止信息。</p><p class="form-help">全部学期包含归档记录，归档不会隐藏待办。可按学期查看当前或历史任务；未关联课程的任务仅在全部学期中显示。</p></div>
+      <div><p class="eyebrow">任务与计划</p><h1>任务</h1><p class="intro">维护任务 DDL、优先级与剩余投入；调整不会改写课程原始截止信息。</p><p class="form-help">全部学期包含归档记录，归档不会隐藏待办。可按学期查看当前或历史任务；未关联课程的任务仅在全部学期中显示。</p></div>
       <button type="button" @click="openEditor(undefined, $event)">添加任务</button>
     </div>
 

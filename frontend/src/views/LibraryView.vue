@@ -773,9 +773,9 @@ onBeforeUnmount(() => {
     <div class="page-heading page-heading-row">
       <div>
         <p class="eyebrow">资料库</p>
-        <h1>资料</h1>
+        <h1>资料库</h1>
         <p class="intro">导入课程资料与通知，查看每一份资料的处理状态与未覆盖范围。</p>
-        <p class="form-help">原文读取与问答索引分开显示，状态与未覆盖范围来自后端作业查询，不做本地推断；索引失败不会被显示为已准备，缺失内容也不会被当作“没有要求”。问答界面暂未提供入口，索引状态只表示检索数据是否已准备好。</p>
+        <p class="form-help">原文读取与问答索引分开显示，状态与未覆盖范围来自后端作业查询，不做本地推断。索引失败不会被显示为已准备，缺失内容也不会被当作“没有要求”；问答界面暂未提供入口，索引状态只表示检索数据是否已准备好。</p>
       </div>
       <button type="button" @click="importOpen = !importOpen">{{ importOpen ? '收起导入' : '导入资料' }}</button>
     </div>
@@ -901,7 +901,7 @@ onBeforeUnmount(() => {
               <!-- 粘贴文本：原文保存只是第一步；问答索引与事项提取必须显示真实状态并提供显式入口。 -->
               <div v-if="material.source_type === 'text'" class="recognition-box">
                 <div class="task-title-line">
-                  <strong>原文保存与识别分开</strong>
+                  <strong>原文保存与识别状态</strong>
                   <span class="status-pill" :data-status="recognitionSummary(material).tone">{{ recognitionSummary(material).text }}</span>
                 </div>
                 <template v-if="recognitionFor(material)">

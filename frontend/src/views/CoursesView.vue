@@ -171,8 +171,8 @@ onMounted(load)
       <div>
         <p class="eyebrow">学期与课程</p>
         <h1>课程</h1>
-        <p class="intro">先确定正在查看的学期，再管理其中的课程与教学班。</p>
-        <p class="form-help">归档只隐藏进行中学期入口，不删除课程、任务或日程；勾选“显示历史学期”可查看和恢复。</p>
+        <p class="intro">按学期维护课程与教学班。</p>
+        <p class="form-help">归档只隐藏进行中学期入口，不删除课程、任务或固定日程；勾选“显示历史学期”可查看和恢复。</p>
       </div>
       <label class="switch-field"><input v-model="showHistory" type="checkbox" /> 显示历史学期</label>
     </div>
@@ -181,7 +181,7 @@ onMounted(load)
     <div v-else class="two-column-layout">
       <section class="panel">
         <div class="section-heading">
-          <div><p class="eyebrow">学期列表</p><h2>选择当前查看范围</h2></div>
+          <div><p class="eyebrow">学期列表</p><h2>选择学期</h2></div>
           <span class="count-badge">{{ visibleSemesters.length }} 个</span>
         </div>
         <p v-if="loading" class="muted">正在加载学期…</p>

@@ -795,10 +795,10 @@ onMounted(async () => {
       <p class="eyebrow">课程关系与修读路径</p>
       <h1>课程路径</h1>
       <p class="intro">
-        按适用培养方案维护课程、三类关系、别名与个人修读状态；当前方案版本决定哪些关系参与路径分析。
+        按适用培养方案维护课程、三类关系、别名与个人修读状态；只有当前适用方案中的已确认关系参与路径分析。
       </p>
       <p class="form-help">
-        这里只分析依赖关系，不构成毕业资格或选课审核；缺失学分、开课学期或课程时会明确列出。
+        本页只分析依赖关系，不构成毕业资格或选课审核；缺失学分、开课学期或课程时会明确列出。
       </p>
     </div>
 
@@ -831,7 +831,7 @@ onMounted(async () => {
       <div class="two-column-layout">
         <section class="panel">
           <div class="section-heading">
-            <div><p class="eyebrow">方案版本</p><h2>选择或新建</h2></div>
+            <div><p class="eyebrow">方案版本</p><h2>选择查看版本</h2></div>
             <span class="count-badge">{{ plans.length }} 个版本</span>
           </div>
           <div class="plan-list">
@@ -1072,7 +1072,7 @@ onMounted(async () => {
             @retry="retryStudy"
           />
           <p v-else-if="studyUnavailable" class="status-banner failed">
-            <span><strong>修读状态暂不可用</strong><p>后端修读记录接口尚未接入；当前不会伪造任何状态。</p></span>
+            <span><strong>修读状态暂不可用</strong><p>修读记录暂不可读取；当前不会伪造任何状态。</p></span>
           </p>
           <template v-else>
             <div class="data-table">
@@ -1169,8 +1169,8 @@ onMounted(async () => {
         <template v-else-if="graph">
           <div :class="['status-banner', graph.complete ? 'success' : 'failed']">
             <div>
-              <strong>{{ graph.complete ? '关系图完整' : '图不完整，不能宣称依赖关系已完整' }}</strong>
-              <p v-if="graph.complete">接口未报告环、缺项、矛盾或未转换候选；仍只代表当前方案内已确认的关系。</p>
+              <strong>{{ graph.complete ? '关系图完整' : '图不完整，依赖关系尚未核对完整' }}</strong>
+              <p v-if="graph.complete">当前未发现环、缺项、矛盾或未转换候选；结论仍只代表当前方案内已确认的关系。</p>
               <p v-else>环、缺项、矛盾或待核对候选的原因列在下方问题清单中；未核对前不生成完整结论。</p>
             </div>
           </div>
@@ -1236,14 +1236,14 @@ onMounted(async () => {
               </div>
             </div>
           </template>
-          <!-- 标题标注“始终可见”：四组固定渲染，空组显示“无”，不让某类问题从页面消失。 -->
+          <!-- 四组固定渲染，空组显示“无”，不让某类问题从页面消失；徽标显示问题总数。 -->
           <div class="problem-section">
             <div class="section-heading">
               <div><p class="eyebrow">问题清单</p><h3>环、矛盾、缺项与待核对</h3></div>
-              <span class="count-badge">始终可见</span>
+              <span class="count-badge">{{ graphProblemGroups.reduce((sum, group) => sum + group.items.length, 0) }} 条问题</span>
             </div>
             <p v-if="!graph.complete" class="form-error">图不完整：以下问题未核对前，不能把当前依赖关系当作完整约束。</p>
-            <p v-else class="form-help">接口未报告环、缺项、矛盾或待核对关系；空清单不等于依赖绝对正确。</p>
+            <p v-else class="form-help">当前未发现环、缺项、矛盾或待核对关系；空清单不等于依赖绝对正确。</p>
             <div v-for="group in graphProblemGroups" :key="group.key" :class="['problem-group', group.tone]">
               <div class="problem-group-heading">
                 <strong>{{ group.label }}</strong>
@@ -1369,7 +1369,7 @@ onMounted(async () => {
           <span class="status-pill">仅作参考</span>
         </div>
         <p class="form-help">
-          学期建议只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核。
+          学期试排只依据强制先修、已知开课季节和学分上限，不构成选课或毕业资格审核。
         </p>
         <form class="stack-form semester-form" @submit.prevent="generateSemesterPlan">
           <div class="form-grid">
@@ -1390,15 +1390,15 @@ onMounted(async () => {
             </label>
           </div>
           <button type="submit" :disabled="semesterLoading || selectedPlanId === null">
-            {{ semesterLoading ? '生成中…' : '生成学期建议' }}
+            {{ semesterLoading ? '生成中…' : '生成学期试排' }}
           </button>
         </form>
         <p v-if="semesterError" class="form-error" role="alert">{{ semesterError }}</p>
         <template v-if="semesterPlan">
           <div :class="['status-banner', semesterPlan.blocked ? 'failed' : 'success']">
             <div>
-              <strong>{{ semesterPlan.blocked ? '未生成学期建议' : '学期建议已生成' }}</strong>
-              <p v-if="semesterPlan.blocked">当前关系图存在未核对问题，后端未输出学期方案；原因见下方限制说明。</p>
+              <strong>{{ semesterPlan.blocked ? '未生成学期试排' : '学期试排已生成' }}</strong>
+              <p v-if="semesterPlan.blocked">当前关系图存在未核对问题，未生成学期试排结果；原因见下方限制说明。</p>
               <p v-else>学分上限：{{ semesterPlan.credit_limit ?? '未知（未检查学分负荷上限）' }}。</p>
             </div>
           </div>
@@ -1420,7 +1420,7 @@ onMounted(async () => {
               </ul>
             </div>
           </div>
-          <p v-else class="compact-empty">没有可展示的学期建议。</p>
+          <p v-else class="compact-empty">没有可展示的学期试排结果。</p>
           <template v-if="semesterPlan.unplaced.length">
             <h3 class="subheading">未排入的课程</h3>
             <ul class="unplaced-list">

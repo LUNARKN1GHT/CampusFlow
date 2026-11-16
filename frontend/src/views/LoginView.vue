@@ -43,8 +43,8 @@ async function submit() {
     <section class="login-card" aria-labelledby="login-title">
       <div class="login-brand"><span class="brand-mark">CF</span><strong>CampusFlow</strong></div>
       <p class="eyebrow">个人工作空间</p>
-      <h1 id="login-title">欢迎回来</h1>
-      <p class="intro">登录后继续管理你的课程、任务与时间。</p>
+      <h1 id="login-title">登录</h1>
+      <p class="intro">登录个人工作空间，管理课程、任务与学习计划。</p>
       <p v-if="expired" class="inline-notice" role="status">会话已失效，请重新登录。私有页面内容已清除。</p>
       <form @submit.prevent="submit">
         <label>用户名<input v-model.trim="username" name="username" autocomplete="username" required /></label>

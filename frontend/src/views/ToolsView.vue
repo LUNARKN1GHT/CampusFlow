@@ -12,12 +12,12 @@ import { RouterLink } from 'vue-router'
     <div class="page-heading">
       <p class="eyebrow">低频工具</p>
       <h1>工具箱</h1>
-      <p class="intro">这里放使用频率较低、但功能完整的能力。它们不占用主导航，需要时从工具箱进入。</p>
+      <p class="intro">使用频率较低的能力集中在此，不占用主导航。</p>
     </div>
 
     <section class="panel" aria-label="工具箱内容">
       <div class="section-heading">
-        <div><p class="eyebrow">培养方案与课程关系</p><h2>低频工具</h2></div>
+        <div><p class="eyebrow">培养方案与课程关系</p><h2>课程路径</h2></div>
         <span class="count-badge">1 项</span>
       </div>
 
