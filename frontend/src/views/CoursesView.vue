@@ -178,7 +178,7 @@ onMounted(load)
     </div>
 
     <ApiFeedback v-if="error" :message="error" :busy="loading" @retry="load" />
-    <div v-else class="two-column-layout">
+    <div v-else class="two-column-layout semester-layout">
       <section class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">学期列表</p><h2>选择学期</h2></div>

@@ -1,5 +1,7 @@
 """A014：计划与通知变化后重算提醒。"""
 
+from datetime import date, timedelta
+
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -7,10 +9,14 @@ from sqlalchemy import create_engine, select
 from campusflow.infrastructure.db.models import ReminderTrigger
 
 
+def _due() -> date:
+    return date.today() + timedelta(days=2)
+
+
 def _task(client: TestClient, **overrides) -> dict:
     payload = {
         "title": "重算任务",
-        "due_date": "2026-11-20",
+        "due_date": _due().isoformat(),
         "due_time": "18:00:00",
         "estimated_minutes": 60,
         "remaining_minutes": 60,
@@ -42,8 +48,8 @@ def _draft(client: TestClient) -> dict:
     response = client.post(
         "/api/v1/plans/drafts",
         json={
-            "start_date": "2026-11-16",
-            "end_date": "2026-11-22",
+            "start_date": (_due() - timedelta(days=4)).isoformat(),
+            "end_date": (_due() + timedelta(days=2)).isoformat(),
             "assumptions": {"buffer_minutes": 0},
         },
     )
@@ -75,7 +81,7 @@ def test_accepted_due_change_replaces_without_two_pending_sets(client: TestClien
 
     updated = client.patch(
         f"/api/v1/tasks/{task['id']}",
-        json={"due_date": "2026-11-24", "due_time": "12:00:00"},
+        json={"due_date": (_due() + timedelta(days=4)).isoformat(), "due_time": "12:00:00"},
     )
     assert updated.status_code == 200, updated.text
 
@@ -96,7 +102,7 @@ def test_reminder_does_not_touch_task_or_plan(client: TestClient) -> None:
     assert accepted.status_code == 200
 
     current = client.get(f"/api/v1/tasks/{task['id']}").json()
-    assert current["due_date"] == "2026-11-20"
+    assert current["due_date"] == _due().isoformat()
     assert current["due_time"] == "18:00:00"
     plan = client.get("/api/v1/plans/current").json()
     assert plan["status"] == "accepted"

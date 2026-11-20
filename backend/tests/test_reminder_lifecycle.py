@@ -1,6 +1,6 @@
 """A013：完成、取消、暂停与重新打开对提醒的影响。"""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from conftest import TEST_DATABASE_URL
 from fastapi.testclient import TestClient
@@ -12,7 +12,7 @@ from campusflow.infrastructure.db.models import ReminderTrigger
 def _task(client: TestClient, **overrides) -> dict:
     payload = {
         "title": "生命周期任务",
-        "due_date": "2026-11-20",
+        "due_date": (date.today() + timedelta(days=2)).isoformat(),
         "due_time": "18:00:00",
         "estimated_minutes": 60,
         "remaining_minutes": 60,
@@ -135,7 +135,7 @@ def test_task_due_change_replaces_only_changed_window(client: TestClient) -> Non
     _rule(client, task_id=task["id"], advance_minutes=60)
     [before] = _triggers(task["id"], "pending")
 
-    new_due = "2026-11-25"
+    new_due = (date.today() + timedelta(days=7)).isoformat()
     updated = client.patch(
         f"/api/v1/tasks/{task['id']}",
         json={"due_date": new_due, "due_time": "18:00:00"},

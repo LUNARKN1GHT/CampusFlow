@@ -564,7 +564,7 @@ onMounted(load)
           <p class="form-help">
             子任务 {{ relations.rollup.subtask_count }} 项 · 预计 {{ relations.rollup.estimated_minutes }} 分钟 ·
             剩余 {{ relations.rollup.remaining_minutes }} 分钟 ·
-            完成度 {{ relations.rollup.percent_complete === null ? '—' : `${relations.rollup.percent_complete}%` }}。
+            完成度 {{ relations.rollup.percent_complete === null ? '—' : `${relations.rollup.percent_complete}%` }}
             父任务只做汇总，排期只安排子任务，不会重复计入耗时。
           </p>
           <div class="form-grid">
